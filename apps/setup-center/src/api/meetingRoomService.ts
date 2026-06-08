@@ -349,6 +349,8 @@ export interface SolutionReviewWhaleReview {
   score_breakdown?: Record<string, number>;
   verdict?: string;
   summary_markdown?: string;
+  /** 拆单策略说明（为何拆成当前条数、按仓库/模块等） */
+  split_strategy_rationale?: string;
   suggestions?: SolutionReviewSuggestion[];
 }
 
@@ -426,6 +428,8 @@ export interface SolutionReviewPayload {
     impact_assessment?: SolutionReviewImpactAssessment;
   };
   split_tasks_draft?: SplitTaskDraft[];
+  /** 自动拆单策略与理由（优先于从 summary_markdown 推断） */
+  split_strategy_rationale?: string;
   human_review?: SolutionReviewHumanReview;
 }
 

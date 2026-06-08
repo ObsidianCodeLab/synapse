@@ -102,11 +102,75 @@ function repoBranchId(row: SolutionReviewRepoRow): string {
   return (row.branch_version_id || '').trim();
 }
 
+function isUnnamedBranch(name: string): boolean {
+  const n = name.trim();
+  return !n || n === '未命名分支' || n === '—';
+}
+
+function repoNameFromUrl(repoUrl: string): string {
+  const url = repoUrl.trim();
+  if (!url) return '';
+  const tail = url.split('/').pop() || '';
+  return tail.replace(/\.git$/i, '').trim();
+}
+
 function repoDisplayLabel(row: SolutionReviewRepoRow): string {
   const mod = (row.product_module_name || '').trim();
   const branch = (row.branch_version_name || '').trim();
-  if (mod && branch) return `${mod} · ${branch}`;
-  return mod || branch || '未命名分支';
+  const urlName = repoNameFromUrl(row.repo_url || '');
+  if (mod && branch && !isUnnamedBranch(branch)) return `${mod} · ${branch}`;
+  if (mod) return mod;
+  if (urlName) return urlName;
+  if (branch && !isUnnamedBranch(branch)) return branch;
+  return '未命名仓库';
+}
+
+function deriveSplitStrategyRationale(
+  payload: SolutionReviewPayload,
+  repos: SolutionReviewRepoRow[],
+  tasks: SplitTaskDraft[],
+): string {
+  const explicit = (
+    payload.split_strategy_rationale ||
+    payload.whale_review?.split_strategy_rationale ||
+    ''
+  ).trim();
+  if (explicit) return explicit;
+
+  const md = (payload.whale_review?.summary_markdown || '').trim();
+  if (md) {
+    const splitLines = md
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && /拆单|拆分|子单|按仓库|按模块|单任务|并行开发|改造冲突/.test(line));
+    if (splitLines.length) return splitLines.join('\n');
+  }
+
+  const repoCount = repos.length;
+  const taskCount = tasks.length;
+  const distinctRepos = new Set(
+    tasks.map((t) => (t.branch_version_id || '').trim()).filter(Boolean),
+  ).size;
+  const distinctModules = new Set(
+    tasks.map((t) => (t.productModuleName || '').trim()).filter(Boolean),
+  ).size;
+
+  if (taskCount <= 1) {
+    if (repoCount <= 1) {
+      return '方案涉及单仓库且改造范围可控，保持 1 条研发子单，便于统一交付与验收。';
+    }
+    return `函数级方案列出 ${repoCount} 个仓库，但当前仅生成 1 条子单；请在评审时确认是否需按仓库拆分。`;
+  }
+
+  if (repoCount >= 2 && distinctRepos >= 2) {
+    return `方案涉及 ${repoCount} 个仓库，已按仓库边界拆分为 ${taskCount} 条子单，便于并行开发与降低跨库改造冲突。`;
+  }
+
+  if (distinctModules >= 2) {
+    return `方案跨 ${distinctModules} 个应用模块且改造范围较大，已按模块独立性拆分为 ${taskCount} 条子单，避免多条任务交叉改造相同代码。`;
+  }
+
+  return `已按方案复杂度拆分为 ${taskCount} 条研发子单（上限 ${MAX_SPLIT_TASKS} 条），请核对每条任务的仓库归属与改造边界。`;
 }
 
 function patchItemToSearchableOption(p: PatchVersionItem): SearchableOption | null {
@@ -362,25 +426,11 @@ const RepoPatchCard: React.FC<{
       className="group relative overflow-visible rounded-2xl border border-border/50 bg-gradient-to-br from-[#0c1018] via-[color:var(--panel,#0f0f12)] to-[#0a0e14] shadow-lg shadow-black/25 transition-all duration-300 hover:border-cyan-500/35 hover:shadow-[0_8px_32px_rgba(34,211,238,0.08)]"
     >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent opacity-60" />
-      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/40 bg-gradient-to-r from-cyan-500/[0.06] to-transparent">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-[11px] font-bold text-cyan-300 border border-cyan-500/25">
-            {index + 1}
-          </span>
-          <div className="min-w-0">
-            <div className="font-medium text-foreground truncate">{repoDisplayLabel(row)}</div>
-            {row.product_module_name ? (
-              <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Package className="h-3 w-3 shrink-0" />
-                {row.product_module_name}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <Tag bordered={false} className="shrink-0 m-0 bg-violet-500/15 text-violet-200 border-violet-500/30">
-          <GitBranch className="inline h-3 w-3 mr-1 -mt-px" />
-          {row.branch_version_name || '—'}
-        </Tag>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-gradient-to-r from-cyan-500/[0.06] to-transparent">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-[11px] font-bold text-cyan-300 border border-cyan-500/25">
+          {index + 1}
+        </span>
+        <div className="min-w-0 font-medium text-foreground truncate">{repoDisplayLabel(row)}</div>
       </div>
       <div className="p-4 space-y-3">
         {row.repo_url ? (
@@ -659,6 +709,7 @@ export function SolutionReviewPanel({
 
   const score = whale?.score ?? 0;
   const reposWithChange = repos.filter((r) => (r.change_summary || '').trim());
+  const splitStrategyRationale = deriveSplitStrategyRationale(payload, repos, editableTasks);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -791,7 +842,7 @@ export function SolutionReviewPanel({
           <SectionHeader
             icon={<GitBranch className="h-5 w-5" />}
             title="涉及仓库与补丁选择"
-            subtitle="按函数级方案仓库清单逐条确认补丁计划（不展示内部分支 ID）"
+            subtitle="按仓库逐条匹配补丁计划版本（卡片标题为仓库/分支名称）"
             accent="cyan"
           />
           {repos.length > 0 ? (
@@ -844,6 +895,15 @@ export function SolutionReviewPanel({
               </div>
             ) : null}
           </div>
+          <Alert
+            type="info"
+            showIcon
+            message="自动拆单理由"
+            description={
+              <p className="text-[13px] leading-relaxed whitespace-pre-wrap m-0">{splitStrategyRationale}</p>
+            }
+            className="border-emerald-500/20 bg-emerald-500/[0.04]"
+          />
           {editableTasks.length > 0 ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {editableTasks.map((task, i) => {

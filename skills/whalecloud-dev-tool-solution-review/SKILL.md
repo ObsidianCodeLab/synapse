@@ -61,6 +61,7 @@ label: 方案评审
     },
     "verdict": "conditional_pass",
     "summary_markdown": "总评",
+    "split_strategy_rationale": "拆单策略与理由（必填，1～3 句：单任务 / 按仓库 / 按模块及依据）",
     "suggestions": [
       {
         "severity": "high",
@@ -91,6 +92,7 @@ label: 方案评审
       "ui_ue": []
     }
   },
+  "split_strategy_rationale": "与 whale_review.split_strategy_rationale 相同，供前端拆单区直接展示",
   "split_tasks_draft": [
     {
       "taskNo": "需求单号",
@@ -166,7 +168,7 @@ label: 方案评审
 2. 判定是否复杂方案（跨模块 + 大范围）→ 否且单仓库 → 输出 1 条
 3. 是复杂方案 → 按模块独立性划分，检查任务间是否有重叠改造点
 4. 合并/调整直至 1 ≤ 任务数 ≤ 5
-5. 在 whale_review.summary_markdown 末尾用 1～2 句说明拆单策略（单任务 / 按仓库 / 按模块）及理由
+5. 填写 `whale_review.split_strategy_rationale` 与顶层 `split_strategy_rationale`（内容一致）：用 1～3 句说明为何拆成当前条数（单任务 / 按仓库 / 按模块）及依据（仓库数、模块数、改造范围等）；`summary_markdown` 末尾可简要呼应，但以结构化字段为准
 ```
 
 ## 工作流程
