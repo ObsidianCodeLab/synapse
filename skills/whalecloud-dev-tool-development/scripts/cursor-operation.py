@@ -20,6 +20,93 @@ from typing import Callable, Optional
 
 MAX_ASSISTANT_ECHO = 2000
 
+FUNC_SOLUTION_REL = Path("synapse_archive") / "需求设计" / "func_solution" / "函数级方案.md"
+ACCEPTANCE_REL = Path("synapse_archive") / "需求分析" / "acceptance" / "验收标准.md"
+
+
+def find_repo_root_with_synapse_archive(start: Path) -> Optional[Path]:
+    """从 code-path 向上查找含 synapse_archive/ 的代码根目录。"""
+    current = start.resolve()
+    if not current.is_dir():
+        current = current.parent
+    for candidate in [current, *current.parents]:
+        if (candidate / "synapse_archive").is_dir():
+            return candidate
+    return None
+
+
+def _is_workdir_archive_doc(path: Path) -> bool:
+    """是否为会议室 {WORK_DIR}/archive/需求设计|需求分析 下的文档（Cursor 不可读）。"""
+    parts = path.parts
+    for i, part in enumerate(parts):
+        if part != "archive" or i + 1 >= len(parts):
+            continue
+        if parts[i + 1] in ("需求设计", "需求分析"):
+            return True
+    return False
+
+
+def _sandbox_path_for_code_path(code_path: Path) -> Optional[Path]:
+    """若 code_path 落在 work/.../code/ 下，推导对应的 sandbox/ 路径。"""
+    parts = code_path.parts
+    for i, part in enumerate(parts):
+        if part != "code":
+            continue
+        sandbox = Path(*parts[:i], "sandbox", *parts[i + 1 :])
+        return sandbox
+    return None
+
+
+def validate_skill_paths(
+    code_path: str,
+    doc: Optional[str],
+    acceptance_doc: Optional[str],
+) -> None:
+    """校验 whalecloud-dev-tool-development 技能约定的路径，错误则 SystemExit。"""
+    code = Path(code_path).resolve()
+    if not code.is_dir():
+        raise SystemExit(f"错误：--code-path 不存在或不是目录：{code}")
+
+    sandbox_equiv = _sandbox_path_for_code_path(code)
+    if sandbox_equiv is not None:
+        hint = f"\n请改用 sandbox 路径，例如：{sandbox_equiv}"
+        if sandbox_equiv.is_dir():
+            hint += "（该路径已存在）"
+        raise SystemExit(
+            f"错误：--code-path 不得使用 code/ 只读参考目录：{code}{hint}"
+        )
+
+    repo_root = find_repo_root_with_synapse_archive(code)
+    if repo_root is None:
+        raise SystemExit(
+            f"错误：无法从 --code-path 向上定位含 synapse_archive/ 的代码根目录：{code}\n"
+            "请确认文档已同步至代码仓 synapse_archive/（见 AGENTS.md §1.2）"
+        )
+
+    for label, doc_arg, rel in (
+        ("--doc", doc, FUNC_SOLUTION_REL),
+        ("--acceptance-doc", acceptance_doc, ACCEPTANCE_REL),
+    ):
+        if not doc_arg:
+            continue
+        doc_path = Path(doc_arg).resolve()
+        if _is_workdir_archive_doc(doc_path):
+            expected = (repo_root / rel).resolve()
+            raise SystemExit(
+                f"错误：{label} 不得使用会议室 archive/ 下的副本（Cursor 无法读取）：\n"
+                f"  错误路径：{doc_path}\n"
+                f"  正确路径：{expected}"
+            )
+        if "synapse_archive" not in doc_path.parts:
+            expected = (repo_root / rel).resolve()
+            raise SystemExit(
+                f"错误：{label} 须位于代码仓 synapse_archive/ 下：\n"
+                f"  当前路径：{doc_path}\n"
+                f"  期望形如：{expected}"
+            )
+        if not doc_path.is_file():
+            raise SystemExit(f"错误：{label} 文件不存在：{doc_path}")
+
 
 def resolve_agent_executable(agent_path: str) -> str:
     """解析 Cursor CLI 可执行路径。
@@ -576,8 +663,16 @@ async def main() -> int:
     parser = argparse.ArgumentParser(description="Cursor Agent CLI 操作工具")
     parser.add_argument("--code-path", required=True, help="代码工作目录（映射为 agent --workspace）")
     parser.add_argument("--target", default=None, help="开发/纠偏任务描述（纠偏轮可与 --fix-feedback 联用）")
-    parser.add_argument("--doc", default=None, help="函数级方案文档路径（首轮推荐）")
-    parser.add_argument("--acceptance-doc", default=None, help="验收标准文档路径（可选）")
+    parser.add_argument(
+        "--doc",
+        default=None,
+        help="函数级方案：{REPO_ROOT}/synapse_archive/需求设计/func_solution/函数级方案.md（禁止 WORK_DIR/archive/）",
+    )
+    parser.add_argument(
+        "--acceptance-doc",
+        default=None,
+        help="验收标准：{REPO_ROOT}/synapse_archive/需求分析/acceptance/验收标准.md（禁止 WORK_DIR/archive/）",
+    )
     parser.add_argument("--fix-feedback", default=None, help="校验未通过项全文（纠偏轮必填）")
     parser.add_argument("--round", type=int, default=1, help="轮次号，写入日志（默认 1）")
     parser.add_argument(
@@ -605,6 +700,7 @@ async def main() -> int:
     )
 
     args = parser.parse_args()
+    validate_skill_paths(args.code_path, args.doc, args.acceptance_doc)
     target = _validate_args(args)
 
     cursor = CursorCLI(
