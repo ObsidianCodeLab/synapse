@@ -1,12 +1,12 @@
 ---
 name: whalecloud-dev-tool-development
-description: "代码开发技能 - 根据函数级方案文档，通过 Cursor CLI 实现代码开发；支持验收检查与多轮纠偏。智能体通过 cursor-operation.py 执行，产出改后源码与执行日志。"
+description: "代码开发技能 - 按 split_plan.json 研发单清单，在 WORK_DIR/sandbox 沙箱中通过 Cursor CLI 逐单实现代码；支持 create_todo 排期、完成度检查与多轮纠偏。"
 label: 代码开发技能
 ---
 
 # 代码开发技能
 
-根据函数级方案文档，通过 Cursor Agent CLI 实现代码开发。智能体**必须**调用 `scripts/cursor-operation.py`（禁止直接调用 `agent`），并在每轮执行后**自行验收**；不通过则带 `--fix-feedback` 再次调用脚本，直至通过或达到轮次上限。
+按 **`split_plan.json`** 中的研发单清单，在 **`{WORK_DIR}/sandbox/`** 沙箱工作区内逐单改码。智能体须先 **`create_todo`** 排定执行顺序，再对外层**研发单**、内层 **Cursor 轮次**双重循环；每轮**必须**调用 `scripts/cursor-operation.py`（禁止直接调用 `agent`），自行验收；不通过则带 `--fix-feedback` 再次调用，直至该研发单完成或达到轮次上限。
 
 ---
 
@@ -14,132 +14,201 @@ label: 代码开发技能
 
 | Parameter | 必填 | 说明 / 示例 |
 |-----------|------|----------------|
-| `WORK_DIR` | 是 | 研发会议室工作目录（与注入的 `WORK_ORDER_DIR` **同义**）。 |
-| `FUNC_SOLUTION_DOC` | 是 | 函数级方案路径。默认：`{WORK_DIR}/archive/需求设计/func_solution/函数级方案.md` |
-| `MODIFY_CODE_PATH` | 是 | 源代码工作目录（脚本 `--code-path`；须在 Git 仓库内，供改码与 `git diff` 验收）。会议室 system 段中的 **`MODIFY_CODE_PATH`**（或与 `CODE_PATH` 同值）为本参数，**禁止**从 `WORK_DIR` 臆造。 |
+| `WORK_DIR` | 是 | 研发会议室工作目录（与注入的 `WORK_ORDER_DIR` **同义**）。改码、归档、拆单计划均在此树下。 |
+| `SPLIT_PLAN_DOC` | 否 | 研发单清单。默认：`{WORK_DIR}/archive/需求设计/solution_review/split_plan.json`（**唯一权威来源**） |
+| `FUNC_SOLUTION_DOC` | 是 | 函数级方案。默认：`{WORK_DIR}/archive/需求设计/func_solution/函数级方案.md` |
 | `OUTPUT_DIR` | 是 | 产物目录。默认：`{WORK_DIR}/archive/需求研发/task_exec/` |
-| `ACCEPTANCE_DOC` | 否 | 工单级验收标准。默认：`{WORK_DIR}/archive/需求分析/acceptance/验收标准.md`（**存在则必查**，并传入 `--acceptance-doc`） |
-| `CODING_STD_DOC` | 否 | 研发编码规范路径。未指定时按方案涉及文件语言选 `references/{语言}研发规范.md`（见下文） |
-| `MAX_ROUNDS` | 否 | 最大 Cursor 调用轮次（含首轮），默认 `10` |
-| `TIMEOUT` | 否 | 单次脚本 `--timeout`（秒），默认 `600`（与 `run_skill_script` 平台超时一致） |
+| `ACCEPTANCE_DOC` | 否 | 工单级验收标准。默认：`{WORK_DIR}/archive/需求分析/acceptance/验收标准.md`（**存在则必查**） |
+| `MAX_ROUNDS_PER_TASK` | 否 | **单个研发单**内最大 Cursor 轮次（含首轮），默认 `10` |
+| `TIMEOUT` | 否 | 单次脚本 `--timeout`（秒），默认 `600` |
 
 ### 参数关系
 
-- **`WORK_DIR`**：归档根；`FUNC_SOLUTION_DOC`、`OUTPUT_DIR`、`ACCEPTANCE_DOC` 可按标准布局推导。
-- **`MODIFY_CODE_PATH`**：独立参数，不能从 `WORK_DIR` 推导。
-- **统一日志文件**：`{OUTPUT_DIR}/development.log`（**所有轮次共用**同一个文件，按时间顺序追加写入；含完整 `stream-json` + 每轮元信息头）。脚本以追加模式打开日志。
-- **不产出 patch 文件**；变更以 `MODIFY_CODE_PATH` 工作区源码为准。
+- **`WORK_DIR`**：归档根；`SPLIT_PLAN_DOC`、`FUNC_SOLUTION_DOC`、`OUTPUT_DIR`、`ACCEPTANCE_DOC` 可按标准布局推导。
+- **研发单清单**：**仅以 `split_plan.json` 的 `tasks[]` 为准**；不使用 `userwork.json` 或其它来源覆盖顺序与条目。
+- **改码目录**：**禁止**使用 `MODIFY_CODE_PATH` 参数；由 `WORK_DIR` + system 注入的 `CODE_PATH` **派生** `SANDBOX_PATH`（见下文）。
+- **一研发单 ↔ 一仓库**：`split_plan` 每条 `tasks[]` 对应**恰好一个**代码仓库（一组 `REPO_NAME` + `CODE_PATH` + `SANDBOX_PATH`）。
+- **统一日志**：`{OUTPUT_DIR}/development.log`（所有研发单、所有轮次**追加**写入；元信息头含研发单标识与轮次）。
+- **不产出 patch**；变更以各研发单 `SANDBOX_PATH` 工作区源码为准。
+
+---
+
+## 沙箱路径派生（必读）
+
+只读参考代码在 `{WORK_DIR}/code/`（`sandbox_build` 之前的开门落盘）；**本次改造只写** `{WORK_DIR}/sandbox/`（`sandbox_build` 节点已 clone 的 Git 工作区）。
+
+从 system「产品工作区路径」读取各组 `REPO_NAME`、`CODE_PATH`，对每条研发单选定**唯一**匹配的一组，再派生沙箱路径：
+
+```
+SANDBOX_PATH = CODE_PATH 中将 "{WORK_DIR}/code/" 替换为 "{WORK_DIR}/sandbox/"
+```
+
+**示例**（`WORK_DIR = /work/21881453`）：
+
+| CODE_PATH | SANDBOX_PATH（`cursor-operation.py --code-path`） |
+|-----------|---------------------------------------------------|
+| `/work/21881453/code/ZmdbCore` | `/work/21881453/sandbox/ZmdbCore` |
+| `/work/21881453/code/ZmdbCore/src/module/foo` | `/work/21881453/sandbox/ZmdbCore/src/module/foo` |
+
+规则：
+
+1. **禁止**在 `code/` 下改码；**禁止**臆造 `sandbox/` 路径。
+2. 执行前确认 `SANDBOX_PATH` 存在且为有效 Git 工作区（`.git` 在仓库根或 `--code-path` 所在仓内）。
+3. `git diff` 在**该 SANDBOX_PATH 所属仓库根**执行；`--code-path` 为子目录时用 `git diff -- <相对路径>`。
+
+### 研发单 → 仓库匹配
+
+对 `split_plan.tasks[]` 每条，用下列字段与 system 注入的仓库表、函数级方案 §1.3「涉及仓库」表**交叉匹配**，选定唯一 `REPO_NAME` + `CODE_PATH`：
+
+| split_plan 字段 | 匹配用途 |
+|-----------------|----------|
+| `productModuleName` | 对齐 §1.3「应用模块」与 `REPO_NAME` |
+| `branchVersionName` / `branch_version_id` | 对齐 §1.3「产品分支」 |
+| `patchName` | 辅助确认分支/补丁（若存在） |
+| `comments` | 该单改造摘要（来自对应仓库行的「改造内容」） |
+
+无法唯一匹配 → **中止该研发单**，在 manifest 标 `failed` 并说明原因，**不得**猜测路径。
+
+---
+
+## 方案切片（按 split_plan）
+
+每个研发单**不**使用整份函数级方案做验收，而是按 **split_plan 行 + 对应仓库** 切片：
+
+1. **范围锚点**：当前 `tasks[]` 行的 `taskTitle`、`comments`、`taskImpactDesc` 及影响字段（`performanceImpact` 等）。
+2. **方案对照**：在 `FUNC_SOLUTION_DOC` 中定位 §1.3 与该单 `productModuleName` / `branchVersionName` 一致的仓库行，以及 §1.6 中**该模块**相关的小节（函数清单、伪代码、文件路径）。
+3. **验收清单**：仅包含上述切片内的可核对项；`git diff` 仅检查该 `SANDBOX_PATH` 范围内、与该单相关的文件。
+4. **工单验收**：`ACCEPTANCE_DOC` 若存在，只核对与**本研发单改造范围**相关的条款（与方案切片取交集）；无关条款跳过。
+
+首轮 Cursor 的 `--target` 须写明研发单 `taskNo` / `taskTitle` 及本单切片摘要，避免改到其它仓库。
 
 ---
 
 ## 核心约束
 
-### A. 调用方式
+### A. 任务计划（create_todo）
 
-1. 智能体**不得**直接调用 Cursor CLI，**只能** `run_skill_script` 执行 `scripts/cursor-operation.py`。
-2. 每轮须传 `--timeout` = `TIMEOUT`（默认 `600`）。
-3. 每轮结束后**必须** `read_file` 当轮 `--log`，并解析 stdout 中 `SYNAPSE_CURSOR_*` 行。
-4. `run_skill_script` 返回非 0 时**仍须读 log**：区分 **Cursor 执行失败**（`SYNAPSE_CURSOR_SUCCESS=0`）与 **脚本包装错误**（超时等）。
+1. 加载 `split_plan.json` 后，**必须**先调用 `create_todo`，再执行任何 `cursor-operation.py`。
+2. `steps`：**一条研发单对应一个 step**；`id` 建议 `task_{taskNo}_{index}`；`description` 含 `taskTitle` 与 `productModuleName`。
+3. **优先级**：严格按 `split_plan.tasks[]` **数组顺序**执行（索引小者优先）；`depends_on` 默认链式依赖前一条（`task_i` depends_on `task_{i-1}`），保证串行。
+4. 每完成一个研发单：`update_todo_step` → `completed`；全部完成后 `complete_todo`。
+5. 进行中可用 `get_todo_status` 查看进度。
+
+### B. 调用方式（cursor-operation.py）
+
+1. **不得**直接调用 Cursor CLI，**只能** `run_skill_script` 执行 `scripts/cursor-operation.py`。
+2. `--code-path` = 当前研发单的 **`SANDBOX_PATH`**（非 `CODE_PATH`）。
+3. 每轮传 `--timeout` = `TIMEOUT`；结束后 **必须** `read_file` `--log` 并解析 `SYNAPSE_CURSOR_*`。
+4. `--continue`：**仅**同一研发单、同一 `SANDBOX_PATH`、上一轮 `SYNAPSE_CURSOR_SUCCESS=1` 时添加；**切换研发单必须新开会话**（不加 `--continue`）。
 
 详见 `references/cursor-operation-readme.md`、`references/cursor-cli-headless.md`。
 
-### B. 输入要求
+### C. 输入要求
 
-1. **函数级方案**（`FUNC_SOLUTION_DOC`）：首轮前通读；验收维度一。
-2. **研发编码规范**：首轮前按**方案列出的文件/语言**选定 `CODING_STD_DOC` 并 `read_file` 相关章节；验收维度二。
-3. **验收标准**（`ACCEPTANCE_DOC`）：若文件存在则**必查**（验收维度三），并传入 `--acceptance-doc`。
-4. **代码目录**（`MODIFY_CODE_PATH`）：有效 Git 工作区。
+1. **`split_plan.json`**：`tasks[]` 非空且已评审落盘（含 `approved_at`）。
+2. **`FUNC_SOLUTION_DOC`**：通读；按单切片用于验收。
+3. **`ACCEPTANCE_DOC`**：若存在则传入 `--acceptance-doc`，并按单过滤相关条款。
+4. **`{WORK_DIR}/sandbox/`**：已由 `sandbox_build` 落盘。
 
-### C. 输出产物
+### D. 输出产物
 
-1. 修改后的源码（`MODIFY_CODE_PATH`）。
-2. **统一日志文件**：`{OUTPUT_DIR}/development.log`（唯一文件，所有轮次按时间顺序**追加**写入；含完整 `stream-json` + 每轮元信息头）。脚本以追加模式打开日志；如需从空白日志开始，先手动删除该文件。
-3. 清单（可选）：`{WORK_DIR}/artifacts/manifest.json`（记录轮次、`development.log` 路径、`modify_code_path`、验收结论；**不含 patch**）。
+1. 各研发单修改后的沙箱源码（对应 `SANDBOX_PATH`）。
+2. **`{OUTPUT_DIR}/development.log`**（追加；头部分隔：`=== 研发单 {taskNo} | {taskTitle} | 第 N 轮 ===`）。
+3. **`{WORK_DIR}/artifacts/manifest.json`**（含 per-task 完成度、轮次、路径、验收结论）。
 
-### D. 禁止事项
+### E. 禁止事项
 
-- 不要 `git commit`；不要生成或要求 `*.patch` 落盘。
-- 不要用 `run_shell` 直接调 `agent` 代替脚本改业务代码。
-- 不要跳过验收直接宣告完成。
+- 不要 `git commit`；不要生成 `*.patch`。
+- 不要用 `run_shell` 直接调 `agent`。
+- 不要跳过 `create_todo` 或跳过单研发单验收就宣告全局完成。
+- 不要改 `WORK_DIR/code/` 下的只读参考树。
 
 ---
 
-## 工作流程（多轮开发闭环）
+## 工作流程（双层循环）
 
 ```
-Step 1 — 准备
-  1a. 确认 FUNC_SOLUTION_DOC、MODIFY_CODE_PATH 存在
-  1b. read_file FUNC_SOLUTION_DOC；按方案涉及语言选定并 read_file CODING_STD_DOC
-  1c. 若存在 ACCEPTANCE_DOC 则 read_file；创建 OUTPUT_DIR（无需 diff/ 子目录）
+Step 0 — 准备（一次）
+  0a. 确认 WORK_DIR、SPLIT_PLAN_DOC、FUNC_SOLUTION_DOC 存在
+  0b. read_file SPLIT_PLAN_DOC → tasks[]；为空则 failed 结束
+  0c. 确认 WORK_DIR/sandbox/ 已落盘；从 system 读取全部 REPO_NAME + CODE_PATH
+  0d. read_file FUNC_SOLUTION_DOC；若存在 ACCEPTANCE_DOC 则 read_file
+  0e. 创建 OUTPUT_DIR
 
-Step 2 — 第 N 轮开发（N=1..MAX_ROUNDS）
-  2a. run_skill_script → cursor-operation.py
-      --code-path MODIFY_CODE_PATH
-      --doc FUNC_SOLUTION_DOC（首轮必填；纠偏轮建议保留）
+Step 1 — create_todo 排期
+  1a. 按 tasks[] 顺序生成 steps（优先级 = 数组下标）
+  1b. create_todo(task_summary, steps)
+  1c. 为每个研发单预匹配 REPO_NAME、CODE_PATH、SANDBOX_PATH（写入执行笔记或 manifest 草稿）
+
+Step 2 — 外循环：按 split_plan 顺序处理每个研发单 T
+  2a. update_todo_step(T, in_progress)
+  2b. 生成 T 的方案切片与验收清单
+  2c. 内循环：第 N 轮（N=1..MAX_ROUNDS_PER_TASK）→ 见 Step 3
+  2d. 计算 T 的完成度；100% → update_todo_step(T, completed)；否则继续内循环或 T failed
+  2e. 进入下一个研发单（**不加 --continue**）
+
+Step 3 — 内循环：研发单 T 的第 N 轮 Cursor
+  3a. run_skill_script → cursor-operation.py
+      --code-path SANDBOX_PATH
+      --doc FUNC_SOLUTION_DOC
       --acceptance-doc ACCEPTANCE_DOC（若存在）
-      --target "…"
+      --target "研发单 {taskNo}：{taskTitle}；范围：{comments 摘要}"
       --log OUTPUT_DIR/development.log
       --round N
       --timeout TIMEOUT
-      --continue（仅当 N≥2 且第 N-1 轮 SYNAPSE_CURSOR_SUCCESS=1 时加；否则靠完整 prompt）
-  2b. read_file 同一份 development.log 中第 N 轮段落；记录 SYNAPSE_CURSOR_SUCCESS / SYNAPSE_CURSOR_LOG
+      --continue（仅当 N≥2 且同 T、同 SANDBOX_PATH、上一轮 SUCCESS=1）
+  3b. read_file development.log 中本单本轮段落；记录 SYNAPSE_CURSOR_SUCCESS
 
-Step 2′ — 执行结果分支（在 Step 3 之前）
-  若 SYNAPSE_CURSOR_SUCCESS=0 或 run_skill_script 超时/失败：
-    → 视为 [执行] 失败，**不得**进入方案/规范验收结论
-    → 若 N < MAX_ROUNDS：带 --fix-feedback（前缀 [执行]）重试同轮或下一轮，说明 log 中错误/超时原因
-    → 若已达 MAX_ROUNDS：status=failed，更新 manifest，结束
-  若 SYNAPSE_CURSOR_SUCCESS=1：
-    → 进入 Step 3
+Step 3′ — 执行分支
+  SUCCESS=0 或超时 → [执行] 失败；N < MAX → --fix-feedback [执行] 重试；否则 T failed
+  SUCCESS=1 → Step 4
 
-Step 3 — 验收（方案 + 规范 + 可选工单验收）
-  3A. FUNC_SOLUTION_DOC + git diff（在 Git 仓库根或 MODIFY_CODE_PATH 相对路径范围内）
-  3B. CODING_STD_DOC / references/*研发规范.md
-  3C. ACCEPTANCE_DOC（若存在则**必过**）
-  全部通过 → Step 5；否则整理未通过项 → Step 4（N+1）
+Step 4 — 单研发单验收
+  4A. 方案切片 + git diff（SANDBOX_PATH / 仓库根）
+  4B. ACCEPTANCE_DOC 相关条款（若存在）
+  全部通过 → T 完成度 100%，回到 Step 2 下一单；否则 Step 5
 
-Step 4 — 纠偏（功能/规范/验收，非 [执行]）
-  4a. --fix-feedback 含 [方案]/[规范]/[验收] 逐条
-  4b. 回到 Step 2（round=N+1），满足 --continue 条件时可加 --continue
-  4c. N+1 > MAX_ROUNDS → failed，写 manifest，结束
+Step 5 — 单研发单纠偏
+  5a. --fix-feedback：[方案]/[验收] 逐条（仅本单范围）
+  5b. 回到 Step 3（N+1）；N+1 > MAX_ROUNDS_PER_TASK → T failed
 
-Step 5 — 完成
-  5a. 更新 WORK_DIR/artifacts/manifest.json（status=completed，cursor_logs，modify_code_path）
-  5b. 汇报：轮次、统一日志路径 `{OUTPUT_DIR}/development.log`、验收结论、关键改动文件列表（无需 patch 路径）
+Step 6 — 全局收尾
+  6a. 全部 T completed → complete_todo；manifest status=completed
+  6b. 任一 T failed → manifest status=partial_failed 或 failed，附 failure_reason
+  6c. 汇报：研发单列表、各单轮次、development.log、关键改动文件（按 SANDBOX_PATH）
 ```
 
 ---
 
-## 子智能体验收（Step 3 核心）
+## 子智能体验收（Step 4 核心）
 
-须先满足 **Step 2′：`SYNAPSE_CURSOR_SUCCESS=1`**，再做工单/方案/规范验收。
+须先满足 **Step 3′：`SYNAPSE_CURSOR_SUCCESS=1`**，再验收**当前研发单**的方案切片。
 
-### 文档一：`FUNC_SOLUTION_DOC`（[方案]）
+### 方案（[方案]）
 
-1. 提取可核对清单；对照 `MODIFY_CODE_PATH` 与 `git diff`（在**仓库根**执行，必要时限定路径前缀）。
-2. 未全覆盖 → `--fix-feedback` 标 `[方案]`。
+1. 仅核对本单切片清单；对照 `SANDBOX_PATH` 与 `git diff`。
+2. 未覆盖 → `--fix-feedback` 标 `[方案]`，注明 `taskNo` 与文件路径。
 
-### 文档二：研发编码规范（[规范]）
+### 验收（[验收]）
 
-- 规范表见 `references/*研发规范.md`（技能内置）。
-- **首轮前**：按方案列出的文件扩展名选规范；**每轮后**：可按 diff 涉及语言复核。
-- 违规 → `[规范]`。
+- 仅核与本单相关的 `ACCEPTANCE_DOC` 条款；未过 → `[验收]`。
 
-### 文档三：`ACCEPTANCE_DOC`（[验收]，文件存在时必查）
-
-- 与方案不重复的工单条款须逐项满足；未过 → `[验收]`。
-
-### 验收通过条件（同时满足）
+### 单研发单通过条件
 
 1. `SYNAPSE_CURSOR_SUCCESS=1`（当轮）。
-2. 方案全覆盖。
-3. 规范合规（【规则】无违反）。
-4. 若存在 `ACCEPTANCE_DOC`，工单验收通过。
-5. 若方案要求改码，则 `git diff` 非空且在预期范围内。
+2. 本单方案切片全覆盖。
+3. 相关工单验收条款通过（若 `ACCEPTANCE_DOC` 存在）。
+4. 本单预期范围内 `git diff` 非空且文件集合理。
+
+### 完成度
+
+- `完成度 = 已通过核对项 / 本单核对项总数`。
+- **100%** 方可 `update_todo_step(completed)`；否则继续内循环。
 
 ### `--fix-feedback` 书写
 
-- 前缀：`[执行]`（CLI/超时）、`[方案]`、`[规范]`、`[验收]`。
+- 前缀：`[执行]`、`[方案]`、`[验收]`。
+- 首行建议：`研发单 {taskNo} ({taskTitle})：` …
 - 每条可验证（路径+行号或方案章节）。
 
 ---
@@ -148,29 +217,31 @@ Step 5 — 完成
 
 | 类别 | 检查内容 |
 |------|----------|
-| **执行** | `SYNAPSE_CURSOR_SUCCESS=1`；否则走 Step 2′，勿判为方案/规范问题 |
-| **方案** | `FUNC_SOLUTION_DOC` 条目全覆盖 |
-| **规范** | `CODING_STD_DOC` / references 与 diff 一致 |
-| **验收** | `ACCEPTANCE_DOC` 存在则必过 |
-| **范围** | diff 仅含预期文件 |
+| **计划** | 已 `create_todo` 且按 `split_plan` 顺序执行 |
+| **路径** | 仅写 `SANDBOX_PATH`；未改 `code/` |
+| **执行** | `SYNAPSE_CURSOR_SUCCESS=1` |
+| **方案** | 本单 split_plan + 方案切片全覆盖 |
+| **验收** | 相关 `ACCEPTANCE_DOC` 条款通过 |
+| **范围** | diff 仅含本单预期文件 |
 
 ---
 
 ## 目录结构（示例）
 
-**`WORK_DIR`（task_id = 21881453）**
-
 ```
-C:\Users\<user>\.synapse\work\21881453\
+{WORK_DIR}/
+├── code/                          ← 只读参考（禁止改码）
+│   └── ZmdbCore/...
+├── sandbox/                       ← 改码目标（sandbox_build）
+│   └── ZmdbCore/...
 ├── archive/
-│   ├── 需求设计/func_solution/函数级方案.md
+│   ├── 需求设计/
+│   │   ├── func_solution/函数级方案.md
+│   │   └── solution_review/split_plan.json   ← 研发单清单（权威）
 │   ├── 需求分析/acceptance/验收标准.md
-│   └── 需求研发/task_exec/
-│       └── development.log     ← 所有轮次追加写入的唯一日志文件
+│   └── 需求研发/task_exec/development.log
 └── artifacts/manifest.json
 ```
-
-**`MODIFY_CODE_PATH`**：可与 `WORK_DIR` 无关，例如 `D:\repos\...\Zmdb\` 或 `{WORK_DIR}/code/...`。
 
 ---
 
@@ -178,39 +249,48 @@ C:\Users\<user>\.synapse\work\21881453\
 
 ```json
 {
-  "task_id": "21881453",
+  "demand_no": "21881450",
   "status": "completed",
-  "modify_code_path": "D:/repos/.../Zmdb",
-  "development_rounds": 2,
-  "cursor_logs": [
-    "archive/需求研发/task_exec/development.log"
-  ],
-  "acceptance": {
-    "func_solution": "passed",
-    "coding_standard": "passed",
-    "acceptance_doc": "passed"
-  }
+  "split_plan_doc": "archive/需求设计/solution_review/split_plan.json",
+  "cursor_logs": ["archive/需求研发/task_exec/development.log"],
+  "tasks": [
+    {
+      "task_no": "21881453",
+      "task_title": "需求标题 — 模块A",
+      "product_module_name": "模块A",
+      "repo_name": "ZmdbCore",
+      "sandbox_path": "sandbox/ZmdbCore",
+      "rounds": 2,
+      "completion": 1.0,
+      "acceptance": {
+        "func_solution_slice": "passed",
+        "acceptance_doc": "passed"
+      }
+    }
+  ]
 }
 ```
 
-失败时 `"status": "failed"`，附 `failure_reason` 与 `development.log` 路径。
+失败时：`status` 为 `failed` 或 `partial_failed`；失败研发单附 `failure_reason` 与 `development.log` 定位说明。
 
 ---
 
-## 实施建议（维护者 / 智能体）
+## 实施建议
 
-1. **`--continue`**：仅上一轮同工作区 Cursor 成功结束时使用；并行多工单、或上轮超时/失败时**不要**加，避免串会话。
-2. **`git diff`**：在 Git 仓库根执行；`MODIFY_CODE_PATH` 为子目录时用 `git diff -- <相对路径>`。
-3. **`run_skill_script` 报失败但 log 存在**：以 log 中 `SYNAPSE_CURSOR_SUCCESS` 为准，勿重复盲目重跑。
-4. **会议室路径**：以 system 注入的 `MODIFY_CODE_PATH` 为准；`CODE_PATH` 若同时出现，与之同值，仅作兼容。
-5. **与 SOP 归档**：本技能默认 `OUTPUT_DIR` 在 `archive/需求研发/task_exec/`；若会议室 `archive_dir` 指向 `archive/开发中/task_exec/`，以会议室注入的 `OUTPUT_DIR` / `archive_dir` 覆盖默认值。
+1. **`--continue`**：不得跨研发单、不得跨 `SANDBOX_PATH`。
+2. **`git diff`**：在 sandbox 仓库根执行；子目录改码时限定路径前缀。
+3. **日志定位**：按 `=== 研发单 {taskNo}` 分段阅读 `development.log`。
+4. **会议室路径**：以 system 注入的 `WORK_DIR` / `WORK_ORDER_DIR` 为准；`OUTPUT_DIR` 可被 `archive_dir` 覆盖。
+5. **上游依赖**：须先完成方案评审（`split_plan.json` 落盘）与 `sandbox_build`。
 
 ---
 
 ## 与上游技能衔接
 
-| 上游技能 | 输出物 | 本技能用途 |
-|----------|--------|------------|
-| `whalecloud-dev-tool-function-solution` | 函数级方案.md | `--doc`；方案验收依据 |
+| 上游 | 输出物 | 本技能用途 |
+|------|--------|------------|
+| `whalecloud-dev-tool-solution-review` | `split_plan.json` | 研发单清单与执行顺序 |
+| `whalecloud-dev-tool-function-solution` | `函数级方案.md` | 按单切片对照 §1.3 / §1.6 |
+| 系统节点 `sandbox_build` | `WORK_DIR/sandbox/` | `--code-path` 改码根 |
 
-首轮改码由 Cursor 读方案实现；**验收与纠偏由子智能体**依据方案 + 规范 +（可选）工单验收文档驱动。
+Cursor 按方案与 `--target` 改沙箱源码；**验收、完成度与纠偏由子智能体**按 split_plan 切片 +（可选）工单验收驱动。
