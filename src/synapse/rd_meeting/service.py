@@ -642,6 +642,8 @@ class MeetingRoomService:
         target = (node_id or current).strip() or current
         if target == current:
             return self.reprocess_current_node(rid, reason=reason, agent_pool=agent_pool)
+        if target == "auto_split" or is_system_node(target):
+            raise ValueError("system_node_reprocess_forbidden")
         return self._reprocess_historical_node(
             rid,
             sid,
