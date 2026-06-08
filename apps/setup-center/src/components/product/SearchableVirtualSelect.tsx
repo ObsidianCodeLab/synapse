@@ -112,7 +112,7 @@ export function SearchableVirtualSelect({
           <div className="relative">
             {isLoading ? (
               <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Loader2 className="size-4 app-loading-spin" aria-hidden />
+                <Loader2 className="size-4 animate-spin app-loading-spin" aria-hidden />
               </div>
             ) : filtered.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm text-muted-foreground">

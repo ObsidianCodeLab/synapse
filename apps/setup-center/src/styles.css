@@ -1318,6 +1318,8 @@ button.btnApplyRestart:hover {
 .rd-meeting-reprocess-spin.animate-spin,
 .ant-btn-loading-icon,
 .ant-btn-loading-icon svg,
+.anticon-spin,
+.anticon-loading.anticon-spin,
 .ant-spin-dot-spin,
 .ant-spin .ant-spin-dot-item {
   animation-duration: 1.2s !important;
@@ -4761,6 +4763,8 @@ button.btnApplyRestart:hover {
   .rd-meeting-reprocess-spin.animate-spin,
   .ant-btn-loading-icon,
   .ant-btn-loading-icon svg,
+  .anticon-spin,
+  .anticon-loading.anticon-spin,
   .ant-spin-dot-spin,
   .ant-spin .ant-spin-dot-item {
     animation-duration: 1.2s !important;
@@ -4806,6 +4810,8 @@ button.btnApplyRestart:hover {
 [data-perf-mode="low"] .rd-meeting-reprocess-spin.animate-spin,
 [data-perf-mode="low"] .ant-btn-loading-icon,
 [data-perf-mode="low"] .ant-btn-loading-icon svg,
+[data-perf-mode="low"] .anticon-spin,
+[data-perf-mode="low"] .anticon-loading.anticon-spin,
 [data-perf-mode="low"] .ant-spin-dot-spin,
 [data-perf-mode="low"] .ant-spin .ant-spin-dot-item {
   animation-duration: 1.2s !important;
