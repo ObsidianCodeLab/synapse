@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
 from synapse.rd_meeting.auto_split_assets import bootstrap_auto_split, format_auto_split_report
 from synapse.rd_meeting.binding import resolve_node_binding
 from synapse.rd_meeting.env_pregen_assets import _copy_tree_files, bootstrap_env_pregen
 from synapse.rd_meeting.sandbox_assets import materialize_repo_to_sandbox
 from synapse.rd_sop.manifest import default_human_confirm, is_system_node
+
+_SAMPLE_SPLIT_TASK = {
+    "taskNo": "D12345",
+    "taskTitle": "子单A",
+    "comments": "desc",
+    "productModuleName": "ZMDB",
+    "branchVersionName": "main",
+    "patchName": "patch-1",
+    "taskImpactDesc": "自测说明",
+    "performanceImpact": "无",
+    "functionalImpact": "无",
+    "cfgChangeDescription": "无",
+    "upgradeRisk": "无",
+    "securityImpact": "无",
+    "compatibilityImpact": "无",
+}
 
 
 def test_sandbox_build_is_system_type():
@@ -65,6 +81,14 @@ def test_materialize_repo_to_sandbox_skips_utf8(monkeypatch, tmp_path):
 def test_auto_split_from_userwork(monkeypatch, tmp_path):
     scope_id = "D12345"
     monkeypatch.setattr(
+        "synapse.rd_meeting.auto_split_assets._load_split_plan_tasks",
+        lambda _sid: [dict(_SAMPLE_SPLIT_TASK)],
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.auto_split_assets._create_tasks_from_split_plan_sync",
+        lambda _dn, _tasks: [{"status": "ok", "taskTitle": "子单A", "task_no": "T002"}],
+    )
+    monkeypatch.setattr(
         "synapse.rd_meeting.auto_split_assets._load_userwork_list",
         lambda: [
             {
@@ -84,9 +108,74 @@ def test_auto_split_from_userwork(monkeypatch, tmp_path):
     assert assets["status"] == "ok"
     assert len(assets["local_tasks"]) == 1
     assert "T002" in assets["portal_task_nos"]
+    assert assets["create_task_results"][0]["task_no"] == "T002"
     report = format_auto_split_report(assets, node_name="自动拆单")
     assert "研发子单拆分清单" in report
+    assert "create_task" in report
     assert "T001" in report
+
+
+@pytest.mark.asyncio
+async def test_auto_split_portal_fetch_from_running_event_loop(monkeypatch):
+    scope_id = "D99999"
+    calls: list[str] = []
+
+    async def _fake_get_task_list(body):
+        calls.append(body.demandNo)
+        return {"errorcode": 0, "message": "success", "data": [{"taskNo": "T900"}]}
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.auto_split_assets._load_split_plan_tasks",
+        lambda _sid: [dict(_SAMPLE_SPLIT_TASK, taskNo=scope_id)],
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.auto_split_assets._create_tasks_from_split_plan_sync",
+        lambda _dn, _tasks: [{"status": "ok", "taskTitle": "子单A", "task_no": "T901"}],
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.auto_split_assets._load_userwork_list",
+        lambda: [{"demand_no": scope_id, "owned_work_items": []}],
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud._get_task_list_from_demand",
+        _fake_get_task_list,
+    )
+
+    assets = bootstrap_auto_split("demand", scope_id)
+    assert assets["portal_task_nos"] == ["T900"]
+    assert assets.get("portal_error") == ""
+    assert calls == [scope_id]
+
+
+@pytest.mark.asyncio
+async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
+    from synapse.api.routes.dev_iwhalecloud import CreateTaskRequest
+
+    created: list[CreateTaskRequest] = []
+
+    async def _fake_create(body):
+        created.append(body)
+        return {"errorcode": 0, "data": {"task_no": "T-NEW-1"}}
+
+    monkeypatch.setattr("synapse.api.routes.dev_iwhalecloud.create_task", _fake_create)
+
+    from synapse.rd_meeting.auto_split_assets import _create_tasks_from_split_plan_async
+
+    rows = await _create_tasks_from_split_plan_async("D100", [_SAMPLE_SPLIT_TASK])
+    assert len(created) == 1
+    assert created[0].taskTitle == "子单A"
+    assert rows[0]["status"] == "ok"
+    assert rows[0]["task_no"] == "T-NEW-1"
+
+
+def test_sandbox_build_test_sleep(monkeypatch):
+    slept: list[float] = []
+    monkeypatch.setenv("SYNAPSE_SANDBOX_BUILD_TEST_SLEEP", "1")
+    monkeypatch.setattr("synapse.rd_meeting.sandbox_assets.time.sleep", lambda s: slept.append(s))
+    from synapse.rd_meeting.sandbox_assets import _sandbox_build_test_sleep
+
+    _sandbox_build_test_sleep()
+    assert slept == [100_000]
 
 
 def test_env_pregen_copies_entropy(monkeypatch, tmp_path):

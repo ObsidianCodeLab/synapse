@@ -176,12 +176,13 @@ def handle_auto_split(
     dev: dict[str, Any],
     pipe: Any = None,
 ) -> dict[str, Any]:
-    """自动拆单：同步 userwork 与门户研发子单清单。"""
+    """自动拆单：读 split_plan 调 create_task，并同步 userwork / 门户清单。"""
     _ = pipe
     sid = scope_id.strip()
     from synapse.rd_meeting.auto_split_assets import bootstrap_auto_split, format_auto_split_report
 
     assets = bootstrap_auto_split(scope_type, sid)
+
     _save_pipeline_context_assets(sid, "auto_split_assets", assets)
 
     node_name = node_display_name(node_id)
@@ -196,6 +197,7 @@ def handle_auto_split(
             "demand_no": assets.get("demand_no"),
             "local_tasks": assets.get("local_tasks") or [],
             "portal_task_nos": assets.get("portal_task_nos") or [],
+            "create_task_results": assets.get("create_task_results") or [],
             "artifacts": artifacts,
             "report_body": report_body,
         }
@@ -205,6 +207,7 @@ def handle_auto_split(
         "demand_no": assets.get("demand_no"),
         "local_tasks": assets.get("local_tasks") or [],
         "portal_task_nos": assets.get("portal_task_nos") or [],
+        "create_task_results": assets.get("create_task_results") or [],
         "artifacts": artifacts,
         "report_body": report_body,
     }
