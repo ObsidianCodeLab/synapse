@@ -47,6 +47,7 @@
 
 ```
 <代码根目录>/
+├── AGENTS.md
 └── synapse_archive/
     ├── 需求分析/
     │   ├── req_clarify/
