@@ -8,6 +8,7 @@ import {
   fetchMeetingNodeParticipants,
   fetchMeetingRoomConfig,
   interveneMeetingRoom,
+  serializeHitlFormSubmission,
   MEETING_NODE_TOKEN_BUDGET,
   MEETING_ROOM_TOKEN_BUDGET,
   reprocessMeetingRoom,
@@ -27,7 +28,7 @@ import {
 } from './meetingRoomRoster';
 import { consumeMeetingRoomFocus } from '../../../rd-meeting/focus';
 import { MeetingRoomConfigDrawer } from './MeetingRoomConfigDrawer';
-import { MeetingHitlForm, type HitlFormSchema } from './MeetingHitlForm';
+import { MeetingHitlForm, type HitlFormSchema, type HitlFormValues } from './MeetingHitlForm';
 import { SolutionReviewPanel } from './SolutionReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
 import type { NodeReviewPayload, SolutionReviewPayload } from '../../../api/meetingRoomService';
@@ -1342,7 +1343,7 @@ const InterventionDialog = ({
   open: boolean; 
   onClose: () => void;
   /** 仅中栏人工确认表单提交时使用，协作流只读 */
-  onHitlSubmit?: (text: string) => void;
+  onHitlSubmit?: (text: string, values: HitlFormValues) => void;
   onReprocess?: (nodeId: string, reason?: string) => void;
   onStopRun?: () => void;
   /** 按 SOP 节点合并协作流（来自 agents/<node_id>/room_history.jsonl） */
@@ -1999,10 +2000,7 @@ const InterventionDialog = ({
                     submitLabel="提交并继续处理"
                     onSubmit={(values) => {
                       setCenterTab('detail');
-                      const summary = Object.entries(values)
-                        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(',') : String(v)}`)
-                        .join('\n');
-                      onHitlSubmit?.(`[人工确认表单]\n${summary}`);
+                      onHitlSubmit?.(serializeHitlFormSubmission(values), values);
                     }}
                   />
                 </div>
@@ -2383,12 +2381,15 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       });
   };
 
-  const handleHitlSubmit = (text: string) => {
+  const handleHitlSubmit = (text: string, values: HitlFormValues) => {
     if (!activeRoom) return;
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
-    void interveneMeetingRoom(base, activeRoom.id, text, 'instruction', { resumeRun: true })
+    void interveneMeetingRoom(base, activeRoom.id, text, 'instruction', {
+      resumeRun: true,
+      formValues: values,
+    })
       .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = Boolean(detail.room_state?.hitl_locked)

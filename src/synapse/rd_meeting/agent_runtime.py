@@ -1,4 +1,4 @@
-"""研发会议室 Agent 运行时：任务级工具白名单 + Profile 技能摘要预注入。"""
+"""研发会议室 Agent 运行时：任务级工具白名单 + Profile 技能元数据内嵌能力档案。"""
 
 from __future__ import annotations
 
@@ -92,60 +92,167 @@ def _ensure_whalecloud_base_scripts(skill_ids: list[str]) -> list[str]:
     return out
 
 
+def _resolve_skill_entry_or_parsed(skill_id: str, agent: Any | None) -> tuple[Any | None, Any | None]:
+    """从 Agent 注册表 / 全局注册表 / loader / 磁盘解析技能元数据（不含 SKILL 正文）。"""
+    key = (skill_id or "").strip()
+    if not key:
+        return None, None
+
+    registry = getattr(agent, "skill_registry", None) if agent is not None else None
+    if registry is not None:
+        entry = registry.get(key)
+        if entry is not None:
+            return entry, None
+
+    try:
+        from synapse.skills.registry import get_skill
+
+        entry = get_skill(key)
+        if entry is not None:
+            return entry, None
+    except Exception:
+        pass
+
+    loader = getattr(agent, "skill_loader", None) if agent is not None else None
+    if loader is not None:
+        parsed = loader.get_skill(key)
+        if parsed is not None:
+            return None, parsed
+
+    try:
+        from synapse.rd_meeting.room_skill import _find_external_skill_file
+        from synapse.skills.parser import skill_parser
+
+        path = _find_external_skill_file(key)
+        if path is not None:
+            return None, skill_parser.parse_file(path)
+    except Exception as exc:
+        logger.debug("resolve skill metadata from disk failed for %s: %s", key, exc)
+
+    return None, None
+
+
+def _compact_detail_sublines_from_entry(entry: Any) -> list[str]:
+    from synapse.skills.exposure import build_skill_exposure
+
+    exposed = build_skill_exposure(entry)
+    desc = (
+        entry.get_display_description()
+        if hasattr(entry, "get_display_description")
+        else entry.description
+    )
+    lines: list[str] = []
+    if desc and str(desc).strip():
+        lines.append(f"摘要：{str(desc).strip()}")
+    when = getattr(entry, "when_to_use", "") or ""
+    if str(when).strip():
+        lines.append(f"何时使用：{str(when).strip()}")
+    if exposed.scripts:
+        lines.append(f"脚本：{', '.join(exposed.scripts)}")
+    else:
+        lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
+    return lines
+
+
+def _compact_detail_sublines_from_parsed(skill_id: str, parsed: Any) -> list[str]:
+    meta = getattr(parsed, "metadata", None)
+    if meta is None:
+        return ["（元数据不可用，请 get_skill_info 加载）"]
+    desc = getattr(meta, "description", "") or ""
+    when = getattr(meta, "when_to_use", "") or ""
+    lines: list[str] = []
+    if str(desc).strip():
+        lines.append(f"摘要：{str(desc).strip()}")
+    if str(when).strip():
+        lines.append(f"何时使用：{str(when).strip()}")
+    skill_dir = None
+    try:
+        from synapse.rd_meeting.room_skill import _find_external_skill_file
+
+        path = _find_external_skill_file(skill_id)
+        if path is not None:
+            skill_dir = path.parent
+    except Exception:
+        skill_dir = None
+    if skill_dir is not None:
+        from synapse.skills.exposure import _list_scripts
+
+        scripts = _list_scripts(skill_dir)
+        if scripts:
+            lines.append(f"脚本：{', '.join(scripts)}")
+        else:
+            lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
+    elif not lines:
+        lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
+    return lines
+
+
+def skill_detail_sublines(skill_id: str, *, agent: Any | None = None) -> list[str]:
+    """单技能 L1 元数据子行（摘要 / 脚本 / 类型），不含 SKILL.md 正文。"""
+    entry, parsed = _resolve_skill_entry_or_parsed(skill_id, agent)
+    if entry is not None:
+        return _compact_detail_sublines_from_entry(entry)
+    if parsed is not None:
+        return _compact_detail_sublines_from_parsed(skill_id, parsed)
+    return ["（注册表中未找到该技能，可尝试 get_skill_info）"]
+
+
+def append_enriched_skill_lines(
+    lines: list[str],
+    skill_ids: list[str],
+    *,
+    limit: int = 0,
+    indent: str = "  ",
+    agent: Any | None = None,
+    format_title: Any | None = None,
+) -> None:
+    """将技能 id + L1 元数据追加为嵌套列表项（供能力档案 / 能力卡片复用）。"""
+    count = 0
+    seen: set[str] = set()
+    for sid in skill_ids:
+        key = (sid or "").strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        title = format_title(key) if format_title else key
+        lines.append(f"{indent}- {title}")
+        for sub in skill_detail_sublines(key, agent=agent):
+            lines.append(f"{indent}  - {sub}")
+        count += 1
+        if limit and count >= limit:
+            break
+
+
 def _format_summary_block(*, skill_id: str, lines: list[str]) -> str:
     return f"### {skill_id}\n\n" + "\n".join(lines)
 
 
 def _summary_lines_from_entry(entry: Any) -> list[str]:
-    from synapse.skills.exposure import build_skill_exposure
-
-    exposed = build_skill_exposure(entry)
-    display = entry.get_display_name() if hasattr(entry, "get_display_name") else entry.name
-    desc = entry.get_display_description() if hasattr(entry, "get_display_description") else entry.description
-    lines = [f"- **名称**: {display}"]
-    label = getattr(entry, "label", None)
-    if label and str(label).strip():
-        lines.append(f"- **标签**: {str(label).strip()}")
-    if desc and str(desc).strip():
-        lines.append(f"- **摘要**: {str(desc).strip()}")
-    when = getattr(entry, "when_to_use", "") or ""
-    if str(when).strip():
-        lines.append(f"- **何时使用**: {str(when).strip()}")
-    if exposed.scripts:
-        lines.append(f"- **脚本**: {', '.join(exposed.scripts)}")
-    else:
-        lines.append(
-            "- **类型**: instruction-only（无预置脚本；须先 get_skill_info 再按指引 run_shell / 读写文件）"
-        )
-    lines.append(f'- **完整指引**: 执行前调用 `get_skill_info("{entry.skill_id}")` 加载 SKILL.md')
+    lines: list[str] = []
+    for sub in _compact_detail_sublines_from_entry(entry):
+        if "：" in sub:
+            key, value = sub.split("：", 1)
+            lines.append(f"- **{key}**: {value}")
+        else:
+            lines.append(f"- **类型**: {sub}")
     return lines
 
 
 def _summary_lines_from_parsed(skill_id: str, parsed: Any) -> list[str]:
-    meta = getattr(parsed, "metadata", None)
-    if meta is None:
-        return [
-            "- **摘要**: （元数据不可用）",
-            f'- **完整指引**: `get_skill_info("{skill_id}")`',
-        ]
-    name = getattr(meta, "name", skill_id) or skill_id
-    desc = getattr(meta, "description", "") or ""
-    when = getattr(meta, "when_to_use", "") or ""
-    lines = [f"- **名称**: {name}"]
-    if str(desc).strip():
-        lines.append(f"- **摘要**: {str(desc).strip()}")
-    if str(when).strip():
-        lines.append(f"- **何时使用**: {str(when).strip()}")
-    lines.append(f'- **完整指引**: 执行前调用 `get_skill_info("{skill_id}")` 加载 SKILL.md')
+    lines: list[str] = []
+    for sub in _compact_detail_sublines_from_parsed(skill_id, parsed):
+        if "：" in sub:
+            key, value = sub.split("：", 1)
+            lines.append(f"- **{key}**: {value}")
+        else:
+            lines.append(f"- **类型**: {sub}")
     return lines
 
 
 def collect_skill_summary_blocks(agent: Any, skill_ids: list[str]) -> list[str]:
-    """仅注入 L1 元数据摘要，不加载 SKILL.md 正文（L2 由 get_skill_info 按需加载）。"""
+    """（遗留）按 ### skill_id 块格式化摘要；新代码请用 append_enriched_skill_lines。"""
     if not skill_ids:
         return []
-    registry = getattr(agent, "skill_registry", None)
-    loader = getattr(agent, "skill_loader", None)
     blocks: list[str] = []
     seen: set[str] = set()
 
@@ -154,32 +261,25 @@ def collect_skill_summary_blocks(agent: Any, skill_ids: list[str]) -> list[str]:
         if not key or key in seen:
             continue
         seen.add(key)
-
-        entry = registry.get(key) if registry is not None else None
+        entry, parsed = _resolve_skill_entry_or_parsed(key, agent)
         if entry is not None:
             blocks.append(_format_summary_block(skill_id=key, lines=_summary_lines_from_entry(entry)))
-            continue
-
-        parsed = loader.get_skill(key) if loader is not None else None
-        if parsed is not None:
+        elif parsed is not None:
             blocks.append(
                 _format_summary_block(skill_id=key, lines=_summary_lines_from_parsed(key, parsed))
             )
-            continue
-
-        blocks.append(
-            _format_summary_block(
-                skill_id=key,
-                lines=[
-                    "- **摘要**: （注册表中未找到该技能）",
-                    f'- **完整指引**: `get_skill_info("{key}")`',
-                ],
+        else:
+            blocks.append(
+                _format_summary_block(
+                    skill_id=key,
+                    lines=["- **摘要**: （注册表中未找到该技能）"],
+                )
             )
-        )
     return blocks
 
 
 def format_meeting_skill_guidance_section(skill_summaries: list[str]) -> str:
+    """（遗留）独立「已挂载技能（摘要）」段；技能元数据已内嵌能力档案，不再追加。"""
     if not skill_summaries:
         return ""
     return (
@@ -243,9 +343,6 @@ def apply_meeting_agent_runtime(
     profile: AgentProfile | None,
     base_system_prompt: str,
 ) -> str:
-    """在会议室 base system 上追加技能摘要，并裁剪工具。返回最终 system prompt。"""
-    skill_ids = skill_ids_from_profile(profile)
-    summaries = collect_skill_summary_blocks(agent, skill_ids)
-    full = (base_system_prompt or "").rstrip() + format_meeting_skill_guidance_section(summaries)
+    """裁剪会议室工具列表；技能元数据已在能力档案段内嵌，不再追加独立摘要段。"""
     apply_meeting_slim_tools(agent, role)
-    return full
+    return (base_system_prompt or "").rstrip()

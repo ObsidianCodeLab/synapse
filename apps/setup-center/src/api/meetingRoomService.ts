@@ -711,22 +711,52 @@ export async function openMeetingRoom(
   });
 }
 
+export function serializeHitlFormSubmission(
+  values: Record<string, string | string[] | boolean>,
+): string {
+  const lines = Object.entries(values).map(([key, value]) => {
+    if (Array.isArray(value)) {
+      const parts = value.map(String);
+      const flat = parts.join(',');
+      if (flat.includes('\n')) {
+        return `${key}: ${JSON.stringify(parts)}`;
+      }
+      return `${key}: ${flat}`;
+    }
+    const s = String(value);
+    if (s.includes('\n')) {
+      return `${key}: ${JSON.stringify(s)}`;
+    }
+    return `${key}: ${s}`;
+  });
+  return `[人工确认表单]\n${lines.join('\n')}`;
+}
+
 export async function interveneMeetingRoom(
   synapseApiBase: string,
   roomId: string,
   text: string,
   messageType: 'instruction' | 'chat' = 'instruction',
-  options?: { resumeRun?: boolean },
+  options?: { resumeRun?: boolean; formValues?: Record<string, string | string[] | boolean> },
 ): Promise<MeetingRoomDetail> {
   const base = synapseApiBase.replace(/\/$/, '');
+  const body: {
+    text: string;
+    message_type: string;
+    resume_run: boolean;
+    form_values?: Record<string, string | string[] | boolean>;
+  } = {
+    text,
+    message_type: messageType,
+    resume_run: options?.resumeRun ?? false,
+  };
+  if (options?.formValues && Object.keys(options.formValues).length > 0) {
+    body.form_values = options.formValues;
+  }
   return apiPost<MeetingRoomDetail>(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/intervene`,
-    {
-      text,
-      message_type: messageType,
-      resume_run: options?.resumeRun ?? false,
-    },
+    body,
   );
 }
 

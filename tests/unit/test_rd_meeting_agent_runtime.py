@@ -76,7 +76,7 @@ def test_skill_ids_from_profile_inclusive():
     assert "whalecloud-dev-tool-doc-generate" in ids
 
 
-def test_apply_meeting_agent_runtime_appends_skill_summary_not_full_body():
+def test_apply_meeting_agent_runtime_keeps_prompt_without_duplicate_skill_section():
     from synapse.skills.registry import SkillEntry
 
     agent = MagicMock()
@@ -106,14 +106,41 @@ def test_apply_meeting_agent_runtime_appends_skill_summary_not_full_body():
         profile=profile,
         base_system_prompt="BASE-PROMPT",
     )
-    assert "BASE-PROMPT" in out
-    assert "## 已挂载技能（摘要）" in out
-    assert "Short summary for meeting." in out
-    assert "get_skill_info" in out
-    assert "Skill body" not in out
-    assert "# Skill body" not in out
+    assert out == "BASE-PROMPT"
+    assert "## 已挂载技能（摘要）" not in out
     assert "list_skills" not in {t["name"] for t in agent._tools}
 
 
-def test_format_meeting_skill_guidance_empty():
-    assert format_meeting_skill_guidance_section([]) == ""
+def test_rd_meeting_policy_bypass_allows_run_shell_in_meeting_session():
+    from synapse.core.policy_v2.adapter import evaluate_via_v2
+    from synapse.core.policy_v2.context import PolicyContext, set_current_context, reset_current_context
+    from synapse.core.policy_v2.enums import ConfirmationMode, DecisionAction, SessionRole
+    from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_session
+
+    decision = try_rd_meeting_allow_via_session(
+        "run_shell",
+        session_id="rd_meeting:room-abc:host",
+    )
+    assert decision is not None
+    assert decision.action.name == "ALLOW"
+
+    ctx = PolicyContext(
+        session_id="rd_meeting:room-abc:host",
+        workspace_roots=(),
+        channel="desktop",
+        is_owner=True,
+        session_role=SessionRole.AGENT,
+        confirmation_mode=ConfirmationMode.DEFAULT,
+        is_unattended=False,
+    )
+    token = set_current_context(ctx)
+    try:
+        via_adapter = evaluate_via_v2("run_shell", {"command": "python scripts/foo.py"})
+        assert via_adapter.action == DecisionAction.ALLOW
+        assert via_adapter.reason == "研发会议室白名单工具自动放行"
+    finally:
+        reset_current_context(token)
+
+    normal = try_rd_meeting_allow_via_session("run_shell", session_id="cli-session-1")
+    assert normal is None
+

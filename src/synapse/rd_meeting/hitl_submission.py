@@ -2,18 +2,49 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
 from typing import Any
 
 from synapse.rd_meeting.room_runtime import load_room_state, save_room_state
-from synapse.rd_meeting.user_context import is_hitl_form_submission
 
 _HITL_FORM_PREFIX = "[人工确认表单]"
+_FIELD_KEY_LINE = re.compile(r"^([a-zA-Z][a-zA-Z0-9_-]*):\s*(.*)$")
 
 
 def _now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _looks_like_field_key(key: str) -> bool:
+    return bool(re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]*", key or ""))
+
+
+def _coerce_parsed_field_value(raw: str) -> Any:
+    """将单行或多行字段原始文本转为 str / list。"""
+    s = (raw or "").strip()
+    if not s:
+        return s
+    if s[0] in "[{\"":
+        try:
+            parsed = json.loads(s)
+            if isinstance(parsed, (str, list)):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+    if s.startswith("OTHER:"):
+        return s[6:].strip() or s
+    if "," in s and "\n" not in s:
+        return [p.strip() for p in s.split(",") if p.strip()]
+    return s
+
+
+def _assign_parsed_field(values: dict[str, Any], key: str, raw: str) -> None:
+    val = _coerce_parsed_field_value(raw)
+    if key.lower() == "decision":
+        return
+    values[key] = val
 
 
 def parse_hitl_form_text(text: str) -> tuple[dict[str, Any], str, str | None]:
@@ -21,6 +52,10 @@ def parse_hitl_form_text(text: str) -> tuple[dict[str, Any], str, str | None]:
 
     values 键为题 id；值为 str / list（多选逗号分隔已拆成 list 时由调用方处理）。
     decision 取自 ``decision`` 题或文本中的 decision: 行。
+
+    支持：
+    - 多行 ``textarea`` / ``human_supplement``（续行无 ``key:`` 前缀时并入上一字段）
+    - 前端 ``JSON.stringify`` 编码的多行/多选值
     """
     raw = (text or "").strip()
     if not raw.startswith(_HITL_FORM_PREFIX):
@@ -29,33 +64,44 @@ def parse_hitl_form_text(text: str) -> tuple[dict[str, Any], str, str | None]:
     values: dict[str, Any] = {}
     comment_parts: list[str] = []
     decision: str | None = None
+    current_key: str | None = None
+    current_lines: list[str] = []
+
+    def flush_field() -> None:
+        nonlocal current_key, current_lines
+        if not current_key:
+            return
+        _assign_parsed_field(values, current_key, "\n".join(current_lines))
+        current_key = None
+        current_lines = []
 
     for line in raw.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("["):
             continue
         if stripped.lower().startswith("decision:"):
+            flush_field()
             decision = stripped.split(":", 1)[-1].strip().lower()
             continue
         if stripped.startswith("补充说明:") or stripped.lower().startswith("comment:"):
+            flush_field()
             comment_parts.append(stripped.split(":", 1)[-1].strip())
             continue
-        if ":" not in stripped:
-            continue
-        key, val = stripped.split(":", 1)
-        key = key.strip()
-        val = val.strip()
-        if not key:
-            continue
-        if key.lower() == "decision":
-            decision = val.lower()
-            continue
-        if val.startswith("OTHER:"):
-            values[key] = val[6:].strip() or val
-        elif "," in val and key not in ("comment",):
-            values[key] = [p.strip() for p in val.split(",") if p.strip()]
-        else:
-            values[key] = val
+
+        matched = _FIELD_KEY_LINE.match(stripped)
+        if matched:
+            key = matched.group(1).strip()
+            rest = matched.group(2)
+            if _looks_like_field_key(key):
+                flush_field()
+                current_key = key
+                current_lines = [rest] if rest else []
+                continue
+
+        if current_key:
+            current_lines.append(stripped)
+
+    flush_field()
 
     if decision is None and "decision" in values:
         decision = str(values.pop("decision")).lower()

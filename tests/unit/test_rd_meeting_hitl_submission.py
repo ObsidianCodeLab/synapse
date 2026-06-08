@@ -57,6 +57,30 @@ decision: approve
     assert decision == "approve"
 
 
+def test_parse_hitl_form_text_multiline_human_supplement():
+    text = """[人工确认表单]
+q1: cron
+human_supplement: 1、复用mdbRep+ZmdbReadOraLog
+2、通过多中心同步备份
+3、目标为另一个 ZMDB 实例
+"""
+    values, comment, decision = parse_hitl_form_text(text)
+    assert values["q1"] == "cron"
+    assert "1、复用mdbRep" in values["human_supplement"]
+    assert "2、通过多中心同步备份" in values["human_supplement"]
+    assert "3、目标为另一个 ZMDB 实例" in values["human_supplement"]
+    assert comment == ""
+    assert decision is None
+
+
+def test_parse_hitl_form_text_json_encoded_multiline():
+    text = """[人工确认表单]
+human_supplement: "1、第一行\\n2、第二行\\n3、第三行"
+"""
+    values, _, _ = parse_hitl_form_text(text)
+    assert values["human_supplement"] == "1、第一行\n2、第二行\n3、第三行"
+
+
 def test_record_hitl_submission_locked(scope_work):
     scope_id, work = scope_work
     raw = "[人工确认表单]\nq1: 答案A"

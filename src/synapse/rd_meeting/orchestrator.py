@@ -331,7 +331,7 @@ class MeetingRoomOrchestrator:
                 binding=binding,
                 sop_node_display=sop_display,
             )
-        # 会议室提示词 + Profile 技能全文 + 任务级工具白名单（对齐产品知识生成）
+        # 会议室提示词 + 任务级工具白名单（技能元数据已内嵌能力档案）
         agent._custom_prompt_suffix = ""
         target_pid = (self_profile_id or "").strip()
         if role == "host" and not target_pid:

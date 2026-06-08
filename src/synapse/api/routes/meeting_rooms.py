@@ -43,6 +43,10 @@ class InterveneBody(BaseModel):
     text: str = Field(..., description="人工指令或聊天内容")
     message_type: str = Field("instruction", description="instruction 或 chat")
     resume_run: bool = Field(False, description="干预后继续执行当前节点")
+    form_values: dict[str, Any] | None = Field(
+        None,
+        description="人机确认表单结构化答案（优先于 text 解析，用于保留多行输入）",
+    )
 
 
 class PutMeetingRoomConfigBody(BaseModel):
@@ -162,6 +166,7 @@ async def intervene_meeting(room_id: str, body: InterveneBody, request: Request)
             text=body.text,
             message_type=body.message_type,
             resume_run=body.resume_run,
+            form_values=body.form_values,
             agent_pool=pool,
         )
         return success_response(item)

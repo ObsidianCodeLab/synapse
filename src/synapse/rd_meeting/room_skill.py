@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from synapse.agents.profile import AgentProfile, get_profile_store
+from synapse.rd_meeting.agent_runtime import append_enriched_skill_lines, skill_ids_from_profile
 from synapse.rd_meeting.collaboration import collaboration_worker_ids
 from synapse.rd_meeting.product_assets import resolve_repo_code_path
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
@@ -351,7 +352,7 @@ def _format_capability_card(
     llm_endpoint: str,
 ) -> str:
     name = profile.get_display_name() or profile.name or profile.id
-    skills = format_skill_entries(profile.skills or [], limit=6)
+    skill_ids = skill_ids_from_profile(profile)
     desc = (profile.description or "").strip()
     custom = (profile.custom_prompt or "").strip()
 
@@ -360,8 +361,15 @@ def _format_capability_card(
     lines.append(f"- 角色：{role} · 端点：`{llm_endpoint or DEFAULT_LLM_ENDPOINT_KEY}`")
     if desc:
         lines.append(f"- 简介：{desc}")
-    if skills:
-        lines.append(f"- 核心技能：{', '.join(skills)}")
+    if skill_ids:
+        lines.append("- 核心技能：")
+        append_enriched_skill_lines(
+            lines,
+            skill_ids,
+            limit=6,
+            indent="  ",
+            format_title=format_skill_entry,
+        )
     if custom:
         short = re.sub(r"\s+", " ", custom).strip()
         if len(short) > 160:
@@ -391,7 +399,7 @@ def _format_self_capability_block(
         )
 
     name = profile.get_display_name() or profile.name or profile.id
-    skills = format_skill_entries(profile.skills or [], limit=12)
+    skill_ids = skill_ids_from_profile(profile)
     desc = (profile.description or "").strip()
     custom = (profile.custom_prompt or "").strip()
 
@@ -400,10 +408,18 @@ def _format_self_capability_block(
     lines.append(f"- **使用端点**：`{llm_endpoint or DEFAULT_LLM_ENDPOINT_KEY}`")
     if desc:
         lines.append(f"- **简介**：{desc}")
-    if skills:
-        lines.append(f"- **你具备的技能**（仅在这些范围内执行任务）：")
-        for s in skills:
-            lines.append(f"  - {s}")
+    if skill_ids:
+        lines.append(
+            "- **你具备的技能**（仅在这些范围内执行任务；摘要供选型，"
+            "执行前须 `get_skill_info(skill_id)` 加载完整 SKILL.md）："
+        )
+        append_enriched_skill_lines(
+            lines,
+            skill_ids,
+            limit=12,
+            indent="  ",
+            format_title=format_skill_entry,
+        )
     if custom:
         lines.append("- **角色主张 / 工作风格**：")
         for line in custom.splitlines():
@@ -943,7 +959,7 @@ def build_meeting_runtime_header(
         lines.append("- 你是子 Agent，**禁止再发起委派**（不要调用 delegate_to_agent / delegate_parallel），也无法直接联系其他 Worker；任何「需要别人配合」的诉求都改为在产出里向小鲸说明。")
         lines.append("- 仅在「你的能力档案」描述的能力边界内执行任务；超出边界时**坦诚向小鲸说明**并建议改派，不要勉强执行、不要伪造结果。")
         lines.append(
-            "- **接到子任务后**，先看 system「已挂载技能（摘要）」确认 skill_id，"
+            "- **接到子任务后**，在「你的能力档案」确认 skill_id 与摘要，"
             "再 `get_skill_info(skill_id)` 加载完整 SKILL.md 后执行；"
             "**禁止**拉全量技能列表，**禁止**未读 SKILL 就用通用工具硬做。"
         )
@@ -970,8 +986,7 @@ def build_meeting_runtime_header(
         else "「参会能力卡片」/「你的能力档案」"
     )
     lines.append(
-        f"  1. system「已挂载技能（摘要）」仅含元数据；"
-        f"从{skill_id_hint}确认 skill_id 后，"
+        f"  1. 从{skill_id_hint}的「你具备的技能」/「核心技能」确认 skill_id 与摘要；"
         "**必须先** `get_skill_info(skill_id)` 加载完整 SKILL.md。"
     )
     lines.append(

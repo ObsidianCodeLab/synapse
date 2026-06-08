@@ -933,6 +933,7 @@ class MeetingRoomService:
         text: str,
         message_type: str = "instruction",
         resume_run: bool = False,
+        form_values: dict[str, Any] | None = None,
         agent_pool: Any | None = None,
     ) -> dict[str, Any]:
         rid = (room_id or "").strip()
@@ -962,6 +963,7 @@ class MeetingRoomService:
                 scope_type=scope_type,
                 scope_id=scope_id,
                 text=text,
+                form_values=form_values if isinstance(form_values, dict) else None,
                 ticket_title=ticket_title,
                 room_state=rs,
                 detail=detail,
@@ -1017,6 +1019,7 @@ class MeetingRoomService:
         scope_type: str,
         scope_id: str,
         text: str,
+        form_values: dict[str, Any] | None = None,
         ticket_title: str,
         room_state: dict[str, Any],
         detail: dict[str, Any],
@@ -1025,8 +1028,13 @@ class MeetingRoomService:
         """问卷提交：落地锁定 → 按 intervention_kind 分支继续处理。"""
         rid = room_id.strip()
         sid = scope_id.strip()
-        form_values, comment, parsed_decision = parse_hitl_form_text(text)
-        submission = record_hitl_submission_locked(sid, raw_text=text, values=form_values)
+        parsed_values, comment, parsed_decision = parse_hitl_form_text(text)
+        effective_values = dict(parsed_values)
+        if isinstance(form_values, dict) and form_values:
+            effective_values.update(form_values)
+        submission = record_hitl_submission_locked(
+            sid, raw_text=text, values=effective_values
+        )
         schema = submission.get("schema_snapshot") if isinstance(submission.get("schema_snapshot"), dict) else None
 
         from synapse.rd_meeting.hitl_feedback import (
@@ -1042,8 +1050,8 @@ class MeetingRoomService:
             set_ready_for_node_review,
         )
 
-        feedback_mode = classify_hitl_feedback_mode(form_values, schema, comment=comment)
-        instruction_text = format_hitl_feedback_structured(form_values, schema, comment=comment)
+        feedback_mode = classify_hitl_feedback_mode(effective_values, schema, comment=comment)
+        instruction_text = format_hitl_feedback_structured(effective_values, schema, comment=comment)
 
         kind = str(room_state.get("intervention_kind") or "interactive").strip().lower()
         node_id = str(room_state.get("current_node_id") or "pending")
@@ -1059,7 +1067,7 @@ class MeetingRoomService:
             except Exception:
                 followup_round = 1
         round_record = build_hitl_round_record(
-            form_values,
+            effective_values,
             schema,
             comment=comment,
             intervention_kind=kind,
@@ -1122,7 +1130,7 @@ class MeetingRoomService:
                 input_kind="questionnaire_feedback" if kind == "interactive" else "summary_feedback",
                 title="人类问卷反馈" if kind == "interactive" else "人类总结反馈",
                 summary=instruction_text[:1200],
-                detail={"intervention_kind": kind, "form_values": form_values},
+                detail={"intervention_kind": kind, "form_values": effective_values},
             )
         except Exception as exc:
             logger.debug("hitl form activity record failed: %s", exc)
@@ -1183,7 +1191,7 @@ class MeetingRoomService:
             return out
 
         if kind == "exception":
-            decision = (parsed_decision or str(form_values.get("decision") or "")).lower()
+            decision = (parsed_decision or str(effective_values.get("decision") or "")).lower()
             rs2 = dict(load_room_state(sid) or {})
             rs2["status"] = "processing"
             save_room_state(sid, rs2)

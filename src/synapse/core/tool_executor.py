@@ -1691,37 +1691,13 @@ class ToolExecutor:
         """
         return None
 
-    @staticmethod
-    def _meeting_room_allowed_tool_names() -> frozenset[str]:
-        from synapse.rd_meeting.agent_runtime import meeting_tool_names_for_role
-
-        return (
-            meeting_tool_names_for_role("host") | meeting_tool_names_for_role("worker")
-        )
-
-    def _rd_meeting_permission_bypass(
+    def check_permission(self, tool_name: str, tool_input: dict) -> "PermissionDecision":
         self, tool_name: str
     ) -> "PermissionDecision | None":
         """研发会议室（Host / Worker）：白名单内工具自动放行，避免 policy_v2 CONFIRM 卡死派单与执行。"""
-        if tool_name not in self._meeting_room_allowed_tool_names():
-            return None
-        agent = self._agent_ref
-        if agent is None or not getattr(agent, "_org_context", False):
-            return None
-        session_id = ""
-        sess = getattr(agent, "_current_session", None)
-        if sess is not None:
-            session_id = (
-                getattr(sess, "id", None) or getattr(sess, "session_id", None) or ""
-            )
-        if not session_id:
-            session_id = getattr(agent, "_current_session_id", None) or ""
-        try:
-            from synapse.rd_meeting.live import parse_rd_meeting_session
+        from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_agent
 
-            if parse_rd_meeting_session(str(session_id)) is None:
-                return None
-        except Exception:
+        if not try_rd_meeting_allow_via_agent(tool_name, self._agent_ref):
             return None
         from .permission import PermissionDecision
 

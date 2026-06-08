@@ -610,6 +610,15 @@ def evaluate_via_v2(
     params = tool_input or {}
     ctx = _resolve_context(extra_ctx=extra_ctx, user_message=user_message)
 
+    try:
+        from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_session
+
+        _rd_bypass = try_rd_meeting_allow_via_session(tool_name, session_id=ctx.session_id)
+        if _rd_bypass is not None:
+            return _rd_bypass
+    except Exception as exc:
+        logger.debug("[PolicyV2 adapter] rd_meeting bypass skipped: %s", exc)
+
     event = ToolCallEvent(
         tool=tool_name,
         params=params,
