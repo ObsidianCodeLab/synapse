@@ -171,3 +171,99 @@ async def test_run_with_progress_timeout_skips_meeting_ensure_for_non_meeting_se
 
     orch._pool.get_or_create.assert_awaited_once_with("desktop:chat-1", helper_profile)
     mock_ensure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_call_agent_uses_pool_session_id_for_worker_todo_isolation(
+    orchestrator_with_worker_profile: AgentOrchestrator,
+):
+    """Worker 委派时 chat_with_session 须用池化 session_id，不可复用 Host session.id。"""
+    orch = orchestrator_with_worker_profile
+    session = _meeting_host_session()
+    worker_agent = MagicMock()
+    worker_agent.chat_with_session = AsyncMock(return_value="worker done")
+    worker_agent._execution_lock = asyncio.Lock()
+    worker_agent._agent_profile = orch._profile_store.get(WORKER_PROFILE_ID)
+    worker_agent._agent_profile_id = WORKER_PROFILE_ID
+    worker_agent.reasoning_engine = None
+
+    result = await AgentOrchestrator._call_agent(
+        worker_agent,
+        session,
+        "委派任务",
+        is_sub_agent=True,
+        pool_session_id=EXPECTED_POOL_SESSION_ID,
+    )
+
+    assert "worker done" in result
+    worker_agent.chat_with_session.assert_awaited_once()
+    assert worker_agent.chat_with_session.call_args.kwargs["session_id"] == EXPECTED_POOL_SESSION_ID
+    assert worker_agent.chat_with_session.call_args.kwargs["session_id"] != HOST_SESSION_ID
+
+
+@pytest.mark.asyncio
+async def test_run_with_progress_timeout_tracks_worker_pool_session_progress(
+    orchestrator_with_worker_profile: AgentOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """进度指纹须用 pool session id；用 Host session.id 会永远读不到 Worker 任务。"""
+    orch = orchestrator_with_worker_profile
+    session = _meeting_host_session()
+    worker_profile = orch._profile_store.get(WORKER_PROFILE_ID)
+
+    class _FakeTask:
+        iteration = 2
+        status = type("S", (), {"value": "running"})()
+        tools_executed = ["read_file", "create_todo"]
+
+    class _FakeState:
+        def get_task_for_session(self, sid: str):
+            if sid == EXPECTED_POOL_SESSION_ID:
+                return _FakeTask()
+            return None
+
+        current_task = None
+
+    worker_agent = MagicMock()
+    worker_agent.agent_state = _FakeState()
+    worker_agent.chat_with_session = AsyncMock(return_value="worker done")
+    worker_agent._execution_lock = asyncio.Lock()
+    worker_agent._agent_profile = worker_profile
+    worker_agent._agent_profile_id = WORKER_PROFILE_ID
+    worker_agent.reasoning_engine = None
+    orch._pool.get_or_create = AsyncMock(return_value=worker_agent)
+
+    progress_events: list[tuple[int, int]] = []
+
+    async def _slow_chat(*args, **kwargs):
+        await asyncio.sleep(0.35)
+        return "worker done"
+
+    worker_agent.chat_with_session = _slow_chat
+
+    from synapse.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "progress_timeout_seconds", 600)
+    monkeypatch.setattr(app_settings, "hard_timeout_seconds", 0)
+
+    real_log = orch._log_delegation
+
+    def _capture_log(payload: dict) -> None:
+        if payload.get("event") == "progress":
+            progress_events.append((payload.get("iter", -1), payload.get("tools_count", 0)))
+        real_log(payload)
+
+    monkeypatch.setattr(orch, "_log_delegation", _capture_log)
+
+    with patch("synapse.rd_meeting.agent_prompt.ensure_meeting_agent_configured"):
+        result = await orch._run_with_progress_timeout(
+            session,
+            "委派任务",
+            WORKER_PROFILE_ID,
+            depth=1,
+        )
+
+    assert "worker done" in result
+    assert progress_events, "expected progress fingerprint updates from worker pool session"
+    assert progress_events[0][0] == 2
+    assert progress_events[0][1] == 2

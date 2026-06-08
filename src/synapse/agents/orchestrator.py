@@ -676,9 +676,23 @@ class AgentOrchestrator:
         pool_session_id = resolve_rd_meeting_pool_session_id(
             session.id, agent_profile_id, depth=depth
         )
+        meeting_ctx = parse_rd_meeting_session(session.id) is not None
+        meeting_worker = meeting_ctx and depth > 0
+        # 研发会议室 Worker 单次委派可能跑 30min+ SKILL；Profile 上的 timeout_seconds
+        # 面向桌面短对话，不应用于硬杀会议室协作智能体。
+        if meeting_worker and getattr(profile, "timeout_seconds", None) is not None:
+            hard_timeout = float(
+                getattr(settings, "hard_timeout_seconds", 0) or _DEFAULT_HARD_TIMEOUT
+            )
+            logger.debug(
+                "[Orchestrator] rd_meeting worker %s: ignore profile timeout_seconds=%s",
+                agent_profile_id,
+                profile.timeout_seconds,
+            )
+
         agent = await self._pool.get_or_create(pool_session_id, profile)
 
-        if parse_rd_meeting_session(session.id) is not None:
+        if meeting_ctx:
             ensure_meeting_agent_configured(
                 agent,
                 session_id=pool_session_id,
@@ -707,12 +721,21 @@ class AgentOrchestrator:
         gw = self._gateway if pass_gateway else None
 
         task = asyncio.create_task(
-            self._call_agent(agent, session, message, gateway=gw, is_sub_agent=(depth > 0))
+            self._call_agent(
+                agent,
+                session,
+                message,
+                gateway=gw,
+                is_sub_agent=(depth > 0),
+                pool_session_id=pool_session_id,
+            )
         )
 
         start = time.monotonic()
         last_fingerprint: tuple[int, str, int] = (-1, "", 0)
         last_progress_time = start
+        # chat_with_session / agent_state 任务键与 pool 一致，不能用 Host session.id
+        progress_session_id = pool_session_id
 
         state_key = pre_state_key or f"{session.id}:{agent_profile_id}:{uuid.uuid4().hex[:8]}"
         existing_state = self._sub_agent_states.get(state_key, {})
@@ -752,14 +775,14 @@ class AgentOrchestrator:
                     self._update_sub_state(state_key, "timeout", elapsed)
                     raise TimeoutError()
 
-                fp = self._get_progress_fingerprint(agent, session.id, session)
+                fp = self._get_progress_fingerprint(agent, progress_session_id, session)
                 if fp != last_fingerprint:
                     last_fingerprint = fp
                     last_progress_time = time.monotonic()
                     logger.debug(
                         f"[Orchestrator] Agent {agent_profile_id} progress: "
                         f"iter={fp[0]}, status={fp[1]}, tools={fp[2]}, "
-                        f"elapsed={elapsed:.0f}s"
+                        f"elapsed={elapsed:.0f}s, progress_session={progress_session_id}"
                     )
                     self._log_delegation(
                         {
@@ -774,7 +797,7 @@ class AgentOrchestrator:
                     )
 
                 # Update live sub-agent state for frontend polling
-                tools_list = self._get_tools_executed(agent, session.id, session)
+                tools_list = self._get_tools_executed(agent, progress_session_id, session)
                 idle_s = time.monotonic() - last_progress_time
 
                 _current_tool = tools_list[-1] if tools_list else ""
@@ -1032,6 +1055,7 @@ class AgentOrchestrator:
         *,
         gateway: Any = None,
         is_sub_agent: bool = True,
+        pool_session_id: str | None = None,
     ) -> str:
         """Thin wrapper around agent.chat_with_session for use as a task target.
 
@@ -1041,7 +1065,14 @@ class AgentOrchestrator:
 
         Top-level agents (depth == 0) keep _is_sub_agent_call = False so they
         CAN use delegation tools (delegate_to_agent, spawn_agent, etc.).
+
+        ``pool_session_id`` 用于 todo / task 状态键（与 AgentInstancePool 一致）。
+        研发会议室 Worker 委派时必须与 ``rd_meeting:{room}:{profile}`` 对齐，
+        不可复用 Host 的 ``session.id``，否则会读到主控会话里的旧 todo 计划。
         """
+        chat_session_id = (pool_session_id or getattr(session, "id", None) or "").strip()
+        if not chat_session_id:
+            chat_session_id = str(getattr(session, "id", "") or "")
         if not hasattr(agent, "_execution_lock"):
             agent._execution_lock = asyncio.Lock()
 
@@ -1086,7 +1117,7 @@ class AgentOrchestrator:
                 result = await agent.chat_with_session(
                     message=message,
                     session_messages=session_messages,
-                    session_id=session.id,
+                    session_id=chat_session_id,
                     session=session,
                     gateway=gateway,
                     mode=_mode,

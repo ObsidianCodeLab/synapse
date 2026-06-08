@@ -78,7 +78,6 @@ from synapse.rd_meeting.sop_stage_hooks import schedule_sop_stage_transition_hoo
 from synapse.rd_meeting.room_skill import (
     DEFAULT_LLM_ENDPOINT_KEY,
     build_room_skill_prompt,
-    get_meeting_room_rules,
     make_context,
 )
 from synapse.rd_meeting.user_context import drain_user_context_for_prompt
@@ -215,7 +214,6 @@ class MeetingRoomOrchestrator:
         ]
         if not worker_ids:
             return
-        skill_body = get_meeting_room_rules()
         for wid in worker_ids:
             if prewarm_generation > 0 and not is_meeting_prewarm_generation_current(
                 room_id, prewarm_generation
@@ -246,7 +244,7 @@ class MeetingRoomOrchestrator:
                 scope_id=scope_id,
                 ticket_title=ticket_title,
                 scope_path=str(scope_dir(scope_id)),
-                skill_body=skill_body,
+                skill_body=None,
                 self_profile_id=wid,
             )
 

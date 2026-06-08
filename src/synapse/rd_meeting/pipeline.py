@@ -1009,6 +1009,39 @@ def clear_nodes_for_historical_reprocess(scope_id: str, node_ids: list[str]) -> 
         _remove_agent_sop_node_dir(scope_id, nid)
 
 
+def _clear_meeting_todo_sessions(scope_id: str) -> None:
+    """重处理时清理 Host/Worker 池化 session 上的 todo，避免残留步骤 id 与新一轮冲突。"""
+    from synapse.rd_meeting.agent_session import host_session_id
+    from synapse.tools.handlers.todo_state import force_close_plan
+
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    rs = load_room_state(sid) or {}
+    room_id = str(rs.get("room_id") or "").strip()
+    if not room_id:
+        return
+
+    force_close_plan(host_session_id(room_id))
+
+    worker_ids: list[str] = []
+    binding = rs.get("current_node_binding")
+    if isinstance(binding, dict):
+        raw_workers = binding.get("worker_profile_ids")
+        if isinstance(raw_workers, list):
+            worker_ids.extend(str(w).strip() for w in raw_workers if str(w).strip())
+    participants = rs.get("participants")
+    if isinstance(participants, list):
+        for item in participants:
+            if not isinstance(item, dict) or str(item.get("role") or "") != "worker":
+                continue
+            pid = str(item.get("profile_id") or "").strip()
+            if pid and pid not in worker_ids:
+                worker_ids.append(pid)
+    for wid in worker_ids:
+        force_close_plan(f"rd_meeting:{room_id}:{wid}")
+
+
 def clear_room_state_for_node_reprocess(
     scope_id: str,
     node_id: str,
@@ -1021,6 +1054,7 @@ def clear_room_state_for_node_reprocess(
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     clear_host_prompt_cache(sid)
+    _clear_meeting_todo_sessions(sid)
 
     metric_ids: list[str] = []
     if nid:
@@ -1050,6 +1084,12 @@ def clear_room_state_for_node_reprocess(
         "escalate_reason",
     ):
         rs.pop(key, None)
+
+    plan = rs.get("current_work_plan")
+    if isinstance(plan, dict):
+        plan_node = str(plan.get("node_id") or "").strip()
+        if plan_node and plan_node in metric_ids:
+            rs.pop("current_work_plan", None)
 
     node_metrics = rs.get("node_metrics")
     if isinstance(node_metrics, dict):

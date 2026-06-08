@@ -81,6 +81,11 @@ def test_clear_room_state_for_node_reprocess(monkeypatch):
         "stopped_at": "t",
         "stopped_reason": "user_stop",
         "hitl_locked": True,
+        "current_work_plan": {
+            "node_id": node_id,
+            "delegation_started": True,
+            "delegated_item_ids": ["t1"],
+        },
     }
 
     clear_room_state_for_node_reprocess(scope, node_id)
@@ -94,3 +99,64 @@ def test_clear_room_state_for_node_reprocess(monkeypatch):
     assert "participants" not in rs
     assert "stopped_at" not in rs
     assert "hitl_locked" not in rs
+    assert "current_work_plan" not in rs
+
+
+def test_clear_room_state_for_node_reprocess_keeps_other_node_work_plan(monkeypatch):
+    store: dict[str, dict] = {}
+
+    def _load(sid: str):
+        return dict(store.get(sid, {}))
+
+    def _save(sid: str, rs: dict):
+        store[sid] = dict(rs)
+
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.save_room_state", _save)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.save_room_state", _save)
+
+    scope = "rs-scope-2"
+    node_id = "req_clarify"
+    other_plan = {"node_id": "module_func", "delegation_started": True}
+    store[scope] = {"current_work_plan": other_plan}
+
+    clear_room_state_for_node_reprocess(scope, node_id)
+
+    assert store[scope]["current_work_plan"] == other_plan
+
+
+def test_clear_meeting_todo_sessions_on_reprocess(monkeypatch):
+    closed: list[str] = []
+
+    def _force_close(session_id: str) -> bool:
+        closed.append(session_id)
+        return True
+
+    monkeypatch.setattr("synapse.tools.handlers.todo_state.force_close_plan", _force_close)
+
+    scope = "todo-scope"
+    monkeypatch.setattr(
+        "synapse.rd_meeting.pipeline.load_room_state",
+        lambda sid: {
+            "room_id": "mr_d_todo_s1",
+            "current_node_binding": {"worker_profile_ids": ["whalecloud-design-expert"]},
+            "participants": [
+                {"profile_id": "default", "role": "host"},
+                {"profile_id": "whalecloud-design-expert", "role": "worker"},
+            ],
+        },
+    )
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.save_room_state", lambda sid, rs: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.host_prompt_cache.load_room_state",
+        lambda sid: {},
+    )
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.save_room_state", lambda sid, rs: None)
+
+    from synapse.rd_meeting.pipeline import _clear_meeting_todo_sessions
+
+    _clear_meeting_todo_sessions(scope)
+
+    assert "rd_meeting:mr_d_todo_s1:host" in closed
+    assert "rd_meeting:mr_d_todo_s1:whalecloud-design-expert" in closed

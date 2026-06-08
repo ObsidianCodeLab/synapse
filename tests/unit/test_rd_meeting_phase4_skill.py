@@ -10,6 +10,7 @@ from synapse.rd_meeting.room_skill import (
     get_meeting_room_rules,
     get_meeting_room_rules_meta,
     make_context,
+    resolve_meeting_rules_kind,
     trim_skill_for_role,
 )
 
@@ -37,24 +38,50 @@ def host_binding() -> dict:
 
 
 def test_meeting_room_rules_loads_from_bundled_md():
-    """会议室流程规则来自 prompts/meeting_room_rules.md。"""
-    body = get_meeting_room_rules()
-    assert body, "规则正文不应为空"
-    assert "## 会议室流程与规则" in body
-    assert "### 1. 节点成功标准" in body
-    assert "### 7. 不变量" in body
-    assert "name: whalecloud-dev-tool-meeting-room" not in body, "不应再含 front-matter"
-    meta = get_meeting_room_rules_meta()
-    assert "meeting_room_rules.md" in meta["source"]
+    """会议室流程规则按节点类型分流到三份模板。"""
+    ai_body = get_meeting_room_rules(node_type="ai")
+    assert ai_body, "AI 规则正文不应为空"
+    assert "AI 主导节点" in ai_body
+    assert "分工" in ai_body
+    assert "必须先" in ai_body
+    assert "禁止 Host 代劳" in ai_body
+    assert "HITL 问卷规范" not in ai_body
+    assert "问卷格式" not in ai_body
+    assert "协同评审" not in ai_body
+    assert "kind=exception" not in ai_body
+    assert "禁止" in ai_body and "submit_hitl_questionnaire" in ai_body
+
+    human_body = get_meeting_room_rules(node_type="human")
+    assert "人工主导节点" in human_body
+    assert "HITL 硬约束" in human_body
+    assert "问卷格式" in human_body
+    assert "自主多轮迭代" not in human_body
+
+    collab_body = get_meeting_room_rules(node_type="ai_human")
+    assert "协同节点" in collab_body
+    assert "方案评审" in collab_body
+    assert "interactive" in collab_body
+    assert "禁止" in collab_body
+
+    assert resolve_meeting_rules_kind(node_type="ai") == "ai"
+    assert resolve_meeting_rules_kind(node_type="human") == "human"
+    assert resolve_meeting_rules_kind(node_type="ai_human") == "collab"
+    assert resolve_meeting_rules_kind(node_id="req_clarify") == "human"
+    assert resolve_meeting_rules_kind(node_id="boundary") == "ai"
+    assert resolve_meeting_rules_kind(node_id="solution_review") == "collab"
+
+    meta = get_meeting_room_rules_meta(node_type="human")
+    assert "meeting_room_rules_human.md" in meta["source"]
+    assert meta["kind"] == "human"
 
 
 def test_trim_skill_for_role_keeps_host_and_strips_worker():
     """精简后：流程规则仅 host 看到；worker 视角下规则段为空。"""
-    body = get_meeting_room_rules()
+    body = get_meeting_room_rules(node_type="ai")
     host_view = trim_skill_for_role(body, "host")
     worker_view = trim_skill_for_role(body, "worker")
 
-    assert "### 3. 工作循环" in host_view
+    assert "### 2. 小鲸与协作智能体分工" in host_view
     assert worker_view == "", "worker 视角不应再追加任何流程规则正文"
 
 
@@ -138,16 +165,16 @@ def test_build_room_skill_prompt_renders_context_vars(host_binding, monkeypatch)
     assert "worker-default" in rendered
     # 精简后：只在 host 段出现「会议室流程与规则」，且无四段式 §0/§3/§4 标题
     assert "## 会议室流程与规则" in rendered
-    assert "### 3. 工作循环" in rendered
+    assert "### 2. 小鲸与协作智能体分工" in rendered
     assert "## 3. 小鲸（Host）的工作循环" not in rendered, "旧版四段式标题不应再出现"
     assert "## 4. 协作智能体（Worker）的协作规范" not in rendered
     # 「一、本 SOP 环节工作信息」已在运行时头展示，不再注入到「系统信息」中
     assert "## 一、本 SOP 环节工作信息" not in rendered, "运行时头已覆盖，避免重复"
     assert "本产品为账务中心" in rendered, "运营补充应在运行时头展示"
     assert "{DYNAMIC_MEETING_CONTEXT}" not in rendered
-    assert rendered.count("## 二、工单信息") == 1
-    assert "## 三、产品信息" in rendered
-    assert "## 四、系统信息" in rendered
+    assert rendered.count("## 一、工单信息") == 1
+    assert "## 二、产品信息" in rendered
+    assert "## 三、系统信息" in rendered
     # 能力卡片应排除自己（host 视角时不渲染 host 自己卡）
     assert "## 参会能力卡片" in rendered
     # 会议任务展示为「阶段名 + 节点名」格式
@@ -164,7 +191,22 @@ def test_build_room_skill_prompt_renders_context_vars(host_binding, monkeypatch)
     assert "本会话不提供 list_skills" in rendered
 
 
-def test_build_room_skill_prompt_worker_view(host_binding):
+def test_build_room_skill_prompt_worker_view(host_binding, monkeypatch):
+    monkeypatch.setattr(
+        "synapse.rd_meeting.init_context.resolve_product_for_meeting",
+        lambda *_a, **_k: (
+            {"locator_code": "ok", "prod": "p1", "repos": [], "docs": []},
+            {"synapse_url": "http://127.0.0.1:10001"},
+        ),
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.init_context._scope_row",
+        lambda *_a, **_k: {"demand_no": "21878317", "demand_title": "演示工单", "prod": "p1"},
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.userwork_sync.load_scope_work_order_context",
+        lambda *_a, **_k: {"demand_no": "21878317", "demand_title": "演示工单", "prod": "p1"},
+    )
     ctx = make_context(
         role="worker",
         binding=host_binding,
@@ -173,19 +215,19 @@ def test_build_room_skill_prompt_worker_view(host_binding):
         ticket_title="演示工单",
         archive_dir="/tmp/work/21878317/archive/1/boundary",
     )
-    rendered = build_room_skill_prompt(ctx)
+    rendered = build_room_skill_prompt(ctx, binding=host_binding)
     # 精简后：worker 视角不再追加任何流程规则正文
     assert "## 会议室流程与规则" not in rendered, "worker 视角不应再看到 host 专属规则段"
-    assert "### 3. 工作循环" not in rendered
+    assert "### 2. 小鲸与协作智能体分工" not in rendered
     # Worker 视角下不再渲染「参会能力卡片」，改为渲染当前 worker 自己的「能力档案」
     assert "## 参会能力卡片" not in rendered, "worker 不允许委派，不应再看到他人能力卡片"
     assert "## 你的能力档案" in rendered
     # 自己的 worker id 应出现在能力档案中
     assert "whalecloud-requirement-expert" in rendered
     # 工单 / 产品 / 系统三段都应在
-    assert "## 二、工单信息" in rendered
-    assert "## 三、产品信息" in rendered
-    assert "## 四、系统信息" in rendered
+    assert "## 一、工单信息" in rendered
+    assert "## 二、产品信息" in rendered
+    assert "## 三、系统信息" in rendered
     # Worker 也必须看到技能与工具裁剪说明
     assert "## 工具与技能使用" in rendered
     assert "你具备的技能" in rendered

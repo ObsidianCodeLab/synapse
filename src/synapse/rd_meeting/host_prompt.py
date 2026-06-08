@@ -49,7 +49,10 @@ def assemble_host_prompt_bundle(
         sop_node_display=sop_display,
     )
 
-    skill_body = get_meeting_room_rules()
+    skill_body = get_meeting_room_rules(
+        node_type=str(bind.get("type") or ""),
+        node_id=nid,
+    )
     ctx = make_context(
         role="host",
         binding=bind,

@@ -407,7 +407,18 @@ class PlanHandler:
                 break
 
         if not step_found:
-            return f"❌ 未找到步骤：{step_id}"
+            available = [
+                str(s.get("id") or "").strip()
+                for s in (_plan.get("steps") or [])
+                if isinstance(s, dict) and str(s.get("id") or "").strip()
+            ]
+            if available:
+                return (
+                    f"❌ 未找到步骤：{step_id}；"
+                    f"当前计划可用步骤：{', '.join(available)}。"
+                    f"请用 create_todo 重建计划，或改用上述 step_id。"
+                )
+            return f"❌ 未找到步骤：{step_id}；当前计划无步骤，请先调用 create_todo"
 
         self._save_plan_markdown()
         cid_for_store = self._get_conversation_id()

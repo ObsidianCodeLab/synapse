@@ -2,8 +2,8 @@
 
 设计目标（对齐《多智能体研发会议室实现方案》§9）：
 
-- 会议室通用规范来自 ``prompts/meeting_room_rules.md``（或 ``settings.rd_meeting_rules_path``），
-  与 SKILL 加载机制无关，仅作为本会议室 Host 的 system 上下文片段。
+- 会议室 Host 规范来自 ``prompts/meeting_room_rules_{ai,human,collab}.md``（按节点类型分流；
+  或 ``settings.rd_meeting_rules_path`` 指向单一自定义文件），与 SKILL 加载机制无关。
 - 同时渲染「参会能力卡片」（host 视角）/「你的能力档案」（worker 视角），让小鲸按能力
   边界派单、让 worker 清楚自己的身份与边界。
 - `ask-user` 仍以独立 SKILL.md 形式存在（人机问卷格式与示例较多，单独维护）。
@@ -31,12 +31,17 @@ from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 logger = logging.getLogger(__name__)
 
 Role = Literal["host", "worker"]
+MeetingRulesKind = Literal["ai", "human", "collab"]
 
 DEFAULT_ASK_USER_SKILL_ID = "whalecloud-dev-tool-ask-user"
 DEFAULT_LLM_ENDPOINT_KEY = "default"
 
-# 默认会议室规则文件名（与本模块同级 prompts/ 目录）
-_DEFAULT_RULES_FILENAME = "meeting_room_rules.md"
+# 会议室规则模板（与本模块同级 prompts/ 目录，按 SOP 节点 type 分流）
+_RULES_FILENAME_BY_KIND: dict[MeetingRulesKind, str] = {
+    "ai": "meeting_room_rules_ai.md",
+    "human": "meeting_room_rules_human.md",
+    "collab": "meeting_room_rules_collab.md",
+}
 
 
 # ─── SKILL.md 定位（仅供 ask-user 等真正的外部 SKILL 使用） ────────────
@@ -105,40 +110,56 @@ def load_ask_user_skill_body(skill_id: str = DEFAULT_ASK_USER_SKILL_ID) -> str:
         return ""
 
 
-def get_meeting_room_rules() -> str:
+def resolve_meeting_rules_kind(*, node_type: str = "", node_id: str = "") -> MeetingRulesKind:
+    """按 SOP 节点类型选择会议室规则模板。"""
+    from synapse.rd_sop.manifest import NODE_TYPES
+
+    t = (node_type or "").strip()
+    if not t and node_id:
+        t = NODE_TYPES.get((node_id or "").strip(), "")
+    if t == "ai_human":
+        return "collab"
+    if t in ("human", "human_start", "human_multi", "ai_exception"):
+        return "human"
+    return "ai"
+
+
+def get_meeting_room_rules(*, node_type: str = "", node_id: str = "") -> str:
     """返回会议室通用规范正文。
 
     优先级：
     1. ``settings.rd_meeting_rules_path``（私有化 / 多租户场景可指向自定义规则文件）
-    2. 本模块同级 ``prompts/meeting_room_rules.md``（随仓库发布的默认版本）
+    2. 按 ``node_type`` / ``node_id`` 选择 ``prompts/meeting_room_rules_{ai,human,collab}.md``
 
     文件缺失或读盘失败时返回空字符串并打 error 日志。
 
     读取结果带 LRU 缓存。如需在运行时强制重载，调用
     :func:`reload_meeting_room_rules`。
     """
-    text, _ = _load_meeting_room_rules()
+    kind = resolve_meeting_rules_kind(node_type=node_type, node_id=node_id)
+    text, _ = _load_meeting_room_rules(kind)
     return text
 
 
-def get_meeting_room_rules_meta() -> dict[str, str]:
-    """返回当前生效规则的元数据：``source`` / ``sha256[:12]`` / ``length``。
+def get_meeting_room_rules_meta(*, node_type: str = "", node_id: str = "") -> dict[str, str]:
+    """返回当前生效规则的元数据：``source`` / ``sha256[:12]`` / ``length`` / ``kind``。
 
     供调试 / 审计使用——例如把 hash 一并写进 ``hitl_submission.schema_snapshot``，
     便于复盘"那次会议跑成那样时用的是哪一版规则"。
     """
-    text, source = _load_meeting_room_rules()
+    kind = resolve_meeting_rules_kind(node_type=node_type, node_id=node_id)
+    text, source = _load_meeting_room_rules(kind)
     digest = hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()[:12]
-    return {"source": source, "sha256": digest, "length": str(len(text))}
+    return {"source": source, "sha256": digest, "length": str(len(text)), "kind": kind}
 
 
 def reload_meeting_room_rules() -> dict[str, str]:
-    """清除规则缓存，下次取用时重新读盘。返回新的元数据。"""
+    """清除规则缓存，下次取用时重新读盘。返回 ai 模板的元数据（兼容旧调用）。"""
     _load_meeting_room_rules.cache_clear()  # type: ignore[attr-defined]
-    return get_meeting_room_rules_meta()
+    return get_meeting_room_rules_meta(node_type="ai")
 
 
-def _resolve_rules_path() -> Path | None:
+def _resolve_rules_path(*, kind: MeetingRulesKind = "ai") -> Path | None:
     """按优先级解析规则文件路径。"""
     try:
         from synapse.config import settings
@@ -155,15 +176,16 @@ def _resolve_rules_path() -> Path | None:
     except Exception as exc:
         logger.debug("settings.rd_meeting_rules_path lookup skipped: %s", exc)
 
-    bundled = Path(__file__).resolve().parent / "prompts" / _DEFAULT_RULES_FILENAME
-    if bundled.is_file():
-        return bundled
+    prompts_dir = Path(__file__).resolve().parent / "prompts"
+    typed = prompts_dir / _RULES_FILENAME_BY_KIND[kind]
+    if typed.is_file():
+        return typed
     return None
 
 
-def _load_meeting_room_rules_uncached() -> tuple[str, str]:
+def _load_meeting_room_rules_uncached(kind: MeetingRulesKind = "ai") -> tuple[str, str]:
     """实际读盘逻辑，返回 (text, source_label)。"""
-    path = _resolve_rules_path()
+    path = _resolve_rules_path(kind=kind)
     if path is not None:
         try:
             text = path.read_text(encoding="utf-8")
@@ -173,7 +195,7 @@ def _load_meeting_room_rules_uncached() -> tuple[str, str]:
     else:
         logger.error(
             "meeting room rules file not found; expected prompts/%s or settings.rd_meeting_rules_path",
-            _DEFAULT_RULES_FILENAME,
+            _RULES_FILENAME_BY_KIND[kind],
         )
     return "", "<missing>"
 
@@ -181,12 +203,14 @@ def _load_meeting_room_rules_uncached() -> tuple[str, str]:
 try:
     from functools import lru_cache
 
-    @lru_cache(maxsize=1)
-    def _load_meeting_room_rules() -> tuple[str, str]:  # type: ignore[no-redef]
-        return _load_meeting_room_rules_uncached()
+    @lru_cache(maxsize=8)
+    def _load_meeting_room_rules(kind: str = "ai") -> tuple[str, str]:  # type: ignore[no-redef]
+        k: MeetingRulesKind = kind if kind in ("ai", "human", "collab") else "ai"
+        return _load_meeting_room_rules_uncached(k)
 except Exception:  # pragma: no cover - lru_cache 总是可用，仅作防御
-    def _load_meeting_room_rules() -> tuple[str, str]:  # type: ignore[no-redef]
-        return _load_meeting_room_rules_uncached()
+    def _load_meeting_room_rules(kind: str = "ai") -> tuple[str, str]:  # type: ignore[no-redef]
+        k: MeetingRulesKind = kind if kind in ("ai", "human", "collab") else "ai"
+        return _load_meeting_room_rules_uncached(k)
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -718,8 +742,13 @@ def _format_meeting_outputs(binding: dict[str, Any] | None) -> str:
     return "、".join(f"`{n}`" for n in outs)
 
 
-def _append_host_duties_shared(lines: list[str], context: MeetingRoomContext) -> None:
-    """主持职责：有/无协作智能体共用。"""
+def _append_host_duties_shared(
+    lines: list[str],
+    context: MeetingRoomContext,
+    *,
+    rules_kind: MeetingRulesKind = "ai",
+) -> None:
+    """主持职责：按节点规则模板裁剪共性说明。"""
     lines.append(
         "- 必须熟悉本工单对应的产品信息（产品文档 / 仓库代码 / 历史工单），"
         "所有决策都要基于产品事实；缺少产品事实时可以拒绝或报错，**不得臆造**。"
@@ -727,60 +756,109 @@ def _append_host_duties_shared(lines: list[str], context: MeetingRoomContext) ->
     lines.append(
         "- 基于产品事实，**专注于上方「会议目标」中要做的具体事情**，不进行超出本节点目标的决策。"
     )
-    lines.append(
-        "- **用户反馈内容持久化**（共性原则）：用户反馈的内容（包括澄清、澄清后的问题）"
-        "必须持久化到临时文件中，供下一轮迭代使用；**禁止**用户反馈内容丢失。"
-    )
-    lines.append(
-        "- **多轮迭代继承上一轮结果**（共性原则）：上一轮已被认可 / 校验通过的结论**直接视为既成事实**，"
-        "已被指正的按最新口径覆盖、新增想法纳入推演；下一轮**只**推进未决 / 新增 / 需重做的部分，"
-        "**禁止**推倒重来或重复审问已通过项；详见下方规范 §3.1。"
-    )
-    if (context.node_id or "").strip() == "solution_review":
+    if rules_kind == "human":
         lines.append(
-            "- **方案评审节点（专用流程）**：须执行 `whalecloud-dev-tool-solution-review` 生成 "
-            "`solution_review.json` 与 `方案评审结论.md`；**禁止** `submit_hitl_questionnaire(kind=interactive)`。"
-            "人工评审由前端「方案评审」面板完成（补丁选择 + 通过/不通过），系统会自动进入门控。"
+            "- **用户反馈内容持久化**：用户澄清与补充须写入 `hitl_context.json` 台账；"
+            "**禁止**丢失多行补充。生成产出前须 read_file 该路径。"
+        )
+        lines.append(
+            "- **多轮会中问卷**：已确认项视为既成事实，只推进未决点；详见下方规范 §3.1。"
+        )
+        lines.append(
+            "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
+            "提交后立即停止；用户无新指正时收敛归档。"
+        )
+    elif rules_kind == "collab":
+        nid = (context.node_id or "").strip()
+        if nid == "solution_review":
+            lines.append(
+                "- **方案评审（协同门控）**：执行 `whalecloud-dev-tool-solution-review` 生成 "
+                "`solution_review.json` 与 `方案评审结论.md`；**禁止** interactive HITL。"
+                "人工在「方案评审」面板裁决。"
+            )
+        elif nid == "leader_review":
+            lines.append(
+                "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
+                "**禁止** interactive HITL；人工在 NodeReview 面板确认。"
+            )
+        else:
+            lines.append(
+                "- **协同评审节点**：结构化报告落盘后走专用前端面板；**禁止** interactive HITL。"
+            )
+    else:
+        lines.append(
+            "- **自主迭代**：上一轮已通过自检的结论视为既成事实，只补未决项；详见下方规范 §2.1。"
+        )
+        lines.append(
+            "- **AI 节点无人机交互**：`human_confirm` 固定关闭；三项校验全过且产出覆盖「会议产出」清单方可归档；"
+            "自主迭代 ≤3 轮，仍未收敛则在正文说明阻塞并停止，**禁止**调用 `submit_hitl_questionnaire`。"
         )
     lines.append(
-        "- **`human_confirm: true` 时**：每轮决策都通过 HITL 表单交由用户裁决；"
-        "当用户无新想法亦无新指正时即视为本轮收敛。"
-    )
-    lines.append(
-        '- **`human_confirm: false` 时**：不发表单，由你自评收敛质量——若三项校验（契合度 / 真实性 / 准确性）'
-        "有任一不通过、证据缺失、产出相互矛盾、或决策高影响，则**必须再迭代一轮**；"
-        "三项全过且产出已覆盖「会议产出」清单时才能归档；自主迭代原则上**不超过 3 轮**，"
-        '仍未收敛时升级为 `submit_hitl_questionnaire(kind="exception", ...)` 请求人工介入。'
-    )
-    lines.append(
-        "- 节点目标完成且通过自检后，按下方规范第 6 节归档到「本节点归档目录」"
-        "（系统信息段已展示完整路径，并带阶段名 · 节点名便于识别）并报告结论。"
+        "- 节点目标完成且通过自检后，按下方规范「输出物与归档」写入「本节点归档目录」"
+        "（系统信息段已展示完整路径）并报告结论。"
     )
     lines.append(
         "- **会议产出 = 归档文件名（硬约束）**：上方「会议产出」列出的就是本节点必须落盘的文件，"
         "归档文件名必须与之**逐字一致**（如 `需求澄清.md`、`模块功能.md`），"
         "**禁止**改名 / 加前后缀 / 用 `result.md` 替代；多文件时每一项都要落盘，且不能多出清单之外的文件。"
     )
-    lines.append(
-        '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
-        "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板；"
-        "若运行时头已给出 `hitl_context.json` 路径且文件存在，**必须先** `read_file` 该路径，"
-        '再以之为 `CONTEXT_JSON` 调用 doc-generate 落盘；若模板缺失或与本节点产出物不匹配，**立即** '
-        '`submit_hitl_questionnaire(kind="exception", summary="doc-generate 缺少 <文件名> 模板，需人工补齐模板或调整产出物清单")` '
-        "请求人工介入，**禁止**自行手写 Markdown 兜底。"
-    )
-    lines.append(
-        '- **`result_confirm` 不得整篇覆盖会议产出**：节点验收问卷仅用于确认/返工指令，'
-        "禁止用验收轮反馈直接重写已归档的「会议产出」全文。"
-    )
-    lines.append(
-        "- `human_confirm` 开启或出现异常 / 风险不可控时，必须调用 `submit_hitl_questionnaire`，"
-        "**禁止伪造用户答复**，**禁止只口头宣称问卷已提交**。"
-    )
+    if rules_kind == "collab" and (context.node_id or "").strip() == "solution_review":
+        lines.append(
+            "- **方案评审产出**：须通过 `whalecloud-dev-tool-solution-review` 生成 "
+            "`solution_review.json` 与 `方案评审结论.md`；JSON schema 校验失败或模板缺失时 exception HITL。"
+        )
+    elif rules_kind == "human":
+        doc_ctx = (
+            "若运行时头已给出 `hitl_context.json` 路径且文件存在，**必须先** `read_file` 该路径，"
+            "再以之为 `CONTEXT_JSON` 调用 doc-generate 落盘；"
+        )
+        lines.append(
+            '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
+            "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板；"
+            f"{doc_ctx}"
+            '若模板缺失或与本节点产出物不匹配，**立即** '
+            '`submit_hitl_questionnaire(kind="exception", summary="doc-generate 缺少 <文件名> 模板，需人工补齐模板或调整产出物清单")` '
+            "请求人工介入，**禁止**自行手写 Markdown 兜底。"
+        )
+    elif rules_kind == "ai":
+        lines.append(
+            '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
+            "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板，再落盘；"
+            "模板缺失时在正文说明阻塞原因并停止落盘，**禁止**手写 Markdown 兜底，**禁止**调用 `submit_hitl_questionnaire`。"
+        )
+    else:
+        lines.append(
+            "- **协同节点产出**：按节点专用 SKILL 生成结构化报告与结论文档；"
+            "schema / 模板缺失时 exception HITL，禁止手写绕过。"
+        )
+    if rules_kind == "human":
+        lines.append(
+            "- **`result_confirm` 不得整篇覆盖会议产出**：节点验收问卷仅用于确认/返工指令，"
+            "禁止用验收轮反馈直接重写已归档的「会议产出」全文。"
+        )
+        lines.append(
+            "- `human_confirm` 开启或出现异常时，必须调用 `submit_hitl_questionnaire`，"
+            "**禁止伪造用户答复**，**禁止只口头宣称问卷已提交**。"
+        )
+    elif rules_kind == "collab":
+        lines.append(
+            "- 协同节点**禁止** `submit_hitl_questionnaire(kind=\"interactive\")`；"
+            "仅异常场景使用 `kind=\"exception\"`。"
+        )
+    else:
+        lines.append(
+            "- **禁止** `submit_hitl_questionnaire` 及一切问卷 / 表单流程；"
+            "不得口头宣称已提交表单或等待人工确认。"
+        )
 
 
 def _append_host_duties_with_collaborators(lines: list[str]) -> None:
     """主持职责：本场有协作智能体。"""
+    lines.append(
+        "- **有 Worker 必须先委派（强制）**：参会能力卡片上 Worker 具备的技能，"
+        "**禁止** Host 在本会话抢先执行；须 `submit_meeting_work_plan` → `delegate_*` 后再综合校验。"
+        "Host 只做主持编排与 Worker 不具备能力时的补缺。"
+    )
     lines.append(
         "- **事实先于分析（强约束）**：委派分析型 SKILL 前，须先完成或并行完成代码/文档/相似工单事实收集；"
         "除非用户反馈了明确的分析方向, 否则禁止在指派任务时圈定范围或维度。"
@@ -938,13 +1016,17 @@ def build_meeting_runtime_header(
     lines.append("")
 
     solo_host = False
+    rules_kind = resolve_meeting_rules_kind(
+        node_type=str((binding or {}).get("type") or ""),
+        node_id=context.node_id,
+    )
     if role == "host":
         solo_host = not collaboration_worker_ids(
             context.host_profile_id,
             context.worker_profile_ids,
         )
         lines.append("## 主持人职责")
-        _append_host_duties_shared(lines, context)
+        _append_host_duties_shared(lines, context, rules_kind=rules_kind)
         if solo_host:
             _append_host_duties_solo(lines)
         else:
@@ -975,10 +1057,21 @@ def build_meeting_runtime_header(
         "get_skill_info / run_skill_script / get_skill_reference 等。"
     )
     if role == "host":
-        lines.append(
-            "- **Host 额外工具**：submit_meeting_work_plan、submit_hitl_questionnaire、"
-            "delegate_to_agent、delegate_parallel、send_agent_message。"
-        )
+        if rules_kind == "human":
+            lines.append(
+                "- **Host 额外工具**：submit_meeting_work_plan、submit_hitl_questionnaire、"
+                "delegate_to_agent、delegate_parallel、send_agent_message。"
+            )
+        elif rules_kind == "collab":
+            lines.append(
+                "- **Host 额外工具**：submit_hitl_questionnaire（**仅** kind=exception）、"
+                "send_agent_message；**禁止** delegate_* 与 interactive 问卷。"
+            )
+        else:
+            lines.append(
+                "- **Host 额外工具**：submit_meeting_work_plan、delegate_to_agent、delegate_parallel、"
+                "send_agent_message；**禁止** `submit_hitl_questionnaire`（本类型无人机交互）。"
+            )
     lines.append("- **外部技能（SKILL）执行路径（强约束）**：")
     skill_id_hint = (
         "「你的能力档案」"
@@ -1043,9 +1136,8 @@ def build_room_skill_prompt(
     2. **系统信息**（`build_dynamic_meeting_context(include_overview=False)`）—— 都看：
        仅工单 / 产品 / 系统三段；运行时头已展示的「会议节点/会议目标/人工确认/协作智能体」
        不再重复。
-    3. **会议室流程与规则**（``prompts/meeting_room_rules.md``）—— **仅 Host** 追加：
-       节点成功标准、HITL 语义、工作循环、产品上下文加载、HITL 三场景与 summary 约束、
-       归档要求、不变量。
+    3. **会议室流程与规则**（``prompts/meeting_room_rules_{ai,human,collab}.md``）—— **仅 Host** 追加：
+       按 ``binding.type`` 注入 AI / 人工 / 协同 三套模板之一。
 
     `skill_body` 仅供测试 / 缓存等场景覆盖。
     """
@@ -1080,7 +1172,10 @@ def build_room_skill_prompt(
         include_overview=False,
     )
 
-    body = skill_body if skill_body is not None else get_meeting_room_rules()
+    body = skill_body if skill_body is not None else get_meeting_room_rules(
+        node_type=str(bind.get("type") or ""),
+        node_id=str(bind.get("node_id") or context.node_id),
+    )
     body = trim_skill_for_role(body, context.role)
     rules_block = render_skill(body, context.template_vars()).strip() if body else ""
 
