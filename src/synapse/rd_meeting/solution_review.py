@@ -27,6 +27,7 @@ SPLIT_PLAN_NAME = "split_plan.json"
 CONCLUSION_NAME = "方案评审结论.md"
 SCHEMA_VERSION = 1
 MIN_HUMAN_REVIEW_COMMENT_LEN = 50
+MAX_SPLIT_TASKS = 5
 
 _TABLE_ROW_RE = re.compile(r"^\|(.+)\|$")
 _SECTION_RE = re.compile(r"^#{1,4}\s+(.+)$")
@@ -447,6 +448,19 @@ def ensure_human_review_pending_for_gate(
     return out
 
 
+def validate_split_tasks_draft(tasks: list[Any]) -> None:
+    """校验拆单草案：非空且不超过 MAX_SPLIT_TASKS。"""
+    if not isinstance(tasks, list) or not tasks:
+        raise ValueError("split_tasks_draft_required")
+    if len(tasks) > MAX_SPLIT_TASKS:
+        raise ValueError(f"split_tasks_draft_too_many:{MAX_SPLIT_TASKS}")
+    for i, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            raise ValueError(f"split_tasks_draft_invalid:{i}")
+        if not str(task.get("taskTitle") or "").strip():
+            raise ValueError(f"split_task_title_required:{i}")
+
+
 def validate_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
     data = _read_json_file(json_path(scope_id))
     if data is None:
@@ -460,6 +474,8 @@ def validate_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
     draft = data.get("split_tasks_draft")
     if not isinstance(draft, list) or not draft:
         errors.append("split_tasks_draft 须为非空数组")
+    elif len(draft) > MAX_SPLIT_TASKS:
+        errors.append(f"split_tasks_draft 不得超过 {MAX_SPLIT_TASKS} 条")
     return len(errors) == 0, errors
 
 
@@ -662,6 +678,15 @@ def apply_patch_selections(
 HumanDecision = Literal["approve", "reject"]
 
 
+def save_split_tasks_draft(scope_id: str, tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    """人工编辑拆单草案后落盘（不改变 human_review 状态）。"""
+    validate_split_tasks_draft(tasks)
+    payload = load_solution_review_payload(scope_id) or {}
+    payload["split_tasks_draft"] = [dict(x) for x in tasks if isinstance(x, dict)]
+    _write_json_file(json_path(scope_id), payload)
+    return payload
+
+
 def validate_human_review_comment(comment: str) -> None:
     """人工评审意见不少于 MIN_HUMAN_REVIEW_COMMENT_LEN 字（按 Unicode 字符计）。"""
     text = (comment or "").strip()
@@ -678,6 +703,7 @@ def apply_human_decision(
     comment: str,
     patches: list[dict[str, Any]] | None = None,
     demand_no: str = "",
+    tasks_override: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """写入人工裁决、拆单计划与评审结论；返回更新后的 payload。"""
     validate_human_review_comment(comment)
@@ -693,7 +719,11 @@ def apply_human_decision(
     }
     payload["reviewed_at"] = payload.get("reviewed_at") or _now_iso()
 
-    tasks = ensure_split_tasks_draft(payload, demand_no)
+    if tasks_override is not None:
+        tasks = [dict(x) for x in tasks_override if isinstance(x, dict)]
+    else:
+        tasks = ensure_split_tasks_draft(payload, demand_no)
+    validate_split_tasks_draft(tasks)
     if decision == "approve":
         if not patches:
             raise ValueError("patches_required")

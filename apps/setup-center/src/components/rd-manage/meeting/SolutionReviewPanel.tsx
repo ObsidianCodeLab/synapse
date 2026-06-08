@@ -13,21 +13,24 @@ import {
   message,
 } from 'antd';
 import {
-  ArrowRight,
   CheckCircle2,
   FileText,
   GitBranch,
   Layers,
   Loader2,
   Package,
+  Plus,
   Shield,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 
 import {
   fetchPatchVersions,
   fetchSolutionReview,
+  saveSolutionReviewTasks,
   submitSolutionReviewDecision,
+  MAX_SPLIT_TASKS,
   type PatchVersionItem,
   type SolutionReviewPayload,
   type SplitTaskDraft,
@@ -132,43 +135,171 @@ function patchOptionsToSearchable(
   return [{ value: cur, label: cur }, ...opts];
 }
 
-/** 按仓库行与 split_tasks_draft 合并，供拆单预览 1:1 展示 */
-function buildSplitPreviewForRepo(
-  repo: SolutionReviewRepoRow,
-  tasks: SplitTaskDraft[],
-  patchByBranch: Record<string, string>,
-  demandNo: string,
-  requirementName: string,
-): SplitTaskDraft {
-  const bid = repoBranchId(repo);
-  const matched =
-    tasks.find((t) => (t.branch_version_id || '').trim() === bid && bid) ??
-    tasks.find(
-      (t) =>
-        (t.productModuleName || '').trim() === (repo.product_module_name || '').trim() &&
-        (t.branchVersionName || '').trim() === (repo.branch_version_name || '').trim(),
-    );
-  const patch = bid ? patchByBranch[bid] : '';
-  const titleBase = (requirementName || demandNo || '研发子单').trim();
-  const mod = (repo.product_module_name || '').trim();
+function repoOptionLabel(row: SolutionReviewRepoRow): string {
+  return repoDisplayLabel(row);
+}
 
+function applyRepoToTask(task: SplitTaskDraft, repo: SolutionReviewRepoRow): SplitTaskDraft {
   return {
-    taskNo: matched?.taskNo || demandNo,
-    taskTitle: matched?.taskTitle || `${titleBase}${mod ? ` — ${mod}` : ''}`,
-    comments: matched?.comments || repo.change_summary || '',
-    productModuleName: repo.product_module_name || matched?.productModuleName,
-    branchVersionName: repo.branch_version_name || matched?.branchVersionName,
-    patchName: patch || matched?.patchName || '',
-    taskImpactDesc: matched?.taskImpactDesc,
-    performanceImpact: matched?.performanceImpact,
-    functionalImpact: matched?.functionalImpact,
-    cfgChangeDescription: matched?.cfgChangeDescription,
-    upgradeRisk: matched?.upgradeRisk,
-    securityImpact: matched?.securityImpact,
-    compatibilityImpact: matched?.compatibilityImpact,
-    branch_version_id: bid,
+    ...task,
+    productModuleName: repo.product_module_name || task.productModuleName,
+    branchVersionName: repo.branch_version_name || task.branchVersionName,
+    branch_version_id: repoBranchId(repo) || task.branch_version_id,
   };
 }
+
+function emptySplitTask(demandNo: string, requirementName: string, repos: SolutionReviewRepoRow[]): SplitTaskDraft {
+  const titleBase = (requirementName || demandNo || '研发子单').trim();
+  const first = repos[0];
+  const base: SplitTaskDraft = {
+    taskNo: demandNo,
+    taskTitle: `${titleBase} — 研发子单`,
+    comments: '',
+    productModuleName: '',
+    branchVersionName: '',
+    patchName: '',
+    taskImpactDesc: '',
+    branch_version_id: '',
+  };
+  return first ? applyRepoToTask(base, first) : base;
+}
+
+// ─── 可编辑拆单任务卡片 ─────────────────────────────────────────────
+
+const SplitTaskEditorCard: React.FC<{
+  index: number;
+  task: SplitTaskDraft;
+  repos: SolutionReviewRepoRow[];
+  patchName?: string;
+  readOnly: boolean;
+  canDelete: boolean;
+  onChange: (index: number, patch: Partial<SplitTaskDraft>) => void;
+  onDelete: (index: number) => void;
+}> = ({ index, task, repos, patchName, readOnly, canDelete, onChange, onDelete }) => {
+  const repoOptions: SearchableOption[] = repos
+    .filter((r) => repoBranchId(r))
+    .map((r) => ({
+      value: repoBranchId(r),
+      label: repoOptionLabel(r),
+    }));
+
+  const selectedBranch = (task.branch_version_id || '').trim();
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.04] via-[color:var(--panel,#0f0f12)] to-[#0a1018] shadow-lg shadow-black/20">
+      <div className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-gradient-to-b from-emerald-400/80 to-teal-500/40" />
+      <div className="pl-5 pr-4 py-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-[11px] font-bold text-emerald-300 border border-emerald-500/25">
+              {index + 1}
+            </span>
+            <div className="text-[11px] text-muted-foreground">研发子单 {index + 1}</div>
+          </div>
+          {!readOnly && canDelete ? (
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+              onClick={() => onDelete(index)}
+            >
+              删除
+            </Button>
+          ) : null}
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">标题</div>
+          <Input
+            value={task.taskTitle || ''}
+            onChange={(e) => onChange(index, { taskTitle: e.target.value })}
+            disabled={readOnly}
+            placeholder="研发单标题"
+          />
+        </div>
+
+        {repoOptions.length > 0 ? (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">关联仓库/分支</div>
+            <SearchableVirtualSelect
+              value={selectedBranch}
+              onValueChange={(bid) => {
+                const repo = repos.find((r) => repoBranchId(r) === bid);
+                if (repo) {
+                  onChange(index, applyRepoToTask(task, repo));
+                } else {
+                  onChange(index, { branch_version_id: bid });
+                }
+              }}
+              options={repoOptions}
+              placeholder="选择产品分支"
+              searchPlaceholder="搜索模块或分支…"
+              disabled={readOnly}
+              itemHeight={40}
+            />
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <div className="text-[10px] text-muted-foreground mb-1">应用模块</div>
+            <Input
+              value={task.productModuleName || ''}
+              onChange={(e) => onChange(index, { productModuleName: e.target.value })}
+              disabled={readOnly}
+              placeholder="应用模块"
+            />
+          </div>
+          <div>
+            <div className="text-[10px] text-muted-foreground mb-1">产品分支</div>
+            <Input
+              value={task.branchVersionName || ''}
+              onChange={(e) => onChange(index, { branchVersionName: e.target.value })}
+              disabled={readOnly}
+              placeholder="产品分支"
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">研发单描述</div>
+          <TextArea
+            rows={3}
+            value={task.comments || ''}
+            onChange={(e) => onChange(index, { comments: e.target.value })}
+            disabled={readOnly}
+            placeholder="本任务改造范围与交付说明"
+          />
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">研发单影响（可选）</div>
+          <TextArea
+            rows={2}
+            value={task.taskImpactDesc || ''}
+            onChange={(e) => onChange(index, { taskImpactDesc: e.target.value })}
+            disabled={readOnly}
+            placeholder="本任务范围内的影响说明"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-[12px]">
+          <div className="rounded-lg bg-black/25 px-2.5 py-2 border border-border/30">
+            <div className="text-[10px] text-muted-foreground">需求单号</div>
+            <div className="font-mono text-foreground/90 mt-0.5">{task.taskNo || '—'}</div>
+          </div>
+          <div className="rounded-lg bg-black/25 px-2.5 py-2 border border-border/30">
+            <div className="text-[10px] text-muted-foreground">补丁计划</div>
+            <div className={`mt-0.5 font-medium ${patchName ? 'text-emerald-300' : 'text-amber-400/90'}`}>
+              {patchName || task.patchName || '待选择'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ─── 子组件：渐变章节头 ───────────────────────────────────────────────
 
@@ -295,73 +426,6 @@ const RepoPatchCard: React.FC<{
   );
 };
 
-// ─── 拆单预览卡片（与仓库卡片一一对应）────────────────────────────────
-
-const SplitPreviewCard: React.FC<{
-  index: number;
-  task: SplitTaskDraft;
-  repoLabel: string;
-}> = ({ index, task, repoLabel }) => {
-  const impactFields = [
-    { label: '研发单影响', value: task.taskImpactDesc },
-    { label: '性能', value: task.performanceImpact },
-    { label: '功能', value: task.functionalImpact },
-    { label: '配置', value: task.cfgChangeDescription },
-    { label: '升级风险', value: task.upgradeRisk },
-    { label: '安全', value: task.securityImpact },
-    { label: '兼容', value: task.compatibilityImpact },
-  ].filter((f) => (f.value || '').trim());
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.04] via-[color:var(--panel,#0f0f12)] to-[#0a1018] shadow-lg shadow-black/20">
-      <div className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-gradient-to-b from-emerald-400/80 to-teal-500/40" />
-      <div className="pl-5 pr-4 py-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-[11px] font-bold text-emerald-300 border border-emerald-500/25">
-              {index + 1}
-            </span>
-            <div className="min-w-0">
-              <div className="text-[11px] text-muted-foreground">{repoLabel}</div>
-              <div className="font-medium text-foreground line-clamp-2">{task.taskTitle || '—'}</div>
-            </div>
-          </div>
-          <ArrowRight className="h-4 w-4 text-emerald-400/60 shrink-0 mt-1" />
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-[12px]">
-          <div className="rounded-lg bg-black/25 px-2.5 py-2 border border-border/30">
-            <div className="text-[10px] text-muted-foreground">需求单号</div>
-            <div className="font-mono text-foreground/90 mt-0.5">{task.taskNo || '—'}</div>
-          </div>
-          <div className="rounded-lg bg-black/25 px-2.5 py-2 border border-border/30">
-            <div className="text-[10px] text-muted-foreground">补丁计划</div>
-            <div className={`mt-0.5 font-medium ${task.patchName ? 'text-emerald-300' : 'text-amber-400/90'}`}>
-              {task.patchName || '待选择'}
-            </div>
-          </div>
-        </div>
-        {task.comments ? (
-          <div className="rounded-lg border border-border/30 bg-muted/5 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">研发单描述</div>
-            <p className="text-[12px] leading-relaxed text-foreground/85 line-clamp-3">{task.comments}</p>
-          </div>
-        ) : null}
-        {impactFields.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {impactFields.slice(0, 4).map((f) => (
-              <Tooltip key={f.label} title={f.value}>
-                <span className="inline-block max-w-[140px] truncate rounded-md bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-200/90 border border-emerald-500/20">
-                  {f.label}
-                </span>
-              </Tooltip>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-};
-
 // ─── 主面板 ───────────────────────────────────────────────────────────
 
 export function SolutionReviewPanel({
@@ -380,6 +444,8 @@ export function SolutionReviewPanel({
   const [patchLoading, setPatchLoading] = useState<Record<string, boolean>>({});
   const patchFetchedRef = useRef<Set<string>>(new Set());
   const [projectId, setProjectId] = useState<number | null>(null);
+  const [editableTasks, setEditableTasks] = useState<SplitTaskDraft[]>([]);
+  const [savingTasks, setSavingTasks] = useState(false);
 
   const load = useCallback(async () => {
     if (!synapseApiBase || !roomId) return;
@@ -411,16 +477,26 @@ export function SolutionReviewPanel({
   const impact = payload?.func_solution_parsed?.impact_assessment;
   const whale = payload?.whale_review;
   const artifacts = payload?.inputs?.stage2_artifacts ?? [];
-  const tasks = payload?.split_tasks_draft ?? [];
   const humanStatus = payload?.human_review?.status ?? 'pending';
   const readOnly = blocked || humanStatus !== 'pending';
   const demandNo = payload?.demand_no ?? '';
   const requirementName = payload?.requirement_name ?? '';
 
-  const branchIds = useMemo(
-    () => [...new Set(repos.map((r) => repoBranchId(r)).filter(Boolean))],
-    [repos],
-  );
+  useEffect(() => {
+    if (!payload) return;
+    const draft = payload.split_tasks_draft ?? [];
+    if (draft.length > 0) {
+      setEditableTasks(draft.map((t) => ({ ...t, taskNo: t.taskNo || demandNo })));
+      return;
+    }
+    setEditableTasks([emptySplitTask(demandNo, requirementName, repos)]);
+  }, [payload, demandNo, requirementName, repos]);
+
+  const branchIds = useMemo(() => {
+    const fromTasks = editableTasks.map((t) => (t.branch_version_id || '').trim()).filter(Boolean);
+    const fromRepos = repos.map((r) => repoBranchId(r)).filter(Boolean);
+    return [...new Set([...fromTasks, ...fromRepos])];
+  }, [editableTasks, repos]);
   const branchIdsKey = branchIds.join('|');
 
   useEffect(() => {
@@ -459,18 +535,45 @@ export function SolutionReviewPanel({
     }
   }, [synapseApiBase, roomId, branchIdsKey, readOnly, branchIds, projectId, repos]);
 
-  const splitPreviews = useMemo(
-    () =>
-      repos.length > 0
-        ? repos.map((repo) =>
-            buildSplitPreviewForRepo(repo, tasks, patchByBranch, demandNo, requirementName),
-          )
-        : tasks.map((t) => {
-            const bid = (t.branch_version_id || '').trim();
-            return { ...t, patchName: bid ? patchByBranch[bid] || t.patchName : t.patchName };
-          }),
-    [repos, tasks, patchByBranch, demandNo, requirementName],
-  );
+  const updateTask = (index: number, patch: Partial<SplitTaskDraft>) => {
+    setEditableTasks((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+  };
+
+  const addTask = () => {
+    if (editableTasks.length >= MAX_SPLIT_TASKS) {
+      message.warning(`一个需求最多拆分 ${MAX_SPLIT_TASKS} 个任务`);
+      return;
+    }
+    setEditableTasks((prev) => [...prev, emptySplitTask(demandNo, requirementName, repos)]);
+  };
+
+  const removeTask = (index: number) => {
+    if (editableTasks.length <= 1) {
+      message.warning('至少保留 1 个研发子单');
+      return;
+    }
+    setEditableTasks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveTasksDraft = async () => {
+    if (!synapseApiBase || !roomId) return;
+    for (let i = 0; i < editableTasks.length; i++) {
+      if (!(editableTasks[i].taskTitle || '').trim()) {
+        message.warning(`请填写第 ${i + 1} 个任务的标题`);
+        return;
+      }
+    }
+    setSavingTasks(true);
+    try {
+      const res = await saveSolutionReviewTasks(synapseApiBase, roomId, editableTasks);
+      setPayload(res.payload);
+      message.success('拆单草案已保存');
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '保存失败');
+    } finally {
+      setSavingTasks(false);
+    }
+  };
 
   const humanCommentLen = humanComment.trim().length;
   const humanCommentTooShort = humanCommentLen < MIN_HUMAN_REVIEW_COMMENT_LEN;
@@ -482,12 +585,27 @@ export function SolutionReviewPanel({
       );
       return;
     }
+    for (let i = 0; i < editableTasks.length; i++) {
+      if (!(editableTasks[i].taskTitle || '').trim()) {
+        message.warning(`请填写第 ${i + 1} 个任务的标题`);
+        return;
+      }
+    }
+    if (editableTasks.length > MAX_SPLIT_TASKS) {
+      message.warning(`拆单任务不得超过 ${MAX_SPLIT_TASKS} 个`);
+      return;
+    }
     if (decision === 'approve') {
-      for (const repo of repos) {
-        const bid = repoBranchId(repo);
-        if (!bid) continue;
+      const taskBranchIds = [
+        ...new Set(
+          editableTasks.map((t) => (t.branch_version_id || '').trim()).filter(Boolean),
+        ),
+      ];
+      for (const bid of taskBranchIds) {
         if (!patchByBranch[bid]?.trim()) {
-          message.warning(`请为「${repoDisplayLabel(repo)}」选择补丁计划`);
+          const repo = repos.find((r) => repoBranchId(r) === bid);
+          const label = repo ? repoDisplayLabel(repo) : bid;
+          message.warning(`请为「${label}」选择补丁计划`);
           return;
         }
       }
@@ -498,10 +616,19 @@ export function SolutionReviewPanel({
         branch_version_id: bid,
         patch_name: patchByBranch[bid] || '',
       }));
+      const tasksPayload = editableTasks.map((t) => {
+        const bid = (t.branch_version_id || '').trim();
+        return {
+          ...t,
+          taskNo: t.taskNo || demandNo,
+          patchName: bid ? patchByBranch[bid] || t.patchName : t.patchName,
+        };
+      });
       await submitSolutionReviewDecision(synapseApiBase, roomId, {
         decision,
         comment: humanComment.trim(),
         patches: decision === 'approve' ? patches : undefined,
+        split_tasks_draft: tasksPayload,
       });
       message.success(decision === 'approve' ? '评审通过，已落盘拆单计划并推进流程' : '评审未通过，已阻断流程');
       await load();
@@ -693,30 +820,55 @@ export function SolutionReviewPanel({
           )}
         </section>
 
-        {/* 拆单预览 — 与仓库卡片一一对应 */}
+        {/* 拆单任务编辑 — 支持新增/修改，最多 5 条 */}
         <section className="space-y-4">
-          <SectionHeader
-            icon={<Package className="h-5 w-5" />}
-            title="拆单预览"
-            subtitle="与上方仓库条目一一对应，补丁选择将实时反映到研发单"
-            accent="emerald"
-          />
-          {splitPreviews.length > 0 ? (
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionHeader
+              icon={<Package className="h-5 w-5" />}
+              title="拆单任务"
+              subtitle={`小鲸按方案复杂度生成初始草案；可编辑、新增或删除（1～${MAX_SPLIT_TASKS} 条，跨仓库必拆、简单方案单条）`}
+              accent="emerald"
+            />
+            {!readOnly ? (
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  icon={<Plus className="h-4 w-4" />}
+                  disabled={editableTasks.length >= MAX_SPLIT_TASKS}
+                  onClick={addTask}
+                >
+                  新增任务
+                </Button>
+                <Button loading={savingTasks} onClick={() => void saveTasksDraft()}>
+                  保存草案
+                </Button>
+              </div>
+            ) : null}
+          </div>
+          {editableTasks.length > 0 ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {splitPreviews.map((task, i) => (
-                <SplitPreviewCard
-                  key={`split-${task.branch_version_id}-${i}`}
-                  index={i}
-                  task={task}
-                  repoLabel={repos[i] ? repoDisplayLabel(repos[i]) : task.branchVersionName || '研发子单'}
-                />
-              ))}
+              {editableTasks.map((task, i) => {
+                const bid = (task.branch_version_id || '').trim();
+                return (
+                  <SplitTaskEditorCard
+                    key={`split-edit-${i}-${bid}`}
+                    index={i}
+                    task={task}
+                    repos={repos}
+                    patchName={bid ? patchByBranch[bid] : undefined}
+                    readOnly={readOnly}
+                    canDelete={editableTasks.length > 1}
+                    onChange={updateTask}
+                    onDelete={removeTask}
+                  />
+                );
+              })}
             </div>
           ) : (
-            <Alert type="info" showIcon message="暂无拆单预览数据" />
+            <Alert type="info" showIcon message="暂无拆单任务，请点击「新增任务」或等待小鲸生成草案" />
           )}
           <p className="text-[11px] text-muted-foreground text-center">
-            评审通过后将按上述预览落盘 split_plan.json 并推进自动拆单节点
+            评审通过后将按上述任务落盘 split_plan.json 并推进自动拆单节点（当前 {editableTasks.length} /{' '}
+            {MAX_SPLIT_TASKS} 条）
           </p>
         </section>
 

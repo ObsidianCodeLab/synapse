@@ -126,11 +126,48 @@ label: 方案评审
 
 `patchName` 在 SKILL 阶段**一律留空**；`human_review.status` 初始为 `pending`。
 
-### split_tasks_draft 生成规则
+### split_tasks_draft 生成规则（拆单策略）
 
-- 按 `func_solution_parsed.repos` 每个仓库一行生成一条（同一 `taskNo`）；
-- `taskImpactDesc` 与 `performanceImpact` 等从 §1.10 对应表归纳，勿臆造；
-- 无仓库表时生成单条草案。
+**核心原则**：拆单是为了方便并行开发与降低改造冲突；简单方案保持单任务，复杂或跨仓库方案才拆分。
+
+#### 何时必须 / 可以拆分
+
+| 场景 | 是否拆分 | 说明 |
+|------|----------|------|
+| 涉及 **2 个及以上不同仓库** | **必须拆分** | 每个仓库至少 1 条任务，按仓库边界切分 |
+| **复杂方案**（跨模块 + 大范围代码改造） | **应当拆分** | 按模块独立性拆成 2～5 条，避免多任务改同一文件/类 |
+| 单仓库、单模块、改造范围可控 | **不拆分** | 仅生成 **1 条** 任务 |
+| 跨模块但改造范围小（局部函数/配置） | **不拆分** | 仍生成 1 条，在 `comments` 中列明涉及模块 |
+
+**复杂方案判定**（须同时满足）：
+1. **跨模块**：函数级方案 §1.3 / §1.10 功能影响涉及 **≥2 个**  distinct 应用模块或业务域；
+2. **大范围改造**：待改造函数/类 **≥5 个**，或涉及核心链路重构、数据库结构变更、公共接口 Breaking Change 之一。
+
+#### 拆分颗粒度
+
+- **以模块独立为首要依据**：每条任务应能独立开发、独立验收，尽量不让多条任务交叉改造相同代码（同一文件、同一类、同一接口）。
+- **同一仓库内多模块**：按模块或子域拆成多条，每条 `productModuleName` / `comments` 明确本任务改造边界。
+- **跨仓库**：按仓库拆；若某仓库内仍跨多模块且属复杂方案，可在该仓库下再按模块拆（总任务数仍 ≤5）。
+- **硬上限**：一个需求 **最多 5 条** 任务（`split_tasks_draft.length ≤ 5`）；若按规则需超过 5 条，优先合并相邻模块并在 `whale_review.suggestions` 中提示「建议收缩范围或分阶段交付」。
+
+#### 字段填写
+
+- 所有任务共用同一 `taskNo`（需求单号）；
+- `taskTitle`：「{需求名称} — {模块/子域/仓库简称}」；
+- `taskImpactDesc` 与 `performanceImpact` 等从 §1.10 **仅归纳本任务范围** 内的影响，勿把全方案影响复制到每条；
+- `branch_version_id` / `productModuleName` / `branchVersionName` 须与函数级方案 §1.3 一致；
+- `patchName` 在 SKILL 阶段 **一律留空**（人工在评审面板选择）；
+- 无仓库表时生成 **单条** 草案。
+
+#### 决策流程（生成前自检）
+
+```
+1. 统计 repos 数量 → ≥2 则必须按仓库拆分
+2. 判定是否复杂方案（跨模块 + 大范围）→ 否且单仓库 → 输出 1 条
+3. 是复杂方案 → 按模块独立性划分，检查任务间是否有重叠改造点
+4. 合并/调整直至 1 ≤ 任务数 ≤ 5
+5. 在 whale_review.summary_markdown 末尾用 1～2 句说明拆单策略（单任务 / 按仓库 / 按模块）及理由
+```
 
 ## 工作流程
 
@@ -139,9 +176,10 @@ label: 方案评审
 2. 重点精读：历史方案映射.md、函数级方案.md、entropy agent.md/rule.md
 3. 填写 whale_review（评分 0-100、建议带 evidence_refs）
 4. 从函数级方案解析 repos 与 impact_assessment（表格行转为对象数组）
-5. 生成 split_tasks_draft（patchName 为空）
-6. write_file → {ARCHIVE_DIR}/solution_review.json
-7. whalecloud-dev-tool-doc-generate → 方案评审结论.md
+5. 按「拆单策略」生成 split_tasks_draft（1～5 条，patchName 为空）
+6. 自检：跨仓库必拆、简单方案单条、复杂方案按模块切分且无交叉改造
+7. write_file → {ARCHIVE_DIR}/solution_review.json
+8. whalecloud-dev-tool-doc-generate → 方案评审结论.md
 ```
 
 ## 字符编码

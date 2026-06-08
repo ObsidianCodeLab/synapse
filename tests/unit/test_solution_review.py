@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from synapse.rd_meeting.solution_review import (
+    MAX_SPLIT_TASKS,
     MIN_HUMAN_REVIEW_COMMENT_LEN,
     apply_human_decision,
     ensure_human_review_pending_for_gate,
@@ -15,7 +16,9 @@ from synapse.rd_meeting.solution_review import (
     parse_func_solution_impact_assessment,
     parse_func_solution_md,
     render_conclusion_markdown,
+    save_split_tasks_draft,
     validate_human_review_comment,
+    validate_split_tasks_draft,
     validate_solution_review_json,
 )
 
@@ -251,3 +254,34 @@ def test_ensure_human_review_pending_skips_when_split_plan_exists(tmp_path, monk
     payload = {"human_review": {"status": "approved", "decided_at": "x"}}
     out = ensure_human_review_pending_for_gate(scope_id, payload)
     assert out["human_review"]["status"] == "approved"
+
+
+def test_validate_split_tasks_draft_max_five():
+    tasks = [{"taskTitle": f"t{i}"} for i in range(MAX_SPLIT_TASKS)]
+    validate_split_tasks_draft(tasks)
+    with pytest.raises(ValueError, match="split_tasks_draft_too_many"):
+        validate_split_tasks_draft(tasks + [{"taskTitle": "extra"}])
+
+
+def test_validate_split_tasks_draft_requires_title():
+    with pytest.raises(ValueError, match="split_task_title_required"):
+        validate_split_tasks_draft([{"taskTitle": ""}])
+
+
+def test_save_split_tasks_draft_persists(tmp_path, monkeypatch):
+    scope_id = "save-tasks"
+    archive = tmp_path / scope_id / "archive" / "需求设计" / "solution_review"
+    archive.mkdir(parents=True)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review.json_path",
+        lambda sid: archive / "solution_review.json",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review.load_solution_review_payload",
+        lambda sid, **kw: {"demand_no": scope_id, "split_tasks_draft": []},
+    )
+    tasks = [{"taskNo": scope_id, "taskTitle": "模块A改造", "comments": "范围A"}]
+    out = save_split_tasks_draft(scope_id, tasks)
+    assert len(out["split_tasks_draft"]) == 1
+    on_disk = json.loads((archive / "solution_review.json").read_text(encoding="utf-8"))
+    assert on_disk["split_tasks_draft"][0]["taskTitle"] == "模块A改造"

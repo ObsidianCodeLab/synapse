@@ -614,12 +614,40 @@ class SolutionReviewPatchRow(BaseModel):
     patch_name: str = Field(..., description="补丁计划名称")
 
 
+class SolutionReviewSplitTaskRow(BaseModel):
+    taskNo: str = Field("", description="需求单号")
+    taskTitle: str = Field(..., description="研发单标题")
+    comments: str = Field("", description="研发单描述")
+    productModuleName: str = Field("", description="应用模块")
+    branchVersionName: str = Field("", description="产品分支")
+    patchName: str = Field("", description="补丁计划（裁决时由 patches 覆盖）")
+    taskImpactDesc: str = Field("", description="研发单影响")
+    performanceImpact: str = Field("", description="性能影响")
+    functionalImpact: str = Field("", description="功能影响")
+    cfgChangeDescription: str = Field("", description="配置变更")
+    upgradeRisk: str = Field("", description="升级风险")
+    securityImpact: str = Field("", description="安全影响")
+    compatibilityImpact: str = Field("", description="兼容性影响")
+    branch_version_id: str = Field("", description="产品分支ID")
+
+
 class SolutionReviewDecisionBody(BaseModel):
     decision: Literal["approve", "reject"] = Field(..., description="人工评审：通过 / 不通过")
     comment: str = Field("", description="人工评审意见")
     patches: list[SolutionReviewPatchRow] = Field(
         default_factory=list,
         description="按产品分支选择的补丁（通过时必填）",
+    )
+    split_tasks_draft: list[SolutionReviewSplitTaskRow] = Field(
+        default_factory=list,
+        description="人工编辑后的拆单草案（可选；有则覆盖 solution_review.json 中的草案）",
+    )
+
+
+class SolutionReviewTasksBody(BaseModel):
+    split_tasks_draft: list[SolutionReviewSplitTaskRow] = Field(
+        ...,
+        description="拆单草案（1～5 条）",
     )
 
 
@@ -677,6 +705,9 @@ async def submit_solution_review_decision(
         {"branch_version_id": p.branch_version_id, "patch_name": p.patch_name}
         for p in (body.patches or [])
     ]
+    tasks_override = None
+    if body.split_tasks_draft:
+        tasks_override = [t.model_dump() for t in body.split_tasks_draft]
     orch = MeetingRoomOrchestrator()
     try:
         result = orch.confirm_solution_review_decision(
@@ -686,6 +717,7 @@ async def submit_solution_review_decision(
             decision=body.decision,
             comment=body.comment or "",
             patches=patches,
+            tasks_override=tasks_override,
             ticket_title=ticket_title,
             agent_pool=pool,
         )
@@ -694,11 +726,35 @@ async def submit_solution_review_decision(
         code = 400
         if msg.startswith("patch_required") or msg.startswith("human_review_comment_too_short"):
             code = 422
+        if msg.startswith("split_tasks_draft"):
+            code = 422
         return error_response(code, msg)
     except Exception as exc:
         logger.exception("submit_solution_review_decision failed: %s", exc)
         return error_response(500, "solution_review_decision_failed", str(exc))
     return success_response(result)
+
+
+@router.put("/api/dev/meeting-rooms/{room_id}/solution-review/tasks")
+async def save_solution_review_tasks(
+    room_id: str,
+    body: SolutionReviewTasksBody,
+) -> dict:
+    """保存人工编辑的拆单草案（不触发裁决）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.solution_review import load_solution_review_payload, save_split_tasks_draft
+
+    if load_solution_review_payload(sid) is None:
+        return error_response(404, "solution_review_not_found")
+    tasks = [t.model_dump() for t in body.split_tasks_draft]
+    try:
+        payload = save_split_tasks_draft(sid, tasks)
+    except ValueError as exc:
+        return error_response(422, str(exc))
+    return success_response({"scope_id": sid, "payload": payload})
 
 
 @router.post("/api/dev/meeting-rooms/{room_id}/patch-versions")

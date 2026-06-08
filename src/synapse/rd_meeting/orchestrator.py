@@ -968,6 +968,7 @@ class MeetingRoomOrchestrator:
         decision: str,
         comment: str = "",
         patches: list[dict[str, Any]] | None = None,
+        tasks_override: list[dict[str, Any]] | None = None,
         ticket_title: str = "",
         agent_pool: Any | None = None,
     ) -> dict[str, Any]:
@@ -1001,6 +1002,7 @@ class MeetingRoomOrchestrator:
             comment=comment,
             patches=patches if dec == "approve" else None,
             demand_no=demand_no,
+            tasks_override=tasks_override,
         )
 
         if dec == "reject":

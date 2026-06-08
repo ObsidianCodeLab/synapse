@@ -406,6 +406,8 @@ export interface SplitTaskDraft {
   branch_version_id?: string;
 }
 
+export const MAX_SPLIT_TASKS = 5;
+
 export interface SolutionReviewHumanReview {
   status?: 'pending' | 'approved' | 'rejected';
   comment?: string;
@@ -487,6 +489,7 @@ export async function submitSolutionReviewDecision(
     decision: 'approve' | 'reject';
     comment: string;
     patches?: { branch_version_id: string; patch_name: string }[];
+    split_tasks_draft?: SplitTaskDraft[];
   },
 ): Promise<SolutionReviewDecisionResult> {
   const base = synapseApiBase.replace(/\/$/, '');
@@ -494,6 +497,19 @@ export async function submitSolutionReviewDecision(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/solution-review/decision`,
     body,
+  );
+}
+
+export async function saveSolutionReviewTasks(
+  synapseApiBase: string,
+  roomId: string,
+  splitTasksDraft: SplitTaskDraft[],
+): Promise<{ scope_id: string; payload: SolutionReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPut<{ scope_id: string; payload: SolutionReviewPayload }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/solution-review/tasks`,
+    { split_tasks_draft: splitTasksDraft },
   );
 }
 
