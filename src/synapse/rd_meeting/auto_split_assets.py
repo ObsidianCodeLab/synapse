@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Literal
+from collections.abc import Coroutine
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Literal, TypeVar
 
 from synapse.rd_meeting.product_assets import _now_iso
 from synapse.rd_meeting.userwork_sync import _load_userwork_list, _scope_row
@@ -12,6 +14,18 @@ from synapse.rd_meeting.userwork_sync import _load_userwork_list, _scope_row
 logger = logging.getLogger(__name__)
 
 ScopeType = Literal["demand", "task"]
+
+_T = TypeVar("_T")
+
+
+def _run_coroutine_sync(factory: Callable[[], Coroutine[Any, Any, _T]]) -> _T:
+    """在同步代码中执行协程；若当前线程已有事件循环则在独立线程内 asyncio.run。"""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(factory())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(factory())).result()
 
 
 def _norm_id(raw: str) -> str:
@@ -44,31 +58,26 @@ def _local_owned_tasks(demand_no: str) -> list[dict[str, Any]]:
     return []
 
 
-def _fetch_portal_task_nos(demand_no: str) -> tuple[list[str], str]:
-    """调用研发云门户任务列表 API，返回 (taskNo 列表, 错误说明)。"""
+async def _fetch_portal_task_nos_async(demand_no: str) -> tuple[list[str], str]:
+    """调用研发云 ai-gateway 任务列表 API，返回 (taskNo 列表, 错误说明)。"""
     from synapse.api.routes.dev_iwhalecloud import (
         GetTaskListFromDemandRequest,
         _get_task_list_from_demand,
     )
 
-    async def _run() -> dict:
-        return await _get_task_list_from_demand(GetTaskListFromDemandRequest(demandNo=demand_no))
-
     try:
-        resp = asyncio.run(_run())
+        resp = await _get_task_list_from_demand(GetTaskListFromDemandRequest(demandNo=demand_no))
     except Exception as exc:
         logger.warning("auto_split portal fetch failed demand=%s: %s", demand_no, exc)
         return [], f"门户 API 异常: {exc}"
 
     if not isinstance(resp, dict):
         return [], "门户 API 返回格式无效"
-    code = resp.get("code")
-    try:
-        ok = int(code) == 0  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        ok = False
-    if not ok:
-        return [], str(resp.get("message") or resp.get("error") or "门户 API 失败")
+    if resp.get("errorcode") not in (None, 0):
+        err = resp.get("message")
+        if not err and isinstance(resp.get("data"), dict):
+            err = resp["data"].get("error")
+        return [], str(err or "门户 API 失败")
 
     data = resp.get("data")
     if not isinstance(data, list):
@@ -82,6 +91,11 @@ def _fetch_portal_task_nos(demand_no: str) -> tuple[list[str], str]:
         if tn:
             nos.append(tn)
     return nos, ""
+
+
+def _fetch_portal_task_nos(demand_no: str) -> tuple[list[str], str]:
+    """同步入口：会议室 pipeline 在已有事件循环中调用。"""
+    return _run_coroutine_sync(lambda: _fetch_portal_task_nos_async(demand_no))
 
 
 def _load_split_plan_tasks(scope_id: str) -> list[dict[str, Any]]:
