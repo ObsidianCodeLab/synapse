@@ -1691,7 +1691,7 @@ class ToolExecutor:
         """
         return None
 
-    def check_permission(self, tool_name: str, tool_input: dict) -> "PermissionDecision":
+    def _rd_meeting_permission_bypass(
         self, tool_name: str
     ) -> "PermissionDecision | None":
         """研发会议室（Host / Worker）：白名单内工具自动放行，避免 policy_v2 CONFIRM 卡死派单与执行。"""
