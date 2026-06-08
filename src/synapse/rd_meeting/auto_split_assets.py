@@ -3,14 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal, TypeVar
 
 from synapse.rd_meeting.product_assets import _now_iso
-from synapse.rd_meeting.userwork_sync import _load_userwork_list, _scope_row
+from synapse.rd_meeting.userwork_sync import (
+    _load_userwork_list,
+    _scope_row,
+    append_owned_work_items_to_demand,
+)
 
 ScopeType = Literal["demand", "task"]
+
+logger = logging.getLogger(__name__)
 
 _T = TypeVar("_T")
 
@@ -162,6 +169,29 @@ def _split_plan_row_to_create_request(
     )
 
 
+def _build_owned_work_item_from_create(
+    req: Any,
+    data: dict[str, Any] | None,
+    task_no: str,
+) -> dict[str, Any]:
+    """create_task 响应 data → owned_work_items 单条（与门户快照字段一致）。"""
+    row = data if isinstance(data, dict) else {}
+    return {
+        "task_no": str(row.get("task_no") or task_no).strip(),
+        "task_title": str(row.get("task_title") or getattr(req, "taskTitle", "") or ""),
+        "task_desc": str(row.get("task_desc") or getattr(req, "comments", "") or ""),
+        "created_date": str(row.get("created_date") or ""),
+        "sccb_work_hours": row.get("sccb_work_hours"),
+        "stage_name": str(row.get("stage_name") or ""),
+        "product_module_id": row.get("product_module_id"),
+        "product_module_name": str(
+            row.get("product_module_name") or getattr(req, "productModuleName", "") or ""
+        ),
+        "repo_url": str(row.get("repo_url") or ""),
+        "sop_node": str(row.get("sop_node") or ""),
+    }
+
+
 async def _create_tasks_from_split_plan_async(
     demand_no: str,
     tasks: list[dict[str, Any]],
@@ -201,12 +231,18 @@ async def _create_tasks_from_split_plan_async(
         ok = isinstance(resp, dict) and resp.get("errorcode") in (None, 0)
         data = resp.get("data") if isinstance(resp, dict) else None
         task_no = data.get("task_no") if isinstance(data, dict) else None
+        work_item = (
+            _build_owned_work_item_from_create(req, data if isinstance(data, dict) else None, str(task_no))
+            if ok and task_no
+            else None
+        )
         results.append(
             {
                 "index": index,
                 "taskTitle": req.taskTitle,
                 "status": "ok" if ok else "failed",
                 "task_no": task_no,
+                "work_item": work_item,
                 "error": None if ok else str(resp.get("message") or resp),
             }
         )
@@ -270,6 +306,31 @@ def bootstrap_auto_split(
     _apply_create_task_status(result, create_results)
     if result["status"] == "failed":
         return result
+
+    new_work_items = [
+        r["work_item"]
+        for r in create_results
+        if r.get("status") == "ok" and isinstance(r.get("work_item"), dict)
+    ]
+    if new_work_items:
+        added_nos = append_owned_work_items_to_demand(demand_no, new_work_items)
+        result["userwork_added_task_nos"] = added_nos
+        if len(added_nos) < len(new_work_items):
+            skipped = [
+                str(r.get("task_no") or "")
+                for r in create_results
+                if r.get("status") == "ok"
+                and isinstance(r.get("work_item"), dict)
+                and str(r.get("task_no") or "") not in added_nos
+            ]
+            if skipped:
+                logger.info(
+                    "auto_split userwork skip duplicate task_nos demand=%s: %s",
+                    demand_no,
+                    skipped,
+                )
+    else:
+        result["userwork_added_task_nos"] = []
 
     local = _local_owned_tasks(demand_no)
     result["local_tasks"] = [

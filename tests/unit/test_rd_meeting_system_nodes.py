@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from synapse.rd_meeting.auto_split_assets import bootstrap_auto_split, format_auto_split_report
@@ -80,22 +82,62 @@ def test_materialize_repo_to_sandbox_skips_utf8(monkeypatch, tmp_path):
 
 def test_auto_split_from_userwork(monkeypatch, tmp_path):
     scope_id = "D12345"
+    uw_path = tmp_path / "userwork.json"
+    uw_path.write_text(
+        json.dumps(
+            {
+                "list": [
+                    {
+                        "demand_no": scope_id,
+                        "owned_work_items": [
+                            {"task_no": "T001", "task_title": "子单A", "sop_node": "pending"},
+                        ],
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.userwork_sync._owner_order_file_name",
+        lambda: uw_path,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.userwork_sync._owner_order_file_lock_path",
+        lambda: tmp_path / "userwork.lock",
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud._owner_order_file_name",
+        lambda: uw_path,
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud._owner_order_file_lock_path",
+        lambda: tmp_path / "userwork.lock",
+    )
     monkeypatch.setattr(
         "synapse.rd_meeting.auto_split_assets._load_split_plan_tasks",
         lambda _sid: [dict(_SAMPLE_SPLIT_TASK)],
     )
     monkeypatch.setattr(
         "synapse.rd_meeting.auto_split_assets._create_tasks_from_split_plan_sync",
-        lambda _dn, _tasks: [{"status": "ok", "taskTitle": "子单A", "task_no": "T002"}],
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.auto_split_assets._load_userwork_list",
-        lambda: [
+        lambda _dn, _tasks: [
             {
-                "demand_no": scope_id,
-                "owned_work_items": [
-                    {"task_no": "T001", "task_title": "子单A", "sop_node": "pending"},
-                ],
+                "status": "ok",
+                "taskTitle": "子单A",
+                "task_no": "T002",
+                "work_item": {
+                    "task_no": "T002",
+                    "task_title": "子单A",
+                    "task_desc": "desc",
+                    "created_date": "2026-06-08 10:00:00",
+                    "sccb_work_hours": None,
+                    "stage_name": "开发中",
+                    "product_module_id": 1,
+                    "product_module_name": "ZMDB",
+                    "repo_url": "https://example.com/repo.git",
+                    "sop_node": "任务执行",
+                },
             }
         ],
     )
@@ -106,13 +148,18 @@ def test_auto_split_from_userwork(monkeypatch, tmp_path):
 
     assets = bootstrap_auto_split("demand", scope_id)
     assert assets["status"] == "ok"
-    assert len(assets["local_tasks"]) == 1
+    assert assets["userwork_added_task_nos"] == ["T002"]
+    assert len(assets["local_tasks"]) == 2
     assert "T002" in assets["portal_task_nos"]
     assert assets["create_task_results"][0]["task_no"] == "T002"
     report = format_auto_split_report(assets, node_name="自动拆单")
     assert "研发子单拆分清单" in report
     assert "create_task" in report
     assert "T001" in report
+
+    saved = json.loads(uw_path.read_text(encoding="utf-8"))
+    task_nos = [t["task_no"] for t in saved["list"][0]["owned_work_items"]]
+    assert task_nos == ["T001", "T002"]
 
 
 @pytest.mark.asyncio
@@ -166,6 +213,8 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
     assert created[0].taskTitle == "子单A"
     assert rows[0]["status"] == "ok"
     assert rows[0]["task_no"] == "T-NEW-1"
+    assert rows[0]["work_item"]["task_no"] == "T-NEW-1"
+    assert rows[0]["work_item"]["task_title"] == "子单A"
 
 
 def test_env_pregen_test_sleep(monkeypatch):

@@ -75,9 +75,9 @@ export const SOP_STAGES: SOPStage[] = [
     id: 3,
     name: '需求研发',
     nodes: [
-      { id: 'auto_split', name: '自动拆单', type: 'system', desc: '按需求单与方案自动拆分研发子单（系统脚本，无大模型）' },
-      { id: 'sandbox_build', name: '沙箱构建', type: 'system', desc: '针对研发单拉取沙箱代码（git 落盘至 work/<工单>/sandbox/）' },
-      { id: 'env_pregen', name: '环境预生成', type: 'system', desc: '拉取文档与控熵归档至 work/<工单>/env/（系统脚本）' },
+      { id: 'auto_split', name: '自动拆单', type: 'system', desc: '按需求单与方案自动拆分研发子单' },
+      { id: 'sandbox_build', name: '沙箱构建', type: 'system', desc: '针对研发单拉取沙箱代码' },
+      { id: 'env_pregen', name: '环境预生成', type: 'system', desc: '生成研发环境' },
     ],
   },
   {

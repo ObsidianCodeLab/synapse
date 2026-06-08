@@ -1,4 +1,4 @@
-"""会议室 → userwork.json：回写 local_process_state / sop_node / prod。"""
+"""会议室 → userwork.json：回写 local_process_state / sop_node / prod / demand_status。"""
 
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ def patch_userwork_summary(
     local_process_state: str | None = None,
     task_sop_node: str | None = None,
     prod: str | None = None,
+    demand_status: str | None = None,
 ) -> dict[str, str]:
     """更新 userwork 摘要字段。返回本次写入的字段（键为 userwork 字段名）。"""
     path: Path = _owner_order_file_name()
@@ -81,6 +82,10 @@ def patch_userwork_summary(
                     demand["prod"] = prod
                     applied["prod"] = prod
                     modified = True
+                if demand_status is not None:
+                    demand["demand_status"] = demand_status
+                    applied["demand_status"] = demand_status
+                    modified = True
                 break
             # task scope
             owned = demand.get("owned_work_items")
@@ -117,6 +122,72 @@ def patch_userwork_summary(
         }
         _atomic_write_json_file(path, payload)
         return applied
+
+
+def append_owned_work_items_to_demand(
+    demand_no: str,
+    work_items: list[dict[str, Any]],
+) -> list[str]:
+    """将研发子单追加到需求单 ``owned_work_items``（按 task_no 去重）。返回本次新增的 task_no。"""
+    path: Path = _owner_order_file_name()
+    if not path.is_file() or not work_items:
+        return []
+
+    dn = _snapshot_norm_id(demand_no)
+    if not dn:
+        return []
+
+    lock = FileLock(str(_owner_order_file_lock_path()), timeout=30)
+    with lock:
+        try:
+            raw = path.read_text(encoding="utf-8")
+            prev = json.loads(raw)
+            if not isinstance(prev, dict):
+                return []
+            existing_list = prev.get("list")
+            if not isinstance(existing_list, list):
+                return []
+        except (OSError, json.JSONDecodeError):
+            return []
+
+        added: list[str] = []
+        modified = False
+        for demand in existing_list:
+            if not isinstance(demand, dict):
+                continue
+            if _snapshot_norm_id(demand.get("demand_no")) != dn:
+                continue
+            owned = demand.get("owned_work_items")
+            if not isinstance(owned, list):
+                owned = []
+            existing_nos = {
+                _snapshot_norm_id(t.get("task_no"))
+                for t in owned
+                if isinstance(t, dict) and _snapshot_norm_id(t.get("task_no"))
+            }
+            for item in work_items:
+                if not isinstance(item, dict):
+                    continue
+                tn = _snapshot_norm_id(item.get("task_no"))
+                if not tn or tn in existing_nos:
+                    continue
+                owned.append(dict(item))
+                existing_nos.add(tn)
+                added.append(tn)
+                modified = True
+            if modified:
+                demand["owned_work_items"] = owned
+            break
+
+        if not modified:
+            return []
+
+        payload = {
+            "list": existing_list,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        _atomic_write_json_file(path, payload)
+        return added
 
 
 def load_scope_work_order_context(

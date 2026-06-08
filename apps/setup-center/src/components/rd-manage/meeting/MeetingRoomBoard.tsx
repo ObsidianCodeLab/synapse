@@ -1836,23 +1836,23 @@ const InterventionDialog = ({
                       </button>
                     </Tooltip>
                   ) : null}
-                  {/* Node Header Row */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono text-muted-foreground/80">#{String(idx + 1).padStart(2, '0')}</span>
-                      <div className="flex items-center gap-1.5">
-                        {state === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                  {/* Node Header Row：节点名 + 类型同一行，减少卡片高度 */}
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-[10px] font-mono text-muted-foreground/80 shrink-0">#{String(idx + 1).padStart(2, '0')}</span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {state === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
                         {state === 'skipped' && (
                           <Tooltip title="未开启，已跳过">
-                            <SkipForward className="w-3.5 h-3.5 text-slate-400" />
+                            <SkipForward className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           </Tooltip>
                         )}
-                        {state === 'processing' && <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />}
-                        {state === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-500 animate-pulse" />}
-                        {state === 'human_intervention' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />}
-                        {state === 'pending' && <CircleDashed className="w-3.5 h-3.5 text-muted-foreground/80" />}
-                        {state === 'stopped' && <Square className="w-3.5 h-3.5 text-slate-400" />}
-                        <span className={`text-xs font-medium ${
+                        {state === 'processing' && <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />}
+                        {state === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-500 animate-pulse shrink-0" />}
+                        {state === 'human_intervention' && <AlertTriangle className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />}
+                        {state === 'pending' && <CircleDashed className="w-3.5 h-3.5 text-muted-foreground/80 shrink-0" />}
+                        {state === 'stopped' && <Square className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                        <span className={`text-xs font-medium truncate min-w-0 ${
                           isSelected ? 'text-blue-300' :
                           state === 'error' ? 'text-red-400' :
                           state === 'human_intervention' ? 'text-amber-400' :
@@ -1862,6 +1862,10 @@ const InterventionDialog = ({
                           state === 'completed' ? 'text-foreground/90' : 'text-muted-foreground'
                         }`}>
                           {node.name}
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md border shrink-0 ${typeInfo.bg}`}>
+                          <Zap className={`w-2.5 h-2.5 ${typeInfo.color}`} />
+                          <span className={`text-[10px] font-medium leading-none ${typeInfo.color}`}>{typeInfo.label}</span>
                         </span>
                       </div>
                     </div>
@@ -1877,14 +1881,8 @@ const InterventionDialog = ({
                     </div>
                   </div>
 
-                  {/* 主要动作 */}
-                  <div className={`inline-flex items-center gap-1.5 mb-2 px-2 py-0.5 rounded-md border ${typeInfo.bg}`}>
-                    <Zap className={`w-2.5 h-2.5 ${typeInfo.color}`} />
-                    <span className={`text-[10px] font-medium ${typeInfo.color}`}>{typeInfo.label}</span>
-                  </div>
-
                   {/* 会议目标 */}
-                  <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                  <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2 pr-8">
                     {node.desc}
                   </p>
                 </motion.div>

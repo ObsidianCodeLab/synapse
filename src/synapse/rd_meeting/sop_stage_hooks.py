@@ -7,6 +7,7 @@ import logging
 from typing import Any, Literal
 
 from synapse.rd_meeting.room_runtime import append_history_event
+from synapse.rd_meeting.userwork_sync import patch_userwork_summary
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,16 @@ _IMPLEMENTED_DEMAND_TRANSITIONS: dict[tuple[int, int], str] = {
     (1, 2): "transfer_demand_to_designing",
     (2, 3): "transfer_demand_to_developing",
 }
+
+# SOP to_stage → 研发云 demand_status（与 get_demand_by_user 快照字段一致）
+_DEMAND_STATUS_BY_TO_STAGE: dict[int, str] = {
+    2: "需求设计",
+    3: "需求开发",
+}
+
+
+def _demand_status_for_to_stage(to_stage: int) -> str | None:
+    return _DEMAND_STATUS_BY_TO_STAGE.get(int(to_stage))
 
 
 def _transition_comments(
@@ -135,6 +146,7 @@ async def run_sop_stage_transition_hook(
         }
 
     ok = isinstance(resp, dict) and resp.get("errorcode") in (None, 0)
+    userwork_applied: dict[str, str] = {}
     if not ok:
         logger.warning(
             "sop_stage_hook api returned error hook=%s demand=%s resp=%s",
@@ -150,6 +162,19 @@ async def run_sop_stage_transition_hook(
             from_name,
             to_name,
         )
+        demand_status = _demand_status_for_to_stage(to_stage)
+        if demand_status:
+            userwork_applied = patch_userwork_summary(
+                scope_type="demand",
+                scope_id=demand_no,
+                demand_status=demand_status,
+            )
+            if not userwork_applied:
+                logger.warning(
+                    "sop_stage_hook userwork sync skipped demand=%s demand_status=%s",
+                    demand_no,
+                    demand_status,
+                )
 
     return {
         "status": "ok" if ok else "api_error",
@@ -158,6 +183,7 @@ async def run_sop_stage_transition_hook(
         "from_stage": from_stage,
         "to_stage": to_stage,
         "comments": comments,
+        "userwork_applied": userwork_applied,
         "api_response": resp if isinstance(resp, dict) else {"raw": resp},
     }
 
@@ -199,6 +225,7 @@ def schedule_sop_stage_transition_hook(
                     "hook_status": outcome.get("status"),
                     "hook": outcome.get("hook"),
                     "message": outcome.get("message"),
+                    "userwork_applied": outcome.get("userwork_applied"),
                 },
             )
         except Exception as exc:
