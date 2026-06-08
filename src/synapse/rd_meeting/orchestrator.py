@@ -69,6 +69,7 @@ from synapse.rd_meeting.prewarm_coordinator import (
 )
 from synapse.rd_meeting.room_runtime import (
     append_history_event,
+    archived_node_tokens,
     finalize_node_metrics,
     load_room_state,
     save_room_state,
@@ -437,6 +438,7 @@ class MeetingRoomOrchestrator:
             completed_at=now,
         )
         archived_seconds = int(archived.get("seconds") or 0)
+        archived_tokens = archived_node_tokens(archived)
 
         metrics = room_state.get("metrics")
         if not isinstance(metrics, dict):

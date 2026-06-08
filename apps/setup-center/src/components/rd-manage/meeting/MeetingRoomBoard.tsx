@@ -1944,8 +1944,8 @@ const InterventionDialog = ({
                   disabled={room.reprocessing}
                   icon={
                     <RotateCw
-                      className={`w-4 h-4 app-loading-spin rd-meeting-reprocess-spin ${
-                        room.reprocessing ? 'animate-spin' : ''
+                      className={`w-4 h-4 ${
+                        room.reprocessing ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin' : ''
                       }`}
                     />
                   }
@@ -2431,6 +2431,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '正在重新处理节点…';
+        updatedRoom.reprocessing = false;
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
         toast.success('已清理过程数据，正在从节点初始化重跑');

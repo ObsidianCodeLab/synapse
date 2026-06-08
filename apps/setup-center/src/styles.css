@@ -1315,7 +1315,7 @@ button.btnApplyRestart:hover {
 .animate-spin,
 .spinner,
 .spinIcon,
-.rd-meeting-reprocess-spin,
+.rd-meeting-reprocess-spin.animate-spin,
 .ant-btn-loading-icon,
 .ant-btn-loading-icon svg,
 .ant-spin-dot-spin,
@@ -1327,7 +1327,7 @@ button.btnApplyRestart:hover {
 .animate-spin,
 .spinner,
 .spinIcon,
-.rd-meeting-reprocess-spin {
+.rd-meeting-reprocess-spin.animate-spin {
   animation: spin 0.85s linear infinite !important;
 }
 .ant-spin .ant-spin-dot-item {
@@ -4758,7 +4758,7 @@ button.btnApplyRestart:hover {
   .animate-spin,
   .spinner,
   .spinIcon,
-  .rd-meeting-reprocess-spin,
+  .rd-meeting-reprocess-spin.animate-spin,
   .ant-btn-loading-icon,
   .ant-btn-loading-icon svg,
   .ant-spin-dot-spin,
@@ -4771,7 +4771,7 @@ button.btnApplyRestart:hover {
   .animate-spin,
   .spinner,
   .spinIcon,
-  .rd-meeting-reprocess-spin {
+  .rd-meeting-reprocess-spin.animate-spin {
     animation: spin 0.85s linear infinite !important;
   }
   .ant-spin .ant-spin-dot-item {
@@ -4803,7 +4803,7 @@ button.btnApplyRestart:hover {
 [data-perf-mode="low"] .animate-spin,
 [data-perf-mode="low"] .spinner,
 [data-perf-mode="low"] .spinIcon,
-[data-perf-mode="low"] .rd-meeting-reprocess-spin,
+[data-perf-mode="low"] .rd-meeting-reprocess-spin.animate-spin,
 [data-perf-mode="low"] .ant-btn-loading-icon,
 [data-perf-mode="low"] .ant-btn-loading-icon svg,
 [data-perf-mode="low"] .ant-spin-dot-spin,
@@ -4816,7 +4816,7 @@ button.btnApplyRestart:hover {
 [data-perf-mode="low"] .animate-spin,
 [data-perf-mode="low"] .spinner,
 [data-perf-mode="low"] .spinIcon,
-[data-perf-mode="low"] .rd-meeting-reprocess-spin {
+[data-perf-mode="low"] .rd-meeting-reprocess-spin.animate-spin {
   animation: spin 0.85s linear infinite !important;
 }
 [data-perf-mode="low"] .ant-spin .ant-spin-dot-item {
