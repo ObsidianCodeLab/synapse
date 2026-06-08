@@ -2346,6 +2346,7 @@ def _build_task_impact_confirm_payload(
             "relatedTaskId": None,
             "selfTestDesc": self_test_desc,
             "confirmTaskId": task_id,
+            "confirmComments": self_test_desc,
         }
         for impact_id in impact_ids
     ]
@@ -3081,12 +3082,6 @@ async def _sync_task_impact_from_demand(
         if isinstance(add_result, dict) and add_result.get("errorcode") not in (None, 0):
             return error_response(502, "新增任务影响点失败", error=str(add_result))
 
-    logger.info(
-        "task_impact_confirm prep demand_no=%s child_task_id=%s task_impact_desc=%r",
-        demand_no,
-        child_task_id,
-        task_impact_desc,
-    )
     confirm_result = await _task_impact_confirm(
         TaskImpactConfirmRequest(taskId=child_task_id, selfTestDesc=task_impact_desc)
     )

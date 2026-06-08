@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,22 @@ from synapse.rd_meeting.product_context import (
 from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
+
+# 测试用阻塞时长（秒）；设置环境变量 SYNAPSE_ENV_PREGEN_TEST_SLEEP=1 后生效
+_ENV_PREGEN_TEST_SLEEP_SECONDS = 100_000
+
+
+def _env_pregen_test_sleep() -> None:
+    """测试用：环境预生成开始前阻塞，便于观察/中断流程。"""
+    flag = os.environ.get("SYNAPSE_ENV_PREGEN_TEST_SLEEP", "").strip().lower()
+    if flag not in ("1", "true", "yes", "on"):
+        return
+    logger.warning(
+        "env_pregen: test sleep %ss (SYNAPSE_ENV_PREGEN_TEST_SLEEP=%s)",
+        _ENV_PREGEN_TEST_SLEEP_SECONDS,
+        flag,
+    )
+    time.sleep(_ENV_PREGEN_TEST_SLEEP_SECONDS)
 
 _ENTROPY_SOURCE_NODE = "entropy_gen"
 _ENTROPY_SOURCE_STAGE_ID = 2
@@ -135,6 +153,7 @@ def bootstrap_env_pregen(
     catalog_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """环境预生成：文档 + 控熵落盘至 ``work/<scope>/env/``。"""
+    _env_pregen_test_sleep()
     sid = (scope_id or "").strip()
     prod_key = (prod or "").strip()
     scope_dir(sid).mkdir(parents=True, exist_ok=True)

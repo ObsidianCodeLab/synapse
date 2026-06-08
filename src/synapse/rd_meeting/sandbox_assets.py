@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import time
 from typing import Any
 
 from synapse.rd_meeting.paths import sandbox_code_dir, sandbox_root, scope_dir
@@ -20,22 +18,6 @@ from synapse.rd_meeting.product_context import (
 )
 
 logger = logging.getLogger(__name__)
-
-# 测试用阻塞时长（秒）；设置环境变量 SYNAPSE_SANDBOX_BUILD_TEST_SLEEP=1 后生效
-_SANDBOX_BUILD_TEST_SLEEP_SECONDS = 100_000
-
-
-def _sandbox_build_test_sleep() -> None:
-    """测试用：沙箱构建开始前阻塞，便于观察/中断流程。"""
-    flag = os.environ.get("SYNAPSE_SANDBOX_BUILD_TEST_SLEEP", "").strip().lower()
-    if flag not in ("1", "true", "yes", "on"):
-        return
-    logger.warning(
-        "sandbox_build: test sleep %ss (SYNAPSE_SANDBOX_BUILD_TEST_SLEEP=%s)",
-        _SANDBOX_BUILD_TEST_SLEEP_SECONDS,
-        flag,
-    )
-    time.sleep(_SANDBOX_BUILD_TEST_SLEEP_SECONDS)
 
 
 def materialize_repo_to_sandbox(
@@ -103,7 +85,6 @@ def bootstrap_sandbox_assets(
     catalog_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """拉取产品关联仓库至沙箱目录，返回摘要。"""
-    _sandbox_build_test_sleep()
     sid = (scope_id or "").strip()
     prod_key = (prod or "").strip()
     scope_dir(sid).mkdir(parents=True, exist_ok=True)

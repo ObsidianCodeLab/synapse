@@ -168,13 +168,13 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
     assert rows[0]["task_no"] == "T-NEW-1"
 
 
-def test_sandbox_build_test_sleep(monkeypatch):
+def test_env_pregen_test_sleep(monkeypatch):
     slept: list[float] = []
-    monkeypatch.setenv("SYNAPSE_SANDBOX_BUILD_TEST_SLEEP", "1")
-    monkeypatch.setattr("synapse.rd_meeting.sandbox_assets.time.sleep", lambda s: slept.append(s))
-    from synapse.rd_meeting.sandbox_assets import _sandbox_build_test_sleep
+    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_TEST_SLEEP", "1")
+    monkeypatch.setattr("synapse.rd_meeting.env_pregen_assets.time.sleep", lambda s: slept.append(s))
+    from synapse.rd_meeting.env_pregen_assets import _env_pregen_test_sleep
 
-    _sandbox_build_test_sleep()
+    _env_pregen_test_sleep()
     assert slept == [100_000]
 
 
