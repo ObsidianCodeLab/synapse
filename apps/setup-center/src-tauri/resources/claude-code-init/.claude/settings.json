@@ -1,0 +1,20 @@
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "",
+    "ANTHROPIC_BASE_URL": "https://lab.iwhalecloud.com/gpt-proxy/anthropic",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-4.5-haiku",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-4.5-opus",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-4.5-sonnet",
+    "ANTHROPIC_MODEL": "MiniMax-M2.7",
+    "ANTHROPIC_REASONING_MODEL": "MiniMax-M2.7"
+  },
+  "includeCoAuthoredBy": false,
+  "extraKnownMarketplaces": {
+    "claude-hud": {
+      "source": {
+        "source": "github",
+        "repo": "jarrodwatts/claude-hud"
+      }
+    }
+  }
+}

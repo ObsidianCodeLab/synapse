@@ -1,0 +1,155 @@
+/**
+ * 产品管理：跟随全局 light/dark（及 daltonized / high-contrast）
+ * --pw-* 为页面内别名，全部派生自根主题的 --bg、--card-bg、--primary 等。
+ */
+.product-workbench,
+.product-demo {
+  --pw-fg: var(--foreground);
+  --pw-muted: var(--muted-foreground);
+  --pw-muted2: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
+  --pw-border: var(--border);
+  --pw-line-soft: color-mix(in srgb, var(--border) 50%, transparent);
+  --pw-primary: var(--primary);
+  --pw-success: #10b981; /* emerald-500 */
+  --pw-bg: var(--background);
+  --pw-bg-deep: color-mix(in srgb, var(--background) 95%, var(--foreground) 5%);
+  --pw-surface: color-mix(in srgb, var(--background) 98%, var(--foreground) 2%);
+  --pw-card: var(--card);
+  --pw-card-alt: color-mix(in srgb, var(--card) 95%, var(--foreground) 5%);
+  --pw-input: var(--background);
+  --pw-text-soft: color-mix(in srgb, var(--foreground) 80%, transparent);
+  --pw-accent-10: color-mix(in srgb, var(--primary) 10%, transparent);
+  --pw-accent-15: color-mix(in srgb, var(--primary) 15%, transparent);
+  --pw-accent-20: color-mix(in srgb, var(--primary) 20%, transparent);
+  --pw-accent-30: color-mix(in srgb, var(--primary) 30%, transparent);
+  --pw-accent-40: color-mix(in srgb, var(--primary) 40%, transparent);
+  --pw-repo-bg: color-mix(in srgb, var(--muted) 40%, transparent);
+  --pw-graph: color-mix(in srgb, var(--background) 95%, var(--muted) 5%);
+  --pw-code-dot: color-mix(in srgb, var(--primary) 15%, transparent);
+  --pw-green-dot: color-mix(in srgb, var(--pw-success) 15%, transparent);
+  --pw-success-10: color-mix(in srgb, var(--pw-success) 10%, transparent);
+  --pw-success-20: color-mix(in srgb, var(--pw-success) 20%, transparent);
+  --pw-ticket-bg: color-mix(in srgb, var(--muted) 30%, transparent);
+  --pw-stat-bg: color-mix(in srgb, var(--muted) 50%, transparent);
+  --pw-btn-ghost: transparent;
+  --pw-danger-bg: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --pw-radius-sm: var(--radius);
+  --pw-radius-md: calc(var(--radius) + 2px);
+  --pw-radius-lg: calc(var(--radius) + 4px);
+  --pw-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --pw-glow: 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* 深色：加强卡片层次与边界，避免「糊成一块」 */
+:root[data-theme="dark"] .product-workbench,
+:root[data-theme="daltonized-dark"] .product-workbench,
+:root[data-theme="high-contrast"] .product-workbench,
+:root[data-theme="dark"] .product-demo,
+:root[data-theme="daltonized-dark"] .product-demo,
+:root[data-theme="high-contrast"] .product-demo {
+  --pw-card-shadow-deep: 0 4px 28px rgba(0, 0, 0, 0.42);
+  --pw-toolbar-inset: 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --pw-border-refine: rgba(255, 255, 255, 0.1);
+}
+
+.product-workbench {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--pw-bg);
+  color: var(--pw-fg);
+}
+
+.product-workbench-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px;
+}
+
+/* 深色下工具条略抬升 */
+:root[data-theme="dark"] .product-workbench .product-workbench-toolbar,
+:root[data-theme="daltonized-dark"] .product-workbench .product-workbench-toolbar,
+:root[data-theme="high-contrast"] .product-workbench .product-workbench-toolbar {
+  box-shadow: var(--pw-toolbar-inset, none);
+  border-color: var(--pw-border-refine, var(--border)) !important;
+}
+
+/* ── 工具栏搜索框：融入系统主题，避免白底突兀 ── */
+.product-workbench .ant-input-affix-wrapper,
+.product-workbench .ant-input-affix-wrapper.ant-input-outlined {
+  background: var(--pw-input) !important;
+  border-color: var(--pw-border) !important;
+  color: var(--pw-fg) !important;
+  box-shadow: none !important;
+}
+
+.product-workbench .ant-input-affix-wrapper:hover,
+.product-workbench .ant-input-affix-wrapper.ant-input-outlined:hover {
+  border-color: var(--pw-primary) !important;
+}
+
+.product-workbench .ant-input-affix-wrapper:focus-within,
+.product-workbench .ant-input-affix-wrapper.ant-input-outlined:focus-within {
+  border-color: var(--pw-primary) !important;
+  box-shadow: 0 0 0 2px var(--pw-accent-30) !important;
+}
+
+.product-workbench .ant-input-affix-wrapper .ant-input {
+  background: transparent !important;
+  color: var(--pw-fg) !important;
+}
+
+.product-workbench .ant-input-affix-wrapper .ant-input::placeholder {
+  color: var(--pw-muted2) !important;
+}
+
+.product-workbench .ant-input-affix-wrapper .ant-input-prefix,
+.product-workbench .ant-input-affix-wrapper .ant-input-suffix {
+  color: var(--pw-muted2) !important;
+}
+
+/* 清除按钮 */
+.product-workbench .ant-input-affix-wrapper .ant-input-clear-icon {
+  color: var(--pw-muted2) !important;
+}
+
+.product-workbench .ant-divider-vertical {
+  border-color: var(--pw-border);
+}
+
+/* 深色卡片：更清晰轮廓 */
+:root[data-theme="dark"] .product-workbench .ant-card,
+:root[data-theme="daltonized-dark"] .product-workbench .ant-card,
+:root[data-theme="high-contrast"] .product-workbench .ant-card {
+  box-shadow: var(--pw-card-shadow-deep, var(--shadow)) !important;
+  border-color: var(--pw-border-refine, var(--border)) !important;
+}
+
+.product-demo .ant-tabs,
+.product-demo .ant-tabs-content,
+.product-demo .ant-tabs-tabpane {
+  height: 100%;
+}
+
+.product-demo .ant-tabs-content-holder {
+  background: var(--pw-bg);
+}
+
+/* Excalidraw 嵌入（产品文档 MD 预览）：在 flex/Sheet 内占满高度，避免画布区域坍塌 */
+.excalidraw-embed-host {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+.excalidraw-embed-inner,
+.excalidraw-embed-inner .excalidraw {
+  min-height: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 100%;
+  width: 100%;
+}
+

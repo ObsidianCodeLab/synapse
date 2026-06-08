@@ -1,0 +1,131 @@
+Date : 2026-05-29 16:04:32
+Directory : d:\github\openakita_jyhk
+Total : 70 files,  5553 codes, 30 comments, 779 blanks, all 6362 lines
+
+Languages
++----------------+------------+------------+------------+------------+------------+
+| language       | files      | code       | comment    | blank      | total      |
++----------------+------------+------------+------------+------------+------------+
+| Python         |         46 |      2,589 |         28 |        403 |      3,020 |
+| TypeScript JSX |         13 |      1,734 |         -6 |         96 |      1,824 |
+| Markdown       |          7 |      1,104 |          0 |        267 |      1,371 |
+| TypeScript     |          4 |        126 |          8 |         13 |        147 |
++----------------+------------+------------+------------+------------+------------+
+
+Directories
++-----------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                            | files      | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                               |         70 |      5,553 |         30 |        779 |      6,362 |
+| apps                                                                                                            |         17 |      1,860 |          2 |        109 |      1,971 |
+| apps\setup-center                                                                                               |         17 |      1,860 |          2 |        109 |      1,971 |
+| apps\setup-center\src                                                                                           |         17 |      1,860 |          2 |        109 |      1,971 |
+| apps\setup-center\src\api                                                                                       |          2 |         67 |          2 |          5 |         74 |
+| apps\setup-center\src\components                                                                                |         15 |      1,793 |          0 |        104 |      1,897 |
+| apps\setup-center\src\components\product                                                                        |          4 |        186 |          5 |          9 |        200 |
+| apps\setup-center\src\components\rd-manage                                                                      |         11 |      1,607 |         -5 |         95 |      1,697 |
+| apps\setup-center\src\components\rd-manage (Files)                                                              |          1 |         92 |          1 |          3 |         96 |
+| apps\setup-center\src\components\rd-manage\meeting                                                              |         10 |      1,515 |         -6 |         92 |      1,601 |
+| apps\setup-center\src\components\rd-manage\meeting (Files)                                                      |          7 |        724 |         11 |         56 |        791 |
+| apps\setup-center\src\components\rd-manage\meeting\panels                                                       |          3 |        791 |        -17 |         36 |        810 |
+| docs                                                                                                            |          1 |        680 |          0 |        156 |        836 |
+| docs\synapse                                                                                                    |          1 |        680 |          0 |        156 |        836 |
+| skills                                                                                                          |          6 |        505 |          9 |        117 |        631 |
+| skills\whalecloud-dev-tool-ask-user                                                                             |          1 |          8 |          0 |          3 |         11 |
+| skills\whalecloud-dev-tool-doc-generate                                                                         |          3 |        114 |          9 |         20 |        143 |
+| skills\whalecloud-dev-tool-doc-generate (Files)                                                                 |          2 |        106 |          9 |         16 |        131 |
+| skills\whalecloud-dev-tool-doc-generate\templates                                                               |          1 |          8 |          0 |          4 |         12 |
+| skills\whalecloud-dev-tool-function-solution                                                                    |          1 |        412 |          0 |        109 |        521 |
+| skills\whalecloud-dev-tool-module-function                                                                      |          1 |        -29 |          0 |        -15 |        -44 |
+| skills\whalecloud-dev-tool-module-function\templates                                                            |          1 |        -29 |          0 |        -15 |        -44 |
+| src                                                                                                             |         29 |      1,610 |         18 |        212 |      1,840 |
+| src\synapse                                                                                                     |         29 |      1,610 |         18 |        212 |      1,840 |
+| src\synapse\api                                                                                                 |          2 |        183 |          8 |         24 |        215 |
+| src\synapse\api\routes                                                                                          |          2 |        183 |          8 |         24 |        215 |
+| src\synapse\rd_meeting                                                                                          |         25 |      1,326 |          8 |        183 |      1,517 |
+| src\synapse\rd_meeting (Files)                                                                                  |         24 |      1,313 |          8 |        176 |      1,497 |
+| src\synapse\rd_meeting\prompts                                                                                  |          1 |         13 |          0 |          7 |         20 |
+| src\synapse\rd_sop                                                                                              |          1 |         91 |          2 |          5 |         98 |
+| src\synapse\tools                                                                                               |          1 |         10 |          0 |          0 |         10 |
+| src\synapse\tools\definitions                                                                                   |          1 |         10 |          0 |          0 |         10 |
+| tests                                                                                                           |         17 |        898 |          1 |        185 |      1,084 |
+| tests\integration                                                                                               |          1 |          2 |          0 |          0 |          2 |
+| tests\unit                                                                                                      |         16 |        896 |          1 |        185 |      1,082 |
++-----------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-----------------------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| filename                                                                                                        | language       | code       | comment    | blank      | total      |
++-----------------------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| d:\github\openakita_jyhk\apps\setup-center\src\api\meetingRoomService.ts                                        | TypeScript     |         51 |          1 |          4 |         56 |
+| d:\github\openakita_jyhk\apps\setup-center\src\api\rdUnifiedService.ts                                          | TypeScript     |         16 |          1 |          1 |         18 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\product\ProductModal.tsx                              | TypeScript JSX |         58 |          0 |          2 |         60 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\product\RepoBranchDerivedDisplay.tsx                  | TypeScript JSX |         32 |          1 |          1 |         34 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\product\RepoUpdateDialog.tsx                          | TypeScript JSX |         58 |          0 |          2 |         60 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\product\types.ts                                      | TypeScript     |         38 |          4 |          4 |         46 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\OrderManagement.tsx                         | TypeScript JSX |         92 |          1 |          3 |         96 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\MeetingAgentContextDrawer.tsx       | TypeScript JSX |         20 |          1 |          2 |         23 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\MeetingChatStructuredCards.tsx      | TypeScript JSX |         -1 |          0 |          0 |         -1 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\MeetingHitlForm.tsx                 | TypeScript JSX |         66 |          0 |          4 |         70 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\MeetingRoomBoard.tsx                | TypeScript JSX |        499 |          3 |         35 |        537 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\NodeReviewPanel.tsx                 | TypeScript JSX |         34 |          3 |          1 |         38 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\meetingChatUtils.ts                 | TypeScript     |         21 |          2 |          4 |         27 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\meetingRoomRoster.tsx               | TypeScript JSX |         85 |          2 |         10 |         97 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\panels\MeetingNodeDetailPanel.tsx   | TypeScript JSX |        610 |          5 |         34 |        649 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\panels\MeetingNodeReferenceTabs.tsx | TypeScript JSX |        623 |          3 |         23 |        649 |
+| d:\github\openakita_jyhk\apps\setup-center\src\components\rd-manage\meeting\panels\RequirementAnalysisPanel.tsx | TypeScript JSX |       -442 |        -25 |        -21 |       -488 |
+| d:\github\openakita_jyhk\docs\synapse\subprocess-multi-agent-development-scheme.md                              | Markdown       |        680 |          0 |        156 |        836 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-ask-user\SKILL.md                                           | Markdown       |          8 |          0 |          3 |         11 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-doc-generate\SKILL.md                                       | Markdown       |         12 |          0 |          3 |         15 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-doc-generate\fill_clarify.py                                | Python         |         94 |          9 |         13 |        116 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-doc-generate\templates\函数级方案.md                             | Markdown       |          8 |          0 |          4 |         12 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-function-solution\SKILL.md                                  | Markdown       |        412 |          0 |        109 |        521 |
+| d:\github\openakita_jyhk\skills\whalecloud-dev-tool-module-function\templates\03-模块功能.md                        | Markdown       |        -29 |          0 |        -15 |        -44 |
+| d:\github\openakita_jyhk\src\synapse\api\routes\dev_iwhalecloud.py                                              | Python         |         81 |          7 |          9 |         97 |
+| d:\github\openakita_jyhk\src\synapse\api\routes\meeting_rooms.py                                                | Python         |        102 |          1 |         15 |        118 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\agent_context_probe.py                                          | Python         |         34 |          0 |        -31 |          3 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\agent_prompt.py                                                 | Python         |         32 |          0 |          7 |         39 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\agent_trace.py                                                  | Python         |         65 |          0 |         10 |         75 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\artifacts.py                                                    | Python         |        -72 |          0 |        -14 |        -86 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\chat_display.py                                                 | Python         |          8 |          0 |          2 |         10 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\hitl_feedback.py                                                | Python         |         22 |          1 |          5 |         28 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\hitl_form.py                                                    | Python         |        119 |          3 |         21 |        143 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\hitl_lifecycle.py                                               | Python         |          1 |          0 |          0 |          1 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\hitl_submission.py                                              | Python         |         -3 |          0 |          0 |         -3 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\live.py                                                         | Python         |         12 |          0 |          0 |         12 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\node_review.py                                                  | Python         |          8 |          0 |          1 |          9 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\orchestrator.py                                                 | Python         |        126 |          1 |          6 |        133 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\participants.py                                                 | Python         |         24 |          1 |          7 |         32 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\paths.py                                                        | Python         |          1 |          0 |          0 |          1 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\phase.py                                                        | Python         |         -3 |          0 |          0 |         -3 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\pipeline.py                                                     | Python         |        164 |          0 |         20 |        184 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\prewarm_coordinator.py                                          | Python         |         20 |          0 |          9 |         29 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\prior_outputs.py                                                | Python         |        164 |          0 |         32 |        196 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\prompts\meeting_room_rules.md                                   | Markdown       |         13 |          0 |          7 |         20 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\questionnaire_repair.py                                         | Python         |        232 |          1 |         49 |        282 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\room_runtime.py                                                 | Python         |         71 |          0 |         13 |         84 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\room_skill.py                                                   | Python         |          5 |          0 |          2 |          7 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\service.py                                                      | Python         |         82 |          0 |         13 |         95 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\sop_stage_hooks.py                                              | Python         |        188 |          1 |         23 |        212 |
+| d:\github\openakita_jyhk\src\synapse\rd_meeting\validation.py                                                   | Python         |         13 |          0 |          1 |         14 |
+| d:\github\openakita_jyhk\src\synapse\rd_sop\manifest.py                                                         | Python         |         91 |          2 |          5 |         98 |
+| d:\github\openakita_jyhk\src\synapse\tools\definitions\meeting_room.py                                          | Python         |         10 |          0 |          0 |         10 |
+| d:\github\openakita_jyhk\tests\integration\test_dev_iwhalecloud_api.py                                          | Python         |          2 |          0 |          0 |          2 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_agent_context_probe.py                                      | Python         |         70 |          0 |          8 |         78 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_agent_prompt.py                                             | Python         |         61 |          0 |          9 |         70 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_agent_trace.py                                              | Python         |         25 |          0 |          7 |         32 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_chat_display.py                                             | Python         |         30 |          1 |          3 |         34 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_hitl_questionnaire.py                                       | Python         |         54 |          0 |          9 |         63 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_live_phase_artifacts.py                                     | Python         |        -13 |          0 |         -2 |        -15 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_live_route.py                                               | Python         |         73 |          0 |         14 |         87 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_node_history.py                                             | Python         |         40 |          0 |         15 |         55 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_participants.py                                             | Python         |         40 |          0 |         17 |         57 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_phase5_node_enable.py                                       | Python         |          3 |          0 |          1 |          4 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_pipeline.py                                                 | Python         |         33 |          0 |          8 |         41 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_pipeline_node_review.py                                     | Python         |         -1 |          0 |          0 |         -1 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_prior_outputs.py                                            | Python         |        108 |          0 |         25 |        133 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_questionnaire_repair.py                                     | Python         |        177 |          0 |         26 |        203 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_skip_before_init.py                                         | Python         |        122 |          0 |         27 |        149 |
+| d:\github\openakita_jyhk\tests\unit\test_rd_meeting_sop_stage_hooks.py                                          | Python         |         74 |          0 |         18 |         92 |
+| Total                                                                                                           |                |      5,553 |         30 |        779 |      6,362 |
++-----------------------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+

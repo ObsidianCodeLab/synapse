@@ -1,0 +1,1440 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Drawer, Empty, Segmented, Spin, Tag, Tooltip } from 'antd';
+import {
+  Activity,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  BookOpen,
+  Bot,
+  BrainCircuit,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Cpu,
+  FileCode2,
+  Hash,
+  Loader2,
+  RefreshCw,
+  ScrollText,
+  Sparkles,
+  Terminal,
+  User as UserIcon,
+  Wrench,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { ALL_NODES } from '../../../rd-sop/constants';
+import {
+  fetchMeetingAgentContexts,
+  type MeetingAgentContextEntry,
+  type MeetingAgentContextsPayload,
+  type MeetingAgentDelegationRun,
+  type ProcessingHistoryEntry,
+  type SkillExecutionEntry,
+} from '../../../api/meetingRoomService';
+
+export interface AgentContextTarget {
+  profileId: string;
+  name: string;
+  role: string;
+  isHost?: boolean;
+  avatarColor?: string;
+  /** 当前 UI 选中的 SOP 节点（与 agent-contexts API 的 node_id 对齐） */
+  nodeId?: string;
+}
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  synapseApiBase: string;
+  roomId: string;
+  agent: AgentContextTarget | null;
+}
+
+type ActivityCategory = 'all' | 'input' | 'output' | 'llm_usage' | 'tool' | 'skill_load' | 'skill_load_blocked' | 'skill_exec' | 'skill';
+
+const ACTIVITY_CATEGORY_META: Record<
+  Exclude<ActivityCategory, 'all'>,
+  { label: string; icon: React.ReactNode; chip: string; dot: string; glow: string }
+> = {
+  input: {
+    label: '输入',
+    icon: <ArrowDownToLine className="w-3.5 h-3.5" />,
+    chip: 'bg-sky-500/12 text-sky-200 border-sky-500/35',
+    dot: 'bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.55)]',
+    glow: 'from-sky-500/20 via-sky-500/5 to-transparent',
+  },
+  output: {
+    label: '输出',
+    icon: <ArrowUpFromLine className="w-3.5 h-3.5" />,
+    chip: 'bg-emerald-500/12 text-emerald-200 border-emerald-500/35',
+    dot: 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.55)]',
+    glow: 'from-emerald-500/20 via-emerald-500/5 to-transparent',
+  },
+  llm_usage: {
+    label: 'LLM 推理',
+    icon: <BrainCircuit className="w-3.5 h-3.5" />,
+    chip: 'bg-violet-500/18 text-violet-100 border-violet-500/40',
+    dot: 'bg-violet-400 shadow-[0_0_14px_rgba(167,139,250,0.65)]',
+    glow: 'from-violet-500/25 via-violet-500/8 to-transparent',
+  },
+  tool: {
+    label: '工具',
+    icon: <Wrench className="w-3.5 h-3.5" />,
+    chip: 'bg-slate-500/12 text-slate-200 border-slate-500/35',
+    dot: 'bg-slate-300 shadow-[0_0_10px_rgba(203,213,225,0.35)]',
+    glow: 'from-slate-400/15 via-slate-400/5 to-transparent',
+  },
+  skill_load: {
+    label: '加载技能',
+    icon: <BookOpen className="w-3.5 h-3.5" />,
+    chip: 'bg-cyan-500/12 text-cyan-200 border-cyan-500/35',
+    dot: 'bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.55)]',
+    glow: 'from-cyan-500/20 via-cyan-500/5 to-transparent',
+  },
+  skill_load_blocked: {
+    label: '技能被拦截',
+    icon: <BookOpen className="w-3.5 h-3.5" />,
+    chip: 'bg-orange-500/12 text-orange-200 border-orange-500/35',
+    dot: 'bg-orange-400 shadow-[0_0_12px_rgba(251,146,60,0.55)]',
+    glow: 'from-orange-500/20 via-orange-500/5 to-transparent',
+  },
+  skill_exec: {
+    label: '执行技能',
+    icon: <Sparkles className="w-3.5 h-3.5" />,
+    chip: 'bg-amber-500/12 text-amber-200 border-amber-500/35',
+    dot: 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.55)]',
+    glow: 'from-amber-500/20 via-amber-500/5 to-transparent',
+  },
+  skill: {
+    label: '技能',
+    icon: <Sparkles className="w-3.5 h-3.5" />,
+    chip: 'bg-amber-500/12 text-amber-200 border-amber-500/35',
+    dot: 'bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.55)]',
+    glow: 'from-amber-500/20 via-amber-500/5 to-transparent',
+  },
+};
+
+function formatDurationMs(ms?: number): string {
+  if (ms == null || ms <= 0) return '';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.round((ms % 60_000) / 1000);
+  return `${m}m${s}s`;
+}
+
+function formatActivityTime(ts?: string): string {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function normalizeActivityCategory(category?: string): Exclude<ActivityCategory, 'all'> {
+  const c = (category || 'tool').trim();
+  if (c === 'skill') {
+    return 'skill_load';
+  }
+  if (c === 'llm_usage') {
+    return 'llm_usage';
+  }
+  if (c in ACTIVITY_CATEGORY_META) {
+    return c as Exclude<ActivityCategory, 'all'>;
+  }
+  return 'tool';
+}
+
+function isMutedActivityEntry(entry: ProcessingHistoryEntry, cat: Exclude<ActivityCategory, 'all'>): boolean {
+  if (entry.presentation_tier === 'secondary') return true;
+  if (entry.presentation_tier === 'primary') return false;
+  return cat === 'llm_usage';
+}
+
+function LlmTokenBadges({ entry }: { entry: ProcessingHistoryEntry }) {
+  const inp = entry.input_tokens;
+  const out = entry.output_tokens;
+  const total = entry.total_tokens ?? (inp != null && out != null ? inp + out : undefined);
+  if (inp == null && out == null && total == null) return null;
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      {inp != null ? (
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-sky-500/30 bg-sky-500/10 text-sky-100/90">
+          入 {inp.toLocaleString()}
+        </span>
+      ) : null}
+      {out != null ? (
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-100/90">
+          出 {out.toLocaleString()}
+        </span>
+      ) : null}
+      {total != null ? (
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-violet-500/35 bg-violet-500/12 text-violet-100/95">
+          计 {total.toLocaleString()}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function ActivityNameBadge({
+  name,
+  variant = 'skill',
+}: {
+  name: string;
+  variant?: 'skill' | 'tool' | 'script';
+}) {
+  const label = name.trim();
+  if (!label) return null;
+  const styles =
+    variant === 'tool'
+      ? 'bg-slate-500/20 text-slate-100/95 border-slate-400/25'
+      : variant === 'script'
+        ? 'bg-cyan-500/20 text-cyan-100/95 border-cyan-400/25'
+        : 'bg-amber-500/20 text-amber-100/95 border-amber-500/30';
+  const Icon = variant === 'tool' ? Wrench : variant === 'script' ? FileCode2 : Sparkles;
+  const iconColor =
+    variant === 'tool' ? 'text-slate-300' : variant === 'script' ? 'text-cyan-400' : 'text-amber-400';
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-mono font-medium max-w-[200px] ${styles}`}
+      title={label}
+    >
+      <Icon className={`w-3 h-3 shrink-0 ${iconColor}`} />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+function InvokeChainRow({
+  leader,
+  tail,
+  tailVariant = 'tool',
+}: {
+  leader: string;
+  tail: string;
+  tailVariant?: 'tool' | 'script';
+}) {
+  if (!leader.trim() || !tail.trim()) return <ActivityNameBadge name={leader || tail} />;
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      <ActivityNameBadge name={leader} variant="skill" />
+      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+      <ActivityNameBadge name={tail} variant={tailVariant} />
+    </span>
+  );
+}
+
+function isSkillCategory(cat: Exclude<ActivityCategory, 'all'>): boolean {
+  return cat === 'skill_load' || cat === 'skill_exec' || cat === 'skill_load_blocked' || cat === 'skill';
+}
+
+function resolveActivityPresentation(entry: ProcessingHistoryEntry) {
+  const cat = normalizeActivityCategory(entry.category);
+  const skillTitle = (entry.display_title || entry.skill_name || '').trim();
+  const toolName = (entry.tool_name || '').trim();
+  const scriptName = (entry.script_name || '').trim();
+  const isChainedTool = cat === 'tool' && Boolean(entry.executing_skill_id?.trim());
+  const isSkillRow = isSkillCategory(cat);
+  const isLlmRow = cat === 'llm_usage';
+
+  let chipLabel = entry.category_label || ACTIVITY_CATEGORY_META[cat]?.label || cat;
+  let chipMeta = ACTIVITY_CATEGORY_META[cat] || ACTIVITY_CATEGORY_META.tool;
+  if (isChainedTool) {
+    chipLabel = '技能调用';
+    chipMeta = ACTIVITY_CATEGORY_META.skill_exec;
+  }
+
+  return { cat, skillTitle, toolName, scriptName, isChainedTool, isSkillRow, isLlmRow, chipLabel, chipMeta };
+}
+
+function ProcessingHistoryCard({ entry, isLast }: { entry: ProcessingHistoryEntry; isLast?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const { cat, skillTitle, toolName, scriptName, isChainedTool, isSkillRow, isLlmRow, chipLabel, chipMeta } =
+    resolveActivityPresentation(entry);
+  const isMuted = isMutedActivityEntry(entry, cat);
+  const title = entry.display_title || entry.title || chipLabel;
+  const summary = (entry.summary || entry.result_preview || '').trim();
+  const durationLabel = formatDurationMs(entry.duration_ms);
+  const hasDetail =
+    Boolean(summary) ||
+    entry.tool_input != null ||
+    Boolean(entry.detail && Object.keys(entry.detail).length) ||
+    Boolean(entry.usage_scene?.trim());
+
+  const renderTitle = () => {
+    if (isLlmRow) {
+      return (
+        <span className={`inline-flex items-center gap-2 flex-wrap min-w-0 ${isMuted ? 'text-muted-foreground/85' : ''}`}>
+          <span
+            className={`text-xs font-semibold truncate max-w-[220px] ${isMuted ? 'text-muted-foreground/90 font-medium' : 'text-violet-100/95'}`}
+            title={title}
+          >
+            {title}
+          </span>
+          <LlmTokenBadges entry={entry} />
+        </span>
+      );
+    }
+    if (isChainedTool) {
+      return <InvokeChainRow leader={skillTitle} tail={toolName} tailVariant="tool" />;
+    }
+    if (isSkillRow && normalizeActivityCategory(entry.category) === 'skill_exec' && scriptName) {
+      return <InvokeChainRow leader={skillTitle} tail={scriptName} tailVariant="script" />;
+    }
+    if (isSkillRow && skillTitle) {
+      return <ActivityNameBadge name={skillTitle} variant="skill" />;
+    }
+    return <span className="text-xs font-semibold text-foreground/95 truncate">{title}</span>;
+  };
+
+  return (
+    <div className={`relative flex gap-3 group ${isMuted ? 'opacity-[0.52]' : ''}`}>
+      <div className="flex flex-col items-center shrink-0 w-5 pt-1">
+        <div
+          className={`rounded-full ring-2 ring-[color:var(--panel,#0f0f12)] ${chipMeta.dot} ${
+            isMuted ? 'w-2 h-2 opacity-70' : 'w-2.5 h-2.5'
+          }`}
+        />
+        {!isLast ? (
+          <div
+            className={`w-px flex-1 min-h-[12px] mt-1 bg-gradient-to-b ${
+              isMuted ? 'from-border/40 to-border/10' : 'from-border/80 to-border/20'
+            }`}
+          />
+        ) : null}
+      </div>
+      <div
+        className={`flex-1 min-w-0 mb-3 rounded-xl border overflow-hidden transition-all duration-200 ${
+          isMuted
+            ? 'border-border/25 bg-black/10 shadow-none hover:opacity-80'
+            : `border-border/50 hover:border-border/80 hover:shadow-lg hover:shadow-black/20 bg-gradient-to-br ${chipMeta.glow}`
+        }`}
+      >
+        <button
+          type="button"
+          className="w-full text-left px-3 py-2.5 flex items-start gap-2"
+          onClick={() => hasDetail && setExpanded((v) => !v)}
+        >
+          <span
+            className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border shrink-0 ${chipMeta.chip}`}
+          >
+            {chipMeta.icon}
+            {chipLabel}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {renderTitle()}
+              {entry.source_label ? (
+                <span className="text-[10px] text-muted-foreground/80">{entry.source_label}</span>
+              ) : null}
+              {durationLabel ? (
+                <span className="text-[10px] font-mono text-muted-foreground/80">{durationLabel}</span>
+              ) : null}
+              {isMuted && isLlmRow ? (
+                <span className="text-[10px] text-muted-foreground/60 italic">底层推理</span>
+              ) : null}
+              {entry.success === false ? (
+                <Tag color="error" className="text-[10px] leading-none m-0 px-1 py-0">失败</Tag>
+              ) : null}
+            </div>
+            {!expanded && summary ? (
+              <p className="text-[11px] text-muted-foreground/90 mt-1 line-clamp-2 whitespace-pre-wrap">{summary}</p>
+            ) : null}
+          </div>
+          <span className="text-[10px] font-mono text-muted-foreground/60 shrink-0 tabular-nums">
+            {formatActivityTime(entry.ts)}
+          </span>
+          {hasDetail ? (
+            expanded ? (
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            )
+          ) : null}
+        </button>
+        {expanded && hasDetail ? (
+          <div className="px-3 pb-3 pt-0 space-y-2 border-t border-border/30">
+            {summary ? (
+              <pre className="text-[11px] leading-relaxed whitespace-pre-wrap break-words font-mono text-foreground/85 bg-black/20 rounded-lg p-2.5 max-h-48 overflow-y-auto custom-scrollbar">
+                {summary}
+              </pre>
+            ) : null}
+            {entry.tool_input != null ? (
+              <div>
+                <div className="text-[10px] text-muted-foreground mb-1">工具参数</div>
+                <pre className="text-[10.5px] font-mono whitespace-pre-wrap break-words bg-black/25 rounded-lg p-2 max-h-36 overflow-y-auto custom-scrollbar">
+                  {typeof entry.tool_input === 'string'
+                    ? entry.tool_input
+                    : JSON.stringify(entry.tool_input, null, 2)}
+                </pre>
+              </div>
+            ) : null}
+            {entry.usage_scene ? (
+              <div className="text-[10px] text-muted-foreground/80 font-mono break-all">
+                场景：{entry.usage_scene}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ProcessingHistoryTimeline({ entries }: { entries: ProcessingHistoryEntry[] }) {
+  if (!entries.length) {
+    return (
+      <p className="text-xs text-muted-foreground text-center py-10">
+        当前节点暂无处理记录；节点执行后将在此展示输入、输出、工具与技能调用
+      </p>
+    );
+  }
+  return (
+    <div className="py-1">
+      {entries.map((e, i) => (
+        <ProcessingHistoryCard key={e.id || `${e.seq}-${i}`} entry={e} isLast={i === entries.length - 1} />
+      ))}
+    </div>
+  );
+}
+
+type MsgRole = 'system' | 'user' | 'assistant' | 'tool' | 'unknown';
+type SpeakerKind = 'user' | 'host' | 'coworker' | 'system' | 'tool' | 'unknown';
+
+interface NormalizedMessage {
+  index: number;
+  role: MsgRole;
+  text: string;
+  toolName?: string;
+  isToolResult?: boolean;
+  hasToolUse?: boolean;
+  speakerKind?: SpeakerKind;
+  speakerName?: string;
+}
+
+function detectRole(raw: unknown): MsgRole {
+  const r = String(raw || '').toLowerCase();
+  if (r === 'system' || r === 'user' || r === 'assistant' || r === 'tool') return r;
+  return 'unknown';
+}
+
+function extractSpeaker(msg: Record<string, unknown>): { kind?: SpeakerKind; name?: string } {
+  // 兼容 agent_trace.py 输出的 conversation.jsonl 结构：
+  //   { role: 'assistant'|..., speaker: { kind: 'host'|'coworker'|..., display_name, profile_id }, content: ... }
+  const sp = msg.speaker;
+  if (!sp || typeof sp !== 'object') return {};
+  const obj = sp as Record<string, unknown>;
+  const k = String(obj.kind || '').toLowerCase();
+  const valid: SpeakerKind[] = ['user', 'host', 'coworker', 'system', 'tool', 'unknown'];
+  const kind = (valid as string[]).includes(k) ? (k as SpeakerKind) : undefined;
+  const name = typeof obj.display_name === 'string' ? obj.display_name : undefined;
+  return { kind, name };
+}
+
+function normalizeMessage(msg: Record<string, unknown>, index: number): NormalizedMessage {
+  const role = detectRole(msg.role);
+  const { kind: speakerKind, name: speakerName } = extractSpeaker(msg);
+  const content = msg.content;
+  let text = '';
+  let toolName: string | undefined;
+  let isToolResult = false;
+  let hasToolUse = false;
+
+  if (typeof content === 'string') {
+    text = content;
+  } else if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const part of content) {
+      if (!part || typeof part !== 'object') {
+        parts.push(String(part ?? ''));
+        continue;
+      }
+      const p = part as Record<string, unknown>;
+      const t = String(p.type || '');
+      if (t === 'text' && typeof p.text === 'string') {
+        parts.push(p.text);
+      } else if (t === 'tool_use') {
+        hasToolUse = true;
+        toolName = String(p.name || toolName || '');
+        try {
+          parts.push(`🔧 [tool_use] ${toolName}\n${JSON.stringify(p.input ?? {}, null, 2)}`);
+        } catch {
+          parts.push(`🔧 [tool_use] ${toolName}`);
+        }
+      } else if (t === 'tool_result') {
+        isToolResult = true;
+        const inner = p.content;
+        if (typeof inner === 'string') {
+          parts.push(`📎 [tool_result]\n${inner}`);
+        } else {
+          try {
+            parts.push(`📎 [tool_result]\n${JSON.stringify(inner, null, 2)}`);
+          } catch {
+            parts.push('📎 [tool_result]');
+          }
+        }
+      } else {
+        try {
+          parts.push(JSON.stringify(p, null, 2));
+        } catch {
+          parts.push(String(p));
+        }
+      }
+    }
+    text = parts.join('\n\n');
+  } else if (content != null) {
+    try {
+      text = JSON.stringify(content, null, 2);
+    } catch {
+      text = String(content);
+    }
+  }
+
+  return { index, role, text, toolName, isToolResult, hasToolUse, speakerKind, speakerName };
+}
+
+const SPEAKER_META: Record<
+  SpeakerKind,
+  { label: string; chip: string; bar: string }
+> = {
+  user: {
+    label: '用户',
+    chip: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
+    bar: 'bg-sky-500/70',
+  },
+  host: {
+    label: '主持人',
+    chip: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+    bar: 'bg-amber-500/70',
+  },
+  coworker: {
+    label: '协作智能体',
+    chip: 'bg-violet-500/15 text-violet-300 border border-violet-500/30',
+    bar: 'bg-violet-500/70',
+  },
+  system: {
+    label: '系统',
+    chip: 'bg-slate-500/15 text-slate-300 border border-slate-500/30',
+    bar: 'bg-slate-500/70',
+  },
+  tool: {
+    label: '工具',
+    chip: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    bar: 'bg-emerald-500/70',
+  },
+  unknown: {
+    label: '其它',
+    chip: 'bg-muted text-muted-foreground border border-border/60',
+    bar: 'bg-muted',
+  },
+};
+
+const ROLE_META: Record<
+  MsgRole,
+  { label: string; icon: React.ReactNode; chip: string; bar: string }
+> = {
+  system: {
+    label: 'System',
+    icon: <Sparkles className="w-3 h-3" />,
+    chip: 'bg-violet-500/15 text-violet-300 border border-violet-500/30',
+    bar: 'bg-violet-500/70',
+  },
+  user: {
+    label: 'User',
+    icon: <UserIcon className="w-3 h-3" />,
+    chip: 'bg-blue-500/15 text-blue-300 border border-blue-500/30',
+    bar: 'bg-blue-500/70',
+  },
+  assistant: {
+    label: 'Assistant',
+    icon: <Bot className="w-3 h-3" />,
+    chip: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+    bar: 'bg-emerald-500/70',
+  },
+  tool: {
+    label: 'Tool',
+    icon: <Wrench className="w-3 h-3" />,
+    chip: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+    bar: 'bg-amber-500/70',
+  },
+  unknown: {
+    label: 'Other',
+    icon: <Hash className="w-3 h-3" />,
+    chip: 'bg-muted text-muted-foreground border border-border/60',
+    bar: 'bg-muted',
+  },
+};
+
+function copy(text: string) {
+  if (!text) return;
+  void navigator.clipboard
+    .writeText(text)
+    .then(() => toast.success('已复制'))
+    .catch(() => toast.error('复制失败'));
+}
+
+function CollapsibleBlock({
+  title,
+  text,
+  icon,
+  defaultOpen = true,
+  emptyHint,
+  mono = true,
+  maxHeight = 320,
+}: {
+  title: string;
+  text: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  emptyHint?: string;
+  mono?: boolean;
+  maxHeight?: number;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const trimmed = text.trim();
+  return (
+    <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 backdrop-blur-sm overflow-hidden">
+      <div
+        className="px-3 py-2 border-b border-border/40 flex items-center justify-between cursor-pointer select-none hover:bg-muted/30 transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="flex items-center gap-2 text-xs font-medium text-foreground/90">
+          {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {icon}
+          <span>{title}</span>
+          {trimmed ? (
+            <span className="font-mono text-[10px] text-muted-foreground/70">
+              {trimmed.length.toLocaleString()} 字符
+            </span>
+          ) : null}
+        </div>
+        {trimmed ? (
+          <Tooltip title="复制全文">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                copy(text);
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+          </Tooltip>
+        ) : null}
+      </div>
+      {open ? (
+        trimmed ? (
+          <pre
+            className={`p-3 text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words text-foreground/85 overflow-y-auto custom-scrollbar ${
+              mono ? 'font-mono' : ''
+            }`}
+            style={{ maxHeight }}
+          >
+            {text}
+          </pre>
+        ) : (
+          <p className="p-4 text-xs text-muted-foreground text-center">
+            {emptyHint || '（空）'}
+          </p>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function MessageCard({ msg }: { msg: NormalizedMessage }) {
+  const speakerMeta = msg.speakerKind ? SPEAKER_META[msg.speakerKind] : null;
+  const roleMeta = ROLE_META[msg.role];
+  const meta = speakerMeta
+    ? { ...roleMeta, label: msg.speakerName || speakerMeta.label, chip: speakerMeta.chip, bar: speakerMeta.bar }
+    : roleMeta;
+  const [expanded, setExpanded] = useState(msg.text.length < 1500);
+  const preview =
+    expanded || msg.text.length < 1500
+      ? msg.text
+      : msg.text.slice(0, 1500) + `\n\n…（点击展开剩余 ${msg.text.length - 1500} 字符）`;
+
+  return (
+    <div className="group relative pl-3">
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-full ${meta.bar}`} />
+      <div className="flex items-center gap-2 mb-1.5">
+        <span
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium ${meta.chip}`}
+        >
+          {meta.icon}
+          {meta.label}
+        </span>
+        <span className="text-[10px] font-mono text-muted-foreground/70">#{msg.index + 1}</span>
+        {msg.toolName ? (
+          <span className="text-[10px] text-amber-300/90 font-mono">tool: {msg.toolName}</span>
+        ) : null}
+        {msg.isToolResult ? (
+          <span className="text-[10px] text-amber-300/90">tool_result</span>
+        ) : null}
+        <span className="ml-auto text-[10px] text-muted-foreground/70 font-mono">
+          {msg.text.length.toLocaleString()}
+        </span>
+        <Tooltip title="复制本条">
+          <button
+            type="button"
+            onClick={() => copy(msg.text)}
+            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground p-0.5"
+          >
+            <Copy className="w-3 h-3" />
+          </button>
+        </Tooltip>
+      </div>
+      <pre
+        onClick={() => {
+          if (!expanded && msg.text.length >= 1500) setExpanded(true);
+        }}
+        className={`text-[11.5px] leading-[1.55] whitespace-pre-wrap break-words font-mono text-foreground/85 rounded-lg border border-border/40 bg-muted/20 p-2.5 ${
+          !expanded && msg.text.length >= 1500 ? 'cursor-pointer hover:bg-muted/30' : ''
+        }`}
+      >
+        {preview || <span className="text-muted-foreground italic">（空消息）</span>}
+      </pre>
+    </div>
+  );
+}
+
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex-1 min-w-[88px] rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2">
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wider">
+        {icon}
+        {label}
+      </div>
+      <div className="text-xs font-semibold text-foreground/90 mt-0.5 truncate">{value}</div>
+    </div>
+  );
+}
+
+interface SkillAggRow {
+  skill: string;
+  count: number;
+  lastTs: number;
+  lastScript: string;
+  tools: string[];
+  scripts: string[];
+}
+
+function isSkillExecEntry(it: SkillExecutionEntry): boolean {
+  const kind = (it.kind || '').trim();
+  if (kind === 'load') return false;
+  const tool = (it.tool || '').trim();
+  if (!kind && ['get_skill_info', 'get_skill_reference', 'read_skill_file'].includes(tool)) {
+    return false;
+  }
+  return Boolean((it.skill || '').trim());
+}
+
+function aggregateSkills(items: SkillExecutionEntry[]): SkillAggRow[] {
+  const map = new Map<string, SkillAggRow>();
+  for (const it of items || []) {
+    if (!isSkillExecEntry(it)) continue;
+    const key = (it.skill || '').trim();
+    const existing = map.get(key);
+    const ts = Number(it.ts || 0);
+    if (!existing) {
+      map.set(key, {
+        skill: key,
+        count: 1,
+        lastTs: ts,
+        lastScript: (it.script || '').trim(),
+        tools: it.tool ? [it.tool] : [],
+        scripts: it.script ? [it.script] : [],
+      });
+      continue;
+    }
+    existing.count += 1;
+    if (ts > existing.lastTs) {
+      existing.lastTs = ts;
+      if (it.script) existing.lastScript = it.script;
+    }
+    if (it.tool && !existing.tools.includes(it.tool)) existing.tools.push(it.tool);
+    if (it.script && !existing.scripts.includes(it.script)) existing.scripts.push(it.script);
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    return b.lastTs - a.lastTs;
+  });
+}
+
+function formatRelativeTime(ts: number): string {
+  if (!ts) return '';
+  const diff = Math.max(0, Date.now() / 1000 - ts);
+  if (diff < 60) return `${Math.round(diff)}s 前`;
+  if (diff < 3600) return `${Math.round(diff / 60)}m 前`;
+  if (diff < 86400) return `${Math.round(diff / 3600)}h 前`;
+  return `${Math.round(diff / 86400)}d 前`;
+}
+
+/** 「已使用 SKILL」聚合卡片：按 skill 分组，count desc，前 8 条 + 折叠剩余。 */
+function SkillUsageCard({ entries }: { entries: SkillExecutionEntry[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const execEntries = useMemo(() => (entries || []).filter(isSkillExecEntry), [entries]);
+  const rows = useMemo(() => aggregateSkills(execEntries), [execEntries]);
+  const total = execEntries.length;
+
+  if (!rows.length) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+        <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-medium text-foreground/90">
+          <Sparkles className="w-3 h-3 text-amber-400" />
+          <span>已使用 SKILL</span>
+          <span className="font-mono text-[10px] text-muted-foreground/70">0 次</span>
+        </div>
+        <p className="p-4 text-xs text-muted-foreground text-center">
+          本任务暂未记录技能执行（
+          <span className="font-mono">run_skill_script</span>
+          {' / instruction-only 上下文工具调用等）'}
+        </p>
+      </div>
+    );
+  }
+
+  const maxCount = rows[0].count;
+  const visible = showAll ? rows : rows.slice(0, 8);
+  const hidden = rows.length - visible.length;
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+      <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-medium text-foreground/90">
+        <Sparkles className="w-3 h-3 text-amber-400" />
+        <span>已使用 SKILL</span>
+        <span className="font-mono text-[10px] text-muted-foreground/70">
+          {rows.length} 个 · 共 {total} 次
+        </span>
+      </div>
+      <div className="p-3 space-y-2">
+        {visible.map((row) => {
+          const pct = Math.max(8, Math.round((row.count / Math.max(1, maxCount)) * 100));
+          return (
+            <div
+              key={row.skill}
+              className="group relative rounded-lg border border-border/40 bg-muted/10 hover:bg-muted/20 transition-colors px-2.5 py-2"
+            >
+              {/* 频次背景条 */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-lg bg-gradient-to-r from-amber-500/15 via-amber-500/8 to-transparent pointer-events-none"
+                style={{ width: `${pct}%` }}
+              />
+              <div className="relative flex items-center gap-2 flex-wrap">
+                <ActivityNameBadge name={row.skill} variant="skill" />
+                <span className="text-[10px] font-semibold text-amber-300/95 font-mono">
+                  ×{row.count}
+                </span>
+                {row.lastTs ? (
+                  <span className="text-[10px] text-muted-foreground/70 font-mono">
+                    {formatRelativeTime(row.lastTs)}
+                  </span>
+                ) : null}
+                <Tooltip title="复制 skill 名">
+                  <button
+                    type="button"
+                    onClick={() => copy(row.skill)}
+                    className="ml-auto opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground p-0.5 transition-opacity"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </Tooltip>
+              </div>
+              {((row.lastScript && row.lastScript !== 'instruction-only') ||
+                row.scripts.length > 1 ||
+                row.tools.length > 0) && (
+                <div className="relative flex flex-col gap-1.5 mt-2 pl-0.5">
+                  {row.lastScript && row.lastScript !== 'instruction-only' ? (
+                    <span className="inline-flex items-center gap-1 flex-wrap">
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+                      <ActivityNameBadge name={row.lastScript} variant="script" />
+                    </span>
+                  ) : null}
+                  {row.scripts.length > 1 ? (
+                    <span className="text-[10px] text-muted-foreground/70 font-mono">
+                      另有 {row.scripts.length - 1} 个脚本
+                    </span>
+                  ) : null}
+                  {row.tools.length > 0 ? (
+                    <span className="inline-flex items-center gap-1 flex-wrap text-[10px] text-muted-foreground/70">
+                      <span className="shrink-0">via</span>
+                      {row.tools.map((t) => (
+                        <ActivityNameBadge key={t} name={t} variant="tool" />
+                      ))}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {hidden > 0 && !showAll ? (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="w-full text-[11px] text-muted-foreground hover:text-foreground py-1 rounded border border-dashed border-border/40 hover:border-border transition-colors"
+          >
+            展开剩余 {hidden} 个 SKILL
+          </button>
+        ) : null}
+        {showAll && rows.length > 8 ? (
+          <button
+            type="button"
+            onClick={() => setShowAll(false)}
+            className="w-full text-[11px] text-muted-foreground hover:text-foreground py-1 rounded border border-dashed border-border/40 hover:border-border transition-colors"
+          >
+            收起
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+interface ToolAggRow {
+  tool: string;
+  count: number;
+}
+
+function aggregateTools(names: string[]): ToolAggRow[] {
+  const map = new Map<string, number>();
+  for (const raw of names || []) {
+    const key = (raw || '').trim();
+    if (!key) continue;
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([tool, count]) => ({ tool, count }))
+    .sort((a, b) => b.count - a.count || a.tool.localeCompare(b.tool));
+}
+
+/** 「已使用工具」列表：按工具名聚合频次。 */
+function ToolUsageCard({
+  tools,
+  totalHint,
+}: {
+  tools: string[];
+  totalHint?: number;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const rows = useMemo(() => aggregateTools(tools), [tools]);
+  const listed = rows.reduce((n, r) => n + r.count, 0);
+  const total = Math.max(listed, totalHint || 0, tools.length);
+
+  if (!rows.length) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+        <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-medium text-foreground/90">
+          <Wrench className="w-3 h-3 text-blue-400" />
+          <span>已使用工具</span>
+          <span className="font-mono text-[10px] text-muted-foreground/70">0 次</span>
+        </div>
+        <p className="p-4 text-xs text-muted-foreground text-center">
+          本任务暂未记录工具调用（委派类工具如 delegate_to_agent 会在主控执行后展示）
+        </p>
+      </div>
+    );
+  }
+
+  const visible = showAll ? rows : rows.slice(0, 10);
+  const hidden = rows.length - visible.length;
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+      <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-medium text-foreground/90">
+        <Wrench className="w-3 h-3 text-blue-400" />
+        <span>已使用工具</span>
+        <span className="font-mono text-[10px] text-muted-foreground/70">
+          {rows.length} 种 · 共 {total} 次
+        </span>
+      </div>
+      <div className="p-3 flex flex-wrap gap-1.5">
+        {visible.map((row) => (
+          <span
+            key={row.tool}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-mono bg-blue-500/10 text-blue-200/90 border border-blue-500/25"
+            title={row.tool}
+          >
+            {row.tool}
+            {row.count > 1 ? <span className="text-blue-300/80">×{row.count}</span> : null}
+          </span>
+        ))}
+        {hidden > 0 && !showAll ? (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-dashed border-border/40"
+          >
+            +{hidden} 更多
+          </button>
+        ) : null}
+        {showAll && rows.length > 10 ? (
+          <button
+            type="button"
+            onClick={() => setShowAll(false)}
+            className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-1 rounded border border-dashed border-border/40"
+          >
+            收起
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function DelegationRunsCard({ runs }: { runs: MeetingAgentDelegationRun[] }) {
+  if (!runs.length) return null;
+  return (
+    <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+      <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 text-xs font-medium text-foreground/90">
+        <Activity className="w-3 h-3 text-emerald-400" />
+        <span>委派子任务</span>
+        <span className="font-mono text-[10px] text-muted-foreground/70">{runs.length} 次</span>
+      </div>
+      <div className="p-3 space-y-2">
+        {runs.map((run, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-border/40 bg-muted/10 px-2.5 py-2 text-[11px] space-y-1"
+          >
+            <div className="flex items-center gap-2 flex-wrap font-mono">
+              <Tag className="m-0 text-[10px]">{run.status || 'unknown'}</Tag>
+              {run.elapsed_s != null ? (
+                <span className="text-muted-foreground">{run.elapsed_s}s</span>
+              ) : null}
+              {run.iteration != null ? (
+                <span className="text-muted-foreground">iter={run.iteration}</span>
+              ) : null}
+              {run.tools_total != null ? (
+                <span className="text-muted-foreground">tools={run.tools_total}</span>
+              ) : null}
+            </div>
+            {run.plan_item_id ? (
+              <p className="text-muted-foreground/80 font-mono">计划项: {run.plan_item_id}</p>
+            ) : null}
+            {run.reason ? (
+              <p className="text-muted-foreground/90">原因: {run.reason}</p>
+            ) : null}
+            {run.task_preview ? (
+              <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+                委派内容: {run.task_preview}
+              </p>
+            ) : null}
+            {run.result_summary ? (
+              <p className="text-emerald-200/90 whitespace-pre-wrap break-words leading-relaxed">
+                返回: {run.result_summary}
+              </p>
+            ) : null}
+            {run.current_tool_summary ? (
+              <p className="text-amber-300/90 font-mono truncate">末次工具: {run.current_tool_summary}</p>
+            ) : null}
+            {(run.tools_executed || []).length > 0 ? (
+              <p className="text-muted-foreground font-mono truncate">
+                近期: {(run.tools_executed || []).join(', ')}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function collectToolsFromSubEntries(subEntries: { tools_executed?: string[] }[]): string[] {
+  const out: string[] = [];
+  for (const s of subEntries || []) {
+    for (const t of s?.tools_executed || []) {
+      if (t && !out.includes(t)) out.push(t);
+    }
+  }
+  return out;
+}
+
+export function MeetingAgentContextDrawer({
+  open,
+  onClose,
+  synapseApiBase,
+  roomId,
+  agent,
+}: Props) {
+  const [loading, setLoading] = useState(false);
+  const [payload, setPayload] = useState<MeetingAgentContextsPayload | null>(null);
+  const [view, setView] = useState<'all' | 'prompt' | 'history'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<ActivityCategory>('all');
+
+  const load = useCallback(async () => {
+    const base = (synapseApiBase || '').trim();
+    if (!base || !roomId) return;
+    setLoading(true);
+    try {
+      const data = await fetchMeetingAgentContexts(base, roomId, {
+        nodeId: agent?.nodeId,
+      });
+      setPayload(data);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [synapseApiBase, roomId, agent?.nodeId]);
+
+  useEffect(() => {
+    if (open && agent) void load();
+    if (!open) {
+      setPayload(null);
+      setView('all');
+      setCategoryFilter('all');
+    }
+  }, [open, agent?.profileId, agent?.nodeId, load]);
+
+  const entry: MeetingAgentContextEntry | undefined = useMemo(() => {
+    if (!payload || !agent) return undefined;
+    return payload.agents?.find((a) => a.profile_id === agent.profileId);
+  }, [payload, agent]);
+
+  const subEntries = useMemo(() => {
+    if (!payload || !agent) return [];
+    return (payload.sub_agents || []).filter(
+      (s) => String(s.profile_id || s.agent_id || '') === agent.profileId,
+    );
+  }, [payload, agent]);
+
+  const taskTools = useMemo(() => {
+    const fromTask = entry?.task?.tools_executed || [];
+    if (fromTask.length) return fromTask;
+    return collectToolsFromSubEntries(subEntries);
+  }, [entry?.task?.tools_executed, subEntries]);
+
+  const taskSkills = useMemo(() => {
+    const fromTask = entry?.task?.skills_executed || [];
+    if (fromTask.length) return fromTask;
+    const merged: SkillExecutionEntry[] = [];
+    for (const s of subEntries) {
+      for (const item of s.skills_executed || []) merged.push(item);
+    }
+    return merged;
+  }, [entry?.task?.skills_executed, subEntries]);
+
+  const delegationRuns = useMemo(
+    () => entry?.delegation_runs || [],
+    [entry?.delegation_runs],
+  );
+
+  const toolsTotalDisplay = useMemo(() => {
+    const hint = entry?.task?.tools_total_hint;
+    const listed = taskTools.length;
+    if (hint && hint > listed) return hint;
+    return listed || undefined;
+  }, [entry?.task?.tools_total_hint, taskTools.length]);
+
+  const processingHistory = useMemo<ProcessingHistoryEntry[]>(() => {
+    return entry?.processing_history || [];
+  }, [entry?.processing_history]);
+
+  const filteredHistory = useMemo(() => {
+    if (categoryFilter === 'all') return processingHistory;
+    if (categoryFilter === 'skill_exec') {
+      return processingHistory.filter((e) => {
+        const pres = resolveActivityPresentation(e);
+        return pres.isChainedTool || normalizeActivityCategory(e.category) === 'skill_exec';
+      });
+    }
+    return processingHistory.filter((e) => normalizeActivityCategory(e.category) === categoryFilter);
+  }, [processingHistory, categoryFilter]);
+
+  const categoryCounts = useMemo(() => {
+    const out: Partial<Record<Exclude<ActivityCategory, 'all'>, number>> = {};
+    for (const e of processingHistory) {
+      const pres = resolveActivityPresentation(e);
+      const c = pres.isChainedTool ? 'skill_exec' : normalizeActivityCategory(e.category);
+      out[c] = (out[c] || 0) + 1;
+    }
+    return out;
+  }, [processingHistory]);
+
+  const systemPromptEmptyHint = useMemo(() => {
+    if (entry?.offline_from_disk) {
+      return '该节点执行时未落盘 System Prompt（节点需正常收尾后才会保存）';
+    }
+    return '暂无 system prompt（可能尚未触发 LLM）';
+  }, [entry?.offline_from_disk]);
+
+  const avatarColor = agent?.isHost ? 'bg-violet-500' : agent?.avatarColor || 'bg-sky-500';
+
+  const nodeLabel = useMemo(() => {
+    const nid = (agent?.nodeId || payload?.current_node_id || '').trim();
+    if (!nid) return '';
+    return ALL_NODES.find((n) => n.id === nid)?.name || nid;
+  }, [agent?.nodeId, payload?.current_node_id]);
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      width={620}
+      destroyOnClose
+      closable={false}
+      headerStyle={{ display: 'none' }}
+      bodyStyle={{ padding: 0, background: 'var(--panel, #0f0f12)' }}
+    >
+      {/* ─── Header ─────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 backdrop-blur-md bg-[color:var(--panel,#0f0f12)]/85 border-b border-border/60">
+        <div className="px-5 py-4 flex items-start gap-3">
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center text-white ${avatarColor} shadow-lg shadow-black/30 shrink-0`}
+          >
+            {agent?.isHost ? <Bot className="w-5 h-5" /> : <Cpu className="w-5 h-5" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-base font-semibold text-foreground truncate">
+                {agent?.name || '智能体'}
+              </span>
+              <Tag color={agent?.isHost ? 'purple' : 'blue'} className="m-0 text-[10px]">
+                {agent?.isHost ? '主控 · 小鲸' : '协作智能体'}
+              </Tag>
+              {nodeLabel ? (
+                <Tag className="m-0 text-[10px]" color="default">
+                  节点 · {nodeLabel}
+                </Tag>
+              ) : null}
+              {entry?.task?.status ? (
+                <Tag
+                  color={
+                    entry.task.status === 'reasoning' || entry.task.status === 'acting'
+                      ? 'processing'
+                      : entry.task.status === 'completed'
+                        ? 'success'
+                        : entry.task.status === 'failed'
+                          ? 'error'
+                          : 'default'
+                  }
+                  className="m-0 text-[10px]"
+                >
+                  {entry.task.status}
+                </Tag>
+              ) : null}
+            </div>
+            <div className="text-[11px] text-muted-foreground font-mono truncate mt-0.5">
+              {agent?.profileId}
+              {entry?.preferred_endpoint ? ` · ${entry.preferred_endpoint}` : ''}
+            </div>
+          </div>
+          <Button
+            type="text"
+            size="small"
+            icon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            onClick={() => void load()}
+          >
+            刷新
+          </Button>
+          <Button type="text" size="small" onClick={onClose}>
+            关闭
+          </Button>
+        </div>
+
+        {entry ? (
+          <div className="px-5 pb-3 flex flex-wrap gap-2">
+            <Stat
+              icon={<ScrollText className="w-3 h-3" />}
+              label="处理记录"
+              value={processingHistory.length || '—'}
+            />
+            <Stat
+              icon={<Activity className="w-3 h-3" />}
+              label="迭代"
+              value={entry.task?.iteration ?? '—'}
+            />
+            <Stat
+              icon={<Wrench className="w-3 h-3" />}
+              label="工具"
+              value={toolsTotalDisplay ?? '—'}
+            />
+            <Stat
+              icon={<Sparkles className="w-3 h-3" />}
+              label="SKILL"
+              value={(() => {
+                const arr = taskSkills;
+                if (!arr.length) return '—';
+                const unique = new Set(arr.map((s) => s.skill)).size;
+                return `${arr.length}·${unique}`;
+              })()}
+            />
+            <Stat
+              icon={<FileCode2 className="w-3 h-3" />}
+              label="System"
+              value={(entry.system_prompt || '').length.toLocaleString()}
+            />
+          </div>
+        ) : null}
+
+        <div className="px-5 pb-3">
+          <Segmented
+            size="small"
+            block
+            value={view}
+            onChange={(v) => setView(v as typeof view)}
+            options={[
+              { label: '全部', value: 'all' },
+              { label: 'Prompt', value: 'prompt' },
+              { label: `处理历史 (${processingHistory.length})`, value: 'history' },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* ─── Body ───────────────────────────────────────────────── */}
+      <div className="px-5 py-4 space-y-4">
+        {loading && !payload ? (
+          <div className="flex items-center justify-center py-16">
+            <Spin tip="加载上下文…" />
+          </div>
+        ) : !entry ? (
+          <Empty
+            description={
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-2">
+                  <BrainCircuit className="w-4 h-4 opacity-50" />
+                  <span>该智能体尚未在 Agent 池中激活，或实例已被回收</span>
+                </div>
+                <div className="text-[11px] text-muted-foreground/70">
+                  节点执行中点击「刷新」；完整 LLM 请求见 data/llm_debug/
+                </div>
+              </div>
+            }
+          >
+            {(delegationRuns.length > 0 || subEntries.length > 0) ? (
+              <div className="mt-4 mx-auto max-w-md text-left space-y-3">
+                <DelegationRunsCard
+                  runs={
+                    delegationRuns.length > 0
+                      ? delegationRuns
+                      : subEntries.map((s) => ({
+                          status: s.status,
+                          reason: s.reason,
+                          elapsed_s: s.elapsed_s,
+                          iteration: s.iteration,
+                          tools_total: s.tools_total,
+                          tools_executed: s.tools_executed,
+                          current_tool_summary: s.current_tool_summary,
+                        }))
+                  }
+                />
+                <ToolUsageCard tools={collectToolsFromSubEntries(subEntries)} />
+                {(() => {
+                  const merged: SkillExecutionEntry[] = [];
+                  for (const s of subEntries) {
+                    for (const item of s.skills_executed || []) merged.push(item);
+                  }
+                  return merged.length ? <SkillUsageCard entries={merged} /> : null;
+                })()}
+              </div>
+            ) : null}
+          </Empty>
+        ) : (
+          <>
+            {(view === 'all' || view === 'prompt') && (
+              <>
+                <CollapsibleBlock
+                  title="System Prompt"
+                  icon={<Sparkles className="w-3 h-3 text-violet-400" />}
+                  text={entry.system_prompt || ''}
+                  emptyHint={systemPromptEmptyHint}
+                  defaultOpen={view === 'prompt'}
+                  maxHeight={view === 'prompt' ? 640 : 280}
+                />
+                {entry.custom_prompt_suffix ? (
+                  <CollapsibleBlock
+                    title="会议室 SKILL 注入"
+                    icon={<Terminal className="w-3 h-3 text-emerald-400" />}
+                    text={entry.custom_prompt_suffix}
+                    defaultOpen={false}
+                    maxHeight={260}
+                  />
+                ) : null}
+                {entry.task?.description_preview ? (
+                  <CollapsibleBlock
+                    title="当前任务描述"
+                    icon={<Activity className="w-3 h-3 text-blue-400" />}
+                    text={entry.task.description_preview}
+                    defaultOpen={false}
+                    mono={false}
+                    maxHeight={180}
+                  />
+                ) : null}
+                {view === 'all' ? (
+                  <>
+                    <ToolUsageCard
+                      tools={taskTools}
+                      totalHint={entry.task?.tools_total_hint}
+                    />
+                    <SkillUsageCard entries={taskSkills} />
+                    {!agent?.isHost && delegationRuns.length > 0 ? (
+                      <DelegationRunsCard runs={delegationRuns} />
+                    ) : null}
+                  </>
+                ) : null}
+              </>
+            )}
+
+            {(view === 'all' || view === 'history') && (
+              <div className="rounded-xl border border-border/60 bg-[color:var(--panel,#1c1c1f)]/60 overflow-hidden">
+                <div className="px-3 py-2 border-b border-border/40 flex items-center gap-2 flex-wrap">
+                  <ScrollText className="w-3.5 h-3.5 text-violet-400" />
+                  <span className="text-xs font-medium">处理历史</span>
+                  {entry?.current_node_id || payload?.current_node_id ? (
+                    <Tag className="text-[10px] m-0 border-border/50 bg-muted/30 font-mono">
+                      节点 {entry?.current_node_id || payload?.current_node_id}
+                    </Tag>
+                  ) : null}
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {filteredHistory.length}/{processingHistory.length}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1 flex-wrap">
+                    {(['all', 'input', 'output', 'llm_usage', 'tool', 'skill_load', 'skill_load_blocked', 'skill_exec'] as const).map((c) => {
+                      const active = categoryFilter === c;
+                      const count =
+                        c === 'all'
+                          ? processingHistory.length
+                          : categoryCounts[c as Exclude<ActivityCategory, 'all'>] || 0;
+                      if (c !== 'all' && count === 0) return null;
+                      const label =
+                        c === 'all'
+                          ? '全部'
+                          : ACTIVITY_CATEGORY_META[c as Exclude<ActivityCategory, 'all'>].label;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setCategoryFilter(c)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-colors ${
+                            active
+                              ? 'bg-violet-500/20 border-violet-500/40 text-violet-200'
+                              : 'border-border/40 text-muted-foreground hover:text-foreground hover:border-border'
+                          }`}
+                        >
+                          {label} · {count}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="p-3 max-h-[min(62vh,580px)] overflow-y-auto custom-scrollbar">
+                  <ProcessingHistoryTimeline entries={filteredHistory} />
+                </div>
+              </div>
+            )}
+
+            {payload?.dump_path ? (
+              <div className="text-[10px] text-muted-foreground flex items-center gap-1 px-1">
+                <ScrollText className="w-3 h-3" />
+                服务端快照: <span className="font-mono">{payload.dump_path}</span>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </Drawer>
+  );
+}
