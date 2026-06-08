@@ -7,6 +7,9 @@ export type ChatDisplayKind =
   | 'participants'
   | 'system_roster'
   | 'system_exec'
+  | 'system_auto_split'
+  | 'system_sandbox_build'
+  | 'system_env_pregen'
   | 'work_plan'
   | 'delegation_start'
   | 'delegation_done'
@@ -54,6 +57,9 @@ const STRUCTURED_KINDS: ChatDisplayKind[] = [
   'participants',
   'system_roster',
   'system_exec',
+  'system_auto_split',
+  'system_sandbox_build',
+  'system_env_pregen',
   'work_plan',
   'delegation_start',
   'delegation_done',

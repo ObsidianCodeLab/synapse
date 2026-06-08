@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -264,7 +265,32 @@ def test_bootstrap_env_pregen_partial_without_catalog(monkeypatch, tmp_path):
         lambda *a, **k: {"doc_type": "x", "status": "skipped", "error": "skip"},
     )
 
-    assets = bootstrap_env_pregen(scope_id, "prod-x", wire_row={"prod": "prod-x", "repos": [], "docs": []})
+    wire = {
+        "prod": "prod-x",
+        "repo_info": [
+            {
+                "repo_url": "https://git.example.com/demo.git",
+                "repo_module": "1|演示模块",
+                "code_path": "src",
+            }
+        ],
+        "doc_process": [],
+    }
+    dev_dir = tmp_path / "dev"
+    dev_dir.mkdir()
+    (dev_dir / "agents.md.template_202606").write_text("# agents", encoding="utf-8")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.env_pregen_layout.resolve_dev_dir",
+        lambda: dev_dir,
+    )
+
+    assets = bootstrap_env_pregen(scope_id, "prod-x", wire_row=wire)
     assert assets["status"] in ("ok", "partial")
     assert assets["entropy"].get("status") == "ok"
     assert assets["product_doc_mirror"].get("status") == "ok"
+    engineering = assets.get("engineering") or {}
+    assert engineering.get("status") in ("ok", "partial")
+    layouts = engineering.get("layouts") or []
+    assert layouts
+    eng_root = Path(layouts[0]["engineering_root"])
+    assert (eng_root / "AGENTS.md").read_text(encoding="utf-8") == "# agents"

@@ -45,7 +45,12 @@ export type MeetingChatDisplayKindWire =
   | 'pending_confirm'
   | 'flow_meta'
   | 'pipeline'
-  | 'plain';
+  | 'plain'
+  | 'system_roster'
+  | 'system_exec'
+  | 'system_auto_split'
+  | 'system_sandbox_build'
+  | 'system_env_pregen';
 
 export interface MeetingRoomChatLogWire {
   id: string;

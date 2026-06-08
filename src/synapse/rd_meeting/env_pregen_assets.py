@@ -203,12 +203,21 @@ def bootstrap_env_pregen(
     if entropy.get("status") != "ok":
         result["errors"].append(f"控熵: {entropy.get('error')}")
 
+    from synapse.rd_meeting.env_pregen_layout import bootstrap_engineering_layout
+
+    engineering = bootstrap_engineering_layout(sid, hit)
+    result["engineering"] = engineering
+    if engineering.get("status") == "failed":
+        result["errors"].extend(engineering.get("errors") or [])
+
     has_doc_ok = any(d.get("status") == "ok" for d in result["docs"])
     has_entropy_ok = entropy.get("status") == "ok"
     has_mirror_ok = mirror.get("status") == "ok"
 
+    has_engineering_ok = engineering.get("status") in ("ok", "partial")
+
     if result["errors"]:
-        if has_doc_ok or has_entropy_ok or has_mirror_ok:
+        if has_doc_ok or has_entropy_ok or has_mirror_ok or has_engineering_ok:
             result["status"] = "partial"
         else:
             result["status"] = "failed"
@@ -261,12 +270,44 @@ def format_env_pregen_report(assets: dict[str, Any], *, node_name: str) -> str:
     else:
         lines.append(f"（{entropy.get('error') or '未复制'}）")
 
+    engineering = assets.get("engineering") if isinstance(assets.get("engineering"), dict) else {}
+    lines.extend(["", "## 沙箱工程路径", ""])
+    targets = engineering.get("targets") if isinstance(engineering.get("targets"), list) else []
+    if not targets:
+        lines.append("（未解析到 catalog 关联仓库工程路径）")
+    else:
+        for row in targets:
+            if not isinstance(row, dict):
+                continue
+            mod = row.get("module") or "—"
+            cp = row.get("code_path") or ""
+            root = row.get("engineering_root") or "—"
+            suffix = f"/{cp}" if cp else ""
+            lines.append(f"- **{mod}**{suffix}：`{root}`")
+
+    layouts = engineering.get("layouts") if isinstance(engineering.get("layouts"), list) else []
+    if layouts:
+        lines.append("")
+        lines.append(f"- **工程落盘状态**：{engineering.get('status') or '—'}")
+        for row in layouts:
+            if not isinstance(row, dict):
+                continue
+            dev_t = row.get("dev_templates") if isinstance(row.get("dev_templates"), dict) else {}
+            wo = row.get("work_order_docs") if isinstance(row.get("work_order_docs"), dict) else {}
+            dev_files = dev_t.get("files") or []
+            wo_files = wo.get("files") or []
+            lines.append(
+                f"  - `{row.get('engineering_root') or '—'}`："
+                f"AGENTS/规范 {len(dev_files)} 个，归档文档 {len(wo_files)} 个 — {row.get('status') or '—'}"
+            )
+
     lines.extend(
         [
             "",
             "## 结论",
             "",
-            "环境预生成已完成：文档与控熵已归档至工单 env 目录，可进入下一 SOP 节点。",
+            "环境预生成已完成：文档与控熵已归档至工单 env 目录，"
+            "研发文档与 AGENTS.md 已落盘至沙箱工程路径，可进入下一 SOP 节点。",
             "",
         ]
     )

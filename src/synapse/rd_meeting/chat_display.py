@@ -367,7 +367,21 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
         return _expand_node_init(ev, index, host_id)
 
     if et == "system_node_executed":
-        payload = ev.get("result") if isinstance(ev.get("result"), dict) else {}
+        from synapse.rd_meeting.system_node_display import display_kind_for_system_node
+
+        raw_result = ev.get("result") if isinstance(ev.get("result"), dict) else {}
+        node_id = str(ev.get("node_id") or raw_result.get("node_id") or "").strip()
+        display = raw_result.get("display") if isinstance(raw_result.get("display"), dict) else {}
+        payload = display if display else raw_result
+        if node_id and isinstance(payload, dict):
+            payload = {**payload, "node_id": node_id}
+        display_kind = display_kind_for_system_node(node_id)
+        card_titles = {
+            "system_auto_split": "自动拆单 — 研发子单",
+            "system_sandbox_build": "沙箱构建 — 子单与代码挂钩",
+            "system_env_pregen": "环境预生成 — 路径内容清单",
+        }
+        card_title = card_titles.get(display_kind, "系统节点执行结果")
         out: list[dict[str, Any]] = []
         summary = format_event_chat_display(ev)
         if summary:
@@ -387,10 +401,10 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
                 _row(
                     ev,
                     index,
-                    text="系统节点执行结果",
+                    text=card_title,
                     agent_id=SPEAKER_SYSTEM,
                     speaker_role=SPEAKER_SYSTEM,
-                    display_kind="system_exec",
+                    display_kind=display_kind,
                     payload=payload,
                     suffix="-exec",
                 )

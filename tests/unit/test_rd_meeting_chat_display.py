@@ -199,6 +199,28 @@ def test_solution_review_gate_structured_card() -> None:
     assert "120s" in rows[0]["text"]
 
 
+def test_system_node_executed_uses_node_specific_display_kind() -> None:
+    ev = {
+        "event": "system_node_executed",
+        "node_id": "auto_split",
+        "result": {
+            "status": "ok",
+            "display": {
+                "node_id": "auto_split",
+                "status": "ok",
+                "demand_no": "D1",
+                "tasks": [{"task_no": "T1", "task_title": "子单"}],
+            },
+        },
+        "ts": "2026-06-08T10:00:00",
+    }
+    rows = expand_history_event_to_chat(ev, 0)
+    exec_rows = [r for r in rows if r.get("displayKind", "").startswith("system_")]
+    assert len(exec_rows) == 1
+    assert exec_rows[0]["displayKind"] == "system_auto_split"
+    assert exec_rows[0]["payload"]["demand_no"] == "D1"
+
+
 def test_chat_log_ids_are_scoped_by_node_id() -> None:
     logs = history_to_chat_logs(
         [

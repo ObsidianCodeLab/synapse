@@ -148,24 +148,32 @@ def handle_sandbox_build(
     ok = assets.get("status") in ("ok", "partial") and any(
         r.get("status") == "ok" for r in (assets.get("repos") or []) if isinstance(r, dict)
     )
+    from synapse.rd_meeting.system_node_display import attach_system_node_display
+
     if not ok and assets.get("status") == "failed":
-        return {
+        out = {
             "status": "failed",
             "error": "; ".join(assets.get("errors") or []) or "沙箱代码拉取失败",
             "sandbox_root": assets.get("sandbox_root"),
             "repos": assets.get("repos") or [],
             "artifacts": artifacts,
             "report_body": report_body,
+            **assets,
         }
+        return attach_system_node_display(
+            node_id, out, scope_id=sid, wire_row=wire_hit,
+        )
 
-    return {
+    out = {
         "status": "ok" if assets.get("status") == "ok" else "partial",
         "sandbox_root": assets.get("sandbox_root"),
         "repos": assets.get("repos") or [],
         "artifacts": artifacts,
         "report_body": report_body,
         "prod": prod,
+        **assets,
     }
+    return attach_system_node_display(node_id, out, scope_id=sid, wire_row=wire_hit)
 
 
 def handle_auto_split(
@@ -190,8 +198,10 @@ def handle_auto_split(
     stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
     artifacts = _write_system_archive(sid, node_id, stage_name, report_body)
 
+    from synapse.rd_meeting.system_node_display import attach_system_node_display
+
     if assets.get("status") == "failed":
-        return {
+        out = {
             "status": "failed",
             "error": "; ".join(assets.get("errors") or []) or "自动拆单失败",
             "demand_no": assets.get("demand_no"),
@@ -200,9 +210,11 @@ def handle_auto_split(
             "create_task_results": assets.get("create_task_results") or [],
             "artifacts": artifacts,
             "report_body": report_body,
+            **assets,
         }
+        return attach_system_node_display(node_id, out, scope_id=sid)
 
-    return {
+    out = {
         "status": assets.get("status") or "ok",
         "demand_no": assets.get("demand_no"),
         "local_tasks": assets.get("local_tasks") or [],
@@ -210,7 +222,9 @@ def handle_auto_split(
         "create_task_results": assets.get("create_task_results") or [],
         "artifacts": artifacts,
         "report_body": report_body,
+        **assets,
     }
+    return attach_system_node_display(node_id, out, scope_id=sid)
 
 
 def handle_env_pregen(
@@ -247,31 +261,41 @@ def handle_env_pregen(
     stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
     artifacts = _write_system_archive(sid, node_id, stage_name, report_body)
 
+    engineering = assets.get("engineering") if isinstance(assets.get("engineering"), dict) else {}
     ok = assets.get("status") in ("ok", "partial") and (
         any(d.get("status") == "ok" for d in (assets.get("docs") or []) if isinstance(d, dict))
         or (assets.get("entropy") or {}).get("status") == "ok"
         or (assets.get("product_doc_mirror") or {}).get("status") == "ok"
+        or engineering.get("status") in ("ok", "partial")
     )
+    from synapse.rd_meeting.system_node_display import attach_system_node_display
+
     if not ok and assets.get("status") == "failed":
-        return {
+        out = {
             "status": "failed",
             "error": "; ".join(assets.get("errors") or []) or "环境预生成失败",
             "env_root": assets.get("env_root"),
             "docs": assets.get("docs") or [],
             "entropy": assets.get("entropy") or {},
+            "engineering": assets.get("engineering") or {},
             "artifacts": artifacts,
             "report_body": report_body,
+            **assets,
         }
+        return attach_system_node_display(node_id, out, scope_id=sid)
 
-    return {
+    out = {
         "status": "ok" if assets.get("status") == "ok" else "partial",
         "env_root": assets.get("env_root"),
         "docs": assets.get("docs") or [],
         "entropy": assets.get("entropy") or {},
+        "engineering": assets.get("engineering") or {},
         "artifacts": artifacts,
         "report_body": report_body,
         "prod": prod,
+        **assets,
     }
+    return attach_system_node_display(node_id, out, scope_id=sid)
 
 
 SYSTEM_NODE_HANDLERS: dict[str, SystemNodeHandler] = {

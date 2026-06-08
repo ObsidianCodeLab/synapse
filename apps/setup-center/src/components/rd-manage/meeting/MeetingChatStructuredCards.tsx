@@ -21,6 +21,12 @@ import {
 } from './MeetingAgentAvatar';
 import type { RoomAgent } from './meetingChatTypes';
 import type { ChatDisplayKind, MeetingChatLog } from './meetingChatUtils';
+import {
+  SystemAutoSplitCard,
+  SystemEnvPregenCard,
+  SystemExecCard,
+  SystemSandboxBuildCard,
+} from './SystemNodeCards';
 
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -201,42 +207,6 @@ export function SystemRosterCard({ payload }: { payload: Record<string, unknown>
         </li>
       </ul>
       <p className="rd-chat-card__desc mt-2">本节点由 Pipeline 代码 handler 执行，不调度主持/协作智能体。</p>
-    </div>
-  );
-}
-
-export function SystemExecCard({ payload }: { payload: Record<string, unknown> }) {
-  const repos = (payload.repos as Record<string, unknown>[]) || [];
-  return (
-    <div className="rd-chat-card rd-chat-card--meta">
-      <SectionTitle icon={<Server className="w-4 h-4" />}>系统节点执行结果</SectionTitle>
-      <dl className="rd-chat-card__kv">
-        <dt>状态</dt>
-        <dd>{String(payload.status || '—')}</dd>
-        <dt>沙箱目录</dt>
-        <dd className="font-mono text-[11px] break-all">{String(payload.sandbox_root || '—')}</dd>
-        {payload.prod ? (
-          <>
-            <dt>产品</dt>
-            <dd>{String(payload.prod)}</dd>
-          </>
-        ) : null}
-        {payload.error ? (
-          <>
-            <dt>错误</dt>
-            <dd className="text-red-400">{String(payload.error)}</dd>
-          </>
-        ) : null}
-      </dl>
-      {repos.length > 0 ? (
-        <ul className="text-[11px] text-muted-foreground space-y-1.5 mt-3 mb-0">
-          {repos.map((row, idx) => (
-            <li key={`${row.repo_name}-${idx}`} className="font-mono break-all">
-              {String(row.repo_name || 'repo')} → {String(row.local_path || '—')} ({String(row.status || '—')})
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
@@ -470,6 +440,12 @@ export function StructuredChatBody({ log }: { log: MeetingChatLog }) {
       return <SystemRosterCard payload={payload} />;
     case 'system_exec':
       return <SystemExecCard payload={payload} />;
+    case 'system_auto_split':
+      return <SystemAutoSplitCard payload={payload} />;
+    case 'system_sandbox_build':
+      return <SystemSandboxBuildCard payload={payload} />;
+    case 'system_env_pregen':
+      return <SystemEnvPregenCard payload={payload} />;
     case 'work_plan':
       return <WorkPlanCard text={log.text} />;
     case 'delegation_start':

@@ -134,6 +134,19 @@ def sandbox_code_dir(scope_id: str, repo_name: str) -> Path:
     return sandbox_root(scope_id) / seg
 
 
+def sandbox_engineering_dir(scope_id: str, module_name: str, code_path: str = "") -> Path:
+    """研发工程路径：``work/<scope>/sandbox/<应用模块>/<code_path>``。"""
+    mod = sanitize_fs_segment(module_name or "default")
+    root = sandbox_root(scope_id) / mod
+    rel = (code_path or "").strip().strip("/\\")
+    if rel:
+        for part in Path(rel).parts:
+            if part in (".", ".."):
+                continue
+            root = root / part
+    return root
+
+
 def env_root(scope_id: str) -> Path:
     """环境预生成根目录：``work/<scope>/env/``。"""
     return scope_dir(scope_id) / "env"

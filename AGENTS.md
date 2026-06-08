@@ -85,6 +85,49 @@ docs/                   # Documentation
 tests/                  # Test suite
 ```
 
+## R&D Document Archive (`synapse_archive/`)
+
+研发文档归档目录，智能体执行研发任务时按此路径读取，禁止臆造目录。
+
+```
+<代码根目录>/
+├── AGENTS.md
+└── synapse_archive/
+    ├── 需求分析/
+    │   ├── req_clarify/
+    │   │   └── 需求澄清.md
+    │   ├── boundary/
+    │   │   └── 边界确认说明.md
+    │   ├── module_func/
+    │   │   └── 模块功能.md
+    │   ├── acceptance/
+    │   │   └── 验收标准.md
+    │   └── req_risk/
+    │       └── 需求风险评估.md
+    ├── 需求设计/
+    │   ├── func_assign/
+    │   │   └── 功能点分派清单.md
+    │   ├── history_solution/
+    │   │   └── 历史方案映射.md
+    │   ├── module_confirm/
+    │   │   └── 模块范围确认.md
+    │   └── func_solution/
+    │       └── 函数级方案.md
+    ├── 产品架构/
+    │   ├── FUNCTIONAL_ARCH.md
+    │   └── TECH_ARCH.md
+    ├── 产品手册/
+    │   └── 产品研发手册.md
+    └── 产品规范/
+        ├── C++研发规范.md
+        ├── Go研发规范.md
+        ├── JAVA研发规范.md
+        ├── JavaScript研发规范.md
+        ├── MYSQL研发规范.md
+        ├── PG研发规范.md
+        └── Python研发规范.md
+```
+
 ## Architecture Notes
 
 - **Identity system**: `identity/SOUL.md` (values), `AGENT.md` (behavior), `USER.md` (preferences), `MEMORY.md` (persistent memory). Compiled to `identity/runtime/` for prompt injection.
