@@ -6,7 +6,7 @@
 
 ```
 <代码根目录>/
-└── archive/
+└── synapse_archive/
     ├── 需求分析/
     │   ├── req_clarify/
     │   │   └── 需求澄清.md
