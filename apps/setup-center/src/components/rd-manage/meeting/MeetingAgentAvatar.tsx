@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Tooltip } from 'antd';
 import { motion } from 'motion/react';
 import {
@@ -39,15 +40,19 @@ export function MeetingAgentAvatar({
   agent,
   size = 'normal',
   showStatusBadge = true,
+  showHoverName = false,
   onClick,
 }: {
   agent: RoomAgent;
   size?: 'small' | 'normal' | 'large';
   showStatusBadge?: boolean;
+  /** 悬停时在头像下方浮动展示智能体名称（portal，避免被 overflow 裁剪） */
+  showHoverName?: boolean;
   onClick?: () => void;
 }) {
   const isLarge = size === 'large';
   const sizeClasses = isLarge ? 'w-10 h-10' : size === 'small' ? 'w-7 h-7' : 'w-8 h-8';
+  const [hoverTip, setHoverTip] = useState<{ x: number; y: number } | null>(null);
 
   const handleClick = onClick
     ? (e: React.MouseEvent) => {
@@ -56,12 +61,23 @@ export function MeetingAgentAvatar({
       }
     : undefined;
 
+  const hoverSubtitle = onClick ? '点击查看上下文' : agent.role;
+
   const content = (
     <div
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
-      aria-label={onClick ? `查看 ${agent.name} 上下文` : undefined}
+      aria-label={onClick ? `查看 ${agent.name} 上下文` : showHoverName ? agent.name : undefined}
       onClick={handleClick}
+      onMouseEnter={
+        showHoverName
+          ? (e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setHoverTip({ x: rect.left + rect.width / 2, y: rect.bottom + 6 });
+            }
+          : undefined
+      }
+      onMouseLeave={showHoverName ? () => setHoverTip(null) : undefined}
       onKeyDown={
         onClick
           ? (e) => {
@@ -113,6 +129,28 @@ export function MeetingAgentAvatar({
       ) : null}
     </div>
   );
+
+  if (showHoverName) {
+    return (
+      <>
+        {content}
+        {hoverTip
+          ? createPortal(
+              <div
+                className="agentOrbitTooltip agentOrbitTooltipVisible"
+                style={{ left: hoverTip.x, top: hoverTip.y }}
+              >
+                <span className="agentOrbitTooltipName">{agent.name}</span>
+                {hoverSubtitle ? (
+                  <span className="agentOrbitTooltipTitle">{hoverSubtitle}</span>
+                ) : null}
+              </div>,
+              document.body,
+            )
+          : null}
+      </>
+    );
+  }
 
   if (!onClick) return content;
   return <Tooltip title={`${agent.name} · 点击查看上下文`}>{content}</Tooltip>;

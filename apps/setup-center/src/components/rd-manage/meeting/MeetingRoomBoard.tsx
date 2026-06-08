@@ -2130,6 +2130,7 @@ const InterventionDialog = ({
                     agent={a}
                     size="small"
                     showStatusBadge={false}
+                    showHoverName
                     onClick={() => openAgentContext(a)}
                   />
                 ))}
