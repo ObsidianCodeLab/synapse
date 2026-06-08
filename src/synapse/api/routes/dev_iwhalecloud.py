@@ -2034,18 +2034,21 @@ async def create_task(body: CreateTaskRequest) -> dict:
             error=str(patch_result),
         )
 
-    # 步骤6：新增任务影响点（必须）
-    # impact_items = [AddTaskImpactItem(taskImpactId=it.taskImpactId, taskId=created_task_id, taskImpactDesc=it.taskImpactDesc) for it in body.taskImpactList]
-    # add_impact_body = AddTaskImpactRequest(userId=user_id, taskImpactList=impact_items)
-    # add_impact_result = await _add_task_impact(add_impact_body)
-    # if isinstance(add_impact_result, dict) and add_impact_result.get("errorcode") not in (None, 0):
-    #     return error_response(502, "任务已创建，但新增任务影响点失败", error=str(add_impact_result))
+    # 步骤6：从需求单复制已评估影响点模板到子单
+    sync_err = await _sync_task_impact_from_demand(
+        child_task_id=created_task_id,
+        demand_no=body.taskNo,
+        user_id=int(user_id),
+        task_impact_desc=body.taskImpactDesc,
+    )
+    if sync_err is not None:
+        return error_response(
+            sync_err.get("errorcode", 502),
+            sync_err.get("message", "任务已创建，但同步影响点失败"),
+            error=str(sync_err.get("data")),
+        )
 
-    # 步骤7：自动确认影响点
-    confirm_body = TaskImpactConfirmRequest(taskId=created_task_id, selfTestDesc=body.taskImpactDesc)
-    confirm_result = await _task_impact_confirm(confirm_body)
-    if isinstance(confirm_result, dict) and confirm_result.get("errorcode") not in (None, 0):
-        return error_response(502, "任务已创建，但影响点确认失败", error=str(confirm_result))
+    # 步骤7：自动确认影响点（已在 _sync_task_impact_from_demand 内完成）
 
     # 步骤9：更新任务影响评估
     auto_eval = {
@@ -2060,6 +2063,11 @@ async def create_task(body: CreateTaskRequest) -> dict:
     eval_result = await _update_task_impact_evaluation(update_eval_body)
     if isinstance(eval_result, dict) and eval_result.get("errorcode") not in (None, 0):
         return error_response(502, "任务已创建，但研发单影响评估编辑失败", error=str(eval_result))
+    logger.info(
+        "create_task update_task_impact_evaluation ok task_id=%s task_no=%s",
+        created_task_id,
+        created_task_no,
+    )
 
     # 步骤10：转开发中（仅做状态流转）
     transfer_body = TransferTaskStageRequest(
@@ -2093,6 +2101,77 @@ async def create_task(body: CreateTaskRequest) -> dict:
             "sop_node": "任务执行",
         },
         "创建任务统一流程执行成功",
+    )
+
+
+class RepairTaskImpactRequest(BaseModel):
+    """补填已创建子单的影响点与六项影响评估（不重复创建子单）。"""
+
+    taskNo: str = Field(..., description="已存在的子单号")
+    demandNo: str = Field(..., description="父需求单号")
+    taskImpactDesc: str = Field(..., description="自测描述")
+    performanceImpact: str = Field(..., description="性能影响")
+    functionalImpact: str = Field(..., description="功能影响")
+    cfgChangeDescription: str = Field(..., description="配置变更说明")
+    upgradeRisk: str = Field(..., description="升级风险")
+    securityImpact: str = Field(..., description="安全影响")
+    compatibilityImpact: str = Field(..., description="兼容性影响")
+
+
+@router.post("/api/dev/iwhalecloud/repair_task_impact")
+async def repair_task_impact(body: RepairTaskImpactRequest) -> dict:
+    """对已拆出的子单补写影响点确认与六项影响评估。"""
+    userinfo = _load_userinfo_plain()
+    if not userinfo:
+        return error_response(400, "未登录，请先调用 /api/dev/iwhalecloud/login 完成引导")
+    user_id = userinfo.get("userId")
+    if not user_id:
+        return error_response(400, "userinfo 中缺少 userId")
+    if not body.taskNo or not body.demandNo:
+        return error_response(400, "taskNo 与 demandNo 不能为空")
+    if not body.taskImpactDesc:
+        return error_response(400, "taskImpactDesc 不能为空")
+    if not body.performanceImpact or not body.functionalImpact or not body.cfgChangeDescription:
+        return error_response(400, "performanceImpact、functionalImpact、cfgChangeDescription 不能为空")
+    if not body.upgradeRisk or not body.securityImpact or not body.compatibilityImpact:
+        return error_response(400, "upgradeRisk、securityImpact、compatibilityImpact 不能为空")
+    try:
+        await _ensure_valid_creds_async()
+    except ValueError as e:
+        return error_response(400, str(e))
+
+    bearer = _load_dev_iwhalecloud_authorization()
+    async with httpx.AsyncClient(timeout=30) as client:
+        _, child_task_id = await _gateway_api_task_owner_and_id(client, body.taskNo.strip(), bearer)
+    if not child_task_id:
+        return error_response(502, f"无法解析子单 taskId：{body.taskNo}")
+
+    sync_err = await _sync_task_impact_from_demand(
+        child_task_id=child_task_id,
+        demand_no=body.demandNo.strip(),
+        user_id=int(user_id),
+        task_impact_desc=body.taskImpactDesc,
+    )
+    if sync_err is not None:
+        return sync_err
+
+    eval_body = UpdateTaskImpactEvaluationRequest(
+        taskId=child_task_id,
+        userId=int(user_id),
+        performanceImpact=body.performanceImpact,
+        functionalImpact=body.functionalImpact,
+        cfgChangeDescription=body.cfgChangeDescription,
+        upgradeRisk=body.upgradeRisk,
+        securityImpact=body.securityImpact,
+        compatibilityImpact=body.compatibilityImpact,
+    )
+    eval_result = await _update_task_impact_evaluation(eval_body)
+    if isinstance(eval_result, dict) and eval_result.get("errorcode") not in (None, 0):
+        return error_response(502, "研发单影响评估编辑失败", error=str(eval_result))
+
+    return success_response(
+        {"task_no": body.taskNo.strip(), "task_id": child_task_id},
+        "子单影响评估补填成功",
     )
 
 
@@ -2237,23 +2316,48 @@ async def task_impact_confirm(body: TaskImpactConfirmRequest) -> dict:
     """对外路由：任务影响确认（内部复用 _task_impact_confirm）。"""
     return await _task_impact_confirm(body)
 
+def _impact_ids_from_rows(rows: list[dict]) -> list[int]:
+    out: list[int] = []
+    for row in rows:
+        raw_id = row.get("taskImpactId")
+        if raw_id is None:
+            continue
+        try:
+            out.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _build_task_impact_confirm_payload(
+    task_id: int,
+    confirm_user_id: int,
+    self_test_desc: str,
+    impact_ids: list[int],
+) -> list[dict]:
+    return [
+        {
+            "taskId": task_id,
+            "taskImpactId": str(impact_id),
+            "confirmRole": "DEV",
+            "confirmUserId": confirm_user_id,
+            "confirmResult": "Y",
+            "note": self_test_desc,
+            "relatedTaskId": None,
+            "selfTestDesc": self_test_desc,
+            "confirmTaskId": task_id,
+        }
+        for impact_id in impact_ids
+    ]
+
+
 async def _task_impact_confirm(body: TaskImpactConfirmRequest) -> dict:
     """
     内部调用：任务影响确认。
 
     接口：POST /portal/zcm-devspace/task/{taskId}/impact/detail/confirm?userId={userId}
-    请求体字段：
-    - taskImpactId: 写死 "327588"
-    - confirmRole: 写死 "DEV"
-    - confirmUserId: 从 userinfo 解密获取
-    - confirmResult: 写死 "Y"
-    - selfTestDesc: 由参数传递
-    - note: 内部赋值为 selfTestDesc
-    - relatedTaskId: 写死 null
-    - taskId: 由参数传递
-    - confirmTaskId: 内部赋值为 taskId
+    taskImpactId 从子单影响明细动态读取（不再写死固定 ID）。
     """
-    # 从 userinfo 解密获取 userId
     userinfo = _load_userinfo_plain()
     if not userinfo:
         return error_response(400, "未登录，请先调用 /api/dev/iwhalecloud/login 完成引导")
@@ -2263,6 +2367,11 @@ async def _task_impact_confirm(body: TaskImpactConfirmRequest) -> dict:
 
     task_id = body.taskId
     self_test_desc = body.selfTestDesc
+    impact_ids = _impact_ids_from_rows(await _task_impact_detail_rows(task_id))
+    if not impact_ids:
+        logger.warning("task_impact_confirm skip: task %s has no impact detail rows", task_id)
+        return success_response({"skipped": True, "reason": "no impact detail rows"})
+
     url = (
         f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-devspace/task/{task_id}/"
         f"impact/detail/confirm?userId={confirm_user_id}"
@@ -2272,22 +2381,14 @@ async def _task_impact_confirm(body: TaskImpactConfirmRequest) -> dict:
     except ValueError as e:
         return error_response(400, str(e))
     headers = _build_task_impact_confirm_headers(csrf, ck)
-    # 根据新接口格式构建请求体
-    payload = [
-        {
-            "taskId": task_id,
-            "taskImpactId": "327588",
-            "confirmRole": "DEV",
-            "confirmUserId": confirm_user_id,
-            "confirmResult": "Y",
-            "note": self_test_desc,
-            "relatedTaskId": None,
-            "selfTestDesc": self_test_desc,
-            "confirmTaskId": task_id,
-        }
-    ]
+    payload = _build_task_impact_confirm_payload(
+        task_id,
+        int(confirm_user_id),
+        self_test_desc,
+        impact_ids,
+    )
 
-    logger.debug("task_impact_confirm url:%s payload:%s", url, payload)
+    logger.debug("task_impact_confirm url:%s payload=%s", url, payload)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(url, headers=headers, json=payload)
@@ -2911,6 +3012,87 @@ async def _get_impact_list_from_task(body: GetImpactListFromTaskRequest) -> dict
     # 提取数据
     mapped = _map_impact_detail_task_impact_id_desc(raw)
     return success_response(mapped)
+
+
+def _envelope_data_list(resp: dict) -> list[dict]:
+    if resp.get("errorcode") not in (None, 0):
+        return []
+    data = resp.get("data")
+    if not isinstance(data, list):
+        return []
+    return [x for x in data if isinstance(x, dict)]
+
+
+async def _resolve_demand_task_id(demand_no: str) -> int | None:
+    demand_no = (demand_no or "").strip()
+    if not demand_no:
+        return None
+    bearer = _load_dev_iwhalecloud_authorization()
+    async with httpx.AsyncClient(timeout=30) as client:
+        _, task_id = await _gateway_api_task_owner_and_id(client, demand_no, bearer)
+    return task_id
+
+
+async def _demand_impact_rows(demand_id: int) -> list[dict]:
+    resp = await _get_impact_list_from_demand(GetImpactListFromDemandRequest(demandId=demand_id))
+    return _envelope_data_list(resp)
+
+
+async def _task_impact_detail_rows(task_id: int) -> list[dict]:
+    resp = await _get_impact_list_from_task(GetImpactListFromTaskRequest(taskId=task_id))
+    return _envelope_data_list(resp)
+
+
+async def _sync_task_impact_from_demand(
+    *,
+    child_task_id: int,
+    demand_no: str,
+    user_id: int,
+    task_impact_desc: str,
+) -> dict | None:
+    """从需求单复制影响点模板到子单并确认。成功返回 None，失败返回 error_response。"""
+    demand_id = await _resolve_demand_task_id(demand_no)
+    if not demand_id:
+        logger.warning("sync_task_impact: cannot resolve demand id demand_no=%s", demand_no)
+        return None
+
+    demand_impacts = await _demand_impact_rows(demand_id)
+    impact_items: list[AddTaskImpactItem] = []
+    for row in demand_impacts:
+        raw_id = row.get("taskImpactId")
+        if raw_id is None:
+            continue
+        try:
+            impact_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        desc = str(row.get("impactDesc") or task_impact_desc).strip() or task_impact_desc
+        impact_items.append(
+            AddTaskImpactItem(
+                taskImpactId=impact_id,
+                taskId=child_task_id,
+                taskImpactDesc=desc,
+            )
+        )
+    if impact_items:
+        add_result = await _add_task_impact(
+            AddTaskImpactRequest(userId=int(user_id), taskImpactList=impact_items)
+        )
+        if isinstance(add_result, dict) and add_result.get("errorcode") not in (None, 0):
+            return error_response(502, "新增任务影响点失败", error=str(add_result))
+
+    logger.info(
+        "task_impact_confirm prep demand_no=%s child_task_id=%s task_impact_desc=%r",
+        demand_no,
+        child_task_id,
+        task_impact_desc,
+    )
+    confirm_result = await _task_impact_confirm(
+        TaskImpactConfirmRequest(taskId=child_task_id, selfTestDesc=task_impact_desc)
+    )
+    if isinstance(confirm_result, dict) and confirm_result.get("errorcode") not in (None, 0):
+        return error_response(502, "影响点确认失败", error=str(confirm_result))
+    return None
 
 
 class GetTaskListFromDemandRequest(BaseModel):
