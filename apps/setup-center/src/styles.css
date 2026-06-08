@@ -1308,14 +1308,30 @@ button.btnApplyRestart:hover {
   animation: spin 0.8s linear infinite;
 }
 
-/* Lucide Loader2 + Tailwind `animate-spin`: global reduced-motion / perf-mode rules
-   set `animation-duration: 0.01ms` and `iteration-count: 1` on `*`, which freezes
-   spinners unless listed in the exceptions below (also in @media / [data-perf-mode]). */
+/* Lucide Loader2 + Tailwind `animate-spin` + Ant Design loading: global reduced-motion /
+   perf-mode rules set `animation-duration: 0.01ms` and `iteration-count: 1` on `*`,
+   which freezes spinners unless listed in the exceptions below. */
 .app-loading-spin,
 .animate-spin,
 .spinner,
-.spinIcon {
+.spinIcon,
+.rd-meeting-reprocess-spin,
+.ant-btn-loading-icon,
+.ant-btn-loading-icon svg,
+.ant-spin-dot-spin,
+.ant-spin .ant-spin-dot-item {
+  animation-duration: 1.2s !important;
+  animation-iteration-count: infinite !important;
+}
+.app-loading-spin,
+.animate-spin,
+.spinner,
+.spinIcon,
+.rd-meeting-reprocess-spin {
   animation: spin 0.85s linear infinite !important;
+}
+.ant-spin .ant-spin-dot-item {
+  animation-duration: 1s !important;
 }
 
 .loadingDots::after {
@@ -4741,8 +4757,25 @@ button.btnApplyRestart:hover {
   .app-loading-spin svg,
   .animate-spin,
   .spinner,
-  .spinIcon {
+  .spinIcon,
+  .rd-meeting-reprocess-spin,
+  .ant-btn-loading-icon,
+  .ant-btn-loading-icon svg,
+  .ant-spin-dot-spin,
+  .ant-spin .ant-spin-dot-item {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
+  .app-loading-spin,
+  .app-loading-spin svg,
+  .animate-spin,
+  .spinner,
+  .spinIcon,
+  .rd-meeting-reprocess-spin {
     animation: spin 0.85s linear infinite !important;
+  }
+  .ant-spin .ant-spin-dot-item {
+    animation-duration: 1s !important;
   }
 }
 
@@ -4769,8 +4802,25 @@ button.btnApplyRestart:hover {
 [data-perf-mode="low"] .app-loading-spin svg,
 [data-perf-mode="low"] .animate-spin,
 [data-perf-mode="low"] .spinner,
-[data-perf-mode="low"] .spinIcon {
+[data-perf-mode="low"] .spinIcon,
+[data-perf-mode="low"] .rd-meeting-reprocess-spin,
+[data-perf-mode="low"] .ant-btn-loading-icon,
+[data-perf-mode="low"] .ant-btn-loading-icon svg,
+[data-perf-mode="low"] .ant-spin-dot-spin,
+[data-perf-mode="low"] .ant-spin .ant-spin-dot-item {
+  animation-duration: 1.2s !important;
+  animation-iteration-count: infinite !important;
+}
+[data-perf-mode="low"] .app-loading-spin,
+[data-perf-mode="low"] .app-loading-spin svg,
+[data-perf-mode="low"] .animate-spin,
+[data-perf-mode="low"] .spinner,
+[data-perf-mode="low"] .spinIcon,
+[data-perf-mode="low"] .rd-meeting-reprocess-spin {
   animation: spin 0.85s linear infinite !important;
+}
+[data-perf-mode="low"] .ant-spin .ant-spin-dot-item {
+  animation-duration: 1s !important;
 }
 [data-perf-mode="low"] .sidebar,
 [data-perf-mode="low"] .chainPanel {

@@ -13,7 +13,7 @@ export function CrossNodeReprocessIcon({ className = 'h-5 w-5', spinning }: Cros
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`shrink-0 ${spinning ? 'animate-spin' : ''} ${className}`}
+      className={`shrink-0 ${spinning ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin' : ''} ${className}`}
       aria-hidden
     >
       <circle

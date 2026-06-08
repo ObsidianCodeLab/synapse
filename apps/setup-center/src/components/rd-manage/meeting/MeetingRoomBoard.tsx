@@ -1941,8 +1941,14 @@ const InterventionDialog = ({
                 <Button
                   type="primary"
                   danger={room.status === 'failed'}
-                  icon={<RotateCw className={`w-4 h-4 ${room.reprocessing ? 'animate-spin' : ''}`} />}
-                  loading={room.reprocessing}
+                  disabled={room.reprocessing}
+                  icon={
+                    <RotateCw
+                      className={`w-4 h-4 app-loading-spin rd-meeting-reprocess-spin ${
+                        room.reprocessing ? 'animate-spin' : ''
+                      }`}
+                    />
+                  }
                   onClick={() => selectedNode && openReprocessModal(selectedNode.id)}
                   className={MEETING_TAB_BAR_ANT_BTN}
                 >
