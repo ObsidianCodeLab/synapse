@@ -132,69 +132,52 @@ def _resolve_skill_entry_or_parsed(skill_id: str, agent: Any | None) -> tuple[An
     return None, None
 
 
-def _compact_detail_sublines_from_entry(entry: Any) -> list[str]:
-    from synapse.skills.exposure import build_skill_exposure
-
-    exposed = build_skill_exposure(entry)
+def _skill_description_from_entry(entry: Any) -> str:
     desc = (
         entry.get_display_description()
         if hasattr(entry, "get_display_description")
         else entry.description
     )
-    lines: list[str] = []
-    if desc and str(desc).strip():
-        lines.append(f"摘要：{str(desc).strip()}")
-    when = getattr(entry, "when_to_use", "") or ""
-    if str(when).strip():
-        lines.append(f"何时使用：{str(when).strip()}")
-    if exposed.scripts:
-        lines.append(f"脚本：{', '.join(exposed.scripts)}")
-    else:
-        lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
-    return lines
+    return str(desc or "").strip()
+
+
+def _skill_description_from_parsed(parsed: Any) -> str:
+    meta = getattr(parsed, "metadata", None)
+    if meta is None:
+        return ""
+    return str(getattr(meta, "description", "") or "").strip()
+
+
+def skill_brief_summary(skill_id: str, *, agent: Any | None = None) -> str:
+    """单技能 L1 摘要（仅 description，不含脚本 / instruction-only）。"""
+    entry, parsed = _resolve_skill_entry_or_parsed(skill_id, agent)
+    if entry is not None:
+        return _skill_description_from_entry(entry)
+    if parsed is not None:
+        return _skill_description_from_parsed(parsed)
+    return ""
+
+
+def _compact_detail_sublines_from_entry(entry: Any) -> list[str]:
+    desc = _skill_description_from_entry(entry)
+    if desc:
+        return [f"摘要：{desc}"]
+    return ["（无摘要，请 get_skill_info 加载）"]
 
 
 def _compact_detail_sublines_from_parsed(skill_id: str, parsed: Any) -> list[str]:
-    meta = getattr(parsed, "metadata", None)
-    if meta is None:
-        return ["（元数据不可用，请 get_skill_info 加载）"]
-    desc = getattr(meta, "description", "") or ""
-    when = getattr(meta, "when_to_use", "") or ""
-    lines: list[str] = []
-    if str(desc).strip():
-        lines.append(f"摘要：{str(desc).strip()}")
-    if str(when).strip():
-        lines.append(f"何时使用：{str(when).strip()}")
-    skill_dir = None
-    try:
-        from synapse.rd_meeting.room_skill import _find_external_skill_file
-
-        path = _find_external_skill_file(skill_id)
-        if path is not None:
-            skill_dir = path.parent
-    except Exception:
-        skill_dir = None
-    if skill_dir is not None:
-        from synapse.skills.exposure import _list_scripts
-
-        scripts = _list_scripts(skill_dir)
-        if scripts:
-            lines.append(f"脚本：{', '.join(scripts)}")
-        else:
-            lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
-    elif not lines:
-        lines.append("instruction-only（须先 get_skill_info 再按指引执行）")
-    return lines
+    desc = _skill_description_from_parsed(parsed)
+    if desc:
+        return [f"摘要：{desc}"]
+    return ["（无摘要，请 get_skill_info 加载）"]
 
 
 def skill_detail_sublines(skill_id: str, *, agent: Any | None = None) -> list[str]:
-    """单技能 L1 元数据子行（摘要 / 脚本 / 类型），不含 SKILL.md 正文。"""
-    entry, parsed = _resolve_skill_entry_or_parsed(skill_id, agent)
-    if entry is not None:
-        return _compact_detail_sublines_from_entry(entry)
-    if parsed is not None:
-        return _compact_detail_sublines_from_parsed(skill_id, parsed)
-    return ["（注册表中未找到该技能，可尝试 get_skill_info）"]
+    """（遗留）单技能摘要子行；新代码请用 skill_brief_summary + append_profile_skill_lines。"""
+    summary = skill_brief_summary(skill_id, agent=agent)
+    if summary:
+        return [f"摘要：{summary}"]
+    return ["（无摘要，请 get_skill_info 加载）"]
 
 
 def append_enriched_skill_lines(
@@ -206,7 +189,7 @@ def append_enriched_skill_lines(
     agent: Any | None = None,
     format_title: Any | None = None,
 ) -> None:
-    """将技能 id + L1 元数据追加为嵌套列表项（供能力档案 / 能力卡片复用）。"""
+    """将技能 id + 名称 + 摘要追加为单行列表项（供能力档案 / 能力卡片复用）。"""
     count = 0
     seen: set[str] = set()
     for sid in skill_ids:
@@ -215,9 +198,11 @@ def append_enriched_skill_lines(
             continue
         seen.add(key)
         title = format_title(key) if format_title else key
-        lines.append(f"{indent}- {title}")
-        for sub in skill_detail_sublines(key, agent=agent):
-            lines.append(f"{indent}  - {sub}")
+        summary = skill_brief_summary(key, agent=agent)
+        if summary:
+            lines.append(f"{indent}- {title}：{summary}")
+        else:
+            lines.append(f"{indent}- {title}")
         count += 1
         if limit and count >= limit:
             break

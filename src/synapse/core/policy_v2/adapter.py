@@ -611,9 +611,13 @@ def evaluate_via_v2(
     ctx = _resolve_context(extra_ctx=extra_ctx, user_message=user_message)
 
     try:
-        from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_session
+        from synapse.rd_meeting.policy_bypass import try_rd_meeting_policy_allow
 
-        _rd_bypass = try_rd_meeting_allow_via_session(tool_name, session_id=ctx.session_id)
+        _rd_bypass = try_rd_meeting_policy_allow(
+            tool_name,
+            session_id=ctx.session_id,
+            metadata=dict(ctx.metadata or {}),
+        )
         if _rd_bypass is not None:
             return _rd_bypass
     except Exception as exc:

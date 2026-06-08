@@ -111,11 +111,38 @@ def test_apply_meeting_agent_runtime_keeps_prompt_without_duplicate_skill_sectio
     assert "list_skills" not in {t["name"] for t in agent._tools}
 
 
+def test_append_enriched_skill_lines_brief_summary_only():
+    from unittest.mock import MagicMock
+
+    from synapse.rd_meeting.agent_runtime import append_enriched_skill_lines
+    from synapse.skills.registry import SkillEntry
+
+    entry = SkillEntry(
+        skill_id="foo-skill",
+        name="Foo",
+        description="Short summary for meeting.",
+    )
+    agent = MagicMock()
+    agent.skill_registry.get.return_value = entry
+    agent.skill_loader = None
+    lines: list[str] = []
+    append_enriched_skill_lines(
+        lines,
+        ["foo-skill"],
+        format_title=lambda sid: sid,
+        agent=agent,
+    )
+    assert len(lines) == 1
+    assert "Short summary for meeting." in lines[0]
+    assert "脚本" not in lines[0]
+    assert "instruction-only" not in lines[0]
+
+
 def test_rd_meeting_policy_bypass_allows_run_shell_in_meeting_session():
     from synapse.core.policy_v2.adapter import evaluate_via_v2
     from synapse.core.policy_v2.context import PolicyContext, set_current_context, reset_current_context
     from synapse.core.policy_v2.enums import ConfirmationMode, DecisionAction, SessionRole
-    from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_session
+    from synapse.rd_meeting.policy_bypass import try_rd_meeting_allow_via_session, try_rd_meeting_policy_allow
 
     decision = try_rd_meeting_allow_via_session(
         "run_shell",
@@ -123,6 +150,14 @@ def test_rd_meeting_policy_bypass_allows_run_shell_in_meeting_session():
     )
     assert decision is not None
     assert decision.action.name == "ALLOW"
+
+    meta_only = try_rd_meeting_policy_allow(
+        "run_skill_script",
+        session_id="policy_v2_adapter_fallback",
+        metadata={"rd_meeting": True},
+    )
+    assert meta_only is not None
+    assert meta_only.action.name == "ALLOW"
 
     ctx = PolicyContext(
         session_id="rd_meeting:room-abc:host",
@@ -132,12 +167,18 @@ def test_rd_meeting_policy_bypass_allows_run_shell_in_meeting_session():
         session_role=SessionRole.AGENT,
         confirmation_mode=ConfirmationMode.DEFAULT,
         is_unattended=False,
+        metadata={"rd_meeting": True},
     )
     token = set_current_context(ctx)
     try:
         via_adapter = evaluate_via_v2("run_shell", {"command": "python scripts/foo.py"})
         assert via_adapter.action == DecisionAction.ALLOW
-        assert via_adapter.reason == "研发会议室白名单工具自动放行"
+        via_skill = evaluate_via_v2(
+            "run_skill_script",
+            {"skill_name": "whalecloud-dev-tool-doc-generate", "script_name": "fill_clarify.py"},
+        )
+        assert via_skill.action == DecisionAction.ALLOW
+        assert via_skill.reason == "研发会议室白名单工具自动放行"
     finally:
         reset_current_context(token)
 

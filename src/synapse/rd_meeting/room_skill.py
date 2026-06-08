@@ -357,7 +357,7 @@ def _format_capability_card(
     custom = (profile.custom_prompt or "").strip()
 
     lines: list[str] = []
-    lines.append(f"## {name} (`{profile.id}`)")
+    lines.append(f"### {name} (`{profile.id}`)")
     lines.append(f"- 角色：{role} · 端点：`{llm_endpoint or DEFAULT_LLM_ENDPOINT_KEY}`")
     if desc:
         lines.append(f"- 简介：{desc}")
@@ -460,7 +460,7 @@ def build_capability_cards(
         wp = _resolve_profile(wid)
         if wp is None:
             cards.append(
-                f"## {wid}\n- 角色：worker · 端点：`{worker_llm_endpoint or DEFAULT_LLM_ENDPOINT_KEY}`\n"
+                f"### {wid}\n- 角色：worker · 端点：`{worker_llm_endpoint or DEFAULT_LLM_ENDPOINT_KEY}`\n"
                 "- 简介：未在 Profile 库中找到，使用兜底身份。"
             )
             continue

@@ -69,6 +69,7 @@ def test_build_capability_cards_lists_host_and_workers(host_binding):
     assert "角色：worker" in cards
     assert "whalecloud-requirement-expert" in cards
     assert "whalecloud-design-expert" in cards
+    assert "### whalecloud-requirement-expert" in cards or "### " in cards
     assert "reasoning-heavy" in cards
 
 

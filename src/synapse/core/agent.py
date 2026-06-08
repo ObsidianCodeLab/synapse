@@ -6237,6 +6237,11 @@ class Agent:
                 child_agent_name=(
                     getattr(self, "_agent_profile_id", None) if _parent_ctx else None
                 ),
+                extra_metadata=(
+                    {"rd_meeting": True}
+                    if getattr(self, "_org_context", None) is True
+                    else None
+                ),
             )
             _policy_ctx_token = _pv2_set_ctx(_policy_ctx)
         except Exception as _ctx_exc:
@@ -6656,6 +6661,11 @@ class Agent:
                 parent_ctx=_parent_ctx,
                 child_agent_name=(
                     getattr(self, "_agent_profile_id", None) if _parent_ctx else None
+                ),
+                extra_metadata=(
+                    {"rd_meeting": True}
+                    if getattr(self, "_org_context", None) is True
+                    else None
                 ),
             )
             _policy_ctx_token = _pv2_set_ctx(_policy_ctx)
@@ -9388,6 +9398,26 @@ class Agent:
 
         self._execute_task_usage_scene = str(getattr(task, "usage_scene", "") or "unknown")
 
+        _policy_ctx_token = None
+        if getattr(self, "_org_context", None) is True:
+            try:
+                from .policy_v2 import reset_current_context as _pv2_reset_ctx
+                from .policy_v2 import set_current_context as _pv2_set_ctx
+                from .policy_v2.adapter import build_policy_context as _pv2_build_ctx
+
+                _meeting_sid = (
+                    str(task.session_id or "")
+                    or str(getattr(self, "_current_session_id", None) or "")
+                )
+                _policy_ctx = _pv2_build_ctx(
+                    session=getattr(self, "_current_session", None),
+                    session_id=_meeting_sid,
+                    extra_metadata={"rd_meeting": True},
+                )
+                _policy_ctx_token = _pv2_set_ctx(_policy_ctx)
+            except Exception as _ctx_exc:
+                logger.debug("[execute_task] meeting PolicyContext install failed: %s", _ctx_exc)
+
         def _fail_task(error: str) -> TaskResult:
             """Finish task execution with a stable TaskResult failure contract."""
             duration = time.time() - start_time
@@ -9891,6 +9921,11 @@ class Agent:
                     logger.warning(f"Failed to get summary: {e}")
                     final_response = "任务已执行完成。"
         finally:
+            if _policy_ctx_token is not None:
+                with contextlib.suppress(Exception):
+                    from .policy_v2 import reset_current_context as _pv2_reset_ctx
+
+                    _pv2_reset_ctx(_policy_ctx_token)
             # 清理 per-conversation override，避免影响后续任务/会话
             with contextlib.suppress(Exception):
                 self.brain.restore_default_model(conversation_id=conversation_id)
