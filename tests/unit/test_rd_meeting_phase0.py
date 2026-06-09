@@ -55,6 +55,43 @@ def test_scan_skips_userwork_file(synapse_work_home):
     assert "userwork.json" not in names
 
 
+def test_list_meeting_rooms_skips_scope_dir_mismatch(synapse_work_home):
+    """目录名与 dev.status.scope.id 不一致时不得出现在会议室列表（避免 room_id 撞车）。"""
+    stale = synapse_work_home / "21881453"
+    stale.mkdir()
+    stale_payload = default_dev_status(
+        scope_type="demand",
+        scope_id="21881454",
+        local_process_state="处理中",
+        stage_id=3,
+        current_node_id="auto_split",
+        pipeline_enabled=True,
+    )
+    stale_payload["meeting_room"] = {"active": True, "room_id": "mr_d_21881454_s1"}
+    (stale / "dev.status").write_text(json.dumps(stale_payload, ensure_ascii=False), encoding="utf-8")
+
+    current = synapse_work_home / "21881454"
+    current.mkdir()
+    current_payload = default_dev_status(
+        scope_type="demand",
+        scope_id="21881454",
+        local_process_state="处理中",
+        stage_id=1,
+        current_node_id="req_clarify",
+        pipeline_enabled=True,
+    )
+    current_payload["meeting_room"] = {"active": True, "room_id": "mr_d_21881454_s1"}
+    (current / "dev.status").write_text(json.dumps(current_payload, ensure_ascii=False), encoding="utf-8")
+
+    items = MeetingRoomService().list_meeting_rooms()
+    assert len(items) == 1
+    assert items[0]["scope_id"] == "21881454"
+    detail = MeetingRoomService().get_room_detail("mr_d_21881454_s1")
+    assert detail is not None
+    assert detail["scope_id"] == "21881454"
+    assert detail["current_node_id"] == "req_clarify"
+
+
 def test_list_meeting_rooms(synapse_work_home):
     d1 = synapse_work_home / "11879580"
     d1.mkdir()

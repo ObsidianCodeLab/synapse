@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Any
 
-from synapse.rd_meeting.dev_status import read_dev_status_file
+from synapse.rd_meeting.dev_status import ensure_room_id, resolve_work_dir_scope
 from synapse.rd_meeting.participants import resolve_profile_display_name
 from synapse.rd_meeting.paths import iter_work_order_directories
 from synapse.rd_meeting.room_runtime import (
@@ -39,14 +39,20 @@ def scope_id_for_room_id(room_id: str) -> str | None:
     rid = (room_id or "").strip()
     if not rid:
         return None
+    matches: list[tuple[str, str]] = []
     for order_dir in iter_work_order_directories():
-        data = read_dev_status_file(order_dir / "dev.status")
-        if not data:
+        resolved = resolve_work_dir_scope(order_dir)
+        if resolved is None:
             continue
+        scope_id, data = resolved
+        data = ensure_room_id(data)
         mr = data.get("meeting_room")
         if isinstance(mr, dict) and str(mr.get("room_id") or "").strip() == rid:
-            return order_dir.name
-    return None
+            matches.append((str(data.get("updated_at") or ""), scope_id))
+    if not matches:
+        return None
+    matches.sort(key=lambda item: item[0], reverse=True)
+    return matches[0][1]
 
 
 def append_meeting_live_event(
