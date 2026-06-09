@@ -14,6 +14,8 @@ SYSTEM_NODE_DISPLAY_KINDS: dict[str, str] = {
     "env_pregen": "system_env_pregen",
 }
 
+STRUCTURED_SYSTEM_NODES: frozenset[str] = frozenset(SYSTEM_NODE_DISPLAY_KINDS)
+
 
 def display_kind_for_system_node(node_id: str) -> str:
     nid = (node_id or "").strip()
@@ -318,6 +320,37 @@ def build_auto_split_display(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _enrich_sandbox_repos(
+    repos: list[dict[str, Any]],
+    wire_row: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """为落盘仓库补充 catalog 中的模块 / 工程路径 / 分支展示字段。"""
+    from synapse.rd_meeting.product_context import _normalize_product_wire
+
+    catalog_by_name: dict[str, dict[str, Any]] = {}
+    if wire_row:
+        normalized = _normalize_product_wire(wire_row)
+        for repo in normalized.get("repos") or []:
+            if isinstance(repo, dict):
+                name = str(repo.get("repo_name") or "").strip()
+                if name:
+                    catalog_by_name[name] = repo
+
+    enriched: list[dict[str, Any]] = []
+    for raw in repos:
+        if not isinstance(raw, dict):
+            continue
+        row = dict(raw)
+        cat = catalog_by_name.get(str(row.get("repo_name") or "").strip()) or {}
+        if cat:
+            row.setdefault("repo_module", _module_display_name(cat.get("repo_module")))
+            row.setdefault("code_path", str(cat.get("code_path") or ""))
+            row.setdefault("repo_branch", str(cat.get("repo_branch") or row.get("repo_branch") or ""))
+            row.setdefault("repo_url", str(cat.get("repo_url") or row.get("repo_url") or ""))
+        enriched.append(row)
+    return enriched
+
+
 def build_sandbox_build_display(
     result: dict[str, Any],
     *,
@@ -325,8 +358,12 @@ def build_sandbox_build_display(
     wire_row: dict[str, Any] | None,
 ) -> dict[str, Any]:
     auto_split = _load_pipeline_context_asset(scope_id, "auto_split_assets") or {}
+    repos = _enrich_sandbox_repos(
+        [r for r in (result.get("repos") or []) if isinstance(r, dict)],
+        wire_row,
+    )
     sandbox_assets = {
-        "repos": result.get("repos") or [],
+        "repos": repos,
         "sandbox_root": result.get("sandbox_root"),
     }
     bindings = build_task_sandbox_bindings(auto_split, wire_row, sandbox_assets)
@@ -336,7 +373,7 @@ def build_sandbox_build_display(
         "prod": result.get("prod"),
         "sandbox_root": result.get("sandbox_root"),
         "errors": result.get("errors") or [],
-        "repos": result.get("repos") or [],
+        "repos": repos,
         "task_bindings": bindings,
         "materialized_at": result.get("materialized_at"),
     }
@@ -377,3 +414,76 @@ def attach_system_node_display(
     elif nid == "env_pregen":
         result["display"] = build_env_pregen_display(result)
     return result
+
+
+def _pipeline_context(scope_id: str) -> dict[str, Any]:
+    sid = (scope_id or "").strip()
+    if not sid:
+        return {}
+    raw = read_json_file(meeting_pipeline_path(sid))
+    if not isinstance(raw, dict):
+        return {}
+    ctx = raw.get("context")
+    return ctx if isinstance(ctx, dict) else {}
+
+
+def _wire_row_for_sandbox(scope_id: str, prod: str) -> dict[str, Any] | None:
+    from synapse.rd_meeting.product_context import load_prod_catalog_from_pipeline, match_prod_row_by_prod
+
+    prod_key = (prod or "").strip()
+    if not prod_key:
+        return None
+    rows = load_prod_catalog_from_pipeline(scope_id)
+    if not rows:
+        catalog = _pipeline_context(scope_id).get("prod_catalog")
+        if isinstance(catalog, list):
+            rows = [r for r in catalog if isinstance(r, dict)]
+    return match_prod_row_by_prod(rows, prod_key) if rows else None
+
+
+def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] | None:
+    """从 pipeline 上下文重建系统节点结构化展示（供节点详情 / API）。"""
+    nid = (node_id or "").strip()
+    if nid not in STRUCTURED_SYSTEM_NODES:
+        return None
+
+    ctx = _pipeline_context(scope_id)
+    last = ctx.get("last_system_node_result") if isinstance(ctx.get("last_system_node_result"), dict) else {}
+    if str(last.get("node_id") or "").strip() == nid:
+        embedded = last.get("display")
+        if isinstance(embedded, dict) and embedded:
+            return {**embedded, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
+
+    if nid == "auto_split":
+        assets = _load_pipeline_context_asset(scope_id, "auto_split_assets")
+        if not assets:
+            return None
+        return {
+            **build_auto_split_display(assets),
+            "display_kind": display_kind_for_system_node(nid),
+        }
+
+    if nid == "sandbox_build":
+        assets = _load_pipeline_context_asset(scope_id, "sandbox_assets")
+        if not assets:
+            if last and str(last.get("status") or ""):
+                assets = {k: last[k] for k in ("status", "sandbox_root", "repos", "prod", "errors", "materialized_at") if k in last}
+            else:
+                return None
+        prod = str(assets.get("prod") or last.get("prod") or "").strip()
+        wire = _wire_row_for_sandbox(scope_id, prod)
+        return {
+            **build_sandbox_build_display(assets, scope_id=scope_id, wire_row=wire),
+            "display_kind": display_kind_for_system_node(nid),
+        }
+
+    if nid == "env_pregen":
+        assets = _load_pipeline_context_asset(scope_id, "env_pregen_assets")
+        if not assets:
+            return None
+        return {
+            **build_env_pregen_display(assets),
+            "display_kind": display_kind_for_system_node(nid),
+        }
+
+    return None

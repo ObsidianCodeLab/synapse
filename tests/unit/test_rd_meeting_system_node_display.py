@@ -9,6 +9,7 @@ from synapse.rd_meeting.system_node_display import (
     build_task_sandbox_bindings,
     collect_task_rows,
     display_kind_for_system_node,
+    resolve_system_node_display,
 )
 
 
@@ -130,3 +131,33 @@ def test_build_sandbox_build_display_has_bindings(monkeypatch):
     )
     assert display["node_id"] == "sandbox_build"
     assert display["task_bindings"]
+
+
+def test_resolve_system_node_display_from_pipeline_assets(monkeypatch):
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_node_display._load_pipeline_context_asset",
+        lambda _sid, key: {
+            "auto_split_assets": {
+                "status": "ok",
+                "demand_no": "D-9",
+                "split_plan_tasks": [{"taskNo": "T9", "taskTitle": "子单", "productModuleName": "M"}],
+            },
+            "sandbox_assets": {
+                "status": "ok",
+                "prod": "p1",
+                "sandbox_root": "/work/x/sandbox",
+                "repos": [{"repo_name": "r", "status": "ok", "local_path": "/work/x/sandbox/r"}],
+            },
+        }.get(key),
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_node_display._wire_row_for_sandbox",
+        lambda _sid, _prod: {"repo_info": []},
+    )
+    split = resolve_system_node_display("scope1", "auto_split")
+    assert split is not None
+    assert split["demand_no"] == "D-9"
+    assert split["display_kind"] == "system_auto_split"
+    sandbox = resolve_system_node_display("scope1", "sandbox_build")
+    assert sandbox is not None
+    assert sandbox["sandbox_root"] == "/work/x/sandbox"

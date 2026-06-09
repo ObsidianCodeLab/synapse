@@ -83,6 +83,12 @@ def test_node_outputs_list(isolated_config_dir: Path):
     assert binding["node_outputs"] == node_output_artifacts("boundary")
 
 
+def test_system_node_binding_has_empty_node_outputs(isolated_config_dir: Path):
+    for nid in ("auto_split", "sandbox_build", "env_pregen"):
+        binding = resolve_node_binding(nid)
+        assert binding["node_outputs"] == []
+
+
 def test_service_put_persists_human_confirm_not_intent(isolated_config_dir: Path):
     svc = MeetingRoomService()
     saved = svc.put_meeting_room_config(

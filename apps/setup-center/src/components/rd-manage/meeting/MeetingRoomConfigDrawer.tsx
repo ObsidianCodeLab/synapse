@@ -957,25 +957,27 @@ export const MeetingRoomConfigDrawer: React.FC<{
                     </ConfigFieldBox>
                   </div>
 
-                  <div>
-                    <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
-                      <FileOutput className="w-3.5 h-3.5 text-amber-400" />
-                      节点产出
-                    </label>
-                    <ConfigFieldBox>
-                      <ul className="text-[11px] text-muted-foreground space-y-2 mb-0">
-                        {nodeOutputs.map((item) => (
-                          <li key={item} className="flex items-start gap-2">
-                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400/80" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="text-[10px] text-muted-foreground/70 mt-3 mb-0 pt-2 border-t border-border/30">
-                        系统固定 · archive/&lt;stage&gt;/&lt;node&gt;/
-                      </p>
-                    </ConfigFieldBox>
-                  </div>
+                  {!isSystemNode ? (
+                    <div>
+                      <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                        <FileOutput className="w-3.5 h-3.5 text-amber-400" />
+                        节点产出
+                      </label>
+                      <ConfigFieldBox>
+                        <ul className="text-[11px] text-muted-foreground space-y-2 mb-0">
+                          {nodeOutputs.map((item) => (
+                            <li key={item} className="flex items-start gap-2">
+                              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-400/80" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="text-[10px] text-muted-foreground/70 mt-3 mb-0 pt-2 border-t border-border/30">
+                          系统固定 · archive/&lt;stage&gt;/&lt;node&gt;/
+                        </p>
+                      </ConfigFieldBox>
+                    </div>
+                  ) : null}
 
                   <div className="h-px bg-gradient-to-r from-transparent via-border/80 to-transparent" />
 

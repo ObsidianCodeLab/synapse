@@ -147,10 +147,27 @@ def _snapshot_norm_id(value: Any) -> str:
     return str(value).strip()
 
 
+_OWNED_WORK_ITEM_STATES = frozenset({"待处理", "开发中", "已完成", "异常"})
+
+
+def _normalize_owned_work_item_state(raw: Any) -> str:
+    """门户阶段名 → owned_work_items.state（四态之一）。"""
+    s = _safe_str(raw).strip()
+    if s in _OWNED_WORK_ITEM_STATES:
+        return s
+    if any(x in s for x in ("异常", "失败", "error", "fail")):
+        return "异常"
+    if any(x in s for x in ("完成", "走查", "done", "closed")):
+        return "已完成"
+    if any(x in s for x in ("开发", "coding", "dev")):
+        return "开发中"
+    return "待处理"
+
+
 def _merge_owned_work_items(
     old_items: list[Any] | None, new_items: list[Any] | None
 ) -> list[dict[str, Any]]:
-    """研发单：新有老无则插入，老有新无则保留，新老均有则整条记录除了sop_node之外的字段更新。"""
+    """研发单：新有老无则插入，老有新无则保留，新老均有则以新数据为准更新整条记录。"""
     old_items = [x for x in (old_items or []) if isinstance(x, dict)]
     new_items = [x for x in (new_items or []) if isinstance(x, dict)]
 
@@ -174,9 +191,7 @@ def _merge_owned_work_items(
             continue
         seen_old_order.add(tn)
         if tn in new_by_task:
-            merged_task = dict(new_by_task[tn])
-            merged_task["sop_node"] = old_by_task[tn].get("sop_node")
-            out.append(merged_task)
+            out.append(dict(new_by_task[tn]))
         else:
             out.append(dict(old_by_task[tn]))
 
@@ -1961,11 +1976,10 @@ async def create_task(body: CreateTaskRequest) -> dict:
         "task_desc": "任务描述",
         "created_date": "创建时间",
         "sccb_work_hours": "工时",
-        "stage_name": "阶段名称",
+        "state": "待处理|开发中|已完成|异常",
         "product_module_id": "应用模块ID",
         "product_module_name": "应用模块名称",
         "repo_url": "仓库URL",
-        "sop_node": "SOP节点"
     }
     """
     userinfo = _load_userinfo_plain()
@@ -2094,11 +2108,10 @@ async def create_task(body: CreateTaskRequest) -> dict:
             "task_desc": body.comments,
             "created_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "sccb_work_hours": None,
-            "stage_name": "开发中",
+            "state": "开发中",
             "product_module_id": branch_data.get("productModuleId") if isinstance(branch_data, dict) else None,
             "product_module_name": branch_data.get("productModuleName") if isinstance(branch_data, dict) else (body.productModuleName or ""),
             "repo_url": branch_data.get("repoUrl") if isinstance(branch_data, dict) else "",
-            "sop_node": "任务执行",
         },
         "创建任务统一流程执行成功",
     )
@@ -3326,7 +3339,7 @@ def _portal_task_detail_to_owned_work_item(detail: dict) -> dict | None:
                 sccb_work_hours = None
 
     flow = detail.get("adTaskFlowStage")
-    stage_name = _safe_str(flow.get("stageName")) if isinstance(flow, dict) else ""
+    portal_stage = _safe_str(flow.get("stageName")) if isinstance(flow, dict) else ""
 
     pmd = detail.get("productModuleDto")
     if isinstance(pmd, dict):
@@ -3344,7 +3357,7 @@ def _portal_task_detail_to_owned_work_item(detail: dict) -> dict | None:
         "task_desc": _safe_str(ad.get("comments")),
         "created_date": _safe_str(ad.get("createdDate")),
         "sccb_work_hours": sccb_work_hours,
-        "stage_name": stage_name,
+        "state": _normalize_owned_work_item_state(portal_stage),
         "product_module_id": product_module_id,
         "product_module_name": product_module_name,
         "repo_url": repo_url,
@@ -3929,8 +3942,8 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
 
     每条需求在落盘数据中含 **owned_work_items**：该需求下研发单摘要列表（串行拉门户详情后映射），每项为扁平
     snake_case 字段：``task_no``、``task_title``、``task_desc``（门户 adTask.comments）、``created_date``、
-    ``sccb_work_hours``（由分钟换算，空为 null）、``stage_name``、``product_module_id``、
-    ``product_module_name``、``repo_url``。
+    ``sccb_work_hours``（由分钟换算，空为 null）、``state``（待处理/开发中/已完成/异常）、
+    ``product_module_id``、``product_module_name``、``repo_url``。
     各需求单下研发单为**串行**拉取（先需求 A 再需求 B，单需求内 work-items 与详情亦顺序请求）。
     拉取 work-items 需 ai-gateway **Bearer**：优先 owner_info 解密 JSON 的 ``token``，否则使用
     ``data/userinfo.encryption`` 中的 Authorization；若皆不可用则 ``owned_work_items`` 为空数组。
@@ -4689,20 +4702,15 @@ def userinfo_for_unified_service():
     return success_response({"owner_info": raw, "owner_name": owner_name})
 
 
-class UpdateOrderWorkItemRequest(BaseModel):
-    task_no: str = Field(..., description="任务单号")
-    sop_node: str | None = Field(None, description="研发单 sop_node 节点")
-
 class UpdateOrderSopLocalProcessStateRequest(BaseModel):
     demand_no: str = Field(..., description="需求单号")
     sop_node: str | None = Field(None, description="需求单 sop_node 节点")
     local_process_state: str | None = Field(None, description="需求单 local_process_state")
-    owned_work_items: list[UpdateOrderWorkItemRequest] | None = Field(None, description="研发单列表")
 
 @router.post("/api/dev/iwhalecloud/update_order_info")
 async def update_order_info(body: UpdateOrderSopLocalProcessStateRequest) -> dict:
     """
-    功能：修改userwork.json的需求单sop_node信息和local_process_state，以及研发单的sop_node节点。
+    功能：修改 userwork.json 需求单的 sop_node 与 local_process_state。
     """
     from filelock import FileLock
 
@@ -4732,19 +4740,6 @@ async def update_order_info(body: UpdateOrderSopLocalProcessStateRequest) -> dic
                 if body.local_process_state is not None:
                     demand["local_process_state"] = body.local_process_state
                     modified = True
-
-                if body.owned_work_items:
-                    task_updates = {item.task_no: item for item in body.owned_work_items}
-                    owned = demand.get("owned_work_items")
-                    if isinstance(owned, list):
-                        for task in owned:
-                            if isinstance(task, dict):
-                                t_no = task.get("task_no")
-                                if t_no in task_updates:
-                                    update_data = task_updates[t_no]
-                                    if update_data.sop_node is not None:
-                                        task["sop_node"] = update_data.sop_node
-                                        modified = True
                 break
 
         if modified:

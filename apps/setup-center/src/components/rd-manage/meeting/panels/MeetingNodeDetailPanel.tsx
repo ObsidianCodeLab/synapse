@@ -22,6 +22,7 @@ import {
   Hammer,
   Loader2,
   RefreshCw,
+  Server,
   Sparkles,
   Timer,
   TrendingUp,
@@ -33,11 +34,16 @@ import {
   fetchMeetingAgentContexts,
   fetchMeetingSummary,
   fetchNodeReview,
+  fetchSystemNodeDisplay,
   type MeetingSummaryNode,
   type NodeReviewPayload,
   type ProcessingHistoryEntry,
 } from '../../../../api/meetingRoomService';
 import { ReviewMarkdown } from '../ReviewMarkdown';
+import {
+  SYSTEM_STRUCTURED_NODE_IDS,
+  SystemNodeDetailCard,
+} from '../SystemNodeCards';
 import {
   KnowledgeBaseTab,
   KnowledgeGraphTab,
@@ -347,6 +353,10 @@ export function MeetingNodeDetailPanel({
     { name: string; relative_path: string; size: number; ext?: string }[]
   >([]);
   const [processEntries, setProcessEntries] = useState<ProcessingHistoryEntry[]>([]);
+  const [systemDisplay, setSystemDisplay] = useState<Record<string, unknown> | null>(null);
+  const isStructuredSystemNode = SYSTEM_STRUCTURED_NODE_IDS.includes(
+    nodeId as (typeof SYSTEM_STRUCTURED_NODE_IDS)[number],
+  );
 
   const load = useCallback(
     async (refresh = false) => {
@@ -357,7 +367,7 @@ export function MeetingNodeDetailPanel({
       try {
         const sid = (scopeId || '').trim();
         const skipNodeReview = nodeId === 'solution_review';
-        const [reviewRes, ctxRes, summaryRes] = await Promise.allSettled([
+        const [reviewRes, ctxRes, summaryRes, systemRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
             : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh }),
@@ -365,6 +375,9 @@ export function MeetingNodeDetailPanel({
           sid
             ? fetchMeetingSummary(synapseApiBase, scopeType, sid)
             : Promise.reject(new Error('missing_scope')),
+          isStructuredSystemNode
+            ? fetchSystemNodeDisplay(synapseApiBase, roomId, nodeId)
+            : Promise.resolve(null),
         ]);
 
         if (reviewRes.status === 'fulfilled' && reviewRes.value) {
@@ -384,6 +397,14 @@ export function MeetingNodeDetailPanel({
         }
         entries.sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
         setProcessEntries(entries);
+
+        if (systemRes.status === 'fulfilled' && systemRes.value?.display) {
+          setSystemDisplay(systemRes.value.display);
+        } else if (!isStructuredSystemNode) {
+          setSystemDisplay(null);
+        } else {
+          setSystemDisplay(null);
+        }
 
         if (summaryRes.status === 'fulfilled') {
           const sn = summaryRes.value.nodes?.find((n) => n.node_id === nodeId) ?? null;
@@ -410,7 +431,7 @@ export function MeetingNodeDetailPanel({
         else setLoading(false);
       }
     },
-    [nodeId, nodeName, nodeState, roomId, scopeId, scopeType, synapseApiBase],
+    [isStructuredSystemNode, nodeId, nodeName, nodeState, roomId, scopeId, scopeType, synapseApiBase],
   );
 
   useEffect(() => {
@@ -546,7 +567,17 @@ export function MeetingNodeDetailPanel({
 
   const outputTab = (
     <div className="space-y-4">
-      {artifacts.length ? (
+      {isStructuredSystemNode && systemDisplay ? (
+        <SystemNodeDetailCard nodeId={nodeId} display={systemDisplay} />
+      ) : isStructuredSystemNode ? (
+        <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
+          <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">系统节点执行结果尚未就绪</p>
+          {nodeState === 'processing' ? (
+            <p className="mt-1 text-xs text-primary/80">脚本执行中，完成后将展示拆单/沙箱结构化结果</p>
+          ) : null}
+        </div>
+      ) : artifacts.length ? (
         <div className="grid grid-cols-1 gap-3">
           {artifacts.map((f) => (
             <ArtifactCard key={f.relative_path} synapseApiBase={synapseApiBase} roomId={roomId} file={f} />
@@ -605,9 +636,9 @@ export function MeetingNodeDetailPanel({
       label: (
         <span className="flex items-center gap-1.5 text-xs">
           <FileText className="h-3 w-3" /> 产出
-          {!isPending && artifacts.length ? (
+          {!isPending && (isStructuredSystemNode && systemDisplay ? true : artifacts.length > 0) ? (
             <span className="rounded-full bg-primary/20 px-1.5 font-mono text-[10px] text-primary">
-              {artifacts.length}
+              {isStructuredSystemNode && systemDisplay ? '✓' : artifacts.length}
             </span>
           ) : null}
         </span>

@@ -933,6 +933,26 @@ export async function fetchMeetingNodeParticipants(
   );
 }
 
+export interface SystemNodeDisplayResponse {
+  room_id: string;
+  scope_id: string;
+  node_id: string;
+  display: Record<string, unknown>;
+}
+
+export async function fetchSystemNodeDisplay(
+  synapseApiBase: string,
+  roomId: string,
+  nodeId: string,
+): Promise<SystemNodeDisplayResponse> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const params = new URLSearchParams({ node_id: nodeId });
+  return apiGet<SystemNodeDisplayResponse>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/system-node-display?${params}`,
+  );
+}
+
 export async function fetchNodeReview(
   synapseApiBase: string,
   roomId: string,

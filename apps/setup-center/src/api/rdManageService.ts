@@ -1,3 +1,6 @@
+/** 研发子单状态（与 Synapse userwork owned_work_items.state 一致） */
+export type OwnedWorkItemState = '待处理' | '开发中' | '已完成' | '异常';
+
 /** 与 Synapse 接口 `data` 字段一致：研发子单 */
 export interface OwnedWorkItem {
   task_no: string;
@@ -5,12 +8,10 @@ export interface OwnedWorkItem {
   task_desc: string;
   created_date: string;
   sccb_work_hours: number | null;
-  stage_name?: string;
+  state: OwnedWorkItemState;
   product_module_id: number | null;
   product_module_name: string;
   repo_url: string;
-  /** 该研发单当前 SOP 节点（中文名或节点 id）；为空时回退到需求单 sop_node */
-  sop_node?: string;
 }
 
 /** 与 Synapse 接口 `data.list[]` 一致：需求单 */
@@ -93,11 +94,10 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
               "方案详见：\nhttps://alidocs.dingtalk.com/i/nodes/oP0MALyR8k795XrxcKyPRpMz83bzYmDO?utm_scene=team_space\n 三.系统设计",
             created_date: "2026-04-30 09:17:43",
             sccb_work_hours: null,
-            stage_name: "开发中",
+            state: "开发中",
             product_module_id: 18598,
             product_module_name: "RATECTR-ZXBilling",
             repo_url: "https://git-nj.iwhalecloud.com/xmjfbss/RATECTR-ZXBilling.git",
-            sop_node: "差异分析",
           },
           {
             task_no: "11879581",
@@ -105,11 +105,10 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
             task_desc: "对齐缴费变更通知 Format_id 与单测补充。",
             created_date: "2026-04-30 10:05:00",
             sccb_work_hours: 4,
-            stage_name: "开发中",
+            state: "开发中",
             product_module_id: 18598,
             product_module_name: "RATECTR-ZXBilling",
             repo_url: "https://git-nj.iwhalecloud.com/xmjfbss/RATECTR-ZXBilling.git",
-            sop_node: "环境预生成",
           },
         ],
       },
@@ -150,7 +149,7 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
       {
         demand_no: "PROC-2026-0002",
         demand_title: "【处理中】多研发单拆分示例",
-        demand_desc: "同一需求下挂两条研发单，用于左侧虚线分组展示。",
+        demand_desc: "同一需求下挂两条研发单，悬停卡片可查看研发单列表。",
         demand_create_time: "2026-04-25 14:00:00",
         demand_deal_time: "3天",
         demand_finish_time: "",
@@ -169,11 +168,10 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
             task_desc: "REST 限流网关接入",
             created_date: "2026-04-26 09:00:00",
             sccb_work_hours: 16,
-            stage_name: "开发中",
+            state: "开发中",
             product_module_id: 20001,
             product_module_name: "gateway-module",
             repo_url: "https://git.example.com/org/gateway.git",
-            sop_node: "方案评审",
           },
           {
             task_no: "TASK-PROC-02",
@@ -181,11 +179,10 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
             task_desc: "限流策略动态下发",
             created_date: "2026-04-26 10:30:00",
             sccb_work_hours: 12,
-            stage_name: "开发中",
+            state: "待处理",
             product_module_id: 20002,
             product_module_name: "config-service",
             repo_url: "https://git.example.com/org/config.git",
-            sop_node: "沙箱构建",
           },
         ],
       },
@@ -238,6 +235,26 @@ type SynapseWire = {
 };
 
 /** 将快照 `data` 规范为看板可用的 {@link RdManageDemandsPayload} */
+function normalizeOwnedWorkItem(row: Record<string, unknown>): OwnedWorkItem {
+  return {
+    task_no: String(row.task_no ?? ""),
+    task_title: String(row.task_title ?? ""),
+    task_desc: String(row.task_desc ?? ""),
+    created_date: String(row.created_date ?? ""),
+    sccb_work_hours:
+      row.sccb_work_hours === null || row.sccb_work_hours === undefined
+        ? null
+        : Number(row.sccb_work_hours),
+    state: String(row.state ?? "待处理") as OwnedWorkItemState,
+    product_module_id:
+      row.product_module_id === null || row.product_module_id === undefined
+        ? null
+        : Number(row.product_module_id),
+    product_module_name: String(row.product_module_name ?? ""),
+    repo_url: String(row.repo_url ?? ""),
+  };
+}
+
 function normalizeOwnerOrderSnapshotData(raw: unknown): RdManageDemandsPayload {
   if (!raw || typeof raw !== "object") {
     return { list: [] };
@@ -250,10 +267,14 @@ function normalizeOwnerOrderSnapshotData(raw: unknown): RdManageDemandsPayload {
     if (!row || typeof row !== "object") continue;
     const d = row as Record<string, unknown>;
     const wi = d.owned_work_items;
-    const owned = Array.isArray(wi) ? wi : [];
+    const owned = Array.isArray(wi)
+      ? wi
+          .filter((x): x is Record<string, unknown> => x != null && typeof x === "object")
+          .map(normalizeOwnedWorkItem)
+      : [];
     out.push({
       ...(d as unknown as DemandListItem),
-      owned_work_items: owned as OwnedWorkItem[],
+      owned_work_items: owned,
     });
   }
   return {
@@ -354,7 +375,7 @@ export async function fetchHumanInLoopFlag(
 /**
  * 批量查询人工介入（对每个 order_id 各调用一次接口，并行）。
  * 后端仅按 sop_trajectories 中该 order **最新一条**（最大 id）轨迹是否 HITL 判定。
- * 仅应对「处理中」工单收集 ID；order_id 与列表展示维度一致（仅需求单用 demand_no；含研发单时用各 task_no）。
+ * 仅应对「处理中」工单收集 demand_no。
  */
 export async function fetchHumanInLoopFlags(
   synapseApiBase: string,

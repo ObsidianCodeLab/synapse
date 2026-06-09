@@ -469,7 +469,10 @@ def parse_func_solution_md(md: str) -> dict[str, Any]:
         repos.append(
             {
                 "branch_version_id": str(
-                    row.get("产品分支ID") or row.get("branch_version_id") or ""
+                    row.get("产品分支ID")
+                    or row.get("branch_id")
+                    or row.get("branch_version_id")
+                    or ""
                 ).strip(),
                 "repo_url": str(row.get("仓库地址") or row.get("repo_url") or "").strip(),
                 "change_summary": str(
@@ -483,6 +486,193 @@ def parse_func_solution_md(md: str) -> dict[str, Any]:
         )
 
     return {"repos": repos, "impact_assessment": parse_func_solution_impact_assessment(md)}
+
+
+def _pipe_id_part(value: Any) -> str:
+    """``id|name`` 取左侧 id（与 catalog ``prod_branch`` 一致）。"""
+    v = str(value or "").strip()
+    if not v:
+        return ""
+    if "|" in v:
+        head = v.split("|", 1)[0].strip()
+        return head or v
+    return v
+
+
+def _pipe_name_part(value: Any) -> str:
+    """``id|name`` 取右侧展示名。"""
+    v = str(value or "").strip()
+    if not v:
+        return ""
+    if "|" in v:
+        tail = v.split("|", 1)[-1].strip()
+        return tail or v
+    return v
+
+
+def _repo_url_key(url: str) -> str:
+    u = (url or "").strip().rstrip("/")
+    if u.lower().endswith(".git"):
+        u = u[:-4]
+    return u.lower()
+
+
+def _load_catalog_repos(scope_id: str) -> list[dict[str, Any]]:
+    """读取工单 catalog 关联仓库（含 ``prod_branch`` / ``repo_module``）。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return []
+    from synapse.rd_meeting.dev_status import load_dev_status
+    from synapse.rd_meeting.product_context import (
+        _normalize_product_wire,
+        load_prod_catalog_from_pipeline,
+        match_prod_row_by_prod,
+    )
+    from synapse.rd_meeting.room_runtime import read_json_file
+
+    rows = load_prod_catalog_from_pipeline(sid) or []
+    if not rows:
+        return []
+
+    prod = ""
+    dev = load_dev_status(sid) or {}
+    mr = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
+    prod = str(mr.get("prod") or "").strip()
+    if not prod:
+        from synapse.rd_meeting.paths import meeting_pipeline_path
+
+        raw = read_json_file(meeting_pipeline_path(sid))
+        if isinstance(raw, dict):
+            ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
+            prod = str(ctx.get("selected_prod") or "").strip()
+    if not prod:
+        return []
+
+    hit = match_prod_row_by_prod(rows, prod)
+    if not hit:
+        return []
+    normalized = _normalize_product_wire(hit)
+    repos = normalized.get("repos")
+    return [dict(r) for r in repos if isinstance(r, dict)]
+
+
+def _match_catalog_repo(
+    *,
+    branch_version_id: str = "",
+    repo_url: str = "",
+    product_module_name: str = "",
+    catalog_repos: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    bid = (branch_version_id or "").strip()
+    url_key = _repo_url_key(repo_url)
+    mod = (product_module_name or "").strip()
+
+    if bid:
+        for row in catalog_repos:
+            if _pipe_id_part(row.get("prod_branch")) == bid:
+                return row
+    if url_key:
+        for row in catalog_repos:
+            if _repo_url_key(str(row.get("repo_url") or "")) == url_key:
+                return row
+    if mod:
+        for row in catalog_repos:
+            if _pipe_name_part(row.get("repo_module")) == mod:
+                return row
+    if len(catalog_repos) == 1:
+        return catalog_repos[0]
+    return None
+
+
+def _fields_from_catalog_repo(catalog_repo: dict[str, Any]) -> dict[str, str]:
+    return {
+        "product_module_name": _pipe_name_part(catalog_repo.get("repo_module")),
+        "branch_version_id": _pipe_id_part(catalog_repo.get("prod_branch")),
+        "branch_version_name": _pipe_name_part(catalog_repo.get("prod_branch")),
+        "repo_url": str(catalog_repo.get("repo_url") or "").strip(),
+    }
+
+
+def enrich_func_solution_repos_from_catalog(
+    scope_id: str,
+    repos: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """用 catalog ``prod_branch`` / ``repo_module`` 补全函数级方案仓库行。"""
+    catalog_repos = _load_catalog_repos(scope_id)
+    if not catalog_repos:
+        return repos
+    out: list[dict[str, Any]] = []
+    for repo in repos:
+        if not isinstance(repo, dict):
+            continue
+        hit = _match_catalog_repo(
+            branch_version_id=str(repo.get("branch_version_id") or ""),
+            repo_url=str(repo.get("repo_url") or ""),
+            product_module_name=str(repo.get("product_module_name") or ""),
+            catalog_repos=catalog_repos,
+        )
+        row = dict(repo)
+        if hit:
+            fields = _fields_from_catalog_repo(hit)
+            if fields["product_module_name"]:
+                row["product_module_name"] = fields["product_module_name"]
+            if fields["branch_version_id"]:
+                row["branch_version_id"] = fields["branch_version_id"]
+            if fields["branch_version_name"]:
+                row["branch_version_name"] = fields["branch_version_name"]
+            if fields["repo_url"] and not str(row.get("repo_url") or "").strip():
+                row["repo_url"] = fields["repo_url"]
+        out.append(row)
+    return out
+
+
+def enrich_split_task_from_catalog(
+    task: dict[str, Any],
+    catalog_repos: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """用 catalog 补全单条拆单草案的产品分支与应用模块。"""
+    if not catalog_repos:
+        return task
+    hit = _match_catalog_repo(
+        branch_version_id=str(task.get("branch_version_id") or ""),
+        repo_url=str(task.get("repo_url") or ""),
+        product_module_name=str(task.get("productModuleName") or ""),
+        catalog_repos=catalog_repos,
+    )
+    if not hit:
+        return task
+    fields = _fields_from_catalog_repo(hit)
+    out = dict(task)
+    if fields["product_module_name"]:
+        out["productModuleName"] = fields["product_module_name"]
+    if fields["branch_version_id"]:
+        out["branch_version_id"] = fields["branch_version_id"]
+    if fields["branch_version_name"]:
+        out["branchVersionName"] = fields["branch_version_name"]
+    return out
+
+
+def enrich_split_tasks_from_catalog(scope_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """补全 payload 内 ``func_solution_parsed.repos`` 与 ``split_tasks_draft`` 的分支字段。"""
+    catalog_repos = _load_catalog_repos(scope_id)
+    if not catalog_repos:
+        return payload
+    out = dict(payload)
+    parsed = out.get("func_solution_parsed") if isinstance(out.get("func_solution_parsed"), dict) else {}
+    if parsed:
+        repos = parsed.get("repos") if isinstance(parsed.get("repos"), list) else []
+        if repos:
+            merged = dict(parsed)
+            merged["repos"] = enrich_func_solution_repos_from_catalog(scope_id, repos)
+            out["func_solution_parsed"] = merged
+    draft = out.get("split_tasks_draft")
+    if isinstance(draft, list) and draft:
+        out["split_tasks_draft"] = [
+            enrich_split_task_from_catalog(dict(x), catalog_repos)
+            for x in draft
+            if isinstance(x, dict)
+        ]
+    return out
 
 
 def _merge_impact_assessment(
@@ -517,7 +707,7 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
     prev = parsed if isinstance(parsed, dict) else {}
     fpath = _func_solution_archive_path(scope_id)
     if not fpath.is_file():
-        return payload
+        return enrich_split_tasks_from_catalog(scope_id, payload)
     try:
         md = fpath.read_text(encoding="utf-8")
     except OSError:
@@ -525,6 +715,7 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
     extracted = parse_func_solution_md(md)
     out = dict(payload)
     merged_repos = extracted.get("repos") if extracted.get("repos") else prev.get("repos")
+    merged_repos = enrich_func_solution_repos_from_catalog(scope_id, merged_repos or [])
     prev_impact = prev.get("impact_assessment") if isinstance(prev.get("impact_assessment"), dict) else {}
     ext_impact = extracted.get("impact_assessment") if isinstance(extracted.get("impact_assessment"), dict) else {}
     merged_impact = _merge_impact_assessment(prev_impact, ext_impact)  # type: ignore[arg-type]
@@ -533,7 +724,7 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
         "repos": merged_repos or [],
         "impact_assessment": merged_impact,
     }
-    return out
+    return enrich_split_tasks_from_catalog(scope_id, out)
 
 
 def enrich_demand_functions(scope_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -591,6 +782,7 @@ def load_solution_review_payload(
     if data is None:
         return None
     data = enrich_payload_from_archive(scope_id, data)
+    data = enrich_split_tasks_from_catalog(scope_id, data)
     data = enrich_demand_functions(scope_id, data)
     if "inputs" not in data or not isinstance(data.get("inputs"), dict):
         data["inputs"] = {}
@@ -761,13 +953,25 @@ def _default_task_impact_desc(impact: dict[str, Any]) -> str:
     return "；".join(x for x in lines if x) or "见函数级方案影响评估章节"
 
 
-def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[dict[str, Any]]:
+def ensure_split_tasks_draft(
+    payload: dict[str, Any],
+    demand_no: str,
+    *,
+    scope_id: str = "",
+) -> list[dict[str, Any]]:
+    sid = (scope_id or demand_no or "").strip()
+    catalog_repos = _load_catalog_repos(sid)
     existing = payload.get("split_tasks_draft")
     if isinstance(existing, list) and existing:
-        return [dict(x) for x in existing if isinstance(x, dict)]
+        return [
+            enrich_split_task_from_catalog(dict(x), catalog_repos)
+            for x in existing
+            if isinstance(x, dict)
+        ]
 
     parsed = payload.get("func_solution_parsed") if isinstance(payload.get("func_solution_parsed"), dict) else {}
     repos = parsed.get("repos") if isinstance(parsed.get("repos"), list) else []
+    repos = enrich_func_solution_repos_from_catalog(sid, repos)
     impact = parsed.get("impact_assessment") if isinstance(parsed.get("impact_assessment"), dict) else {}
     impacts = _build_impact_strings(impact)
     task_impact = _default_task_impact_desc(impact)
@@ -947,7 +1151,7 @@ def apply_human_decision(
     if tasks_override is not None:
         tasks = [dict(x) for x in tasks_override if isinstance(x, dict)]
     else:
-        tasks = ensure_split_tasks_draft(payload, demand_no)
+        tasks = ensure_split_tasks_draft(payload, demand_no, scope_id=scope_id)
     validate_split_tasks_draft(
         tasks,
         demand_functions=demand_functions or None,

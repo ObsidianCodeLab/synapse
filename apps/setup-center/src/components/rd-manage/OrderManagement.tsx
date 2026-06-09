@@ -45,6 +45,7 @@ import {
   fetchHumanInLoopFlags,
   type DemandListItem,
   type OwnedWorkItem,
+  type OwnedWorkItemState,
   type RdManageDemandsPayload,
   type WorkOrderDbMetricsPayload,
 } from '../../api/rdManageService';
@@ -106,19 +107,6 @@ import {
 
 // --- Types & Data ---
 
-export interface WorkItem {
-  id: string;
-  title: string;
-  createdAt: string;
-  tokens: number;
-  branch: string;
-  description: string;
-  /** 该研发单对应的流水线当前节点 id（由接口 task sop_node 解析） */
-  currentNode: string;
-  /** 处理中且本地 sop_trajectories（order_id=task_no）存在人工介入节点时为 true */
-  humanIntervention?: boolean;
-}
-
 export interface Ticket {
   id: string;
   branch: string;
@@ -140,7 +128,7 @@ export interface Ticket {
   runTime: string;
   description: string;
   createdAt: string;
-  workItems: WorkItem[];
+  ownedWorkItems: OwnedWorkItem[];
   /** userwork.json 中的 prod（统一服务产品标识） */
   prod?: string;
 }
@@ -261,27 +249,14 @@ const JsonOutput = ({ data }: { data: any }) => (
   </div>
 );
 
-/**
-
- * 仅「处理中」工单需要查轨迹人工介入；order_id 与左侧展示维度一致：
- * - 仅有需求单（无研发子单）→ 传 demand_no
- * - 有研发子单（按子单展示）→ 只传各 task_no，不传 demand_no
- */
+/** 仅「处理中」需求单查轨迹人工介入（order_id = demand_no）。 */
 function collectOrderIdsForHitlFlags(list: DemandListItem[]): string[] {
   const ids = new Set<string>();
   for (const d of list) {
     const base = deriveBaseTicketStatus(d);
     if (base !== "processing") continue;
-    const owned = d.owned_work_items || [];
-    if (owned.length === 0) {
-      const dn = (d.demand_no || "").trim();
-      if (dn) ids.add(dn);
-    } else {
-      for (const w of owned) {
-        const tid = (w.task_no || "").trim();
-        if (tid) ids.add(tid);
-      }
-    }
+    const dn = (d.demand_no || "").trim();
+    if (dn) ids.add(dn);
   }
   return Array.from(ids);
 }
@@ -322,8 +297,7 @@ function mapDemandListItemToTicket(d: DemandListItem, flags: Record<string, bool
   const dn = (d.demand_no || "").trim();
 
   const status: Ticket["status"] = baseStatus;
-  const sopAwaitingHuman =
-    baseStatus === "processing" && owned.length === 0 && Boolean(dn && flags[dn]);
+  const sopAwaitingHuman = baseStatus === "processing" && Boolean(dn && flags[dn]);
 
   let demandNodeId = "pending";
   if (status === "completed") {
@@ -347,23 +321,6 @@ function mapDemandListItemToTicket(d: DemandListItem, flags: Record<string, bool
     (d.demand_finish_time || "").trim() ||
     "0h";
 
-  const workItems: WorkItem[] = owned.map((w) => {
-    const taskResolved = resolveSopRawToNodeId((w.sop_node || "").trim());
-    const currentNode = taskResolved ?? demandNodeId;
-    const tid = (w.task_no || "").trim();
-    const humanIntervention = baseStatus === "processing" && Boolean(tid && flags[tid]);
-    return {
-      id: w.task_no,
-      title: w.task_title,
-      createdAt: w.created_date || new Date().toISOString(),
-      tokens: w.sccb_work_hours != null ? Math.round(Number(w.sccb_work_hours) * 60) : 0,
-      branch: w.product_module_name || "master",
-      description: w.task_desc || "",
-      currentNode,
-      humanIntervention,
-    };
-  });
-
   return {
     id: d.demand_no || `TICKET-${Math.random().toString(36).slice(2, 9)}`,
     title: d.demand_title || "未知需求",
@@ -378,7 +335,7 @@ function mapDemandListItemToTicket(d: DemandListItem, flags: Record<string, bool
     urgency: "medium",
     currentNode: demandNodeId,
     currentStage: 0,
-    workItems,
+    ownedWorkItems: owned,
     prod: (d.prod || '').trim() || undefined,
   };
 }
@@ -425,18 +382,6 @@ function formatTokenCount(tokens: number): string {
 }
 
 function demandItemFallbackFromTicket(ticket: Ticket): DemandListItem {
-  const items: OwnedWorkItem[] = (ticket.workItems || []).map((w) => ({
-    task_no: w.id,
-    task_title: w.title,
-    task_desc: w.description,
-    created_date: w.createdAt,
-    sccb_work_hours: null,
-    stage_name: '',
-    product_module_id: null,
-    product_module_name: w.branch,
-    repo_url: '',
-    sop_node: '',
-  }));
   return {
     demand_no: ticket.id,
     demand_title: ticket.title,
@@ -452,8 +397,83 @@ function demandItemFallbackFromTicket(ticket: Ticket): DemandListItem {
     prod: ticket.prod,
     sop_node: '',
     local_process_state: '',
-    owned_work_items: items,
+    owned_work_items: ticket.ownedWorkItems,
   };
+}
+
+const OWNED_STATE_CLASS: Record<OwnedWorkItemState, string> = {
+  待处理: 'rd-order-owned-state--pending',
+  开发中: 'rd-order-owned-state--active',
+  已完成: 'rd-order-owned-state--done',
+  异常: 'rd-order-owned-state--error',
+};
+
+function OwnedWorkItemStateBadge({ state }: { state: OwnedWorkItemState }) {
+  return (
+    <span className={`rd-order-owned-state ${OWNED_STATE_CLASS[state]}`}>
+      {state}
+    </span>
+  );
+}
+
+function OwnedWorkItemsScrollList({ items }: { items: OwnedWorkItem[] }) {
+  const loopItems = items.length > 1 ? [...items, ...items] : items;
+  return (
+    <div className="rd-order-owned-popover">
+      <div className="rd-order-owned-popover__header">
+        <GitBranch className="h-3.5 w-3.5 text-primary" />
+        <span className="text-xs font-semibold text-foreground">研发子单</span>
+        <span className="font-mono text-[10px] text-muted-foreground">{items.length}</span>
+      </div>
+      <div
+        className={`rd-order-owned-popover__viewport ${items.length > 3 ? 'rd-order-owned-popover__viewport--scroll' : ''}`}
+      >
+        <div
+          className="rd-order-owned-popover__track"
+          style={{ ['--rd-owned-count' as string]: String(items.length) }}
+        >
+          {loopItems.map((wi, idx) => (
+            <div key={`${wi.task_no}-${idx}`} className="rd-order-owned-popover__row">
+              <span className="rd-order-owned-popover__title" title={wi.task_title}>
+                {wi.task_title}
+              </span>
+              <OwnedWorkItemStateBadge state={wi.state} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OwnedWorkItemsHoverTrigger({
+  items,
+  className,
+}: {
+  items: OwnedWorkItem[];
+  className?: string;
+}) {
+  if (!items.length) return null;
+  return (
+    <Popover
+      trigger="hover"
+      placement="right"
+      mouseEnterDelay={0.12}
+      overlayClassName="rd-order-owned-popover-overlay"
+      content={<OwnedWorkItemsScrollList items={items} />}
+    >
+      <button
+        type="button"
+        className={`rd-order-owned-trigger ${className ?? ''}`}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`${items.length} 个研发子单`}
+      >
+        <GitBranch className="h-3 w-3 shrink-0" />
+        <span className="font-mono text-[10px]">{items.length}</span>
+        <span className="hidden sm:inline">研发单</span>
+      </button>
+    </Popover>
+  );
 }
 
 /** 工单弹窗内：研发子单属性区（与「处理汇总」同款大卡分栏，含仓库） */
@@ -472,11 +492,7 @@ function TaskModalWorkItemStats({
 }) {
   const repo = (wi.repo_url || '').trim();
   const isHttp = /^https?:\/\//i.test(repo);
-  const stageText = (wi.stage_name || '—').trim() || '—';
-  const stageDone =
-    stageText.includes('完成') ||
-    stageText.includes('走查') ||
-    stageText.toLowerCase().includes('done');
+  const stateText = wi.state;
 
   return (
     <div className="space-y-3">
@@ -512,10 +528,10 @@ function TaskModalWorkItemStats({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-background/60 to-muted/20 p-4">
           <div className="relative z-10 text-[10px] font-medium uppercase text-muted-foreground">
-            {t('rdManageOrder.stageName')}
+            {t('rdManageOrder.taskState', { defaultValue: '子单状态' })}
           </div>
-          <div className="relative z-10 mt-2 flex items-center gap-2">
-            <Badge status={stageDone ? 'success' : 'processing'} text={<span className="text-sm text-foreground/90">{stageText}</span>} />
+          <div className="relative z-10 mt-2">
+            <OwnedWorkItemStateBadge state={stateText} />
           </div>
           <Code className="absolute -bottom-3 -right-2 h-16 w-16 text-primary/5" />
         </div>
@@ -575,12 +591,10 @@ export const OrderManagement: React.FC<{
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [demandListRaw, setDemandListRaw] = useState<DemandListItem[]>([]);
   const [activeTicketId, setActiveTicketId] = useState<string>('');
-  const [activeWorkItemId, setActiveWorkItemId] = useState<string>('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SOPNode | null>(null);
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedTicketForModal, setSelectedTicketForModal] = useState<Ticket | null>(null);
-  const [selectedWorkItemIdForModal, setSelectedWorkItemIdForModal] = useState<string | null>(null);
   const [modalDemand, setModalDemand] = useState<DemandListItem | null>(null);
   const [dbMetrics, setDbMetrics] = useState<WorkOrderDbMetricsPayload | null>(null);
   const [dbMetricsLoading, setDbMetricsLoading] = useState(false);
@@ -600,8 +614,6 @@ export const OrderManagement: React.FC<{
   const [openMeetingPickerOpen, setOpenMeetingPickerOpen] = useState(false);
   const [openMeetingPending, setOpenMeetingPending] = useState<{
     ticket: Ticket;
-    workItemId?: string;
-    scopeType: 'demand' | 'task';
     scopeId: string;
   } | null>(null);
   const [selectedProdKey, setSelectedProdKey] = useState('');
@@ -709,13 +721,10 @@ export const OrderManagement: React.FC<{
   }, [ticketModalOpen, modalDemand, synapseApiBase, t]);
 
   const sopMeetingScope = useMemo(() => {
-    if (!activeTicketId.trim()) return null;
-    const taskId = activeWorkItemId.trim();
-    if (taskId) {
-      return { scopeType: 'task' as const, scopeId: taskId };
-    }
-    return { scopeType: 'demand' as const, scopeId: activeTicketId.trim() };
-  }, [activeTicketId, activeWorkItemId]);
+    const sid = activeTicketId.trim();
+    if (!sid) return null;
+    return { scopeType: 'demand' as const, scopeId: sid };
+  }, [activeTicketId]);
 
   useEffect(() => {
     if (!sopMeetingScope?.scopeId) {
@@ -791,8 +800,7 @@ export const OrderManagement: React.FC<{
         (t) =>
           t.status === 'processing' ||
           t.status === 'error' ||
-          t.sopAwaitingHuman ||
-          (t.workItems?.some((w) => w.humanIntervention) ?? false),
+          t.sopAwaitingHuman,
       ),
     [tickets],
   );
@@ -938,16 +946,9 @@ export const OrderManagement: React.FC<{
 
       setTickets(allTickets);
       if (allTickets.length > 0) {
-        const first = allTickets[0];
-        setActiveTicketId(first.id);
-        if (first.status === "processing" && first.workItems && first.workItems.length > 0) {
-          setActiveWorkItemId(first.workItems[0].id);
-        } else {
-          setActiveWorkItemId("");
-        }
+        setActiveTicketId(allTickets[0].id);
       } else {
         setActiveTicketId("");
-        setActiveWorkItemId("");
       }
     },
     [synapseApiBase],
@@ -996,7 +997,12 @@ export const OrderManagement: React.FC<{
         t.id.toLowerCase().includes(q) || 
         t.title.toLowerCase().includes(q) || 
         t.description.toLowerCase().includes(q) ||
-        t.workItems?.some(w => w.id.toLowerCase().includes(q) || w.title.toLowerCase().includes(q) || w.description.toLowerCase().includes(q))
+        t.ownedWorkItems.some(
+          (w) =>
+            w.task_no.toLowerCase().includes(q) ||
+            w.task_title.toLowerCase().includes(q) ||
+            (w.task_desc || '').toLowerCase().includes(q),
+        )
       )) {
         return false;
       }
@@ -1014,44 +1020,11 @@ export const OrderManagement: React.FC<{
   const fullManualCount = useMemo(() => tickets.filter((t) => t.status === 'full_manual').length, [tickets]);
 
   const activeTicket = useMemo(() => tickets.find(t => t.id === activeTicketId) || tickets[0] || null, [activeTicketId, tickets]);
-  const activeWorkItem = useMemo(() => activeTicket?.workItems?.find(w => w.id === activeWorkItemId) || null, [activeTicket, activeWorkItemId]);
 
-  const displayTicket = useMemo(() => {
-    if (!activeTicket) return null;
-    if (activeWorkItem) {
-      const merge: Partial<Ticket> = {
-        id: activeWorkItem.id,
-        title: activeWorkItem.title,
-        createdAt: activeWorkItem.createdAt,
-        tokens: activeWorkItem.tokens,
-        branch: activeWorkItem.branch,
-        description: activeWorkItem.description,
-        sopAwaitingHuman: activeWorkItem.humanIntervention,
-      };
-      if (
-        activeTicket.status === "processing" ||
-        activeTicket.status === "full_manual"
-      ) {
-        merge.currentNode = activeWorkItem.currentNode;
-        merge.currentStage = stageIdForNodeId(activeWorkItem.currentNode);
-      }
-      return { ...activeTicket, ...merge };
-    }
-    return activeTicket;
-  }, [activeTicket, activeWorkItem]);
-
-  /** 工单弹窗：从子单 id 解析出要展示的研发单子集（必须在任意提前 return 之前调用，遵守 Hooks 规则） */
-  const ticketModalWorkItemsResolved = useMemo(() => {
-    const allOwned = modalDemand?.owned_work_items ?? [];
-    const workItemIdTrim = (selectedWorkItemIdForModal || '').trim();
-    const matched =
-      workItemIdTrim.length > 0
-        ? allOwned.filter((wi) => (wi.task_no || '').trim() === workItemIdTrim)
-        : [];
-    const singleTaskMode = Boolean(workItemIdTrim && matched.length > 0);
-    const displayWorkItems = singleTaskMode ? matched : allOwned;
-    return { workItemIdTrim, matched, singleTaskMode, displayWorkItems };
-  }, [modalDemand, selectedWorkItemIdForModal]);
+  const modalOwnedWorkItems = useMemo(
+    () => modalDemand?.owned_work_items ?? [],
+    [modalDemand],
+  );
 
   const getNodeStateGlobal = useCallback(
     (ticket: Ticket | null, nodeId: string): NodeState => {
@@ -1108,16 +1081,16 @@ export const OrderManagement: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [synapseApiBase, activeMeetingRoomId, displayTicket?.currentNode]);
+  }, [synapseApiBase, activeMeetingRoomId, activeTicket?.currentNode]);
 
   const shouldPollMeetingSummary = useMemo(() => {
-    if (!displayTicket) return false;
+    if (!activeTicket) return false;
     return (
-      displayTicket.status === 'processing' ||
-      displayTicket.status === 'error' ||
-      displayTicket.sopAwaitingHuman
+      activeTicket.status === 'processing' ||
+      activeTicket.status === 'error' ||
+      activeTicket.sopAwaitingHuman
     );
-  }, [displayTicket]);
+  }, [activeTicket]);
 
   useEffect(() => {
     if (!sopMeetingScope?.scopeId || !shouldPollMeetingSummary) return;
@@ -1161,19 +1134,19 @@ export const OrderManagement: React.FC<{
   const sopTopRunTimeLabel =
     sopTopStageSeconds != null
       ? formatDurationSeconds(sopTopStageSeconds, t)
-      : displayTicket?.runTime ?? '—';
+      : activeTicket?.runTime ?? '—';
   const sopTopDurationHot = isStageDurationHot(sopTopStageStartedAt);
 
   // Handle auto-scroll to current / 已完成时最后一个 SOP 节点
   useEffect(() => {
-    if (!displayTicket || !canvasRef.current || !containerRef.current) return;
+    if (!activeTicket || !canvasRef.current || !containerRef.current) return;
     if (
-      displayTicket.status === 'prepare' ||
-      displayTicket.status === 'full_manual'
+      activeTicket.status === 'prepare' ||
+      activeTicket.status === 'full_manual'
     )
       return;
     const timeoutId = setTimeout(() => {
-      const focusId = focusNodeIdForTicket(displayTicket);
+      const focusId = focusNodeIdForTicket(activeTicket);
       const activeNodeElement = document.getElementById(`node-${focusId}`);
       if (activeNodeElement) {
         const nodeRect = activeNodeElement.getBoundingClientRect();
@@ -1193,19 +1166,19 @@ export const OrderManagement: React.FC<{
       }
     }, 150);
     return () => clearTimeout(timeoutId);
-  }, [displayTicket?.id, displayTicket?.currentNode, displayTicket?.status]);
+  }, [activeTicket?.id, activeTicket?.currentNode, activeTicket?.status]);
 
   // 切换工单时清空阶段折叠状态；不再自动折叠已完成阶段（避免节点卡片被收成竖条、看不清）
   useEffect(() => {
     setCollapsedStages({});
-  }, [displayTicket?.id]);
+  }, [activeTicket?.id]);
 
   // Calculate Active Line Width based on DOM elements
   const measureActiveLineWidth = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!displayTicket || !canvas) return;
+    if (!activeTicket || !canvas) return;
 
-    if (displayTicket.status === 'completed') {
+    if (activeTicket.status === 'completed') {
       const nodeEl = document.getElementById(`node-${LAST_PIPELINE_NODE_ID}`);
       if (nodeEl) {
         const centerX = getNodeCenterXInCanvas(nodeEl, canvas);
@@ -1216,15 +1189,15 @@ export const OrderManagement: React.FC<{
       }
       return;
     }
-    if (displayTicket.status === 'prepare') {
+    if (activeTicket.status === 'prepare') {
       setActiveLineWidth(0);
       return;
     }
-    if (displayTicket.status === 'full_manual') {
+    if (activeTicket.status === 'full_manual') {
       setActiveLineWidth(0);
       return;
     }
-    if (displayTicket.status === 'pending') {
+    if (activeTicket.status === 'pending') {
       const nodeEl = document.getElementById('node-pending');
       if (nodeEl) {
         const centerX = getNodeCenterXInCanvas(nodeEl, canvas);
@@ -1236,13 +1209,13 @@ export const OrderManagement: React.FC<{
       return;
     }
 
-    const nodeEl = document.getElementById(`node-${displayTicket.currentNode}`);
+    const nodeEl = document.getElementById(`node-${activeTicket.currentNode}`);
     if (!nodeEl) return;
 
     const centerX = getNodeCenterXInCanvas(nodeEl, canvas);
     const maxW = Math.max(0, canvas.scrollWidth - BUS_LINE_START_PX * 2);
     setActiveLineWidth(Math.min(Math.max(0, centerX - BUS_LINE_START_PX), maxW));
-  }, [displayTicket]);
+  }, [activeTicket]);
 
   useEffect(() => {
     let raf = 0;
@@ -1258,7 +1231,7 @@ export const OrderManagement: React.FC<{
       cancelAnimationFrame(raf);
       window.clearTimeout(t);
     };
-  }, [displayTicket, collapsedStages, measureActiveLineWidth]);
+  }, [activeTicket, collapsedStages, measureActiveLineWidth]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1334,12 +1307,11 @@ export const OrderManagement: React.FC<{
     setDrawerOpen(true);
   };
 
-  const handleShowTicketDetails = (e: React.MouseEvent, ticket: Ticket, workItemId?: string) => {
+  const handleShowTicketDetails = (e: React.MouseEvent, ticket: Ticket) => {
     e.stopPropagation();
     const raw = demandListRaw.find((d) => (d.demand_no || "").trim() === ticket.id.trim());
     setModalDemand(raw ?? demandItemFallbackFromTicket(ticket));
     setSelectedTicketForModal(ticket);
-    setSelectedWorkItemIdForModal(workItemId || null);
     setTicketModalOpen(true);
   };
 
@@ -1383,7 +1355,7 @@ export const OrderManagement: React.FC<{
   );
 
   const handleOneClickOpenMeeting = useCallback(
-    (e: React.MouseEvent, ticket: Ticket, workItemId?: string) => {
+    (e: React.MouseEvent, ticket: Ticket) => {
       e.stopPropagation();
       if (!IS_TAURI) {
         toast.message(t('rdManageOrder.productOpenTauriOnly'));
@@ -1397,13 +1369,12 @@ export const OrderManagement: React.FC<{
         toast.error(t('rdManageOrder.prodCatalogEmpty'));
         return;
       }
-      const scopeType = workItemId ? ('task' as const) : ('demand' as const);
-      const scopeId = (workItemId || ticket.id).trim();
+      const scopeId = ticket.id.trim();
       if (!scopeId) return;
       const raw = demandListRaw.find((d) => (d.demand_no || '').trim() === ticket.id.trim());
       const preProd = String((raw as { prod?: string } | undefined)?.prod || '').trim();
       setSelectedProdKey(preProd);
-      setOpenMeetingPending({ ticket, workItemId, scopeType, scopeId });
+      setOpenMeetingPending({ ticket, scopeId });
       setOpenMeetingPickerOpen(true);
     },
     [demandListRaw, prodCatalog.length, prodCatalogLoading, t],
@@ -1416,11 +1387,11 @@ export const OrderManagement: React.FC<{
       toast.error(t('rdManageOrder.selectProductRequired'));
       return;
     }
-    const { ticket, workItemId, scopeType, scopeId } = pending;
-    const busyKey = `${scopeType}:${scopeId}`;
+    const { ticket, scopeId } = pending;
+    const busyKey = `demand:${scopeId}`;
     setOpeningMeetingKey(busyKey);
     try {
-      const detail = await openMeetingRoom(synapseApiBase, scopeType, scopeId, {
+      const detail = await openMeetingRoom(synapseApiBase, 'demand', scopeId, {
         prod,
         promoteToProcessing: true,
       });
@@ -1428,11 +1399,10 @@ export const OrderManagement: React.FC<{
       setOpenMeetingPending(null);
       setMeetingRoomFocus({
         roomId: detail.room_id,
-        scopeType,
+        scopeType: 'demand',
         scopeId,
       });
       setActiveTicketId(ticket.id);
-      setActiveWorkItemId(workItemId || '');
       toast.success(t('rdManageOrder.openMeetingSuccess'));
       if (onViewChange) {
         onViewChange('workbench_meeting');
@@ -1675,7 +1645,7 @@ export const OrderManagement: React.FC<{
     }
   };
 
-  if (!displayTicket) {
+  if (!activeTicket) {
     if (!boardDataInitialized) {
       return (
         <div className="flex h-full min-h-0 flex-1 items-center justify-center text-muted-foreground">
@@ -1795,250 +1765,202 @@ export const OrderManagement: React.FC<{
             </div>
           </div>
           <div className="rd-order-ticket-list convSidebarList flex flex-1 flex-col gap-1 overflow-y-auto p-1">
-            {filteredTickets.map(ticket => {
-              const renderCard = (item: Ticket | WorkItem, isWorkItem: boolean) => {
-                const isDone = ticket.status === 'completed';
-                const nodeIdForRow = isWorkItem ? (item as WorkItem).currentNode : ticket.currentNode;
-                const currentNodeObj = ALL_NODES.find(n => n.id === nodeIdForRow);
-                const rowStageId = isWorkItem
-                  ? stageIdForNodeId((item as WorkItem).currentNode)
-                  : ticket.currentStage;
-                const progressPercent = Math.round((rowStageId / (SOP_STAGES.length - 1)) * 100);
+            {filteredTickets.map((ticket) => {
+              const isDone = ticket.status === 'completed';
+              const currentNodeObj = ALL_NODES.find((n) => n.id === ticket.currentNode);
+              const progressPercent = Math.round((ticket.currentStage / (SOP_STAGES.length - 1)) * 100);
+              const rowHitl = ticket.sopAwaitingHuman;
+              const rowPendingOpen = ticket.status === 'pending';
+              const rowActionOverlay = rowPendingOpen || rowHitl;
+              const openMeetingBusyKey = `demand:${ticket.id}`;
+              const cardScopeMetrics = roomMetricsByScope.get(`demand:${ticket.id}`);
+              const rowTokenAnimating = cardScopeMetrics?.status === 'processing';
+              const progressBarWidth =
+                ticket.status === 'completed'
+                  ? '100%'
+                  : ticket.status === 'pending' ||
+                      ticket.status === 'prepare' ||
+                      ticket.status === 'full_manual'
+                    ? rowTokenAnimating
+                      ? '12%'
+                      : '0%'
+                    : rowTokenAnimating
+                      ? `${Math.max(progressPercent, 8)}%`
+                      : `${progressPercent}%`;
+              const cardTotalTokens = cardScopeMetrics?.tokens ?? 0;
+              const cardTokenLabel =
+                cardTotalTokens >= 1_000_000
+                  ? `${(cardTotalTokens / 1_000_000).toFixed(1)}M`
+                  : cardTotalTokens >= 1000
+                    ? `${(cardTotalTokens / 1000).toFixed(1)}k`
+                    : String(cardTotalTokens);
+              const rowFullManual = ticket.status === 'full_manual';
+              const hidePipelineNodeLabel =
+                ticket.status === 'prepare' || ticket.status === 'full_manual';
+              const statusBorderColor = rowHitl
+                ? 'bg-destructive'
+                : rowFullManual
+                  ? 'bg-violet-500 dark:bg-violet-400'
+                  : ticket.status === 'processing'
+                    ? 'bg-primary'
+                    : ticket.status === 'completed'
+                      ? 'bg-green-600 dark:bg-green-500'
+                      : 'bg-muted-foreground/40';
+              const isActive = activeTicketId === ticket.id;
 
-                const rowHitl = !isWorkItem
-                  ? ticket.sopAwaitingHuman
-                  : Boolean((item as WorkItem).humanIntervention);
-                /** 待处理：一键开会；需人工介入：立即处理 */
-                const rowPendingOpen = !isWorkItem && ticket.status === 'pending';
-                const rowActionOverlay = rowPendingOpen || rowHitl;
-                const openMeetingBusyKey = `${isWorkItem ? 'task' : 'demand'}:${item.id}`;
-                const cardScopeType = isWorkItem ? ('task' as const) : ('demand' as const);
-                const cardScopeMetrics = roomMetricsByScope.get(`${cardScopeType}:${item.id}`);
-                /** 流光/Token 动效仅以 room_state.status 为准；userwork 快照 local_process_state 可与会议室不同步（failed 仍标处理中、无 dev.status 则无会议室条目） */
-                const rowTokenAnimating = cardScopeMetrics?.status === 'processing';
-                const progressBarWidth =
-                  ticket.status === 'completed'
-                    ? '100%'
-                    : ticket.status === 'pending' ||
-                        ticket.status === 'prepare' ||
-                        ticket.status === 'full_manual'
-                      ? rowTokenAnimating
-                        ? '12%'
-                        : '0%'
-                      : rowTokenAnimating
-                        ? `${Math.max(progressPercent, 8)}%`
-                        : `${progressPercent}%`;
-                const cardTotalTokens = cardScopeMetrics?.tokens ?? 0;
-                const cardTokenLabel =
-                  cardTotalTokens >= 1_000_000
-                    ? `${(cardTotalTokens / 1_000_000).toFixed(1)}M`
-                    : cardTotalTokens >= 1000
-                      ? `${(cardTotalTokens / 1000).toFixed(1)}k`
-                      : String(cardTotalTokens);
-                const rowFullManual = !isWorkItem && ticket.status === 'full_manual';
-                /** 预备中 / 全人工不参与本流水线，卡片上不应展示「等待调度」等节点名 */
-                const hidePipelineNodeLabel =
-                  !isWorkItem && (ticket.status === 'prepare' || ticket.status === 'full_manual');
-
-                const statusBorderColor = rowHitl
-                  ? 'bg-destructive'
-                  : rowFullManual
-                    ? 'bg-violet-500 dark:bg-violet-400'
-                    : ticket.status === 'processing'
-                      ? 'bg-primary'
-                      : ticket.status === 'completed'
-                        ? 'bg-green-600 dark:bg-green-500'
-                        : 'bg-muted-foreground/40';
-
-                const isActive = isWorkItem ? activeWorkItemId === item.id : activeTicketId === item.id && !activeWorkItemId;
-
-                const onTicketDetailsClick = (e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  handleShowTicketDetails(e, {
-                    ...ticket,
-                    title: item.title,
-                    description: item.description,
-                    branch: item.branch,
-                    tokens: item.tokens,
-                    createdAt: item.createdAt,
-                    currentNode: isWorkItem ? (item as WorkItem).currentNode : ticket.currentNode,
-                    currentStage: isWorkItem
-                      ? stageIdForNodeId((item as WorkItem).currentNode)
-                      : ticket.currentStage,
-                    sopAwaitingHuman: isWorkItem
-                      ? Boolean((item as WorkItem).humanIntervention)
-                      : ticket.sopAwaitingHuman,
-                  }, isWorkItem ? item.id : undefined);
-                };
-
-                const ticketInfoButton = (
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<Info className="h-3.5 w-3.5" />}
-                    className="z-10 flex h-6 w-6 items-center justify-center p-0 text-muted-foreground hover:text-primary"
-                    title="工单信息"
-                    onClick={onTicketDetailsClick}
-                  />
-                );
-
-                return (
-                  <motion.div
-                    key={item.id}
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => {
-                      setActiveTicketId(ticket.id);
-                      setActiveWorkItemId(isWorkItem ? item.id : '');
-                      const shouldJumpMeeting =
-                        !rowActionOverlay &&
-                        (ticket.status === 'processing' || ticket.status === 'error' || rowHitl);
-                      if (shouldJumpMeeting) {
-                        void navigateToMeetingRoom(
-                          isWorkItem ? 'task' : 'demand',
-                          item.id,
-                        );
-                      }
-                    }}
-                    className={`rd-order-ticket-card group relative mb-1 shrink-0 cursor-pointer overflow-hidden rounded-[10px] px-2.5 py-3 transition-[background,box-shadow] duration-150 ${
-                      isActive 
-                        ? 'bg-[rgba(37,99,235,0.09)] ring-1 ring-border' 
-                        : 'hover:bg-[rgba(37,99,235,0.05)]'
-                    } ${!rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl) ? 'hover:ring-1 hover:ring-primary/30' : ''}`}
-                    title={
-                      !rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl)
-                        ? t('rdManageOrder.clickToOpenMeeting', { defaultValue: '点击进入研发会议室' })
-                        : undefined
+              return (
+                <motion.div
+                  key={ticket.id}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => {
+                    setActiveTicketId(ticket.id);
+                    const shouldJumpMeeting =
+                      !rowActionOverlay &&
+                      (ticket.status === 'processing' || ticket.status === 'error' || rowHitl);
+                    if (shouldJumpMeeting) {
+                      void navigateToMeetingRoom('demand', ticket.id);
                     }
-                  >
-                    {/* Left Status Line */}
-                    <div className={`absolute bottom-0 left-0 top-0 w-1 ${statusBorderColor}`} />
+                  }}
+                  className={`rd-order-ticket-card group relative mb-1 shrink-0 cursor-pointer overflow-hidden rounded-[10px] px-2.5 py-3 transition-[background,box-shadow] duration-150 ${
+                    isActive
+                      ? 'bg-[rgba(37,99,235,0.09)] ring-1 ring-border'
+                      : 'hover:bg-[rgba(37,99,235,0.05)]'
+                  } ${!rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl) ? 'hover:ring-1 hover:ring-primary/30' : ''}`}
+                  title={
+                    !rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl)
+                      ? t('rdManageOrder.clickToOpenMeeting', { defaultValue: '点击进入研发会议室' })
+                      : undefined
+                  }
+                >
+                  <div className={`absolute bottom-0 left-0 top-0 w-1 ${statusBorderColor}`} />
 
-                    {rowActionOverlay && (
-                      <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
-                        <Button
-                          type="primary"
-                          size="small"
-                          loading={openingMeetingKey === openMeetingBusyKey}
-                          className={`h-8 rounded-full border-none px-5 font-medium shadow-lg ${
-                            rowPendingOpen
-                              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                              : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (rowHitl) {
-                              const scopeType = isWorkItem ? ('task' as const) : ('demand' as const);
-                              const scopeId = item.id.trim();
-                              const busyKey = `${scopeType}:${scopeId}`;
-                              setOpeningMeetingKey(busyKey);
-                              void navigateToMeetingRoom(scopeType, scopeId).finally(() => {
-                                setOpeningMeetingKey(null);
-                              });
-                              return;
-                            }
-                            void handleOneClickOpenMeeting(e, ticket, isWorkItem ? item.id : undefined);
-                          }}
-                        >
-                          {rowPendingOpen ? t('rdManageOrder.oneClickOpenMeeting') : t('rdManageOrder.actNow')}
-                        </Button>
-                      </div>
-                    )}
-
-                    <div
-                      className={`absolute right-2 top-2 flex items-center gap-2 ${rowActionOverlay ? 'z-40' : 'z-20'}`}
-                    >
-                      {ticketInfoButton}
-                    </div>
-
-                    {/* Top: Created At + 产品标签（需求单维度 prod，子单继承父单） */}
-                    <div className="mb-2 flex flex-wrap items-center gap-1.5 pl-2 pr-10">
-                      <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/80">
-                        <Clock className="h-3 w-3 opacity-70" />
-                        {item.createdAt.replace('T', ' ').substring(0, 16)}
-                      </span>
-                      <ProductProdTag prod={ticket.prod} className="!m-0 text-[10px]" />
-                    </div>
-                    
-                    {/* Middle: Title */}
-                    <h3 className={`mb-3 line-clamp-3 pl-2 pr-10 text-sm font-medium leading-snug flex items-start gap-1.5 ${isActive ? 'text-primary' : 'text-foreground'}`}>
-                      {!isWorkItem && ticket.urgency === 'high' && (
-                        <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-pulse text-destructive" />
-                      )}
-                      {isWorkItem && <GitBranch className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />}
-                      {item.title}
-                    </h3>
-
-                    {/* Bottom: Node Info & Meta */}
-                    <div className="flex items-center justify-between pl-2 pr-2 text-xs text-muted-foreground">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        {isDone ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
-                        ) : currentNodeObj?.type.includes('human') ? (
-                          <User className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                        ) : currentNodeObj?.type.includes('system') ? (
-                          <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        ) : (
-                          <Bot className="h-3.5 w-3.5 shrink-0 text-primary" />
-                        )}
-                        <span className={`truncate ${isDone ? 'text-green-700 dark:text-green-400' : 'text-foreground/90'}`}>
-                          {isDone
-                            ? '研发完成'
-                            : hidePipelineNodeLabel
-                              ? '待处理'
-                              : (currentNodeObj?.name || '未知节点')}
-                        </span>
-                      </div>
-                      
-                      <div className="flex shrink-0 items-center gap-2 font-mono text-[10px]">
-                        <span className="relative flex items-center gap-1">
-                          <Coins className={`h-3 w-3 ${ticket.status === 'processing' || rowHitl ? 'text-amber-500' : 'text-amber-500/70'}`} />
-                          <span className={ticket.status === 'processing' || rowHitl ? 'text-amber-500' : 'text-amber-600/70 dark:text-amber-400/70'}>
-                            {cardTokenLabel}
-                          </span>
-                          {rowTokenAnimating && (
-                            <motion.div
-                              initial={{ y: 5, opacity: 0 }}
-                              animate={{ y: -10, opacity: [0, 1, 0] }}
-                              transition={{ repeat: Infinity, duration: 1.5 }}
-                              className="absolute -right-3 -top-1 text-green-500"
-                            >
-                              <TrendingUp className="h-2.5 w-2.5" />
-                            </motion.div>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Background Progress Bar */}
-                    <div className="rd-order-ticket-progress-track" aria-hidden>
-                      <div
-                        className={`rd-order-ticket-progress-fill ${
-                          ticket.status === 'completed'
-                            ? 'rd-order-ticket-progress-fill--done'
-                            : rowTokenAnimating
-                              ? 'rd-order-ticket-progress-fill--shimmer'
-                              : 'rd-order-ticket-progress-fill--idle'
+                  {rowActionOverlay && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100">
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={openingMeetingKey === openMeetingBusyKey}
+                        className={`h-8 rounded-full border-none px-5 font-medium shadow-lg ${
+                          rowPendingOpen
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                         }`}
-                        style={{ width: progressBarWidth }}
-                      />
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (rowHitl) {
+                            setOpeningMeetingKey(openMeetingBusyKey);
+                            void navigateToMeetingRoom('demand', ticket.id).finally(() => {
+                              setOpeningMeetingKey(null);
+                            });
+                            return;
+                          }
+                          void handleOneClickOpenMeeting(e, ticket);
+                        }}
+                      >
+                        {rowPendingOpen ? t('rdManageOrder.oneClickOpenMeeting') : t('rdManageOrder.actNow')}
+                      </Button>
                     </div>
-                  </motion.div>
-                );
-              };
+                  )}
 
-              if (ticket.status === 'processing' && ticket.workItems && ticket.workItems.length > 0) {
-                return (
-                  <div key={ticket.id} className="rd-order-ticket-group relative mb-2 mt-3 shrink-0 rounded-[10px] border border-dashed border-primary/40 p-1.5 pt-3">
-                    <div className="absolute -top-2.5 left-2 right-2 min-w-0 truncate bg-[color:var(--panel)] px-1 text-[10px] font-medium text-primary">
-                      {ticket.title}
-                    </div>
-                    {ticket.workItems.map(workItem => renderCard(workItem, true))}
+                  <div
+                    className={`absolute right-2 top-2 flex items-center gap-2 ${rowActionOverlay ? 'z-40' : 'z-20'}`}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<Info className="h-3.5 w-3.5" />}
+                      className="z-10 flex h-6 w-6 items-center justify-center p-0 text-muted-foreground hover:text-primary"
+                      title="工单信息"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShowTicketDetails(e, ticket);
+                      }}
+                    />
                   </div>
-                );
-              }
 
-              return renderCard(ticket, false);
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5 pl-2 pr-10">
+                    <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground/80">
+                      <Clock className="h-3 w-3 opacity-70" />
+                      {ticket.createdAt.replace('T', ' ').substring(0, 16)}
+                    </span>
+                    <ProductProdTag prod={ticket.prod} className="!m-0 text-[10px]" />
+                  </div>
+
+                  <h3
+                    className={`mb-3 line-clamp-3 flex items-start gap-1.5 pl-2 pr-10 text-sm font-medium leading-snug ${isActive ? 'text-primary' : 'text-foreground'}`}
+                  >
+                    {ticket.urgency === 'high' && (
+                      <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-pulse text-destructive" />
+                    )}
+                    {ticket.title}
+                  </h3>
+
+                  <div className="flex items-center justify-between pl-2 pr-2 text-xs text-muted-foreground">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      {isDone ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                      ) : currentNodeObj?.type.includes('human') ? (
+                        <User className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                      ) : currentNodeObj?.type.includes('system') ? (
+                        <TerminalSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <Bot className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                      <span
+                        className={`truncate ${isDone ? 'text-green-700 dark:text-green-400' : 'text-foreground/90'}`}
+                      >
+                        {isDone
+                          ? '研发完成'
+                          : hidePipelineNodeLabel
+                            ? '待处理'
+                            : currentNodeObj?.name || '未知节点'}
+                      </span>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2 font-mono text-[10px]">
+                      <OwnedWorkItemsHoverTrigger items={ticket.ownedWorkItems} />
+                      <span className="relative flex items-center gap-1">
+                        <Coins
+                          className={`h-3 w-3 ${ticket.status === 'processing' || rowHitl ? 'text-amber-500' : 'text-amber-500/70'}`}
+                        />
+                        <span
+                          className={
+                            ticket.status === 'processing' || rowHitl
+                              ? 'text-amber-500'
+                              : 'text-amber-600/70 dark:text-amber-400/70'
+                          }
+                        >
+                          {cardTokenLabel}
+                        </span>
+                        {rowTokenAnimating && (
+                          <motion.div
+                            initial={{ y: 5, opacity: 0 }}
+                            animate={{ y: -10, opacity: [0, 1, 0] }}
+                            transition={{ repeat: Infinity, duration: 1.5 }}
+                            className="absolute -right-3 -top-1 text-green-500"
+                          >
+                            <TrendingUp className="h-2.5 w-2.5" />
+                          </motion.div>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="rd-order-ticket-progress-track" aria-hidden>
+                    <div
+                      className={`rd-order-ticket-progress-fill ${
+                        ticket.status === 'completed'
+                          ? 'rd-order-ticket-progress-fill--done'
+                          : rowTokenAnimating
+                            ? 'rd-order-ticket-progress-fill--shimmer'
+                            : 'rd-order-ticket-progress-fill--idle'
+                      }`}
+                      style={{ width: progressBarWidth }}
+                    />
+                  </div>
+                </motion.div>
+              );
             })}
           </div>
         </div>
@@ -2050,10 +1972,10 @@ export const OrderManagement: React.FC<{
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <h1 className="max-w-[min(100%,52rem)] truncate text-base font-semibold tracking-tight text-foreground md:text-lg">
-                  {displayTicket.title}
+                  {activeTicket.title}
                 </h1>
                 <span className="shrink-0 rounded border border-border bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-primary">
-                  {displayTicket.id}
+                  {activeTicket.id}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -2069,7 +1991,7 @@ export const OrderManagement: React.FC<{
                   <span className="font-mono text-foreground/90">
                     {meetingSummaryLoading
                       ? '…'
-                      : (meetingSummary?.summary_metrics?.tokens ?? displayTicket.tokens).toLocaleString()}
+                      : (meetingSummary?.summary_metrics?.tokens ?? activeTicket.tokens).toLocaleString()}
                   </span>
                 </span>
                 {meetingSummaryErr && (
@@ -2081,8 +2003,8 @@ export const OrderManagement: React.FC<{
             </div>
             
             <motion.div className="flex shrink-0 flex-wrap items-center gap-2">
-              <ProductProdTag prod={displayTicket.prod} />
-              {displayTicket.status === 'full_manual' && (
+              <ProductProdTag prod={activeTicket.prod} />
+              {activeTicket.status === 'full_manual' && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2092,7 +2014,7 @@ export const OrderManagement: React.FC<{
                   {t('rdManageOrder.badgeFullManual')}
                 </motion.div>
               )}
-              {displayTicket.sopAwaitingHuman && (
+              {activeTicket.sopAwaitingHuman && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2115,7 +2037,7 @@ export const OrderManagement: React.FC<{
             onMouseLeave={handleMouseUp}
           >
             
-            {displayTicket.status === 'prepare' ? (
+            {activeTicket.status === 'prepare' ? (
               <div className="flex h-full items-center justify-center p-8">
                 <div className="max-w-md rounded-xl border border-blue-500/25 bg-blue-500/5 p-6 text-center shadow-sm">
                   <Info className="mx-auto mb-4 h-12 w-12 text-blue-500/90" />
@@ -2125,7 +2047,7 @@ export const OrderManagement: React.FC<{
                   </p>
                 </div>
               </div>
-            ) : displayTicket.status === 'full_manual' ? (
+            ) : activeTicket.status === 'full_manual' ? (
               <div className="flex h-full items-center justify-center p-8">
                 <div className="max-w-md rounded-xl border border-violet-500/25 bg-violet-500/5 p-6 text-center shadow-sm">
                   <User className="mx-auto mb-4 h-12 w-12 text-violet-600 dark:text-violet-400" />
@@ -2151,9 +2073,9 @@ export const OrderManagement: React.FC<{
               />
 
               {SOP_STAGES.map((stage, sIdx) => {
-                const isStagePast = displayTicket.currentStage > stage.id;
-                const isStageActive = displayTicket.currentStage === stage.id;
-                const isStageFuture = displayTicket.currentStage < stage.id;
+                const isStagePast = activeTicket.currentStage > stage.id;
+                const isStageActive = activeTicket.currentStage === stage.id;
+                const isStageFuture = activeTicket.currentStage < stage.id;
                 const isCollapsed = collapsedStages[stage.id];
 
                 if (isCollapsed) {
@@ -2191,13 +2113,13 @@ export const OrderManagement: React.FC<{
                       title={stage.id === LAST_PIPELINE_STAGE_ID ? undefined : '点击折叠该阶段'}
                     >
                        <div className={`z-10 flex h-8 w-8 items-center justify-center rounded-full border-[3px] bg-background text-xs font-bold ${
-                         isStagePast || displayTicket.status === 'completed' ? 'border-green-500 text-green-500 shadow-[0_0_10px_color-mix(in_srgb,var(--success)_30%,transparent)]' :
-                         isStageActive && displayTicket.status !== 'prepare' ? 'border-primary text-primary shadow-[0_0_14px_color-mix(in_srgb,var(--primary)_30%,transparent)]' :
+                         isStagePast || activeTicket.status === 'completed' ? 'border-green-500 text-green-500 shadow-[0_0_10px_color-mix(in_srgb,var(--success)_30%,transparent)]' :
+                         isStageActive && activeTicket.status !== 'prepare' ? 'border-primary text-primary shadow-[0_0_14px_color-mix(in_srgb,var(--primary)_30%,transparent)]' :
                          'border-muted text-muted-foreground'
                        }`}>
-                         {isStagePast || displayTicket.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : stage.id}
+                         {isStagePast || activeTicket.status === 'completed' ? <CheckCircle2 className="h-5 w-5" /> : stage.id}
                        </div>
-                       <div className={`absolute top-10 whitespace-nowrap text-xs font-medium tracking-widest ${isStageActive && displayTicket.status !== 'prepare' ? 'text-primary' : isStagePast || displayTicket.status === 'completed' ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>
+                       <div className={`absolute top-10 whitespace-nowrap text-xs font-medium tracking-widest ${isStageActive && activeTicket.status !== 'prepare' ? 'text-primary' : isStagePast || activeTicket.status === 'completed' ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>
                          {stage.name}
                        </div>
                     </div>
@@ -2207,7 +2129,7 @@ export const OrderManagement: React.FC<{
                       {stage.nodes.map((node, nIdx) => {
                         const globalIndex = ALL_NODES.findIndex(n => n.id === node.id);
                         const isTop = globalIndex % 2 === 0;
-                        const state = getNodeStateGlobal(displayTicket, node.id);
+                        const state = getNodeStateGlobal(activeTicket, node.id);
                         const isSkipped = state === 'skipped';
                         const typeInfo = getSopNodeTypeInfo(node.type);
 
@@ -2423,7 +2345,7 @@ export const OrderManagement: React.FC<{
         title={
           selectedNode ? (
             <div className="rd-order-node-drawer__title-row relative z-[1] flex min-w-0 items-center gap-2.5 text-foreground">
-              {getNodeStateGlobal(displayTicket, selectedNode.id) === 'skipped' ? (
+              {getNodeStateGlobal(activeTicket, selectedNode.id) === 'skipped' ? (
                 <div className="shrink-0 rounded-lg border border-slate-500/30 bg-slate-500/10 p-1.5">
                   <SkipForward className="h-4 w-4 text-slate-400" />
                 </div>
@@ -2449,7 +2371,7 @@ export const OrderManagement: React.FC<{
                 {selectedNode.id}
               </span>
               {(() => {
-                const st = getNodeStateGlobal(displayTicket, selectedNode.id);
+                const st = getNodeStateGlobal(activeTicket, selectedNode.id);
                 if (st === 'processing') {
                   return (
                     <span className="rd-order-node-drawer__status-pill rd-order-node-drawer__status-pill--processing ml-auto shrink-0">
@@ -2512,7 +2434,7 @@ export const OrderManagement: React.FC<{
                 synapseApiBase={synapseApiBase}
                 roomId={meetingSummary.room_id}
                 nodeId={selectedNode.id}
-                nodeState={mapNodeStateForPanel(getNodeStateGlobal(displayTicket, selectedNode.id))}
+                nodeState={mapNodeStateForPanel(getNodeStateGlobal(activeTicket, selectedNode.id))}
                 archiveFiles={meetingArchiveByNodeId.get(selectedNode.id)}
                 recentHistory={meetingSummary.recent_history}
                 solutionReviewBlocked={Boolean(
@@ -2542,12 +2464,12 @@ export const OrderManagement: React.FC<{
                     scopeId={sopMeetingScope?.scopeId}
                     nodeId={selectedNode.id}
                     nodeName={selectedNode.name}
-                    nodeState={mapNodeStateForPanel(getNodeStateGlobal(displayTicket, selectedNode.id))}
-                    pollMs={displayTicket.status === 'processing' ? 5000 : 0}
+                    nodeState={mapNodeStateForPanel(getNodeStateGlobal(activeTicket, selectedNode.id))}
+                    pollMs={activeTicket.status === 'processing' ? 5000 : 0}
                   />
                 ) : (
                   <div className="custom-scrollbar max-h-[min(58vh,560px)] overflow-y-auto p-4">
-                    {renderNodeOutput(selectedNode, displayTicket)}
+                    {renderNodeOutput(selectedNode, activeTicket)}
                   </div>
                 )}
               </div>
@@ -2583,7 +2505,6 @@ export const OrderManagement: React.FC<{
         onCancel={() => {
           setTicketModalOpen(false);
           setSelectedTicketForModal(null);
-          setSelectedWorkItemIdForModal(null);
           setModalDemand(null);
           setDbMetrics(null);
           setDbMetricsErr(null);
@@ -2599,8 +2520,8 @@ export const OrderManagement: React.FC<{
       >
         {selectedTicketForModal && modalDemand && (
           <Tabs
-            key={`ticket-modal-${modalDemand.demand_no}-${ticketModalWorkItemsResolved.singleTaskMode ? ticketModalWorkItemsResolved.workItemIdTrim : 'all'}`}
-            defaultActiveKey={ticketModalWorkItemsResolved.singleTaskMode ? 'tasks' : 'overview'}
+            key={`ticket-modal-${modalDemand.demand_no}`}
+            defaultActiveKey="overview"
             items={[
               {
                 key: 'overview',
@@ -2770,155 +2691,93 @@ export const OrderManagement: React.FC<{
                   </div>
                 )
               },
-              ...(showTicketModalPipelineLayers && ticketModalWorkItemsResolved.displayWorkItems.length > 0
+              ...(showTicketModalPipelineLayers && modalOwnedWorkItems.length > 0
                 ? [
                     {
                       key: 'tasks',
-                      label: ticketModalWorkItemsResolved.singleTaskMode
-                        ? t('rdManageOrder.sectionTaskDetails')
-                        : t('rdManageOrder.tabTasksWithCount', {
-                            count: ticketModalWorkItemsResolved.displayWorkItems.length,
-                          }),
+                      label: t('rdManageOrder.tabTasksWithCount', {
+                        count: modalOwnedWorkItems.length,
+                      }),
                       children: (
                         <div className="space-y-4 pt-2">
-                          {ticketModalWorkItemsResolved.singleTaskMode ? (
-                            ticketModalWorkItemsResolved.displayWorkItems.map((wi) => {
+                          <Collapse
+                            className="bg-transparent"
+                            bordered={false}
+                            expandIconPosition="end"
+                            items={modalOwnedWorkItems.map((wi) => {
                               const tm = dbMetrics?.task_metrics?.[wi.task_no];
-                              return (
-                                <div key={wi.task_no} className="rounded-xl border border-border/60 bg-muted/10 p-5">
-                                  <div className="mb-5 flex min-w-0 items-center gap-2 border-b border-border/50 pb-4">
-                                    <Tag color="processing" bordered={false} className="m-0 shrink-0 font-mono text-xs">
-                                      {wi.task_no}
-                                    </Tag>
-                                    <h4
-                                      className="min-w-0 flex-1 text-base font-medium leading-snug text-foreground line-clamp-2"
-                                      title={wi.task_title}
-                                    >
-                                      {wi.task_title}
-                                    </h4>
-                                  </div>
-                                  <TaskModalWorkItemStats
-                                    wi={wi}
-                                    tm={tm}
-                                    dbMetricsLoading={dbMetricsLoading}
-                                    t={t}
-                                    onOpenProductModule={() => void openProductDetailForWorkItem(wi)}
-                                  />
-                                  <div className="mt-6 rounded-lg border border-border/50 bg-background/40 p-4 text-sm">
-                                    <div className="mb-3 border-b border-border/40 pb-2 text-[10px] font-semibold uppercase text-muted-foreground">
-                                      {t('rdManageOrder.taskDescription')}
+                              return {
+                                key: wi.task_no,
+                                style: {
+                                  marginBottom: 12,
+                                  background: 'var(--panel2)',
+                                  borderRadius: 8,
+                                  border: '1px solid var(--line)',
+                                  overflow: 'hidden',
+                                },
+                                label: (
+                                  <div className="flex flex-col gap-1.5 pr-2">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <Tag color="processing" bordered={false} className="m-0 shrink-0 font-mono text-[10px]">
+                                        {wi.task_no}
+                                      </Tag>
+                                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={wi.task_title}>
+                                        {wi.task_title}
+                                      </span>
                                     </div>
-                                    {(wi.task_desc || '').trim() ? (
-                                      <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/85 prose-pre:border prose-pre:border-border/50 prose-pre:bg-muted/30 prose-a:text-primary">
-                                        <ReactMarkdown
-                                          remarkPlugins={[remarkGfm]}
-                                          components={{
-                                            a: ({ ...props }) => (
-                                              <a {...props} className="underline" target="_blank" rel="noopener noreferrer" />
-                                            ),
-                                          }}
-                                        >
-                                          {wi.task_desc}
-                                        </ReactMarkdown>
-                                      </div>
-                                    ) : (
-                                      <span className="text-muted-foreground">{t('rdManageOrder.markdownEmpty')}</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <Collapse
-                              className="bg-transparent"
-                              bordered={false}
-                              expandIconPosition="end"
-                              items={ticketModalWorkItemsResolved.displayWorkItems.map((wi) => {
-                                const tm = dbMetrics?.task_metrics?.[wi.task_no];
-                                return {
-                                  key: wi.task_no,
-                                  style: {
-                                    marginBottom: 12,
-                                    background: 'var(--panel2)',
-                                    borderRadius: 8,
-                                    border: '1px solid var(--line)',
-                                    overflow: 'hidden',
-                                  },
-                                  label: (
-                                    <div className="flex flex-col gap-1.5 pr-2">
-                                      <div className="flex min-w-0 items-center gap-2">
-                                        <Tag color="processing" bordered={false} className="m-0 shrink-0 font-mono text-[10px]">
-                                          {wi.task_no}
-                                        </Tag>
-                                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={wi.task_title}>
-                                          {wi.task_title}
+                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                      <OwnedWorkItemStateBadge state={wi.state} />
+                                      <div className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        <span>
+                                          {dbMetricsLoading && !tm
+                                            ? '…'
+                                            : formatDurationSeconds(tm?.deal_seconds ?? 0, t)}
                                         </span>
                                       </div>
-                                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                        <Badge
-                                          status={
-                                            wi.stage_name?.includes('完成') || wi.stage_name?.includes('走查')
-                                              ? 'success'
-                                              : 'processing'
-                                          }
-                                          text={
-                                            <span className="text-muted-foreground">
-                                              {(wi.stage_name || '—').trim() || '—'}
-                                            </span>
-                                          }
-                                        />
-                                        <div className="flex items-center gap-1">
-                                          <Clock className="h-3 w-3" />
-                                          <span>
-                                            {dbMetricsLoading && !tm
-                                              ? '…'
-                                              : formatDurationSeconds(tm?.deal_seconds ?? 0, t)}
-                                          </span>
-                                        </div>
-                                      </div>
                                     </div>
-                                  ),
-                                  children: (
-                                    <div className="border-t border-border/50 pt-4">
-                                      <TaskModalWorkItemStats
-                                        wi={wi}
-                                        tm={tm}
-                                        dbMetricsLoading={dbMetricsLoading}
-                                        t={t}
-                                        onOpenProductModule={() => void openProductDetailForWorkItem(wi)}
-                                      />
-                                      <div className="mt-6 rounded-lg border border-border/50 bg-muted/10 p-3 text-xs">
-                                        <div className="mb-3 border-b border-border/40 pb-2 text-[10px] font-semibold uppercase text-muted-foreground">
-                                          {t('rdManageOrder.taskDescription')}
-                                        </div>
-                                        {(wi.task_desc || '').trim() ? (
-                                          <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/85 prose-pre:border prose-pre:border-border/50 prose-pre:bg-muted/30 prose-a:text-primary">
-                                            <ReactMarkdown
-                                              remarkPlugins={[remarkGfm]}
-                                              components={{
-                                                a: ({ ...props }) => (
-                                                  <a
-                                                    {...props}
-                                                    className="underline"
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                  />
-                                                ),
-                                              }}
-                                            >
-                                              {wi.task_desc}
-                                            </ReactMarkdown>
-                                          </div>
-                                        ) : (
-                                          <span className="text-muted-foreground">{t('rdManageOrder.markdownEmpty')}</span>
-                                        )}
+                                  </div>
+                                ),
+                                children: (
+                                  <div className="border-t border-border/50 pt-4">
+                                    <TaskModalWorkItemStats
+                                      wi={wi}
+                                      tm={tm}
+                                      dbMetricsLoading={dbMetricsLoading}
+                                      t={t}
+                                      onOpenProductModule={() => void openProductDetailForWorkItem(wi)}
+                                    />
+                                    <div className="mt-6 rounded-lg border border-border/50 bg-muted/10 p-3 text-xs">
+                                      <div className="mb-3 border-b border-border/40 pb-2 text-[10px] font-semibold uppercase text-muted-foreground">
+                                        {t('rdManageOrder.taskDescription')}
                                       </div>
+                                      {(wi.task_desc || '').trim() ? (
+                                        <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/85 prose-pre:border prose-pre:border-border/50 prose-pre:bg-muted/30 prose-a:text-primary">
+                                          <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                              a: ({ ...props }) => (
+                                                <a
+                                                  {...props}
+                                                  className="underline"
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                />
+                                              ),
+                                            }}
+                                          >
+                                            {wi.task_desc}
+                                          </ReactMarkdown>
+                                        </div>
+                                      ) : (
+                                        <span className="text-muted-foreground">{t('rdManageOrder.markdownEmpty')}</span>
+                                      )}
                                     </div>
-                                  ),
-                                };
-                              })}
-                            />
-                          )}
+                                  </div>
+                                ),
+                              };
+                            })}
+                          />
                         </div>
                       ),
                     },

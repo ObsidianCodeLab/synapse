@@ -30,17 +30,43 @@ def _load_userwork_list() -> list[dict[str, Any]]:
     return [x for x in snap["list"] if isinstance(x, dict)]
 
 
+def _demand_row_for_scope(
+    existing_list: list[Any],
+    scope_type: ScopeType,
+    scope_id: str,
+) -> dict[str, Any] | None:
+    """task scope 时解析父需求单；demand scope 时直接命中需求单。"""
+    sid = _snapshot_norm_id(scope_id)
+    if not sid:
+        return None
+    for demand in existing_list:
+        if not isinstance(demand, dict):
+            continue
+        if scope_type == "demand":
+            if _snapshot_norm_id(demand.get("demand_no")) == sid:
+                return demand
+            continue
+        if _snapshot_norm_id(demand.get("demand_no")) == sid:
+            return demand
+        owned = demand.get("owned_work_items")
+        if not isinstance(owned, list):
+            continue
+        for task in owned:
+            if isinstance(task, dict) and _snapshot_norm_id(task.get("task_no")) == sid:
+                return demand
+    return None
+
+
 def patch_userwork_summary(
     *,
     scope_type: ScopeType,
     scope_id: str,
     sop_node: str | None = None,
     local_process_state: str | None = None,
-    task_sop_node: str | None = None,
     prod: str | None = None,
     demand_status: str | None = None,
 ) -> dict[str, str]:
-    """更新 userwork 摘要字段。返回本次写入的字段（键为 userwork 字段名）。"""
+    """更新 userwork 需求单摘要字段（始终以需求单为准）。返回本次写入的字段。"""
     path: Path = _owner_order_file_name()
     if not path.is_file():
         return {}
@@ -62,56 +88,28 @@ def patch_userwork_summary(
         except (OSError, json.JSONDecodeError):
             return {}
 
+        demand = _demand_row_for_scope(existing_list, scope_type, scope_id)
+        if not demand:
+            return {}
+
         modified = False
         applied: dict[str, str] = {}
-        for demand in existing_list:
-            if not isinstance(demand, dict):
-                continue
-            if scope_type == "demand":
-                if _snapshot_norm_id(demand.get("demand_no")) != dn:
-                    continue
-                if sop_node is not None:
-                    demand["sop_node"] = sop_node
-                    applied["sop_node"] = sop_node
-                    modified = True
-                if local_process_state is not None:
-                    demand["local_process_state"] = local_process_state
-                    applied["local_process_state"] = local_process_state
-                    modified = True
-                if prod is not None:
-                    demand["prod"] = prod
-                    applied["prod"] = prod
-                    modified = True
-                if demand_status is not None:
-                    demand["demand_status"] = demand_status
-                    applied["demand_status"] = demand_status
-                    modified = True
-                break
-            # task scope
-            owned = demand.get("owned_work_items")
-            if not isinstance(owned, list):
-                continue
-            for task in owned:
-                if not isinstance(task, dict):
-                    continue
-                if _snapshot_norm_id(task.get("task_no")) != dn:
-                    continue
-                node_val = task_sop_node if task_sop_node is not None else sop_node
-                if node_val is not None:
-                    task["sop_node"] = node_val
-                    applied["sop_node"] = node_val
-                    modified = True
-                if local_process_state is not None:
-                    task["local_process_state"] = local_process_state
-                    applied["local_process_state"] = local_process_state
-                    modified = True
-                if prod is not None:
-                    task["prod"] = prod
-                    applied["prod"] = prod
-                    modified = True
-                break
-            if modified:
-                break
+        if sop_node is not None:
+            demand["sop_node"] = sop_node
+            applied["sop_node"] = sop_node
+            modified = True
+        if local_process_state is not None:
+            demand["local_process_state"] = local_process_state
+            applied["local_process_state"] = local_process_state
+            modified = True
+        if prod is not None:
+            demand["prod"] = prod
+            applied["prod"] = prod
+            modified = True
+        if demand_status is not None:
+            demand["demand_status"] = demand_status
+            applied["demand_status"] = demand_status
+            modified = True
 
         if not modified:
             return {}

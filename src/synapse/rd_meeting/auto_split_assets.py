@@ -182,13 +182,12 @@ def _build_owned_work_item_from_create(
         "task_desc": str(row.get("task_desc") or getattr(req, "comments", "") or ""),
         "created_date": str(row.get("created_date") or ""),
         "sccb_work_hours": row.get("sccb_work_hours"),
-        "stage_name": str(row.get("stage_name") or ""),
+        "state": "待处理",
         "product_module_id": row.get("product_module_id"),
         "product_module_name": str(
             row.get("product_module_name") or getattr(req, "productModuleName", "") or ""
         ),
         "repo_url": str(row.get("repo_url") or ""),
-        "sop_node": str(row.get("sop_node") or ""),
     }
 
 

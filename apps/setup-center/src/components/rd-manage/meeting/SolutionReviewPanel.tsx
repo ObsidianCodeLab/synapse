@@ -364,7 +364,7 @@ export function SolutionReviewPanel({
 }: Props) {
   const [payload, setPayload] = useState<SolutionReviewPayload | null>(initialPayload ?? null);
   const [loading, setLoading] = useState(!initialPayload);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingDecision, setSubmittingDecision] = useState<'approve' | 'reject' | null>(null);
   const [humanComment, setHumanComment] = useState('');
   const [patchByBranch, setPatchByBranch] = useState<Record<string, string>>({});
   const [patchOptions, setPatchOptions] = useState<Record<string, PatchVersionItem[]>>({});
@@ -589,7 +589,7 @@ export function SolutionReviewPanel({
         }
       }
     }
-    setSubmitting(true);
+    setSubmittingDecision(decision);
     try {
       const patches = branchIds.map((bid) => ({
         branch_version_id: bid,
@@ -616,7 +616,7 @@ export function SolutionReviewPanel({
     } catch (e) {
       message.error(e instanceof Error ? e.message : '提交失败');
     } finally {
-      setSubmitting(false);
+      setSubmittingDecision(null);
     }
   };
 
@@ -875,7 +875,8 @@ export function SolutionReviewPanel({
           <Button
             danger
             icon={<XCircle className="h-4 w-4" />}
-            loading={submitting}
+            loading={submittingDecision === 'reject'}
+            disabled={submittingDecision !== null}
             onClick={() => submit('reject')}
           >
             评审不通过
@@ -883,7 +884,8 @@ export function SolutionReviewPanel({
           <Button
             type="primary"
             icon={<CheckCircle2 className="h-4 w-4" />}
-            loading={submitting}
+            loading={submittingDecision === 'approve'}
+            disabled={submittingDecision !== null}
             onClick={() => submit('approve')}
           >
             通过并确认拆单

@@ -488,6 +488,39 @@ async def get_node_review(
         return error_response(500, "node_review_refresh_failed", str(exc))
 
 
+@router.get("/api/dev/meeting-rooms/{room_id}/system-node-display")
+async def get_system_node_display(
+    room_id: str,
+    node_id: str | None = None,
+) -> dict:
+    """系统节点结构化展示（自动拆单 / 沙箱构建 / 环境预生成），非 Markdown 归档。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    nid = (node_id or "").strip()
+    if not nid:
+        return error_response(400, "node_id_required")
+
+    from synapse.rd_meeting.system_node_display import resolve_system_node_display
+    from synapse.rd_sop.manifest import is_system_node
+
+    if not is_system_node(nid):
+        return error_response(400, "not_system_node", f"节点 {nid} 非 system 类型")
+
+    display = resolve_system_node_display(sid, nid)
+    if display is None:
+        return error_response(404, "system_node_display_not_found", "暂无该节点的结构化执行结果")
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "node_id": nid,
+            "display": display,
+        }
+    )
+
+
 @router.get("/api/dev/meeting-rooms/{room_id}/agent-trace")
 async def get_agent_trace(
     room_id: str,

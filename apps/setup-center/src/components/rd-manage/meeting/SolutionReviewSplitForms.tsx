@@ -17,7 +17,6 @@ import {
   Shield,
   Sparkles,
   Trash2,
-  X,
   Zap,
 } from 'lucide-react';
 
@@ -292,7 +291,49 @@ type FunctionPointOption = {
   takenBy?: number;
 };
 
-const FunctionPointMultiPicker: React.FC<{
+const FunctionPointTags: React.FC<{
+  value: string[];
+  options: FunctionPointOption[];
+}> = ({ value, options }) => {
+  const descByValue = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const opt of options) {
+      if (opt.desc) map.set(opt.value, opt.desc);
+    }
+    return map;
+  }, [options]);
+
+  return (
+    <div className="min-h-[2.25rem] rounded-xl border border-border/40 bg-black/15 px-2.5 py-2">
+      {value.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((fp) => {
+            const desc = descByValue.get(fp);
+            return (
+              <span
+                key={fp}
+                className="inline-flex max-w-full items-start rounded-lg border border-indigo-500/30 bg-indigo-500/15 px-2 py-1 text-[12px] text-indigo-100 shadow-sm"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium text-foreground/95">{fp}</span>
+                  {desc ? (
+                    <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground line-clamp-2">
+                      {desc}
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[12px] text-muted-foreground/60 py-0.5">暂无已选功能点</p>
+      )}
+    </div>
+  );
+};
+
+const FunctionPointSelector: React.FC<{
   options: FunctionPointOption[];
   value: string[];
   onChange: (next: string[]) => void;
@@ -303,13 +344,6 @@ const FunctionPointMultiPicker: React.FC<{
   const rootRef = useRef<HTMLDivElement>(null);
 
   const selectedSet = useMemo(() => new Set(value), [value]);
-  const descByValue = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const opt of options) {
-      if (opt.desc) map.set(opt.value, opt.desc);
-    }
-    return map;
-  }, [options]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -347,47 +381,10 @@ const FunctionPointMultiPicker: React.FC<{
     onChange([...value, fp]);
   };
 
-  return (
-    <div ref={rootRef} className="space-y-2">
-      <div className="min-h-[2.25rem] rounded-xl border border-border/40 bg-black/15 px-2.5 py-2">
-        {value.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {value.map((fp) => {
-              const desc = descByValue.get(fp);
-              return (
-                <span
-                  key={fp}
-                  className="inline-flex max-w-full items-start gap-1 rounded-lg border border-indigo-500/30 bg-indigo-500/15 px-2 py-1 text-[12px] text-indigo-100 shadow-sm"
-                >
-                  <span className="min-w-0">
-                    <span className="font-medium text-foreground/95">{fp}</span>
-                    {desc ? (
-                      <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground line-clamp-2">
-                        {desc}
-                      </span>
-                    ) : null}
-                  </span>
-                  {!readOnly ? (
-                    <button
-                      type="button"
-                      className="mt-0.5 shrink-0 rounded p-0.5 text-indigo-200/80 transition-colors hover:bg-indigo-500/25 hover:text-foreground"
-                      aria-label={`移除 ${fp}`}
-                      onClick={() => toggle(fp)}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </span>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-[12px] text-muted-foreground/60 py-0.5">尚未选择功能点</p>
-        )}
-      </div>
+  if (readOnly || options.length === 0) return null;
 
-      {!readOnly && options.length > 0 ? (
-        <div className="relative">
+  return (
+    <div ref={rootRef} className="relative">
           <button
             type="button"
             className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/[0.08] px-3 text-[13px] text-indigo-100 transition-colors hover:border-indigo-400/40 hover:bg-indigo-500/[0.12]"
@@ -463,8 +460,6 @@ const FunctionPointMultiPicker: React.FC<{
               ) : null}
             </div>
           ) : null}
-        </div>
-      ) : null}
     </div>
   );
 };
@@ -603,28 +598,36 @@ export const SplitTaskEditorCard: React.FC<{
           ) : null}
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="h-3 w-3 text-indigo-300" />
-            需求功能匹配
-            <span className="normal-case text-[9px] text-muted-foreground/80">（多选 · 不可重复）</span>
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-indigo-300" />
+              任务涵盖需求功能选择
+              <span className="normal-case text-[9px] text-muted-foreground/80">（多选 · 不可重复）</span>
+            </div>
+            {functionSelectOptions.length > 0 ? (
+              <FunctionPointSelector
+                options={functionSelectOptions}
+                value={selectedFunctionPoints}
+                onChange={(vals) =>
+                  onChange(index, {
+                    functionPoints: vals.map((v) => v.trim()).filter(Boolean),
+                  })
+                }
+                readOnly={readOnly}
+              />
+            ) : (
+              <p className="text-xs italic text-amber-400/90">
+                暂无需求功能点，请确认「模块功能.md」已写入需求功能拆分表或小鲸 solution_review.json
+              </p>
+            )}
           </div>
-          {functionSelectOptions.length > 0 ? (
-            <FunctionPointMultiPicker
-              options={functionSelectOptions}
-              value={selectedFunctionPoints}
-              onChange={(vals) =>
-                onChange(index, {
-                  functionPoints: vals.map((v) => v.trim()).filter(Boolean),
-                })
-              }
-              readOnly={readOnly}
-            />
-          ) : (
-            <p className="text-xs italic text-amber-400/90">
-              暂无需求功能点，请确认「模块功能.md」已写入需求功能拆分表或小鲸 solution_review.json
-            </p>
-          )}
+          <div>
+            <div className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+              任务包含需求功能标签
+            </div>
+            <FunctionPointTags value={selectedFunctionPoints} options={functionSelectOptions} />
+          </div>
         </div>
 
         <div>

@@ -13,6 +13,8 @@ from synapse.rd_meeting.solution_review import (
     apply_human_decision,
     build_demand_function_with_assignments,
     ensure_human_review_pending_for_gate,
+    ensure_split_tasks_draft,
+    enrich_func_solution_repos_from_catalog,
     enrich_payload_from_archive,
     parse_func_solution_impact_assessment,
     parse_func_solution_md,
@@ -87,6 +89,64 @@ def test_parse_impact_by_title_not_section_number():
     assert sections[1]["rows"][0].get("配置项") == "pool.size"
     perf_rows = sections[0]["rows"][0]
     assert "配置项" not in perf_rows
+
+
+def test_enrich_func_solution_repos_from_catalog(monkeypatch):
+    catalog = [
+        {
+            "repo_url": "https://git.example.com/xmjfbss/ZMDB.git",
+            "repo_module": "ZMDB",
+            "prod_branch": "4531|CBOSS_BSS_ZMDB_V9.0_主分支",
+        }
+    ]
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review._load_catalog_repos",
+        lambda _sid: catalog,
+    )
+    repos = [
+        {
+            "branch_version_id": "4531",
+            "repo_url": "https://git.example.com/xmjfbss/ZMDB.git",
+            "branch_version_name": "",
+            "product_module_name": "",
+            "change_summary": "改造",
+        }
+    ]
+    out = enrich_func_solution_repos_from_catalog("21881451", repos)
+    assert out[0]["product_module_name"] == "ZMDB"
+    assert out[0]["branch_version_name"] == "CBOSS_BSS_ZMDB_V9.0_主分支"
+
+
+def test_ensure_split_tasks_draft_fills_branch_from_catalog(monkeypatch):
+    catalog = [
+        {
+            "repo_url": "https://git.example.com/ZMDB.git",
+            "repo_module": "ZMDB",
+            "prod_branch": "4531|CBOSS_BSS_ZMDB_V9.0_主分支",
+        }
+    ]
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review._load_catalog_repos",
+        lambda _sid: catalog,
+    )
+    payload = {
+        "requirement_name": "ZMDB改造",
+        "func_solution_parsed": {
+            "repos": [
+                {
+                    "branch_version_id": "4531",
+                    "repo_url": "https://git.example.com/ZMDB.git",
+                    "change_summary": "核心改造",
+                }
+            ],
+            "impact_assessment": {"sections": []},
+        },
+    }
+    tasks = ensure_split_tasks_draft(payload, "21881451", scope_id="21881451")
+    assert len(tasks) == 1
+    assert tasks[0]["productModuleName"] == "ZMDB"
+    assert tasks[0]["branchVersionName"] == "CBOSS_BSS_ZMDB_V9.0_主分支"
+    assert tasks[0]["branch_version_id"] == "4531"
 
 
 def test_enrich_payload_from_archive_reparses_impact(tmp_path, monkeypatch):

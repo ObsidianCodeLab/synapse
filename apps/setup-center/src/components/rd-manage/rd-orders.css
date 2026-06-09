@@ -29,6 +29,147 @@
   min-height: 5.75rem;
 }
 
+/* 研发子单悬停触发器 */
+.rdOrdersRoot .rd-order-owned-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  padding: 0.1rem 0.45rem;
+  color: var(--primary);
+  line-height: 1.2;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.rdOrdersRoot .rd-order-owned-trigger:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.rd-order-owned-popover-overlay .ant-popover-inner {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 0.75rem !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line)) !important;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--panel2) 94%, transparent),
+    color-mix(in srgb, var(--primary) 6%, var(--panel2))
+  ) !important;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.35),
+    0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent) !important;
+}
+
+.rd-order-owned-popover {
+  width: min(18rem, 72vw);
+  padding: 0.65rem 0.75rem 0.75rem;
+}
+.rd-order-owned-popover__header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line));
+}
+.rd-order-owned-popover__viewport {
+  position: relative;
+  max-height: 9.5rem;
+  overflow: hidden;
+}
+.rd-order-owned-popover__viewport::before,
+.rd-order-owned-popover__viewport::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.1rem;
+  z-index: 2;
+  pointer-events: none;
+}
+.rd-order-owned-popover__viewport::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--panel2) 0%, transparent 100%);
+}
+.rd-order-owned-popover__viewport::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--panel2) 0%, transparent 100%);
+}
+.rd-order-owned-popover__viewport--scroll:hover .rd-order-owned-popover__track {
+  animation-play-state: paused;
+}
+.rd-order-owned-popover__track {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.rd-order-owned-popover__viewport--scroll .rd-order-owned-popover__track {
+  animation: rd-order-owned-scroll calc(var(--rd-owned-count, 3) * 2.2s) linear infinite;
+}
+.rd-order-owned-popover__row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.75rem;
+}
+.rd-order-owned-popover__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rd-order-owned-state {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0.08rem 0.45rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+.rd-order-owned-state--pending {
+  border-color: color-mix(in srgb, #94a3b8 40%, transparent);
+  background: color-mix(in srgb, #94a3b8 12%, transparent);
+  color: #64748b;
+}
+.rd-order-owned-state--active {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+.rd-order-owned-state--done {
+  border-color: color-mix(in srgb, #22c55e 40%, transparent);
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #16a34a;
+}
+.rd-order-owned-state--error {
+  border-color: color-mix(in srgb, var(--destructive, #ef4444) 45%, transparent);
+  background: color-mix(in srgb, var(--destructive, #ef4444) 12%, transparent);
+  color: var(--destructive, #ef4444);
+}
+
+@keyframes rd-order-owned-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(-50% - 0.175rem));
+  }
+}
+
 /* 左侧工单卡片底部进度条流光（CSS 动画，比 Motion 的 backgroundPosition 更稳定可见） */
 .rdOrdersRoot .rd-order-ticket-progress-track {
   position: absolute;

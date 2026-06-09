@@ -1453,3 +1453,275 @@ button.rd-meeting-chat-avatar:hover {
 .rd-roster-meta {
   margin-top: 2px;
 }
+
+/* --- 系统节点结构化卡片（拆单 / 沙箱 / 环境预生成）--- */
+.rd-system-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+
+.rd-system-hero__glow {
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.rd-system-hero--split {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.12) 55%, transparent 100%);
+  border: 1px solid rgba(129, 140, 248, 0.28);
+}
+.rd-system-hero--split .rd-system-hero__glow {
+  background: #6366f1;
+}
+
+.rd-system-hero--sandbox {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2) 0%, rgba(59, 130, 246, 0.1) 55%, transparent 100%);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+.rd-system-hero--sandbox .rd-system-hero__glow {
+  background: #06b6d4;
+}
+
+.rd-system-hero--env {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(52, 211, 153, 0.08) 55%, transparent 100%);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+}
+.rd-system-hero--env .rd-system-hero__glow {
+  background: #10b981;
+}
+
+.rd-system-hero__body {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rd-system-hero__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.rd-system-hero__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f1f5f9;
+}
+
+.rd-system-hero__subtitle {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--text) 78%, transparent);
+}
+
+.rd-system-hero__stats {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rd-system-hero__stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 56px;
+}
+
+.rd-system-hero__stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.rd-system-hero__stat-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted2);
+  margin-top: 2px;
+}
+
+.rd-system-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.rd-system-task-card {
+  border-radius: 12px;
+  border: 1px solid rgba(129, 140, 248, 0.22);
+  background: linear-gradient(160deg, rgba(30, 27, 75, 0.55) 0%, rgba(15, 23, 42, 0.65) 100%);
+  padding: 12px 13px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+}
+
+.rd-system-task-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rd-system-task-card__no {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+
+.rd-system-task-card__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #fbbf24;
+}
+.rd-system-task-card__status.is-ok {
+  color: #34d399;
+}
+
+.rd-system-task-card__title {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  line-height: 1.45;
+}
+
+.rd-system-task-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rd-system-task-card__meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted2);
+}
+
+.rd-system-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  color: #cbd5e1;
+}
+
+.rd-system-chip--module {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(129, 140, 248, 0.35);
+  color: #c7d2fe;
+}
+
+.rd-system-chip--muted {
+  opacity: 0.75;
+}
+
+.rd-system-repo-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  background: linear-gradient(135deg, rgba(8, 47, 73, 0.45) 0%, rgba(15, 23, 42, 0.55) 100%);
+}
+
+.rd-system-repo-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  color: #67e8f9;
+  flex-shrink: 0;
+}
+
+.rd-system-repo-card__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e0f2fe;
+}
+
+.rd-system-binding-card {
+  border-radius: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(30, 27, 75, 0.25);
+  padding: 10px 12px;
+}
+
+.rd-system-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.rd-system-path__text {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  word-break: break-all;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rd-system-path__copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted2);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rd-system-path__copy:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.rd-chat-card--system-split,
+.rd-chat-card--system-sandbox {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
