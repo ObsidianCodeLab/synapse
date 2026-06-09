@@ -99,6 +99,31 @@ def load_or_create_dev_status(
         return payload
 
 
+def resolve_work_dir_scope(order_dir: Path) -> tuple[str, dict[str, Any]] | None:
+    """校验 ``work/<scope_id>/`` 目录名与 ``dev.status.scope.id`` 一致后返回规范 scope_id。
+
+    目录名与文件内 scope 不一致时视为陈旧/错位目录，扫描列表与 room_id 反查时跳过，
+    避免同一 ``room_id`` 命中错误工单（例如 ``21881453/`` 内写了 ``21881454``）。
+    """
+    dir_name = order_dir.name
+    data = read_dev_status_file(order_dir / "dev.status")
+    if data is None:
+        return None
+    scope = data.get("scope") if isinstance(data.get("scope"), dict) else {}
+    file_scope_id = str(scope.get("id") or "").strip()
+    if file_scope_id and file_scope_id != dir_name:
+        logger.warning(
+            "跳过工单目录 %s：dev.status scope.id=%s 与目录名不一致",
+            dir_name,
+            file_scope_id,
+        )
+        return None
+    scope_id = dir_name or file_scope_id
+    if not scope_id:
+        return None
+    return scope_id, data
+
+
 def should_list_in_meeting_rooms(data: dict[str, Any]) -> bool:
     local = str(data.get("local_process_state") or "").strip()
     if local in ACTIVE_LOCAL_STATES:

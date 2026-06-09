@@ -22,6 +22,7 @@ from synapse.rd_meeting.dev_status import (
     load_dev_status,
     load_or_create_dev_status,
     read_dev_status_file,
+    resolve_work_dir_scope,
     save_dev_status,
     should_list_in_meeting_rooms,
 )
@@ -193,9 +194,11 @@ class MeetingRoomService:
         titles = build_title_index()
         items: list[dict[str, Any]] = []
         for order_dir in iter_work_order_directories():
-            scope_id = order_dir.name
-            data = read_dev_status_file(order_dir / "dev.status")
-            if data is None or not should_list_in_meeting_rooms(data):
+            resolved = resolve_work_dir_scope(order_dir)
+            if resolved is None:
+                continue
+            scope_id, data = resolved
+            if not should_list_in_meeting_rooms(data):
                 continue
             ensure_metrics_token_budget(scope_id)
             items.append(self._to_list_item(data, scope_id, titles))
@@ -351,16 +354,22 @@ class MeetingRoomService:
         rid = (room_id or "").strip()
         if not rid:
             return None
+        titles = build_title_index()
+        matches: list[tuple[str, str, dict[str, Any]]] = []
         for order_dir in iter_work_order_directories():
-            scope_id = order_dir.name
-            data = read_dev_status_file(order_dir / "dev.status")
-            if not data:
+            resolved = resolve_work_dir_scope(order_dir)
+            if resolved is None:
                 continue
+            scope_id, data = resolved
             data = ensure_room_id(data)
             mr = data.get("meeting_room")
             if isinstance(mr, dict) and str(mr.get("room_id") or "").strip() == rid:
-                return self._room_detail_payload(data, scope_id, build_title_index())
-        return None
+                matches.append((str(data.get("updated_at") or ""), scope_id, data))
+        if not matches:
+            return None
+        matches.sort(key=lambda item: item[0], reverse=True)
+        _, scope_id, data = matches[0]
+        return self._room_detail_payload(data, scope_id, titles)
 
     def get_room_node_chat(self, room_id: str, node_id: str) -> dict[str, Any] | None:
         """按 SOP 节点读取协作会议流（``agents/<node_id>/room_history.jsonl``）。"""
@@ -446,12 +455,12 @@ class MeetingRoomService:
         pending: list[dict[str, Any]] = []
         titles = build_title_index()
         for order_dir in iter_work_order_directories():
-            scope_id = order_dir.name
+            resolved = resolve_work_dir_scope(order_dir)
+            if resolved is None:
+                continue
+            scope_id, dev = resolved
             rs = load_room_state(scope_id)
             if not rs or str(rs.get("status") or "") != "human_intervention":
-                continue
-            dev = read_dev_status_file(order_dir / "dev.status")
-            if dev is None:
                 continue
             item = self._to_list_item(dev, scope_id, titles)
             item["status"] = "human_intervention"

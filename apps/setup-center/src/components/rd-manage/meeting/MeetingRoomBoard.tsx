@@ -639,6 +639,19 @@ const MEETING_PIPELINE_STAGES = SOP_STAGES.filter((s) => s.id > 0);
 /** 主页面会议室列表自动刷新间隔（会中弹窗打开时不启用，由 live 轮询负责） */
 const LIST_AUTO_REFRESH_MS = 60_000;
 
+function meetingRoomScopeKey(room: Pick<MeetingRoom, 'scopeType' | 'scopeId'>): string {
+  return `${room.scopeType || 'demand'}:${room.scopeId}`;
+}
+
+/** 列表按工单 scope 去重；同一 room_id 撞车时保留 updated 较新的条目（后端已过滤错位目录）。 */
+function dedupeMeetingRooms(rooms: MeetingRoom[]): MeetingRoom[] {
+  const byScope = new Map<string, MeetingRoom>();
+  for (const room of rooms) {
+    byScope.set(meetingRoomScopeKey(room), room);
+  }
+  return Array.from(byScope.values());
+}
+
 /** 会议室弹窗 SOP 阶段导航主题（与配置抽屉色系对齐，增强对比与光效） */
 type StageNavTheme = {
   accent: string;
@@ -2290,7 +2303,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     }
     try {
       const list = await fetchMeetingRooms(base);
-      setRooms(list.map(mapListItemToRoom));
+      setRooms(dedupeMeetingRooms(list.map(mapListItemToRoom)));
       if (silent) setLoadError(null);
     } catch (e) {
       if (!silent) {
@@ -2350,11 +2363,16 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     void fetchMeetingRoomDetail(base, focus.roomId)
       .then((detail) => {
         const merged = mapDetailToRoom(detail);
+        const focusScopeId = (focus.scopeId || '').trim();
+        if (focusScopeId && merged.scopeId !== focusScopeId) {
+          return;
+        }
         setActiveRoom(merged);
         setDialogOpen(true);
         setRooms((prev) => {
-          const exists = prev.some((r) => r.id === merged.id);
-          return exists ? prev.map((r) => (r.id === merged.id ? merged : r)) : [merged, ...prev];
+          const scopeKey = meetingRoomScopeKey(merged);
+          const rest = prev.filter((r) => meetingRoomScopeKey(r) !== scopeKey);
+          return dedupeMeetingRooms([merged, ...rest]);
         });
       })
       .catch(() => {
@@ -2374,7 +2392,9 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       .then((detail) => {
         const merged = mapDetailToRoom(detail);
         setActiveRoom(merged);
-        setRooms((prev) => prev.map((r) => (r.id === merged.id ? merged : r)));
+        setRooms((prev) =>
+          dedupeMeetingRooms(prev.map((r) => (meetingRoomScopeKey(r) === meetingRoomScopeKey(merged) ? merged : r))),
+        );
       })
       .catch(() => {
         /* 保留列表态数据 */
@@ -2518,7 +2538,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
             <AnimatePresence>
               {rooms.map((room) => (
                 <RoomCard
-                  key={room.id}
+                  key={meetingRoomScopeKey(room)}
                   room={room}
                   rosterAgents={rosterForRoom(room)}
                   onClick={handleOpenRoom}
