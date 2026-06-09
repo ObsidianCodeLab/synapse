@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from synapse.rd_meeting.cli_models import DEFAULT_CURSOR_CLI_MODEL, normalize_cursor_cli_model
+from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, normalize_cli_tool
 from synapse.rd_meeting.config_store import (
     DEFAULT_LLM_ENDPOINT_KEY,
     load_meeting_room_config,
 )
 from synapse.rd_meeting.hitl_form import resolve_hitl_form_schema
-from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, normalize_cli_tool
 from synapse.rd_meeting.intents import resolve_node_intent
 from synapse.rd_sop.manifest import (
     DEFAULT_HOST_PROFILE_ID,
@@ -83,6 +84,10 @@ def _merge_binding(base: dict[str, Any], override: dict[str, Any], *, node_id: s
         out["hitl_form_schema"] = override.get("hitl_form_schema")
     if override.get("cli_tool") is not None:
         out["cli_tool"] = normalize_cli_tool(str(override.get("cli_tool") or DEFAULT_CLI_TOOL))
+    if override.get("cli_model") is not None:
+        out["cli_model"] = normalize_cursor_cli_model(str(override.get("cli_model") or ""))
+    if override.get("cli_model_custom") is not None:
+        out["cli_model_custom"] = str(override.get("cli_model_custom") or "").strip()
     return out
 
 
@@ -167,6 +172,15 @@ def resolve_node_binding(
     cli_tool = normalize_cli_tool(
         str(merged.get("cli_tool") or override.get("cli_tool") or DEFAULT_CLI_TOOL)
     )
+    cli_model = normalize_cursor_cli_model(
+        str(merged.get("cli_model") or override.get("cli_model") or DEFAULT_CURSOR_CLI_MODEL)
+    )
+    cli_model_custom = str(
+        merged.get("cli_model_custom") or override.get("cli_model_custom") or ""
+    ).strip()
+    merged["cli_tool"] = cli_tool
+    merged["cli_model"] = cli_model
+    merged["cli_model_custom"] = cli_model_custom
 
     return {
         "node_id": node_id,

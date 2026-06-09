@@ -90,7 +90,14 @@ def _write_system_archive(
     return artifacts
 
 
-def _save_pipeline_context_assets(scope_id: str, key: str, assets: dict[str, Any]) -> None:
+def _save_pipeline_context_assets(
+    scope_id: str,
+    key: str,
+    assets: dict[str, Any],
+    *,
+    pipe: Any = None,
+) -> None:
+    """落盘 pipeline context 资产，并同步内存中的 ``MeetingPipeline``（避免随后 ``pipe.save()`` 覆盖）。"""
     sid = (scope_id or "").strip()
     if not sid:
         return
@@ -103,10 +110,21 @@ def _save_pipeline_context_assets(scope_id: str, key: str, assets: dict[str, Any
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
     write_json_file(path, raw)
+    if pipe is not None:
+        pctx = pipe._data.get("context")
+        if not isinstance(pctx, dict):
+            pctx = {}
+        pctx[key] = assets
+        pipe._data["context"] = pctx
 
 
-def _save_sandbox_assets_to_pipeline(scope_id: str, assets: dict[str, Any]) -> None:
-    _save_pipeline_context_assets(scope_id, "sandbox_assets", assets)
+def _save_sandbox_assets_to_pipeline(
+    scope_id: str,
+    assets: dict[str, Any],
+    *,
+    pipe: Any = None,
+) -> None:
+    _save_pipeline_context_assets(scope_id, "sandbox_assets", assets, pipe=pipe)
 
 
 def handle_sandbox_build(
@@ -138,7 +156,7 @@ def handle_sandbox_build(
     catalog_rows = _load_catalog_rows(sid, pipe)
     wire_hit = match_prod_row_by_prod(catalog_rows, prod) if catalog_rows else None
     assets = bootstrap_sandbox_assets(sid, prod, wire_row=wire_hit, catalog_rows=catalog_rows)
-    _save_sandbox_assets_to_pipeline(sid, assets)
+    _save_sandbox_assets_to_pipeline(sid, assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_sandbox_build_report(assets, node_name=node_name)
@@ -185,13 +203,12 @@ def handle_auto_split(
     pipe: Any = None,
 ) -> dict[str, Any]:
     """自动拆单：读 split_plan 调 create_task，并同步 userwork / 门户清单。"""
-    _ = pipe
     sid = scope_id.strip()
     from synapse.rd_meeting.auto_split_assets import bootstrap_auto_split, format_auto_split_report
 
     assets = bootstrap_auto_split(scope_type, sid)
 
-    _save_pipeline_context_assets(sid, "auto_split_assets", assets)
+    _save_pipeline_context_assets(sid, "auto_split_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_auto_split_report(assets, node_name=node_name)
@@ -249,8 +266,6 @@ def handle_env_pregen(
         }
 
     from synapse.rd_meeting.env_pregen_assets import (
-        _ENV_PREGEN_FORCE_FAIL_FLAG,
-        _env_pregen_force_fail_enabled,
         bootstrap_env_pregen,
         format_env_pregen_report,
     )
@@ -259,7 +274,7 @@ def handle_env_pregen(
     catalog_rows = _load_catalog_rows(sid, pipe)
     wire_hit = match_prod_row_by_prod(catalog_rows, prod) if catalog_rows else None
     assets = bootstrap_env_pregen(sid, prod, wire_row=wire_hit, catalog_rows=catalog_rows)
-    _save_pipeline_context_assets(sid, "env_pregen_assets", assets)
+    _save_pipeline_context_assets(sid, "env_pregen_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_env_pregen_report(assets, node_name=node_name)
@@ -289,25 +304,6 @@ def handle_env_pregen(
         }
         return attach_system_node_display(node_id, out, scope_id=sid)
 
-    if ok and _env_pregen_force_fail_enabled():
-        logger.warning(
-            "env_pregen: force fail after successful materialization (%s=1)",
-            _ENV_PREGEN_FORCE_FAIL_FLAG,
-        )
-        out = {
-            **assets,
-            "env_root": assets.get("env_root"),
-            "docs": assets.get("docs") or [],
-            "entropy": assets.get("entropy") or {},
-            "engineering": assets.get("engineering") or {},
-            "artifacts": artifacts,
-            "report_body": report_body,
-            "prod": prod,
-            "status": "failed",
-            "error": "测试模式：环境预生成内容已落盘，故意置失败以便检查",
-        }
-        return attach_system_node_display(node_id, out, scope_id=sid)
-
     out = {
         "status": "ok" if assets.get("status") == "ok" else "partial",
         "env_root": assets.get("env_root"),
@@ -331,12 +327,11 @@ def handle_code_commit(
     pipe: Any = None,
 ) -> dict[str, Any]:
     """代码提交：特性分支提交并收集试飞结果。"""
-    _ = pipe
     sid = scope_id.strip()
     from synapse.rd_meeting.code_commit_assets import bootstrap_code_commit, format_code_commit_report
 
     assets = bootstrap_code_commit(sid, scope_type=scope_type, task_id=sid if scope_type == "task" else "")
-    _save_pipeline_context_assets(sid, "code_commit_assets", assets)
+    _save_pipeline_context_assets(sid, "code_commit_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_code_commit_report(assets, node_name=node_name)
@@ -366,12 +361,12 @@ def handle_task_check(
     pipe: Any = None,
 ) -> dict[str, Any]:
     """任务检查：试飞级与需求方案级分析，失败时引导回退。"""
-    _ = scope_type, pipe
+    _ = scope_type
     sid = scope_id.strip()
     from synapse.rd_meeting.task_check_assets import bootstrap_task_check, format_task_check_report
 
     assets = bootstrap_task_check(sid)
-    _save_pipeline_context_assets(sid, "task_check_assets", assets)
+    _save_pipeline_context_assets(sid, "task_check_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_task_check_report(assets, node_name=node_name)

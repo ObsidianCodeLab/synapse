@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -26,19 +25,6 @@ from synapse.rd_meeting.product_context import (
 from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
-
-# 测试：环境预生成落盘完成后强制置失败，便于检查产出（不再使用 sleep 阻塞）
-_ENV_PREGEN_FORCE_FAIL_FLAG = "SYNAPSE_ENV_PREGEN_FORCE_FAIL"
-
-
-def _env_pregen_force_fail_enabled() -> bool:
-    flag = os.environ.get(_ENV_PREGEN_FORCE_FAIL_FLAG, "").strip().lower()
-    return flag in ("1", "true", "yes", "on")
-
-
-def _env_pregen_test_sleep() -> None:
-    """已废弃：请改用 SYNAPSE_ENV_PREGEN_FORCE_FAIL=1 在落盘完成后置失败。"""
-    return
 
 _ENTROPY_SOURCE_NODE = "entropy_gen"
 _ENTROPY_SOURCE_STAGE_ID = 2
@@ -122,7 +108,6 @@ def bootstrap_env_pregen(
     catalog_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """环境预生成：补拉 catalog 文档至 ``doc/``、控熵至 ``env/``、工程落盘至 ``sandbox/``。"""
-    _env_pregen_test_sleep()
     sid = (scope_id or "").strip()
     prod_key = (prod or "").strip()
     scope_dir(sid).mkdir(parents=True, exist_ok=True)

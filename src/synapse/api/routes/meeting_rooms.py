@@ -909,3 +909,11 @@ async def list_patch_versions_for_room(
     )
     return await _get_patch_version(req)
 
+
+@router.get("/api/dev/cursor-agent-cli/status")
+async def get_cursor_agent_cli_status() -> dict:
+    """检测本机 Cursor Agent CLI（agent）是否可用。"""
+    from synapse.rd_meeting.cursor_agent_cli import check_cursor_agent_cli
+
+    return success_response(check_cursor_agent_cli())
+

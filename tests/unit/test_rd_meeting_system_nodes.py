@@ -66,7 +66,7 @@ def test_system_node_binding_forbids_human_confirm(monkeypatch):
         assert b["hitl_form_schema"] is None
 
 
-def test_materialize_repo_to_sandbox_skips_utf8(monkeypatch, tmp_path):
+def test_materialize_repo_to_sandbox_always_fresh_clone(monkeypatch, tmp_path):
     scope_id = "sb-scope"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
     dest = tmp_path / "work" / scope_id / "sandbox" / "demo"
@@ -74,26 +74,124 @@ def test_materialize_repo_to_sandbox_skips_utf8(monkeypatch, tmp_path):
     (dest / ".git").mkdir()
     legacy = dest / "legacy.txt"
     legacy.write_bytes("编码测试".encode("gbk"))
+    git_calls: list[list[str]] = []
 
-    monkeypatch.setattr(
-        "synapse.rd_meeting.sandbox_assets._run_git",
-        lambda *args, **kwargs: (True, ""),
-    )
+    def _fake_git(args, **kwargs):
+        git_calls.append(list(args))
+        return True, ""
+
+    monkeypatch.setattr("synapse.rd_meeting.sandbox_assets._run_git", _fake_git)
 
     entry = materialize_repo_to_sandbox(
         scope_id,
         {"repo_name": "demo", "repo_url": "https://example.com/demo.git", "repo_branch": "main"},
     )
     assert entry["status"] == "ok"
-    assert legacy.read_bytes() == "编码测试".encode("gbk")
+    assert not legacy.is_file()
+    assert any(cmd[0:2] == ["git", "clone"] for cmd in git_calls)
+
+
+def test_save_pipeline_context_assets_survives_pipe_save(monkeypatch, tmp_path):
+    """系统节点写盘后 pipe.save() 不得冲掉 auto_split_assets / sandbox_assets。"""
+    scope_id = "pipe-asset-sync"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    from synapse.rd_meeting.paths import meeting_pipeline_path
+    from synapse.rd_meeting.pipeline import MeetingPipeline
+    from synapse.rd_meeting.system_nodes import _save_pipeline_context_assets
+
+    pipe = MeetingPipeline.create(scope_id)
+    auto_assets = {
+        "status": "ok",
+        "create_task_results": [
+            {
+                "status": "ok",
+                "task_no": "11924006",
+                "work_item": {"feature_id": "11924006", "product_module_name": "ZMDB"},
+            }
+        ],
+    }
+    sandbox_assets = {"status": "ok", "repos": [{"repo_name": "ZMDB", "feature_branch": "11924006"}]}
+
+    _save_pipeline_context_assets(scope_id, "auto_split_assets", auto_assets, pipe=pipe)
+    pctx = pipe._data["context"]
+    pctx["last_finished_node_id"] = "auto_split"
+    pctx["last_system_node_result"] = {"status": "ok", **auto_assets}
+    pipe._data["context"] = pctx
+    pipe.save()
+
+    raw = json.loads(meeting_pipeline_path(scope_id).read_text(encoding="utf-8"))
+    assert raw["context"]["auto_split_assets"] == auto_assets
+
+    _save_pipeline_context_assets(scope_id, "sandbox_assets", sandbox_assets, pipe=pipe)
+    pctx = pipe._data["context"]
+    pctx["last_finished_node_id"] = "sandbox_build"
+    pctx["last_system_node_result"] = {"status": "ok", **sandbox_assets}
+    pipe._data["context"] = pctx
+    pipe.save()
+
+    raw = json.loads(meeting_pipeline_path(scope_id).read_text(encoding="utf-8"))
+    assert raw["context"]["auto_split_assets"] == auto_assets
+    assert raw["context"]["sandbox_assets"] == sandbox_assets
+
+
+def test_bootstrap_sandbox_assets_clears_existing_workspace(monkeypatch, tmp_path):
+    scope_id = "sb-clear"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    from synapse.rd_meeting.paths import sandbox_root
+
+    stale = sandbox_root(scope_id) / "ZMDB" / "stale.txt"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("old", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.sandbox_assets._repo_feature_branch_map",
+        lambda *_a, **_k: {},
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.sandbox_assets.materialize_repo_to_sandbox",
+        lambda *_a, **_k: {"repo_name": "ZMDB", "status": "ok", "error": ""},
+    )
+
+    from synapse.rd_meeting.sandbox_assets import bootstrap_sandbox_assets
+
+    wire = {
+        "prod": "demo",
+        "repos": [{"repo_name": "ZMDB", "repo_url": "https://example.com/ZMDB.git", "repo_branch": "main"}],
+    }
+    result = bootstrap_sandbox_assets(scope_id, "demo", wire_row=wire)
+    assert result["status"] == "ok"
+    assert not stale.is_file()
+
+
+def test_materialize_repo_to_sandbox_removes_broken_git_dir(monkeypatch, tmp_path):
+    scope_id = "sb-broken-git"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    dest = tmp_path / "work" / scope_id / "sandbox" / "demo"
+    dest.mkdir(parents=True)
+    (dest / ".git").mkdir()
+    (dest / "stale.txt").write_text("x", encoding="utf-8")
+    git_calls: list[list[str]] = []
+
+    def _fake_git(args, **kwargs):
+        git_calls.append(list(args))
+        return True, ""
+
+    monkeypatch.setattr("synapse.rd_meeting.sandbox_assets._run_git", _fake_git)
+
+    entry = materialize_repo_to_sandbox(
+        scope_id,
+        {"repo_name": "demo", "repo_url": "https://example.com/demo.git", "repo_branch": "main"},
+    )
+    assert entry["status"] == "ok"
+    assert any(cmd[0:2] == ["git", "clone"] for cmd in git_calls)
+    assert not (dest / "stale.txt").is_file()
 
 
 def test_materialize_repo_to_sandbox_checkouts_feature_branch(monkeypatch, tmp_path):
     scope_id = "sb-feature"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
     dest = tmp_path / "work" / scope_id / "sandbox" / "demo"
-    dest.mkdir(parents=True)
-    (dest / ".git").mkdir()
     git_calls: list[list[str]] = []
 
     def _fake_git(args, **kwargs):
@@ -112,8 +210,14 @@ def test_materialize_repo_to_sandbox_checkouts_feature_branch(monkeypatch, tmp_p
     )
     assert entry["status"] == "ok"
     assert entry["feature_branch"] == "feat-11923497"
-    assert any("fetch" in cmd and "feat-11923497" in cmd for cmd in git_calls)
-    assert any("checkout" in cmd and "feat-11923497" in cmd for cmd in git_calls)
+    assert any(
+        "fetch" in cmd and "feat-11923497" in " ".join(cmd)
+        for cmd in git_calls
+    )
+    assert any(
+        "checkout" in cmd and "feat-11923497" in " ".join(cmd)
+        for cmd in git_calls
+    )
 
 
 def test_auto_split_from_userwork(monkeypatch, tmp_path):
@@ -255,80 +359,6 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
     assert rows[0]["work_item"]["task_no"] == "T-NEW-1"
     assert rows[0]["work_item"]["task_title"] == "子单A"
     assert rows[0]["work_item"]["feature_id"] == "feat-branch-1"
-
-
-def test_env_pregen_force_fail_flag(monkeypatch):
-    monkeypatch.delenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", raising=False)
-    from synapse.rd_meeting.env_pregen_assets import _env_pregen_force_fail_enabled
-
-    assert _env_pregen_force_fail_enabled() is False
-    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", "1")
-    assert _env_pregen_force_fail_enabled() is True
-
-
-def test_env_pregen_test_sleep_is_noop():
-    from synapse.rd_meeting.env_pregen_assets import _env_pregen_test_sleep
-
-    _env_pregen_test_sleep()
-
-
-def test_env_pregen_force_fail_overrides_assets_status(monkeypatch, tmp_path):
-    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", "1")
-    scope_id = "env-force-fail"
-    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
-
-    assets = {
-        "prod": "demo",
-        "env_root": str(tmp_path / "work" / scope_id / "env"),
-        "doc_root": str(tmp_path / "work" / scope_id / "doc"),
-        "docs": [{"doc_type": "产品架构", "status": "ok"}],
-        "entropy": {"status": "ok"},
-        "product_docs": {"status": "ok"},
-        "engineering": {"status": "partial"},
-        "status": "partial",
-        "errors": [],
-        "materialized_at": "2026-06-09T00:00:00",
-    }
-
-    monkeypatch.setattr(
-        "synapse.rd_meeting.system_nodes._resolve_prod",
-        lambda *_a, **_k: "demo",
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.system_nodes._load_catalog_rows",
-        lambda *_a, **_k: [],
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.env_pregen_assets.bootstrap_env_pregen",
-        lambda *_a, **_k: assets,
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.system_nodes._save_pipeline_context_assets",
-        lambda *_a, **_k: None,
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.env_pregen_assets.format_env_pregen_report",
-        lambda *_a, **_k: "# report",
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.system_nodes._write_system_archive",
-        lambda *_a, **_k: [],
-    )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.system_node_display.attach_system_node_display",
-        lambda _nid, result, **_k: result,
-    )
-
-    from synapse.rd_meeting.system_nodes import handle_env_pregen
-
-    result = handle_env_pregen(
-        scope_type="demand",
-        scope_id=scope_id,
-        node_id="env_pregen",
-        dev={"stage_id": 3},
-    )
-    assert result["status"] == "failed"
-    assert "故意置失败" in str(result.get("error") or "")
 
 
 def test_env_pregen_copies_entropy(monkeypatch, tmp_path):

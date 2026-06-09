@@ -2,37 +2,41 @@
  * 任务执行评审面板：展示 CLI 批量执行结果，供人工确认后推进。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Input, Tag, Typography, message } from 'antd';
+import { Alert, Button, Input, message } from 'antd';
 import {
   Bot,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
   Coins,
+  FileCode2,
   FolderGit2,
+  ListTree,
   Loader2,
-  Sparkles,
   Target,
   Terminal,
   XCircle,
 } from 'lucide-react';
 import {
   fetchTaskExec,
+  reprocessMeetingRoom,
   submitTaskExecDecision,
   type TaskExecPayload,
   type TaskExecTaskRow,
 } from '../../../api/meetingRoomService';
 import { CLI_TOOL_OPTIONS } from './cliToolConfig';
+import { displayCliModelLabel } from './cliModelConfig';
+import { CursorAgentInstallModal } from './CursorAgentInstallModal';
 import { ReviewMarkdown } from './ReviewMarkdown';
 
 const { TextArea } = Input;
-const { Text } = Typography;
 
-const STATUS_COLOR: Record<string, string> = {
-  ok: 'success',
-  completed: 'success',
-  partial: 'warning',
-  failed: 'error',
-  skipped: 'default',
+const STATUS_META: Record<string, { label: string; className: string }> = {
+  ok: { label: '成功', className: 'rd-task-exec-status--ok' },
+  completed: { label: '已完成', className: 'rd-task-exec-status--ok' },
+  partial: { label: '部分完成', className: 'rd-task-exec-status--partial' },
+  failed: { label: '失败', className: 'rd-task-exec-status--failed' },
+  skipped: { label: '已跳过', className: 'rd-task-exec-status--skipped' },
 };
 
 interface Props {
@@ -55,27 +59,50 @@ function formatDuration(sec: number): string {
   return `${m}m ${s}s`;
 }
 
+function statusMeta(status: string) {
+  const key = String(status || '').toLowerCase();
+  return STATUS_META[key] || { label: status || '—', className: 'rd-task-exec-status--default' };
+}
+
+function PromptBlock({ title, content }: { title: string; content?: string }) {
+  const text = (content || '').trim();
+  if (!text) {
+    return (
+      <div className="rd-task-exec-field">
+        <div className="rd-task-exec-field__label">{title}</div>
+        <p className="rd-task-exec-field__empty">—</p>
+      </div>
+    );
+  }
+  return (
+    <details className="rd-task-exec-prompt" open>
+      <summary className="rd-task-exec-field__label cursor-pointer select-none list-none">
+        {title}
+      </summary>
+      <pre className="rd-task-exec-prompt__body custom-scrollbar">{text}</pre>
+    </details>
+  );
+}
+
 function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
   const status = String(task.status || '—');
+  const meta = statusMeta(status);
   const cov = Array.isArray(task.coverage) ? task.coverage : [];
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-amber-950/20 p-4 shadow-[0_8px_32px_rgba(251,191,36,0.08)]">
       <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-amber-400/10 blur-2xl" />
-      <div className="relative flex flex-wrap items-start justify-between gap-3 mb-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Tag color={STATUS_COLOR[status] || 'default'} className="m-0 font-mono text-[10px]">
-              {status.toUpperCase()}
-            </Tag>
-            <span className="font-semibold text-foreground text-sm truncate">
-              {task.task_no} {task.task_title || ''}
-            </span>
+      <div className="relative mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-foreground text-sm truncate">
+            {task.task_no} {task.task_title || ''}
           </div>
           {task.product_module ? (
             <p className="text-[11px] text-muted-foreground mt-1 mb-0">{task.product_module}</p>
           ) : null}
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground shrink-0">
+        <div className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
+          <span className={`rd-task-exec-status ${meta.className}`}>{meta.label}</span>
           <span className="inline-flex items-center gap-1">
             <Coins className="h-3 w-3 text-amber-400" />
             {task.tokens_used ?? 0}
@@ -87,33 +114,55 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
         </div>
       </div>
 
-      <div className="relative space-y-2 text-[12px]">
-        <div className="flex items-start gap-2">
-          <Target className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
-          <div>
-            <span className="text-muted-foreground">任务目标 · </span>
-            <span className="text-foreground/90">{task.goal || '—'}</span>
+      <div className="relative space-y-3 text-[12px]">
+        <div className="rd-task-exec-field">
+          <div className="rd-task-exec-field__label">
+            <Target className="h-3.5 w-3.5 text-amber-400" />
+            任务目标
           </div>
+          <p className="rd-task-exec-field__value">{task.goal || '—'}</p>
         </div>
-        {cov.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 pl-5">
-            {cov.map((fp) => (
-              <Tag key={fp} className="m-0 text-[10px] border-amber-500/25 bg-amber-500/10 text-amber-200">
-                {fp}
-              </Tag>
-            ))}
+
+        <div className="rd-task-exec-field">
+          <div className="rd-task-exec-field__label">
+            <Bot className="h-3.5 w-3.5 text-violet-400" />
+            覆盖功能
           </div>
-        ) : null}
-        <div className="flex items-start gap-2">
-          <FolderGit2 className="h-3.5 w-3.5 text-cyan-400 mt-0.5 shrink-0" />
-          <code className="text-[10px] text-cyan-300/90 break-all">{task.sandbox_path || '—'}</code>
+          {cov.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {cov.map((fp) => (
+                <span
+                  key={fp}
+                  className="inline-flex rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-200"
+                >
+                  {fp}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="rd-task-exec-field__empty">—</p>
+          )}
         </div>
+
+        <PromptBlock title="开发要求" content={task.develop_prompt} />
+        <PromptBlock title="审计要求" content={task.verify_prompt} />
+
+        <div className="rd-task-exec-field">
+          <div className="rd-task-exec-field__label">
+            <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />
+            工作路径
+          </div>
+          <code className="rd-task-exec-field__path">{task.sandbox_path || '—'}</code>
+        </div>
+
         {task.error ? (
           <Alert type="error" showIcon message={String(task.error)} className="text-[11px]" />
         ) : null}
+
         {task.report_markdown ? (
-          <details className="mt-2 rounded-lg border border-slate-700/60 bg-slate-950/50 px-3 py-2">
-            <summary className="cursor-pointer text-[11px] text-muted-foreground select-none">
+          <details className="rounded-lg border border-slate-700/60 bg-slate-950/50 px-3 py-2">
+            <summary className="cursor-pointer text-[11px] text-muted-foreground select-none list-none flex items-center gap-1.5">
+              <FileCode2 className="h-3.5 w-3.5" />
               CLI 任务报告
             </summary>
             <div className="mt-2 max-h-48 overflow-y-auto custom-scrollbar">
@@ -138,6 +187,8 @@ export function TaskExecReviewPanel({
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
+  const [installOpen, setInstallOpen] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -175,9 +226,40 @@ export function TaskExecReviewPanel({
     }
   };
 
+  const agentCliMissing = ['agent_cli_missing', 'agent_cli_login_required'].includes(
+    String(payload?.status || ''),
+  );
+  const agentInstallHint =
+    (payload?.agent_cli && typeof payload.agent_cli === 'object'
+      ? String(payload.agent_cli.install_hint || '')
+      : '') || String(payload?.error || '');
+
+  useEffect(() => {
+    if (agentCliMissing) setInstallOpen(true);
+  }, [agentCliMissing]);
+
+  const onAgentReady = async () => {
+    setReprocessing(true);
+    try {
+      await reprocessMeetingRoom(
+        synapseApiBase,
+        roomId,
+        'task_exec',
+        'Cursor Agent CLI 已安装，重新执行任务执行',
+      );
+      message.success('已触发任务执行重新处理，请稍候刷新结果');
+      setInstallOpen(false);
+      await refresh();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '重新执行失败');
+    } finally {
+      setReprocessing(false);
+    }
+  };
+
   if (loading && !payload) {
     return (
-      <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
         加载任务执行结果…
       </div>
@@ -185,33 +267,65 @@ export function TaskExecReviewPanel({
   }
 
   if (error && !payload) {
-    return <Alert type="error" message={error} showIcon />;
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Alert type="error" message={error} showIcon />
+      </div>
+    );
   }
 
   if (!payload) {
-    return <Alert type="warning" message="暂无任务执行结果" showIcon />;
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <Alert type="warning" message="暂无任务执行结果" showIcon />
+      </div>
+    );
   }
 
   const ok = Number(summary?.ok || 0);
   const total = Number(summary?.total || tasks.length);
 
   return (
-    <div className="space-y-5 pb-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <CursorAgentInstallModal
+        open={installOpen}
+        synapseApiBase={synapseApiBase}
+        installHint={agentInstallHint}
+        onClose={() => setInstallOpen(false)}
+        onReady={() => void onAgentReady()}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
       <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-violet-500/10 to-slate-900 p-6 shadow-[0_16px_48px_rgba(251,191,36,0.12)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,191,36,0.15),transparent_55%)]" />
-        <div className="relative flex flex-wrap items-start gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/20 border border-amber-400/30 shadow-[0_0_24px_rgba(251,191,36,0.25)]">
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500/20 border border-amber-400/30 shadow-[0_0_24px_rgba(251,191,36,0.25)]">
             <Terminal className="h-7 w-7 text-amber-300" />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h2 className="text-lg font-bold text-foreground m-0 tracking-tight">任务执行评审</h2>
-              <Tag icon={<Sparkles className="h-3 w-3" />} color="gold" className="m-0">
+            <div className="mb-1 flex items-center gap-2 flex-nowrap overflow-hidden">
+              <h2 className="text-lg font-bold text-foreground m-0 tracking-tight shrink-0 whitespace-nowrap">
+                任务执行评审
+              </h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-200 shrink-0 whitespace-nowrap">
+                <Terminal className="h-3 w-3" />
                 {cliLabel(String(payload.cli_tool || ''))}
-              </Tag>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/35 bg-violet-500/15 px-2.5 py-0.5 text-[11px] font-medium text-violet-200 shrink-0 whitespace-nowrap">
+                <Sparkles className="h-3 w-3" />
+                {payload.cli_model_label ||
+                  displayCliModelLabel(
+                    String(payload.cli_tool || 'cursor_cli') as 'cursor_cli',
+                    payload.cli_model,
+                    payload.cli_model_custom,
+                  )}
+              </span>
             </div>
             <p className="text-sm text-muted-foreground m-0 leading-relaxed">
-              CLI 已循环处理 {total} 个研发子单 · 成功 {ok} 个 · 请核对沙箱路径、覆盖功能与任务报告后裁决
+              {agentCliMissing
+                ? payload?.status === 'agent_cli_login_required'
+                  ? '任务执行尚未开始：Cursor Agent CLI 已安装，请先完成账号登录。'
+                  : '任务执行尚未开始：本机缺少 Cursor Agent CLI（agent），请先安装后再重新执行。'
+                : `CLI 已循环处理 ${total} 个研发子单 · 成功 ${ok} 个 · 请核对工作路径、提示词与任务报告后裁决`}
             </p>
           </div>
         </div>
@@ -244,23 +358,44 @@ export function TaskExecReviewPanel({
         </div>
       </div>
 
+      {agentCliMissing ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="需要安装 Cursor Agent CLI"
+          description={
+            <div className="space-y-2">
+              <p className="m-0 text-[12px]">{payload.error || '未检测到 agent 命令'}</p>
+              <Button type="primary" loading={reprocessing} onClick={() => setInstallOpen(true)}>
+                打开安装向导
+              </Button>
+            </div>
+          }
+        />
+      ) : null}
+
       {blocked ? (
         <Alert type="error" showIcon message="任务执行已被驳回，需人工介入后重新处理" />
       ) : null}
 
       <div className="space-y-3">
-        <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          子单执行明细
-        </Text>
-        {tasks.length === 0 ? (
+        <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
+          <ListTree className="h-3.5 w-3.5 text-amber-400" />
+          子单明细
+        </div>
+        {tasks.length === 0 && !agentCliMissing ? (
           <Alert type="warning" message="无子单执行记录" showIcon />
         ) : (
           tasks.map((t) => <TaskRowCard key={String(t.task_no)} task={t} />)
         )}
       </div>
 
+      {!agentCliMissing ? (
       <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
-        <label className="text-xs font-semibold text-foreground/80">评审意见（可选）</label>
+        <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5">
+          <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
+          评审意见（可选）
+        </label>
         <TextArea
           rows={3}
           value={comment}
@@ -289,6 +424,8 @@ export function TaskExecReviewPanel({
             通过并推进
           </Button>
         </div>
+      </div>
+      ) : null}
       </div>
     </div>
   );

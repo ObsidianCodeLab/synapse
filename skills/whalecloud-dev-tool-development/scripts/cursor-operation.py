@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import shutil
 import sys
 from dataclasses import dataclass, field
@@ -108,12 +109,30 @@ def validate_skill_paths(
             raise SystemExit(f"错误：{label} 文件不存在：{doc_path}")
 
 
-def resolve_agent_executable(agent_path: str) -> str:
-    """解析 Cursor CLI 可执行路径。
+def _cursor_agent_install_candidates() -> list[Path]:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import cursor_agent_install_candidates
 
-    Windows 上 CLI 常为 ``agent.cmd``；cmd 可直接运行 ``agent``，但
-    ``asyncio.create_subprocess_exec('agent', ...)`` 不会按 PATHEXT 解析，须用完整路径。
-    """
+        return cursor_agent_install_candidates()
+    except ImportError:
+        pass
+    candidates: list[Path] = []
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "").strip()
+        if local:
+            base = Path(local) / "cursor-agent"
+            for name in ("agent.exe", "agent.cmd", "cursor-agent.exe", "cursor-agent.cmd"):
+                candidates.append(base / name)
+    return candidates
+
+
+def resolve_agent_executable(agent_path: str) -> str:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import resolve_agent_executable as _resolve
+
+        return _resolve(agent_path)
+    except ImportError:
+        pass
     raw = (agent_path or "agent").strip()
     candidate = Path(raw)
     if candidate.is_file():
@@ -121,7 +140,32 @@ def resolve_agent_executable(agent_path: str) -> str:
     resolved = shutil.which(raw)
     if resolved:
         return str(Path(resolved).resolve())
+    for guess in _cursor_agent_install_candidates():
+        if guess.is_file():
+            return str(guess.resolve())
     return raw
+
+
+def format_agent_not_found_error(resolved: str) -> str:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import format_agent_not_found_error as _fmt
+
+        return _fmt(resolved)
+    except ImportError:
+        pass
+    return f"未找到 Cursor Agent CLI：{resolved}"
+
+
+def validate_agent_executable(resolved: str) -> Optional[str]:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import validate_agent_executable as _validate
+
+        return _validate(resolved)
+    except ImportError:
+        pass
+    if Path(resolved).is_file():
+        return None
+    return format_agent_not_found_error(resolved)
 
 
 @dataclass
@@ -446,8 +490,9 @@ class CursorCLI:
         if self.workspace:
             argv.extend(["--workspace", str(self.workspace)])
         argv.extend(["--force", "--trust"])
-        if self.model and self.model.strip():
-            argv.extend(["--model", self.model.strip()])
+        model = (self.model or "").strip()
+        if model and model.lower() != "auto":
+            argv.extend(["--model", model])
         if self.continue_session:
             argv.append("--continue")
         return argv
@@ -458,14 +503,28 @@ class CursorCLI:
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
         on_stream_line: Optional[Callable[[str], None]] = None,
     ) -> CursorResult:
+        agent_err = validate_agent_executable(self.agent_path)
+        if agent_err:
+            if on_stream_line:
+                for line in agent_err.splitlines():
+                    on_stream_line(f"[stderr] {line}")
+            return CursorResult(success=False, stderr=agent_err, exit_code=127)
+
         argv = self.build_argv(prompt)
-        process = await asyncio.create_subprocess_exec(
-            *argv,
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(self.workspace) if self.workspace else None,
-        )
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *argv,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(self.workspace) if self.workspace else None,
+            )
+        except FileNotFoundError:
+            detail = format_agent_not_found_error(self.agent_path)
+            if on_stream_line:
+                for line in detail.splitlines():
+                    on_stream_line(f"[stderr] {line}")
+            return CursorResult(success=False, stderr=detail, exit_code=127)
 
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []
@@ -722,6 +781,18 @@ async def main() -> int:
     )
 
     echo = not args.no_echo_stream
+    agent_err = validate_agent_executable(cursor.agent_path)
+    if agent_err:
+        Path(args.log).parent.mkdir(parents=True, exist_ok=True)
+        with FileProgressLogger(args.log, stream_to_stdout=echo) as logger:
+            logger.log(agent_err, echo=echo)
+        print(f"SYNAPSE_CURSOR_LOG={args.log}", flush=True)
+        print(f"SYNAPSE_CURSOR_ROUND={args.round}", flush=True)
+        print(f"SYNAPSE_CURSOR_CONTINUE={1 if args.continue_session else 0}", flush=True)
+        print("SYNAPSE_CURSOR_SUCCESS=0", flush=True)
+        print(f"执行失败：{agent_err.splitlines()[0]}", flush=True)
+        return 1
+
     with FileProgressLogger(args.log, stream_to_stdout=echo) as logger:
         logger.log(f"=== 第 {args.round} 轮 Cursor 开发 ===", echo=echo)
         logger.log(f"代码目录: {args.code_path}", echo=echo)

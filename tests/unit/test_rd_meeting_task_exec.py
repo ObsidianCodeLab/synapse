@@ -7,6 +7,12 @@ import json
 import pytest
 
 from synapse.rd_meeting.binding import resolve_node_binding
+from synapse.rd_meeting.cli_models import (
+    DEFAULT_CURSOR_CLI_MODEL,
+    normalize_cursor_cli_model,
+    resolve_cli_model_arg,
+    resolve_cursor_cli_model_arg,
+)
 from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, is_cli_tool_implemented, normalize_cli_tool
 from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
 from synapse.rd_meeting.pipeline import FLOW_STEP_LABEL, STEP_TASK_EXEC_CLI
@@ -28,14 +34,86 @@ def test_cli_tool_defaults():
     assert is_cli_tool_implemented("claude_code") is False
 
 
-def test_task_exec_binding_exposes_cli_tool(monkeypatch):
+def test_task_exec_binding_exposes_cli_tool_and_model(monkeypatch):
     monkeypatch.setattr(
         "synapse.rd_meeting.binding.load_meeting_room_config",
-        lambda: {"node_overrides": {"task_exec": {"cli_tool": "cursor_cli"}}},
+        lambda: {
+            "node_overrides": {
+                "task_exec": {
+                    "cli_tool": "cursor_cli",
+                    "cli_model": "auto",
+                    "cli_model_custom": "",
+                }
+            }
+        },
     )
     binding = resolve_node_binding("task_exec")
     assert binding["cli_tool"] == "cursor_cli"
+    assert binding["cli_model"] == "auto"
     assert binding["worker_profile_ids"] == []
+
+
+def test_resolve_cli_model_arg():
+    assert resolve_cursor_cli_model_arg("composer-2.5", None) == "composer-2.5"
+    assert resolve_cursor_cli_model_arg("auto", None) == "auto"
+    assert resolve_cursor_cli_model_arg("custom", "my-model") == "my-model"
+    assert resolve_cursor_cli_model_arg("custom", "") == DEFAULT_CURSOR_CLI_MODEL
+    assert resolve_cli_model_arg("cursor_cli", "auto") == "auto"
+
+
+def test_bootstrap_task_exec_passes_model_to_cli(tmp_path, monkeypatch):
+    scope_id = "te-model"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec._collect_work_orders",
+        lambda _st, _sid: [
+            {
+                "task_no": "T1",
+                "task_title": "子单",
+                "goal": "实现功能点",
+                "coverage": ["功能A"],
+                "sandbox_path": str(sandbox),
+                "product_module": "ZMDB",
+            }
+        ],
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
+
+    seen_models: list[str | None] = []
+
+    def fake_cli_round(**kwargs):
+        seen_models.append(kwargs.get("model"))
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        return {
+            "status": "ok",
+            "tokens_used": 1,
+            "duration_seconds": 1,
+            "log_path": str(log_path),
+            "error": "",
+        }
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._run_cursor_cli_round", fake_cli_round)
+
+    result = bootstrap_task_exec(
+        "demand",
+        scope_id,
+        cli_model="custom",
+        cli_model_custom="composer-2.5-fast",
+    )
+    assert seen_models == ["composer-2.5-fast", "composer-2.5-fast"]
+    assert result["cli_model"] == "custom"
+    assert result["cli_model_custom"] == "composer-2.5-fast"
 
 
 def test_build_task_prompts_cover_goal_scheme_and_human_notes():
@@ -75,6 +153,10 @@ def test_uses_task_exec_cli_only_for_task_exec_node():
 def test_bootstrap_task_exec_fails_without_work_orders(tmp_path, monkeypatch):
     scope_id = "te-empty"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
     result = bootstrap_task_exec("demand", scope_id)
     assert result["status"] == "failed"
     assert "未找到可执行的研发子单" in result["error"]
@@ -92,7 +174,7 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
     monkeypatch.setattr(
         "synapse.rd_meeting.task_exec._collect_work_orders",
-        lambda _sid: [
+        lambda _st, _sid: [
             {
                 "task_no": "T1",
                 "task_title": "子单",
@@ -106,6 +188,10 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
     monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
     monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
 
     rounds: list[str] = []
 
@@ -137,6 +223,10 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     assert len(result["tasks"]) == 1
     assert result["tasks"][0]["status"] == "ok"
     assert result["tasks"][0]["sandbox_path"] == str(sandbox)
+    assert "develop_prompt" in result["tasks"][0]
+    assert "verify_prompt" in result["tasks"][0]
+    assert "【任务执行 · 开发轮】" in result["tasks"][0]["develop_prompt"]
+    assert "【任务执行 · 完成检测轮】" in result["tasks"][0]["verify_prompt"]
     assert result["summary"]["total_tokens"] == 240
 
     payload = load_task_exec_payload(scope_id)
@@ -145,6 +235,50 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     md = render_task_exec_report_markdown(payload)
     assert "任务执行记录" in md
     assert "T1" in md
+
+
+def test_bootstrap_task_exec_stops_when_agent_cli_missing(tmp_path, monkeypatch):
+    scope_id = "te-no-agent"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {
+            "installed": False,
+            "logged_in": False,
+            "ready": False,
+            "error": "未找到 Cursor Agent CLI（agent）。",
+            "install_hint": "请先安装",
+        },
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+
+    result = bootstrap_task_exec("demand", scope_id)
+    assert result["status"] == "agent_cli_missing"
+    assert result["agent_cli"]["installed"] is False
+    payload = load_task_exec_payload(scope_id)
+    assert payload is not None
+    assert payload["status"] == "agent_cli_missing"
+
+
+def test_bootstrap_task_exec_stops_when_agent_cli_not_logged_in(tmp_path, monkeypatch):
+    scope_id = "te-no-login"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {
+            "installed": True,
+            "logged_in": False,
+            "ready": False,
+            "auth_message": "未登录 Cursor 账号",
+            "install_hint": "未登录 Cursor 账号",
+        },
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+
+    result = bootstrap_task_exec("demand", scope_id)
+    assert result["status"] == "agent_cli_login_required"
+    assert result["agent_cli"]["installed"] is True
+    assert result["agent_cli"]["logged_in"] is False
 
 
 def test_confirm_task_exec_decision_reject(tmp_path, monkeypatch):

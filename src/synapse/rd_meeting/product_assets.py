@@ -2,8 +2,9 @@
 
 目录约定（与 ``paths`` 一致）::
 
-    work/<scope>/code/<repo_name>/   # git clone
-    work/<scope>/doc/<doc_type>/      # get_doc 落盘
+    work/<scope>/code/<repo_name>/     # git clone（CODE_PATH）
+    work/<scope>/sandbox/<repo_name>/  # 沙箱落盘（SANDBOX_PATH，由 CODE_PATH 派生）
+    work/<scope>/doc/<doc_type>/       # get_doc 落盘
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import logging
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -409,6 +410,86 @@ def resolve_repo_code_path(
     return base
 
 
+def resolve_repo_sandbox_path(resolved_code_path: str) -> str:
+    """从已解析的 ``CODE_PATH`` 派生 ``SANDBOX_PATH``（路径段 ``code`` → ``sandbox``）。
+
+    与 ``CODE_PATH`` 的唯一差异：工单目录下 ``code/`` 替换为 ``sandbox/``，其余段不变。
+    """
+    p = (resolved_code_path or "").strip()
+    if not p:
+        return ""
+    for old, new in (("/code/", "/sandbox/"), ("\\code\\", "\\sandbox\\")):
+        if old in p:
+            return p.replace(old, new, 1)
+    return ""
+
+
+def resolve_sandbox_path_for_product_module(
+    scope_type: Literal["demand", "task"],
+    scope_id: str,
+    product_module_name: str,
+) -> str:
+    """按子单 ``product_module_name`` 匹配唯一 ``SANDBOX_PATH``（与 room_skill 路径段一致）。
+
+    规则与 ``build_product_workspace_paths_section`` 相同：由 ``init_context.product.repos``
+    中 ``resolved_sandbox_path``（或 ``CODE_PATH`` 的 ``code/``→``sandbox/`` 派生）匹配
+    ``REPO_NAME`` / ``repo_module`` 展示名，**不做** sandbox_assets 挂钩或 local_path 兜底。
+    """
+    mod = (product_module_name or "").strip()
+    if not mod:
+        return ""
+
+    def _pipe_name_part(value: Any) -> str:
+        v = str(value or "").strip()
+        if not v:
+            return ""
+        if "|" in v:
+            tail = v.split("|", 1)[-1].strip()
+            return tail or v
+        return v
+
+    from synapse.rd_meeting.init_context import build_node_init_log_data
+
+    init = build_node_init_log_data(scope_type, scope_id)
+    product = init.get("product") if isinstance(init.get("product"), dict) else {}
+    repos = product.get("repos") if isinstance(product.get("repos"), list) else []
+    code_root = str(product.get("code_root") or "").strip()
+    target = _pipe_name_part(mod) or mod
+    target_lower = target.lower()
+
+    matches: list[str] = []
+    for row in repos:
+        if not isinstance(row, dict):
+            continue
+        repo_name = str(row.get("repo_name") or "").strip()
+        repo_module = _pipe_name_part(str(row.get("repo_module") or "")) or str(
+            row.get("repo_module") or ""
+        ).strip()
+        name_hit = repo_name == target or repo_name.lower() == target_lower
+        module_hit = repo_module == target or repo_module.lower() == target_lower
+        if not name_hit and not module_hit:
+            continue
+
+        sandbox = str(row.get("resolved_sandbox_path") or "").strip()
+        if not sandbox:
+            resolved_code = str(row.get("resolved_code_path") or "").strip()
+            if not resolved_code:
+                resolved_code = resolve_repo_code_path(
+                    local_path=str(row.get("local_path") or ""),
+                    repo_name=repo_name,
+                    code_path=str(row.get("code_path") or ""),
+                    code_root=code_root,
+                )
+            sandbox = resolve_repo_sandbox_path(resolved_code)
+        if sandbox:
+            matches.append(sandbox)
+
+    unique = list(dict.fromkeys(matches))
+    if len(unique) == 1:
+        return unique[0]
+    return ""
+
+
 def enrich_product_with_assets(product: dict[str, Any], assets: dict[str, Any] | None) -> dict[str, Any]:
     """将落盘路径合并进 product / system 段供 prompt 使用。"""
     if not assets:
@@ -434,12 +515,14 @@ def enrich_product_with_assets(product: dict[str, Any], assets: dict[str, Any] |
         if hit:
             merged["local_path"] = hit.get("local_path")
             merged["materialize_status"] = hit.get("status")
-        merged["resolved_code_path"] = resolve_repo_code_path(
+        resolved_code = resolve_repo_code_path(
             local_path=str(merged.get("local_path") or ""),
             repo_name=str(merged.get("repo_name") or ""),
             code_path=str(merged.get("code_path") or ""),
             code_root=str(out.get("code_root") or ""),
         )
+        merged["resolved_code_path"] = resolved_code
+        merged["resolved_sandbox_path"] = resolve_repo_sandbox_path(resolved_code)
         repos_out.append(merged)
     if repos_out:
         out["repos"] = repos_out

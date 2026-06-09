@@ -181,6 +181,10 @@ export interface MeetingRoomNodeOverride {
   llm_endpoint_key?: string;
   /** 任务执行节点：研发工具 CLI（cursor_cli / claude_code / opencode） */
   cli_tool?: string;
+  /** 任务执行节点：CLI 模型预设（composer-2.5 / auto / custom） */
+  cli_model?: string;
+  /** 任务执行节点：custom 模式下的模型名称 */
+  cli_model_custom?: string;
 }
 
 export interface MeetingRoomConfigPayload {
@@ -216,6 +220,9 @@ export interface MeetingRoomNodeBinding {
   host_llm_endpoint_key?: string;
   worker_llm_endpoint_key?: string;
   prompt_supplement?: string;
+  cli_tool?: string;
+  cli_model?: string;
+  cli_model_custom?: string;
 }
 
 export interface DevStatusPayload {
@@ -535,6 +542,8 @@ export interface TaskExecTaskRow {
   coverage?: string[];
   sandbox_path?: string;
   product_module?: string;
+  develop_prompt?: string;
+  verify_prompt?: string;
   status?: string;
   completion?: string;
   error?: string;
@@ -545,7 +554,22 @@ export interface TaskExecTaskRow {
 
 export interface TaskExecPayload {
   cli_tool?: string;
+  cli_model?: string;
+  cli_model_custom?: string;
+  cli_model_label?: string;
   status?: string;
+  error?: string;
+  agent_cli?: {
+    installed?: boolean;
+    logged_in?: boolean;
+    ready?: boolean;
+    path?: string;
+    version?: string | null;
+    auth_message?: string;
+    error?: string;
+    install_hint?: string;
+    platform?: string;
+  };
   summary?: {
     total?: number;
     ok?: number;

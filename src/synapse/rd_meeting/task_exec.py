@@ -12,13 +12,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, is_cli_tool_implemented, normalize_cli_tool
+from synapse.rd_meeting.cli_models import (
+    DEFAULT_CURSOR_CLI_MODEL,
+    display_cli_model_label,
+    normalize_cursor_cli_model,
+    resolve_cli_model_arg,
+)
+from synapse.rd_meeting.cli_tools import (
+    DEFAULT_CLI_TOOL,
+    is_cli_tool_implemented,
+    normalize_cli_tool,
+)
 from synapse.rd_meeting.config_store import load_meeting_room_config
+from synapse.rd_meeting.cursor_agent_cli import check_cursor_agent_cli
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path, scope_dir
+from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
 from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
-    build_task_sandbox_bindings,
+    collect_task_rows,
 )
 from synapse.rd_meeting.userwork_sync import patch_userwork_summary
 from synapse.rd_sop.nodes import stage_name_for_id
@@ -42,6 +54,16 @@ def resolve_cli_tool_for_node(node_id: str = NODE_ID) -> str:
     overrides = cfg.get("node_overrides") if isinstance(cfg.get("node_overrides"), dict) else {}
     ov = overrides.get(node_id) if isinstance(overrides.get(node_id), dict) else {}
     return normalize_cli_tool(str(ov.get("cli_tool") or DEFAULT_CLI_TOOL))
+
+
+def resolve_cli_model_for_node(node_id: str = NODE_ID) -> tuple[str, str]:
+    """返回 (cli_model preset, cli_model_custom)。"""
+    cfg = load_meeting_room_config()
+    overrides = cfg.get("node_overrides") if isinstance(cfg.get("node_overrides"), dict) else {}
+    ov = overrides.get(node_id) if isinstance(overrides.get(node_id), dict) else {}
+    preset = normalize_cursor_cli_model(str(ov.get("cli_model") or DEFAULT_CURSOR_CLI_MODEL))
+    custom = str(ov.get("cli_model_custom") or "").strip()
+    return preset, custom
 
 
 def _repo_root() -> Path:
@@ -76,14 +98,6 @@ def _write_result(scope_id: str, data: dict[str, Any]) -> None:
     (dest.parent / REPORT_MD).write_text(report, encoding="utf-8")
 
 
-def _pipeline_context(scope_id: str) -> dict[str, Any]:
-    raw = read_json_file(meeting_pipeline_path(scope_id))
-    if not isinstance(raw, dict):
-        return {}
-    ctx = raw.get("context")
-    return ctx if isinstance(ctx, dict) else {}
-
-
 def _save_task_exec_assets(scope_id: str, assets: dict[str, Any]) -> None:
     path = meeting_pipeline_path(scope_id)
     raw = read_json_file(path)
@@ -96,46 +110,23 @@ def _save_task_exec_assets(scope_id: str, assets: dict[str, Any]) -> None:
     write_json_file(path, raw)
 
 
-def _collect_work_orders(scope_id: str) -> list[dict[str, Any]]:
-    ctx = _pipeline_context(scope_id)
-    auto_split = dict(ctx.get("auto_split_assets") or {})
-    sandbox = dict(ctx.get("sandbox_assets") or {})
-    env_assets = dict(ctx.get("env_pregen_assets") or {})
-
-    plan_tasks = auto_split.get("split_plan_tasks")
-    if not isinstance(plan_tasks, list) or not plan_tasks:
-        plan_tasks = auto_split.get("local_tasks") or []
-
+def _collect_work_orders(scope_type: ScopeType, scope_id: str) -> list[dict[str, Any]]:
+    """从拆单计划汇总子单，并按 product_module_name 解析唯一 SANDBOX_PATH。"""
     auto_ctx = _auto_split_context_for_bindings(scope_id)
-    if auto_ctx.get("split_plan_tasks"):
-        plan_tasks = auto_ctx["split_plan_tasks"]
-
-    wire_row = None
-    prod = str(sandbox.get("prod") or env_assets.get("prod") or "").strip()
-    if prod:
-        from synapse.rd_meeting.product_context import load_prod_catalog_from_pipeline, match_prod_row_by_prod
-
-        rows = load_prod_catalog_from_pipeline(scope_id)
-        wire_row = match_prod_row_by_prod(rows, prod) if rows else None
-
-    bindings = build_task_sandbox_bindings(
-        {"split_plan_tasks": plan_tasks, "local_tasks": auto_split.get("local_tasks") or []},
-        wire_row,
-        sandbox,
-    )
+    tasks = collect_task_rows(auto_ctx)
 
     orders: list[dict[str, Any]] = []
-    for idx, binding in enumerate(bindings):
+    for idx, binding in enumerate(tasks):
         if not isinstance(binding, dict):
             continue
-        repos = binding.get("repos") if isinstance(binding.get("repos"), list) else []
-        sandbox_path = ""
-        for repo in repos:
-            if isinstance(repo, dict) and repo.get("engineering_path"):
-                sandbox_path = str(repo["engineering_path"])
-                break
-            if isinstance(repo, dict) and repo.get("local_path"):
-                sandbox_path = str(repo["local_path"])
+        product_module = str(
+            binding.get("product_module_name") or binding.get("productModuleName") or ""
+        ).strip()
+        sandbox_path = resolve_sandbox_path_for_product_module(
+            scope_type,
+            scope_id,
+            product_module,
+        )
         fps = binding.get("function_points")
         fp_list = [str(x).strip() for x in fps if str(x).strip()] if isinstance(fps, list) else []
         orders.append(
@@ -146,9 +137,7 @@ def _collect_work_orders(scope_id: str) -> list[dict[str, Any]]:
                 "goal": str(binding.get("comments") or binding.get("task_title") or "").strip(),
                 "coverage": fp_list,
                 "sandbox_path": sandbox_path,
-                "repos": repos,
-                "match_status": str(binding.get("match_status") or ""),
-                "product_module": str(binding.get("productModuleName") or binding.get("product_module_name") or ""),
+                "product_module": product_module,
             }
         )
     return orders
@@ -263,6 +252,7 @@ def _run_cursor_cli_round(
     log_path: Path,
     timeout: int = 900,
     continue_session: bool = False,
+    model: str | None = None,
 ) -> dict[str, Any]:
     script = _cursor_operation_script()
     if not script.is_file():
@@ -294,6 +284,8 @@ def _run_cursor_cli_round(
         argv.extend(["--acceptance-doc", accept_doc])
     if continue_session:
         argv.append("--continue")
+    if model is not None:
+        argv.extend(["--model", model])
 
     try:
         proc = subprocess.run(
@@ -374,8 +366,14 @@ def patch_owned_work_item_task_exec(
     duration_seconds: int = 0,
     report_excerpt: str = "",
 ) -> bool:
-    from synapse.api.routes.dev_iwhalecloud import _atomic_write_json_file, _owner_order_file_lock_path, _owner_order_file_name, _snapshot_norm_id
     from filelock import FileLock
+
+    from synapse.api.routes.dev_iwhalecloud import (
+        _atomic_write_json_file,
+        _owner_order_file_lock_path,
+        _owner_order_file_name,
+        _snapshot_norm_id,
+    )
 
     path = _owner_order_file_name()
     if not path.is_file():
@@ -444,11 +442,20 @@ def bootstrap_task_exec(
     scope_id: str,
     *,
     cli_tool: str | None = None,
+    cli_model: str | None = None,
+    cli_model_custom: str | None = None,
     human_suggestions: str = "",
 ) -> dict[str, Any]:
     """循环处理工单：CLI 开发 + 完成检测 + 持久化。"""
     sid = (scope_id or "").strip()
     tool = normalize_cli_tool(cli_tool or resolve_cli_tool_for_node(NODE_ID))
+    preset, custom = resolve_cli_model_for_node(NODE_ID)
+    if cli_model is not None:
+        preset = normalize_cursor_cli_model(cli_model)
+    if cli_model_custom is not None:
+        custom = str(cli_model_custom or "").strip()
+    model_arg = resolve_cli_model_arg(tool, preset, custom)
+    model_label = display_cli_model_label(tool, preset, custom)
     if not is_cli_tool_implemented(tool):
         return {
             "status": "failed",
@@ -457,7 +464,45 @@ def bootstrap_task_exec(
             "tasks": [],
         }
 
-    orders = _collect_work_orders(sid)
+    if normalize_cli_tool(tool) == DEFAULT_CLI_TOOL:
+        agent_status = check_cursor_agent_cli()
+        if not agent_status.get("ready"):
+            missing = not agent_status.get("installed")
+            result_doc = {
+                "status": "agent_cli_missing" if missing else "agent_cli_login_required",
+                "error": str(
+                    agent_status.get("error")
+                    or agent_status.get("auth_message")
+                    or ("未安装 Cursor Agent CLI" if missing else "Cursor Agent CLI 未登录")
+                ),
+                "agent_cli": agent_status,
+                "cli_tool": tool,
+                "cli_model": preset,
+                "cli_model_custom": custom if preset == "custom" else "",
+                "cli_model_label": model_label,
+                "demand_no": _resolve_demand_no(scope_type, sid),
+                "summary": {
+                    "total": 0,
+                    "ok": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                    "total_tokens": 0,
+                    "total_duration_sec": 0,
+                },
+                "tasks": [],
+                "human_review": {"status": "pending", "comment": "", "decided_at": None},
+            }
+            _write_result(sid, result_doc)
+            _save_task_exec_assets(sid, result_doc)
+            patch_userwork_summary(
+                scope_type=scope_type,
+                scope_id=sid,
+                sop_node="任务执行",
+                local_process_state="human_intervention",
+            )
+            return result_doc
+
+    orders = _collect_work_orders(scope_type, sid)
     if not orders:
         return {
             "status": "failed",
@@ -478,6 +523,11 @@ def bootstrap_task_exec(
 
     for order in orders:
         sandbox_path = str(order.get("sandbox_path") or "").strip()
+        task_key = str(order.get("task_no") or order.get("index"))
+        dev_log = log_root / f"{task_key}_develop.log"
+        verify_log = log_root / f"{task_key}_verify.log"
+        func_doc, accept_doc = _archive_doc_paths(sandbox_path) if sandbox_path else ("", "")
+
         row_base = {
             "task_no": order.get("task_no"),
             "task_title": order.get("task_title"),
@@ -486,43 +536,43 @@ def bootstrap_task_exec(
             "sandbox_path": sandbox_path,
             "product_module": order.get("product_module"),
         }
-        if not sandbox_path or not Path(sandbox_path).is_dir():
-            row = {
-                **row_base,
-                "status": "skipped",
-                "error": "未匹配沙箱工程路径",
-                "tokens_used": 0,
-                "duration_seconds": 0,
-                "report_markdown": "",
-            }
-            task_rows.append(row)
-            continue
-
-        func_doc, accept_doc = _archive_doc_paths(sandbox_path)
-        task_key = str(order.get("task_no") or order.get("index"))
-        dev_log = log_root / f"{task_key}_develop.log"
-        verify_log = log_root / f"{task_key}_verify.log"
-
         develop_prompt = build_task_develop_prompt(
             order=order,
             func_doc=func_doc,
             accept_doc=accept_doc,
             human_suggestions=human_suggestions,
         )
-        dev_result = _run_cursor_cli_round(
-            code_path=sandbox_path,
-            target=develop_prompt,
-            func_doc=func_doc,
-            accept_doc=accept_doc,
-            log_path=dev_log,
-        )
-
         verify_prompt = build_task_verify_prompt(
             order=order,
             func_doc=func_doc,
             human_suggestions=human_suggestions,
             develop_log_hint=str(dev_log),
         )
+
+        if not sandbox_path or not Path(sandbox_path).is_dir():
+            task_rows.append(
+                {
+                    **row_base,
+                    "develop_prompt": develop_prompt,
+                    "verify_prompt": verify_prompt,
+                    "status": "skipped",
+                    "error": "未匹配沙箱工程路径",
+                    "tokens_used": 0,
+                    "duration_seconds": 0,
+                    "report_markdown": "",
+                }
+            )
+            continue
+
+        dev_result = _run_cursor_cli_round(
+            code_path=sandbox_path,
+            target=develop_prompt,
+            func_doc=func_doc,
+            accept_doc=accept_doc,
+            log_path=dev_log,
+            model=model_arg,
+        )
+
         verify_result = _run_cursor_cli_round(
             code_path=sandbox_path,
             target=verify_prompt,
@@ -530,6 +580,7 @@ def bootstrap_task_exec(
             accept_doc=accept_doc,
             log_path=verify_log,
             continue_session=True,
+            model=model_arg,
         )
 
         report_md = _extract_report_from_log(str(verify_result.get("log_path") or verify_log))
@@ -547,6 +598,8 @@ def bootstrap_task_exec(
 
         row = {
             **row_base,
+            "develop_prompt": develop_prompt,
+            "verify_prompt": verify_prompt,
             "status": status,
             "completion": completion,
             "error": verify_result.get("error") or dev_result.get("error") or "",
@@ -573,6 +626,9 @@ def bootstrap_task_exec(
     )
     result_doc = {
         "cli_tool": tool,
+        "cli_model": preset,
+        "cli_model_custom": custom if preset == "custom" else "",
+        "cli_model_label": model_label,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "finished_at": datetime.now().isoformat(timespec="seconds"),
         "status": overall,
@@ -608,20 +664,37 @@ def load_task_exec_payload(scope_id: str) -> dict[str, Any] | None:
 
 
 def render_task_exec_report_markdown(data: dict[str, Any]) -> str:
-    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
     lines = [
         "# 任务执行记录",
         "",
         f"- CLI 工具：{data.get('cli_tool') or '—'}",
+        f"- CLI 模型：{data.get('cli_model_label') or data.get('cli_model') or '—'}",
         f"- 总体状态：{data.get('status') or '—'}",
-        f"- 子单总数：{summary.get('total', 0)}",
-        f"- 成功：{summary.get('ok', 0)}",
-        f"- Token 合计：{summary.get('total_tokens', 0)}",
-        f"- 耗时合计：{summary.get('total_duration_sec', 0)}s",
-        "",
-        "## 子单明细",
-        "",
     ]
+    if str(data.get("status") or "") in ("agent_cli_missing", "agent_cli_login_required"):
+        agent_cli = data.get("agent_cli") if isinstance(data.get("agent_cli"), dict) else {}
+        lines.extend(
+            [
+                "",
+                "## Cursor Agent CLI 未安装",
+                "",
+                str(agent_cli.get("install_hint") or data.get("error") or "请先安装 agent CLI 后重新执行任务执行节点。"),
+                "",
+            ]
+        )
+        return "\n".join(lines)
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    lines.extend(
+        [
+            f"- 子单总数：{summary.get('total', 0)}",
+            f"- 成功：{summary.get('ok', 0)}",
+            f"- Token 合计：{summary.get('total_tokens', 0)}",
+            f"- 耗时合计：{summary.get('total_duration_sec', 0)}s",
+            "",
+            "## 子单明细",
+            "",
+        ]
+    )
     for task in data.get("tasks") or []:
         if not isinstance(task, dict):
             continue

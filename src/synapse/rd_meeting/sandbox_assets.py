@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import stat
+import time
 from pathlib import Path
 from typing import Any
 
@@ -20,18 +24,106 @@ from synapse.rd_meeting.product_context import (
 
 logger = logging.getLogger(__name__)
 
+_FORCE_REMOVE_RETRIES = 3
+
+
+def _chmod_writable(path: Path) -> None:
+    try:
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+    except OSError:
+        pass
+
+
+def _force_remove_path(path: Path) -> bool:
+    """尽量删干净（含 Windows 只读文件、残留 ``.git`` 空目录）。"""
+    if not path.exists():
+        return True
+    last_exc: OSError | None = None
+
+    def _onerror(func, p, _exc_info):
+        _chmod_writable(Path(p))
+        try:
+            func(p)
+        except OSError as exc:
+            nonlocal last_exc
+            last_exc = exc
+
+    for attempt in range(_FORCE_REMOVE_RETRIES):
+        last_exc = None
+        try:
+            if path.is_dir() and not path.is_symlink():
+                shutil.rmtree(path, onerror=_onerror)
+            else:
+                _chmod_writable(path)
+                path.unlink(missing_ok=True)
+        except OSError as exc:
+            last_exc = exc
+        if not path.exists():
+            return True
+        if attempt + 1 < _FORCE_REMOVE_RETRIES:
+            time.sleep(0.2 * (attempt + 1))
+    if last_exc is not None:
+        logger.warning("sandbox: failed to remove %s: %s", path, last_exc)
+    return not path.exists()
+
+
+def _is_git_work_tree(path: Path) -> bool:
+    git_dir = path / ".git"
+    if not git_dir.exists():
+        return False
+    ok, _ = _run_git(["git", "-C", str(path), "rev-parse", "--git-dir"], timeout=30.0)
+    return ok
+
+
+def _prepare_sandbox_repo_dest(dest: Path) -> None:
+    """沙箱单仓落盘前：删掉残留目录（含半成品 ``.git``），保证后续走全新 clone。"""
+    if not dest.exists():
+        return
+    if _is_git_work_tree(dest):
+        _force_remove_path(dest)
+        return
+    _force_remove_path(dest)
+
+
+def clear_sandbox_workspace(scope_id: str) -> bool:
+    """删除 ``work/<scope>/sandbox/``（沙箱构建重跑前清空旧 clone / 工程落盘）。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return False
+    root = sandbox_root(sid)
+    if not root.exists():
+        return True
+    ok = _force_remove_path(root)
+    if ok:
+        logger.info("sandbox: removed workspace %s", root)
+    return ok
+
 
 def _checkout_feature_branch(dest: Path, feature_branch: str) -> tuple[bool, str]:
-    """在已落盘的基础分支上 fetch 并 checkout 特性分支。"""
+    """在已落盘的基础分支上 fetch 并 checkout 特性分支。
+
+    ``--depth 1 origin <branch>`` 仅更新 ``FETCH_HEAD``，不会创建 ``origin/<branch>`` 或本地分支；
+    须用 ``origin <branch>:<branch>`` 拉取到本地 ref，或回退 ``checkout -B <branch> FETCH_HEAD``。
+    """
     branch = (feature_branch or "").strip()
     if not branch:
         return True, ""
     ok, detail = _run_git(
-        ["git", "-C", str(dest), "fetch", "--depth", "1", "origin", branch],
+        ["git", "-C", str(dest), "fetch", "--depth", "1", "origin", f"{branch}:{branch}"],
         timeout=300.0,
     )
     if not ok:
-        return False, detail
+        ok, detail = _run_git(
+            ["git", "-C", str(dest), "fetch", "--depth", "1", "origin", branch],
+            timeout=300.0,
+        )
+        if not ok:
+            return False, detail
+        ok, detail = _run_git(
+            ["git", "-C", str(dest), "checkout", "-B", branch, "FETCH_HEAD"],
+            timeout=120.0,
+        )
+        return ok, detail
     return _run_git(["git", "-C", str(dest), "checkout", branch], timeout=120.0)
 
 
@@ -102,27 +194,11 @@ def materialize_repo_to_sandbox(
         entry["error"] = "无法解析 git 远程地址"
         return entry
 
+    _prepare_sandbox_repo_dest(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    git_dir = dest / ".git"
-    if git_dir.is_dir():
-        ok, detail = _run_git(["git", "-C", str(dest), "fetch", "--depth", "1", "origin"], timeout=300.0)
-        if ok and branch:
-            _run_git(["git", "-C", str(dest), "checkout", branch], timeout=120.0)
-            ok, detail = _run_git(
-                ["git", "-C", str(dest), "pull", "--ff-only", "origin", branch],
-                timeout=300.0,
-            )
-        elif ok:
-            ok, detail = _run_git(["git", "-C", str(dest), "pull", "--ff-only"], timeout=300.0)
-        if ok and feature_branch:
-            ok, detail = _checkout_feature_branch(dest, feature_branch)
-        entry["status"] = "ok" if ok else "failed"
-        entry["error"] = "" if ok else detail
-        return entry
-
     if dest.exists():
         entry["status"] = "failed"
-        entry["error"] = f"目标路径已存在且非 git 仓库: {dest}"
+        entry["error"] = f"无法清空沙箱仓库目录: {dest}"
         return entry
 
     cmd = ["git", "clone", "--depth", "1"]
@@ -147,6 +223,7 @@ def bootstrap_sandbox_assets(
     """拉取产品关联仓库至沙箱目录，返回摘要。"""
     sid = (scope_id or "").strip()
     prod_key = (prod or "").strip()
+    clear_sandbox_workspace(sid)
     scope_dir(sid).mkdir(parents=True, exist_ok=True)
     root = sandbox_root(sid)
     root.mkdir(parents=True, exist_ok=True)

@@ -981,6 +981,11 @@ def clear_current_node_reprocess_artifacts(
                 except OSError as exc:
                     logger.warning("reprocess_prep: failed to remove %s: %s", path, exc)
 
+    if nid == "sandbox_build":
+        from synapse.rd_meeting.sandbox_assets import clear_sandbox_workspace
+
+        clear_sandbox_workspace(sid)
+
     path = meeting_pipeline_path(sid)
     raw = read_json_file(path)
     if not isinstance(raw, dict):
@@ -995,6 +1000,8 @@ def clear_current_node_reprocess_artifacts(
         ctx["node_review"] = nr
     if clear_scope_root_files:
         ctx.pop("host_prompt", None)
+    if nid == "sandbox_build":
+        ctx.pop("sandbox_assets", None)
     raw["context"] = ctx
     raw["phase"] = "running"
     raw["updated_at"] = _now_iso()
@@ -1389,6 +1396,8 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     )
     human_suggestions = str(binding.get("prompt_supplement") or "").strip()
     cli_tool = str(binding.get("cli_tool") or "").strip()
+    cli_model = str(binding.get("cli_model") or "").strip()
+    cli_model_custom = str(binding.get("cli_model_custom") or "").strip()
 
     append_history_event(
         sid,
@@ -1397,6 +1406,7 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             "room_id": room_id,
             "node_id": run_node,
             "cli_tool": cli_tool,
+            "cli_model": cli_model,
             "flow_stage": FLOW_STEP_LABEL[STEP_TASK_EXEC_CLI],
             "log_type": "info",
             "agent_id": "system",
@@ -1415,6 +1425,8 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         scope_type,  # type: ignore[arg-type]
         sid,
         cli_tool=cli_tool or None,
+        cli_model=cli_model or None,
+        cli_model_custom=cli_model_custom or None,
         human_suggestions=human_suggestions,
     )
 
@@ -1426,7 +1438,9 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             "node_id": run_node,
             "result": result,
             "flow_stage": FLOW_STEP_LABEL[STEP_TASK_EXEC_CLI],
-            "log_type": "info" if result.get("status") in ("ok", "partial") else "error",
+            "log_type": "info"
+            if result.get("status") in ("ok", "partial")
+            else ("warning" if result.get("status") in ("agent_cli_missing", "agent_cli_login_required") else "error"),
             "agent_id": "system",
             "system_node": True,
         },

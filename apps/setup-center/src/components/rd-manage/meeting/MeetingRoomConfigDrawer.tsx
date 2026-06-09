@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Drawer, Button, Tag, Spin } from 'antd';
+import { Drawer, Button, Tag, Spin, Input } from 'antd';
 import {
   Settings2,
   Users,
@@ -49,6 +49,11 @@ import {
   type MeetingRoomNodeOverride,
 } from '../../../api/meetingRoomService';
 import { CLI_TOOL_OPTIONS, DEFAULT_CLI_TOOL, normalizeCliTool } from './cliToolConfig';
+import {
+  DEFAULT_CURSOR_CLI_MODEL,
+  cliModelOptionsForTool,
+  normalizeCursorCliModel,
+} from './cliModelConfig';
 
 /** 主控固定为小鲸（profile id: default） */
 const HOST_PROFILE_ID = 'default';
@@ -441,6 +446,13 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const isSystemNode = binding?.type === 'system';
   const isTaskExecNode = selectedNodeId === 'task_exec';
   const cliTool = normalizeCliTool(override.cli_tool ?? binding?.cli_tool ?? DEFAULT_CLI_TOOL);
+  const cliModel = normalizeCursorCliModel(
+    override.cli_model ?? binding?.cli_model ?? DEFAULT_CURSOR_CLI_MODEL,
+  );
+  const cliModelCustom = String(
+    override.cli_model_custom ?? binding?.cli_model_custom ?? '',
+  ).trim();
+  const cliModelOptions = cliModelOptionsForTool(cliTool);
   const nodeOutputs = binding?.node_outputs ?? [];
 
   const patchRoomLevel = (
@@ -1032,6 +1044,67 @@ export const MeetingRoomConfigDrawer: React.FC<{
                       <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
                         任务执行仅调用所选 CLI 循环处理子单，不调度小鲸与协作智能体。
                       </p>
+
+                      {cliModelOptions.length > 0 ? (
+                        <div className="mt-5">
+                          <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                            <Cpu className="w-3.5 h-3.5 text-amber-400" />
+                            CLI 模型
+                          </label>
+                          <div className="space-y-2">
+                            {cliModelOptions.map((opt) => {
+                              const selected = cliModel === opt.id;
+                              return (
+                                <label
+                                  key={opt.id}
+                                  className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-colors ${
+                                    selected
+                                      ? 'border-amber-500/40 bg-amber-500/10'
+                                      : 'border-border/50 bg-muted/20 hover:border-amber-500/25'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="task-exec-cli-model"
+                                    className="mt-1 accent-amber-500"
+                                    checked={selected}
+                                    onChange={() => patchOverride({ cli_model: opt.id })}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-sm font-medium text-foreground">
+                                        {opt.label}
+                                      </span>
+                                      {opt.default ? (
+                                        <Tag color="gold" className="m-0 text-[10px]">
+                                          默认
+                                        </Tag>
+                                      ) : null}
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 mb-0 leading-relaxed">
+                                      {opt.description}
+                                    </p>
+                                    {opt.requiresInput && selected ? (
+                                      <Input
+                                        className="mt-2.5"
+                                        size="small"
+                                        placeholder="输入模型 ID，如 composer-2.5-fast"
+                                        value={cliModelCustom}
+                                        onChange={(e) =>
+                                          patchOverride({ cli_model_custom: e.target.value })
+                                        }
+                                      />
+                                    ) : null}
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+                            任务执行时将按所选模型调用 Cursor Agent CLI（auto 模式由 CLI 自行选择）。
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
 

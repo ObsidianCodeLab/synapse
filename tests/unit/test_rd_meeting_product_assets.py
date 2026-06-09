@@ -20,6 +20,7 @@ from synapse.rd_meeting.product_assets import (
     enrich_product_with_assets,
     fetch_prod_doc,
     resolve_repo_code_path,
+    resolve_repo_sandbox_path,
     save_product_assets_to_pipeline,
 )
 from synapse.rd_meeting.room_skill import build_product_workspace_paths_section
@@ -58,6 +59,16 @@ def test_materialize_repo_converts_to_utf8_after_clone(monkeypatch, tmp_path):
     )
     assert entry["status"] == "ok"
     assert (dest / "legacy.txt").read_text(encoding="utf-8") == "编码测试"
+
+
+def test_resolve_repo_sandbox_path_replaces_code_segment():
+    code = r"C:\Users\jyhk2\.synapse\work\21881451\code\ZMDB\BackServiceCpp\src\cpp\Zmdb"
+    sandbox = r"C:\Users\jyhk2\.synapse\work\21881451\sandbox\ZMDB\BackServiceCpp\src\cpp\Zmdb"
+    assert resolve_repo_sandbox_path(code) == sandbox
+    posix = "/work/21881451/code/demo/src/core"
+    assert resolve_repo_sandbox_path(posix) == "/work/21881451/sandbox/demo/src/core"
+    assert resolve_repo_sandbox_path("") == ""
+    assert resolve_repo_sandbox_path("/no/code/segment/here") == "/no/sandbox/segment/here"
 
 
 def test_resolve_repo_code_path_joins_local_repo_name_and_subpath():
@@ -134,9 +145,9 @@ def test_bootstrap_writes_code_and_doc(monkeypatch, tmp_path):
     assert product["code_root"]
     assert product["doc_root"]
     assert product["repos"][0]["local_path"]
-    assert product["repos"][0]["resolved_code_path"] == str(
-        Path(product["repos"][0]["local_path"]) / "src/core"
-    )
+    resolved_code = str(Path(product["repos"][0]["local_path"]) / "src/core")
+    assert product["repos"][0]["resolved_code_path"] == resolved_code
+    assert product["repos"][0]["resolved_sandbox_path"] == resolve_repo_sandbox_path(resolved_code)
 
     init_ctx = {
         "product": product,
@@ -145,7 +156,9 @@ def test_bootstrap_writes_code_and_doc(monkeypatch, tmp_path):
     block = build_product_workspace_paths_section(init_ctx)
     assert "产品工作区路径" in block
     assert "CODE_PATH：" in block
+    assert "SANDBOX_PATH：" in block
     assert product["repos"][0]["resolved_code_path"] in block
+    assert product["repos"][0]["resolved_sandbox_path"] in block
     assert "REPO_NAME：demo" in block
 
 

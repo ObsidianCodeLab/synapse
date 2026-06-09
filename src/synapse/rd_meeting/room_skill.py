@@ -25,7 +25,7 @@ from typing import Any, Literal
 from synapse.agents.profile import AgentProfile, get_profile_store
 from synapse.rd_meeting.agent_runtime import append_enriched_skill_lines, skill_ids_from_profile
 from synapse.rd_meeting.collaboration import collaboration_worker_ids
-from synapse.rd_meeting.product_assets import resolve_repo_code_path
+from synapse.rd_meeting.product_assets import resolve_repo_code_path, resolve_repo_sandbox_path
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 
 logger = logging.getLogger(__name__)
@@ -588,6 +588,7 @@ def build_product_workspace_paths_section(
     lines: list[str] = ["## 产品工作区路径（room_opened 已落盘，必读）", ""]
     lines.append(
         "- **约定**：产品源码在 `work/<scope>/code/<repo_name>/`；"
+        "沙箱工程在 `work/<scope>/sandbox/<repo_name>/`（`SANDBOX_PATH` 由 `CODE_PATH` 将 `code` 改为 `sandbox`）；"
         "产品文档在 `work/<scope>/doc/<doc_type>/`。"
         "读代码 / 文档时**必须**使用下列路径，**禁止**臆造目录。"
     )
@@ -611,11 +612,17 @@ def build_product_workspace_paths_section(
             )
             if not resolved:
                 continue
+            sandbox = (
+                str(r.get("resolved_sandbox_path") or "").strip()
+                or resolve_repo_sandbox_path(resolved)
+            )
             st = str(r.get("materialize_status") or "").strip()
             note = f"（{st}）" if st and st != "ok" else ""
             lines.append(f"  - 代码 `{name}` 路径参数：")
             lines.append(f"    REPO_NAME：{name}")
             lines.append(f"    CODE_PATH：{resolved}{note}")
+            if sandbox:
+                lines.append(f"    SANDBOX_PATH：{sandbox}")
     if doc_root:
         lines.append(f"- **产品文档根目录**：`{doc_root}`")
     docs = prod.get("docs")

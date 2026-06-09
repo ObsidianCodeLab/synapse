@@ -123,6 +123,8 @@ _SAVABLE_OVERRIDE_KEYS = (
     "llm_endpoint_key",
     "hitl_form_schema",
     "cli_tool",
+    "cli_model",
+    "cli_model_custom",
 )
 
 

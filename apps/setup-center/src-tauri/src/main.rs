@@ -3201,6 +3201,9 @@ fn main() {
             claude_code_apply_user_init,
             get_llm_token_guide_video_path,
             opencode_cli_install,
+            cursor_agent_cli_check,
+            cursor_agent_cli_install,
+            cursor_agent_cli_login,
             rd_terminal::commands::create_agent_workspace,
             rd_terminal::commands::pty_create_attach,
             rd_terminal::commands::pty_write,
@@ -7954,6 +7957,293 @@ async fn claude_code_install(app: tauri::AppHandle) -> Result<String, String> {
 async fn opencode_cli_install(app: tauri::AppHandle) -> Result<String, String> {
     let app = app.clone();
     spawn_blocking_result(move || opencode_cli_install_local_sync(app)).await
+}
+
+const CURSOR_AGENT_INSTALL_LOG_EVENT: &str = "cursor_agent_install_log";
+
+fn emit_cursor_agent_install_line(app: &tauri::AppHandle, text: &str) {
+    let _ = app.emit(
+        CURSOR_AGENT_INSTALL_LOG_EVENT,
+        serde_json::json!({ "text": text }),
+    );
+}
+
+fn cursor_agent_exe_candidates() -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = Vec::new();
+    #[cfg(windows)]
+    {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            let base = PathBuf::from(local).join("cursor-agent");
+            for name in ["agent.exe", "agent.cmd", "cursor-agent.exe", "cursor-agent.cmd"] {
+                out.push(base.join(name));
+            }
+            let versions = base.join("versions");
+            if versions.is_dir() {
+                let mut dirs: Vec<PathBuf> = fs::read_dir(&versions)
+                    .ok()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|e| e.ok().map(|x| x.path()))
+                    .filter(|p| p.is_dir())
+                    .collect();
+                dirs.sort();
+                dirs.reverse();
+                for dir in dirs {
+                    for name in ["agent.exe", "agent.cmd", "cursor-agent.exe", "cursor-agent.cmd"] {
+                        out.push(dir.join(name));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// 检测 Cursor Agent CLI（`agent`），供任务执行前置检查与安装向导。
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CursorAgentCliCheckResult {
+    installed: bool,
+    logged_in: bool,
+    ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    auth_message: Option<String>,
+}
+
+fn resolve_cursor_agent_executable() -> Option<PathBuf> {
+    for path in cursor_agent_exe_candidates() {
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn cursor_agent_cli_auth_sync(agent_path: &Path) -> (bool, Option<String>) {
+    if std::env::var("CURSOR_API_KEY")
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return (true, Some("已配置 CURSOR_API_KEY".into()));
+    }
+    for subcmd in ["status", "whoami"] {
+        let mut c = Command::new(agent_path);
+        c.arg(subcmd);
+        apply_no_window(&mut c);
+        if let Ok(o) = c.output() {
+            let text = format!(
+                "{}{}",
+                String::from_utf8_lossy(&o.stdout),
+                String::from_utf8_lossy(&o.stderr),
+            );
+            let trimmed = text.trim();
+            let lower = trimmed.to_lowercase();
+            if !o.status.success() {
+                continue;
+            }
+            if lower.contains("not logged")
+                || lower.contains("not authenticated")
+                || lower.contains("login required")
+            {
+                continue;
+            }
+            if trimmed.is_empty() {
+                return (true, Some("已登录".into()));
+            }
+            return (
+                true,
+                Some(trimmed.lines().next().unwrap_or(trimmed).to_string()),
+            );
+        }
+    }
+    (false, Some("未登录 Cursor 账号".into()))
+}
+
+fn cursor_agent_cli_check_sync() -> CursorAgentCliCheckResult {
+    let Some(agent_path) = resolve_cursor_agent_executable() else {
+        return CursorAgentCliCheckResult {
+            installed: false,
+            logged_in: false,
+            ready: false,
+            version: None,
+            auth_message: Some("未找到 agent 可执行文件".into()),
+        };
+    };
+
+    let mut version = None;
+    let mut c = Command::new(&agent_path);
+    c.arg("--version");
+    apply_no_window(&mut c);
+    if let Ok(o) = c.output() {
+        version = merged_stdout_stderr_version_line(&o);
+    }
+
+    let (logged_in, auth_message) = cursor_agent_cli_auth_sync(&agent_path);
+    CursorAgentCliCheckResult {
+        installed: true,
+        logged_in,
+        ready: logged_in,
+        version,
+        auth_message,
+    }
+}
+
+/// 检测 Cursor Agent CLI（`agent`），供任务执行前置检查与安装向导。
+#[tauri::command]
+fn cursor_agent_cli_check() -> CursorAgentCliCheckResult {
+    cursor_agent_cli_check_sync()
+}
+
+fn cursor_agent_cli_login_sync(app: tauri::AppHandle) -> Result<String, String> {
+    let agent_path = resolve_cursor_agent_executable()
+        .ok_or_else(|| "未找到 Cursor Agent CLI，请先安装 agent".to_string())?;
+    let (logged_in, _) = cursor_agent_cli_auth_sync(&agent_path);
+    if logged_in {
+        return Ok("Cursor 账号已登录，无需重复登录。".into());
+    }
+
+    emit_cursor_agent_install_line(
+        &app,
+        "正在启动 Cursor 账号登录（将自动打开浏览器，请在浏览器中完成授权）…\n",
+    );
+    let mut c = Command::new(&agent_path);
+    c.arg("login");
+    apply_no_window(&mut c);
+    let o = c.output().map_err(|e| format!("启动 agent login 失败: {e}"))?;
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    if !stdout.is_empty() {
+        emit_cursor_agent_install_line(&app, &stdout);
+    }
+    if !stderr.is_empty() {
+        emit_cursor_agent_install_line(&app, &stderr);
+    }
+
+    let (logged_in, auth_message) = cursor_agent_cli_auth_sync(&agent_path);
+    if logged_in {
+        let detail = auth_message.unwrap_or_else(|| "已登录".to_string());
+        emit_cursor_agent_install_line(&app, &format!("登录成功：{detail}\n"));
+        return Ok(format!("Cursor 账号登录成功（{detail}）。"));
+    }
+
+    let detail = if stderr.trim().is_empty() {
+        stdout.trim().to_string()
+    } else {
+        stderr.trim().to_string()
+    };
+    Err(if detail.is_empty() {
+        "登录未完成：请在浏览器中完成授权后点击「重新检测」。".into()
+    } else {
+        format!("登录未完成：{detail}")
+    })
+}
+
+/// 启动 `agent login`（OAuth 浏览器授权）。实时日志：`cursor_agent_install_log`。
+#[tauri::command]
+async fn cursor_agent_cli_login(app: tauri::AppHandle) -> Result<String, String> {
+    let app = app.clone();
+    spawn_blocking_result(move || cursor_agent_cli_login_sync(app)).await
+}
+
+fn cursor_agent_cli_install_sync(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        emit_cursor_agent_install_line(&app, "正在通过官方脚本安装 Cursor Agent CLI…\n");
+        let script = "irm 'https://cursor.com/install?win32=true' | iex";
+        let mut c = Command::new("powershell");
+        c.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ]);
+        apply_no_window(&mut c);
+        let o = c.output().map_err(|e| format!("启动安装失败: {e}"))?;
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        let stderr = String::from_utf8_lossy(&o.stderr);
+        if !stdout.is_empty() {
+            emit_cursor_agent_install_line(&app, &stdout);
+        }
+        if !stderr.is_empty() {
+            emit_cursor_agent_install_line(&app, &stderr);
+        }
+        if !o.status.success() {
+            return Err(format!(
+                "安装失败 (exit={}): {}",
+                o.status.code().unwrap_or(-1),
+                stderr.trim()
+            ));
+        }
+        let check = cursor_agent_cli_check_sync();
+        if !check.installed {
+            return Err(
+                "安装脚本已结束，但未检测到 agent。请重启 Synapse 后重试。".into(),
+            );
+        }
+        let ver = check
+            .version
+            .clone()
+            .unwrap_or_else(|| "已安装".to_string());
+        emit_cursor_agent_install_line(&app, &format!("检测成功：{ver}\n"));
+        if !check.logged_in {
+            emit_cursor_agent_install_line(&app, "安装完成，接下来将引导 Cursor 账号登录…\n");
+            if let Err(err) = cursor_agent_cli_login_sync(app.clone()) {
+                emit_cursor_agent_install_line(&app, &format!("{err}\n"));
+                return Ok(format!(
+                    "Cursor Agent CLI 已安装（{ver}），但登录尚未完成：{err}"
+                ));
+            }
+        }
+        Ok(format!("Cursor Agent CLI 已安装并完成登录（{ver}）。"))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        emit_cursor_agent_install_line(
+            &app,
+            "正在通过官方脚本安装 Cursor Agent CLI…\n",
+        );
+        let mut c = Command::new("sh");
+        c.arg("-lc").arg("curl https://cursor.com/install -fsS | bash");
+        let o = c.output().map_err(|e| format!("启动安装失败: {e}"))?;
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        let stderr = String::from_utf8_lossy(&o.stderr);
+        if !stdout.is_empty() {
+            emit_cursor_agent_install_line(&app, &stdout);
+        }
+        if !stderr.is_empty() {
+            emit_cursor_agent_install_line(&app, &stderr);
+        }
+        if !o.status.success() {
+            return Err(format!(
+                "安装失败 (exit={}): {}",
+                o.status.code().unwrap_or(-1),
+                stderr.trim()
+            ));
+        }
+        let check = cursor_agent_cli_check_sync();
+        if !check.installed {
+            return Err("安装脚本已结束，但未检测到 agent。请重启终端后重试。".into());
+        }
+        if !check.logged_in {
+            emit_cursor_agent_install_line(&app, "安装完成，接下来将引导 Cursor 账号登录…\n");
+            if let Err(err) = cursor_agent_cli_login_sync(app.clone()) {
+                emit_cursor_agent_install_line(&app, &format!("{err}\n"));
+                return Ok(format!("Cursor Agent CLI 已安装，但登录尚未完成：{err}"));
+            }
+        }
+        Ok("Cursor Agent CLI 已安装并完成登录。".into())
+    }
+}
+
+/// 一键安装 Cursor Agent CLI（官方脚本，需联网）。实时日志：`cursor_agent_install_log`。
+#[tauri::command]
+async fn cursor_agent_cli_install(app: tauri::AppHandle) -> Result<String, String> {
+    let app = app.clone();
+    spawn_blocking_result(move || cursor_agent_cli_install_sync(app)).await
 }
 
 #[cfg(test)]
