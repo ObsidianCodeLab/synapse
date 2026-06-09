@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Package, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Package, Loader2, RefreshCw, Search } from "lucide-react";
 import { ProductCard } from "./ProductCard";
 import { ProductModal, formatProjectSpaceOption, type ProductModalFinishValues } from "./ProductModal";
 import { RepoUpdateDialog } from "./RepoUpdateDialog";
 import { ProductDetail } from "./ProductDetail";
+import { ProductNameSearch, productMatchesNameFilter } from "./ProductNameSearch";
 import {
   Product,
   type ProductKnowledgePatch,
@@ -228,8 +229,13 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
     kind: "refresh" | "repo" | "delete";
   } | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [listFilterQuery, setListFilterQuery] = useState("");
 
-  const filteredProducts = products;
+  const filteredProducts = useMemo(() => {
+    const q = listFilterQuery.trim();
+    if (!q) return products;
+    return products.filter((p) => productMatchesNameFilter(p, q));
+  }, [products, listFilterQuery]);
 
   const handleRefreshProcess = async (product: Product) => {
     if (!IS_TAURI) {
@@ -577,12 +583,38 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
             </CardHeader>
           </Card>
 
+          {!listLoading && products.length > 0 && (
+            <div className="px-1 pt-1">
+              <ProductNameSearch
+                products={products}
+                value={listFilterQuery}
+                onChange={setListFilterQuery}
+                placeholder={t("workbench.products.filterPlaceholder")}
+                filteredCount={filteredProducts.length}
+                totalCount={products.length}
+                clearLabel={t("workbench.products.clearFilter")}
+                resultCountLabel={(filtered, total) =>
+                  t("workbench.products.filterResultCount", { filtered, total })
+                }
+              />
+            </div>
+          )}
+
           {/* Product Grid — get_prod_info 全量拉取，不做分页 */}
           {listLoading ? (
             <Card className="shadow-sm border-border/80">
               <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
                 <Loader2 className="size-10 app-loading-spin text-primary/80" aria-hidden />
                 <p className="text-sm">{t("workbench.products.loadingList")}</p>
+              </CardContent>
+            </Card>
+          ) : products.length === 0 ? (
+            <Card className="shadow-sm border-border/80">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <div className="flex flex-col items-center justify-center gap-3 opacity-60">
+                  <Package size={48} className="text-muted-foreground" />
+                  <p className="text-base font-medium">{t("workbench.products.empty")}</p>
+                </div>
               </CardContent>
             </Card>
           ) : filteredProducts.length > 0 ? (
@@ -610,8 +642,11 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
             <Card className="shadow-sm border-border/80">
               <CardContent className="py-12 text-center text-muted-foreground">
                 <div className="flex flex-col items-center justify-center gap-3 opacity-60">
-                  <Package size={48} className="text-muted-foreground" />
-                  <p className="text-base font-medium">{t("workbench.products.empty")}</p>
+                  <Search size={48} className="text-muted-foreground" />
+                  <p className="text-base font-medium">{t("workbench.products.filterNoMatch")}</p>
+                  <Button variant="outline" size="sm" onClick={() => setListFilterQuery("")}>
+                    {t("workbench.products.clearFilter")}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
