@@ -9,6 +9,7 @@ from synapse.rd_meeting.config_store import (
     load_meeting_room_config,
 )
 from synapse.rd_meeting.hitl_form import resolve_hitl_form_schema
+from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, normalize_cli_tool
 from synapse.rd_meeting.intents import resolve_node_intent
 from synapse.rd_sop.manifest import (
     DEFAULT_HOST_PROFILE_ID,
@@ -80,6 +81,8 @@ def _merge_binding(base: dict[str, Any], override: dict[str, Any], *, node_id: s
         out["prompt_supplement"] = str(override.get("prompt_supplement") or "")
     if override.get("hitl_form_schema") is not None:
         out["hitl_form_schema"] = override.get("hitl_form_schema")
+    if override.get("cli_tool") is not None:
+        out["cli_tool"] = normalize_cli_tool(str(override.get("cli_tool") or DEFAULT_CLI_TOOL))
     return out
 
 
@@ -161,6 +164,9 @@ def resolve_node_binding(
         human_confirm = False
     hitl_schema = resolve_hitl_form_schema(node_id, node_override=override) if human_confirm else None
     node_intent, default_node_intent = resolve_node_intent(node_id, node_override=override)
+    cli_tool = normalize_cli_tool(
+        str(merged.get("cli_tool") or override.get("cli_tool") or DEFAULT_CLI_TOOL)
+    )
 
     return {
         "node_id": node_id,

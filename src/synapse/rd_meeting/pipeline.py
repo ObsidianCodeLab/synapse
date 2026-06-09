@@ -76,6 +76,7 @@ STEP_NODE_REVIEW = "node_review"
 STEP_NODE_FINISH = "node_finish"
 STEP_REPROCESS_PREP = "reprocess_prep"
 STEP_SYSTEM_NODE_EXEC = "system_node_exec"
+STEP_TASK_EXEC_CLI = "task_exec_cli"
 STEP_WAITING = "waiting"
 STEP_DONE = "done"
 
@@ -89,6 +90,7 @@ _VALID_FLOW_STEPS = frozenset(
         STEP_NODE_FINISH,
         STEP_REPROCESS_PREP,
         STEP_SYSTEM_NODE_EXEC,
+        STEP_TASK_EXEC_CLI,
         STEP_WAITING,
         STEP_DONE,
     }
@@ -116,6 +118,7 @@ FLOW_STEP_LABEL: dict[str, str] = {
     STEP_NODE_FINISH: "节点收尾",
     STEP_REPROCESS_PREP: "重新处理准备",
     STEP_SYSTEM_NODE_EXEC: "系统节点执行",
+    STEP_TASK_EXEC_CLI: "任务执行 CLI",
     STEP_WAITING: "流程待机",
     STEP_DONE: "流程结束",
 }
@@ -634,7 +637,9 @@ def _step_node_init(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         save_room_state(sid, rs)
         ctx.room_state = rs
 
-    if not is_system_node(run_node):
+    from synapse.rd_meeting.task_exec import uses_task_exec_cli
+
+    if not is_system_node(run_node) and not uses_task_exec_cli(run_node):
         _schedule_prewarm_for_init(
             scope_type=scope_type,
             scope_id=sid,
@@ -645,10 +650,16 @@ def _step_node_init(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         )
 
     pipe.mark_step_completed(STEP_NODE_INIT)
+
     if is_system_node(run_node):
         pipe.set_flow_step(
             STEP_SYSTEM_NODE_EXEC,
             reason=f"系统节点 {run_node} 初始化完成，进入代码执行",
+        )
+    elif uses_task_exec_cli(run_node):
+        pipe.set_flow_step(
+            STEP_TASK_EXEC_CLI,
+            reason="任务执行节点初始化完成，进入 CLI 批量处理",
         )
     else:
         pipe.set_flow_step(
@@ -677,6 +688,13 @@ def _step_assemble_host_prompt(pipe: MeetingPipeline, ctx: PipelineRunContext) -
     if run_node in ("pending", ""):
         pipe.mark_step_completed(STEP_ASSEMBLE_HOST_PROMPT)
         pipe.set_flow_step(STEP_WAITING, reason="无有效节点，跳过主控提示词组装")
+        return
+
+    from synapse.rd_meeting.task_exec import uses_task_exec_cli
+
+    if uses_task_exec_cli(run_node):
+        pipe.mark_step_completed(STEP_ASSEMBLE_HOST_PROMPT)
+        pipe.set_flow_step(STEP_TASK_EXEC_CLI, reason="任务执行节点跳过小鲸，进入 CLI")
         return
 
     run_binding = resolve_node_binding(
@@ -1348,6 +1366,100 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     pipe.set_flow_step(STEP_NODE_FINISH, reason=f"系统节点 {run_node} 执行完成，进入收尾")
 
 
+def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
+    """任务执行：CLI 循环处理子单，完成后进入专用人工评审门控（不调用小鲸）。"""
+    from synapse.rd_meeting.task_exec import bootstrap_task_exec, uses_task_exec_cli
+
+    sid = ctx.scope_id
+    scope_type = ctx.scope_type
+    data = ctx.dev_status or load_dev_status(sid) or {}
+    room_id = pipe.room_id or str((data.get("meeting_room") or {}).get("room_id") or "")
+    run_node = _resolve_run_node_id(pipe, data)
+    if not uses_task_exec_cli(run_node):
+        pipe.mark_step_completed(STEP_TASK_EXEC_CLI)
+        pipe.set_flow_step(STEP_ASSEMBLE_HOST_PROMPT, reason="非任务执行节点，回退主控组装")
+        return
+
+    ticket_title = str(ctx.detail.get("ticket_title") or "")
+    binding = resolve_node_binding(
+        run_node,
+        scope_type=scope_type,
+        scope_id=sid,
+        ticket_title=ticket_title,
+    )
+    human_suggestions = str(binding.get("prompt_supplement") or "").strip()
+    cli_tool = str(binding.get("cli_tool") or "").strip()
+
+    append_history_event(
+        sid,
+        {
+            "event": "task_exec_cli_started",
+            "room_id": room_id,
+            "node_id": run_node,
+            "cli_tool": cli_tool,
+            "flow_stage": FLOW_STEP_LABEL[STEP_TASK_EXEC_CLI],
+            "log_type": "info",
+            "agent_id": "system",
+            "system_node": True,
+        },
+    )
+
+    rs = dict(load_room_state(sid) or {})
+    rs["status"] = "processing"
+    rs["current_node_id"] = run_node
+    rs["agents_active"] = [{"profile_id": "cli", "role": "system", "display_name": "CLI"}]
+    save_room_state(sid, rs)
+    ctx.room_state = rs
+
+    result = bootstrap_task_exec(
+        scope_type,  # type: ignore[arg-type]
+        sid,
+        cli_tool=cli_tool or None,
+        human_suggestions=human_suggestions,
+    )
+
+    append_history_event(
+        sid,
+        {
+            "event": "task_exec_cli_finished",
+            "room_id": room_id,
+            "node_id": run_node,
+            "result": result,
+            "flow_stage": FLOW_STEP_LABEL[STEP_TASK_EXEC_CLI],
+            "log_type": "info" if result.get("status") in ("ok", "partial") else "error",
+            "agent_id": "system",
+            "system_node": True,
+        },
+    )
+
+    pctx = pipe._data.get("context")
+    if not isinstance(pctx, dict):
+        pctx = {}
+    pctx["task_exec_assets"] = result
+    pctx["last_finished_node_id"] = run_node
+    pipe._data["context"] = pctx
+
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+    from synapse.rd_meeting.task_exec import render_task_exec_report_markdown
+
+    report_body = render_task_exec_report_markdown(result)
+    orch = MeetingRoomOrchestrator()
+    orch.enter_task_exec_gate(
+        scope_type=scope_type,
+        scope_id=sid,
+        room_id=room_id,
+        node_id=run_node,
+        report_body=report_body,
+        tokens_used=int((result.get("summary") or {}).get("total_tokens") or 0),
+        duration_seconds=int((result.get("summary") or {}).get("total_duration_sec") or 0),
+        stage_id=int(data.get("stage_id") or stage_id_for_node_id(run_node)),
+        ticket_title=ticket_title,
+    )
+
+    pipe.mark_step_completed(STEP_TASK_EXEC_CLI)
+    pipe.set_flow_step(STEP_WAITING, reason="任务执行 CLI 完成，等待人工评审")
+
+
 def _step_node_finish(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     """节点收尾：dump host + worker trace、严格冷启动 messages / TaskState，写流日志；
     随后自动进入下一节点的 INIT。
@@ -1438,6 +1550,7 @@ FLOW_STEP_HANDLERS: dict[str, StepHandler] = {
     STEP_NODE_INIT: _step_node_init,
     STEP_ASSEMBLE_HOST_PROMPT: _step_assemble_host_prompt,
     STEP_SYSTEM_NODE_EXEC: _step_system_node_exec,
+    STEP_TASK_EXEC_CLI: _step_task_exec_cli,
     STEP_REPROCESS_PREP: _step_reprocess_prep,
     STEP_NODE_FINISH: _step_node_finish,
 }

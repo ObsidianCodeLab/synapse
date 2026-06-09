@@ -30,8 +30,13 @@ import { consumeMeetingRoomFocus } from '../../../rd-meeting/focus';
 import { MeetingRoomConfigDrawer } from './MeetingRoomConfigDrawer';
 import { MeetingHitlForm, type HitlFormSchema, type HitlFormValues } from './MeetingHitlForm';
 import { SolutionReviewPanel } from './SolutionReviewPanel';
+import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
-import type { NodeReviewPayload, SolutionReviewPayload } from '../../../api/meetingRoomService';
+import type {
+  NodeReviewPayload,
+  SolutionReviewPayload,
+  TaskExecPayload,
+} from '../../../api/meetingRoomService';
 import {
   MeetingAgentContextDrawer,
   type AgentContextTarget,
@@ -158,6 +163,8 @@ interface MeetingRoom {
   interventionPanel?: InterventionPanelKind | string | null;
   solutionReviewPayload?: SolutionReviewPayload | null;
   solutionReviewBlocked?: boolean;
+  taskExecPayload?: TaskExecPayload | null;
+  taskExecBlocked?: boolean;
   /** pending_delivery.node_id：当前人工门控所属节点 */
   hitlPendingNodeId?: string | null;
   hitlLocked?: boolean;
@@ -365,6 +372,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         node_id?: string;
         review_payload?: NodeReviewPayload;
         solution_review_payload?: SolutionReviewPayload;
+        task_exec_payload?: TaskExecPayload;
         report_body?: string;
       }
     | undefined;
@@ -454,6 +462,11 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     solutionReviewBlocked: Boolean(
       live.solution_review_blocked ?? room.solutionReviewBlocked,
     ),
+    taskExecPayload:
+      (pendingDelivery?.task_exec_payload as TaskExecPayload | undefined) ??
+      room.taskExecPayload ??
+      null,
+    taskExecBlocked: Boolean(live.task_exec_blocked ?? room.taskExecBlocked),
     brief: live.phase ? `${nextBrief.split(' · ')[0] || nextBrief} · ${live.phase}` : nextBrief,
     chatSopKey: nextSopKey,
     participants: live.participants?.length ? live.participants : room.participants,
@@ -563,6 +576,10 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
       ((item.room_state?.pending_delivery as { solution_review_payload?: SolutionReviewPayload })
         ?.solution_review_payload as SolutionReviewPayload | undefined) ?? null,
     solutionReviewBlocked: Boolean(item.room_state?.solution_review_blocked),
+    taskExecPayload:
+      ((item.room_state?.pending_delivery as { task_exec_payload?: TaskExecPayload })
+        ?.task_exec_payload as TaskExecPayload | undefined) ?? null,
+    taskExecBlocked: Boolean(item.room_state?.task_exec_blocked),
     participants: item.participants,
     scopeType: item.scope_type,
     scopeId: item.scope_id,
@@ -1438,6 +1455,7 @@ const InterventionDialog = ({
   );
   const hitlBadgeText = useMemo(() => {
     if (interventionPanel === 'solution_review') return '方案评审';
+    if (interventionPanel === 'task_exec') return '任务执行评审';
     if (interventionPanel === 'node_review') return '结果待确认';
     const k = (room?.interventionKind || '').toLowerCase();
     if (k === 'exception') return '异常待裁决';
@@ -1998,7 +2016,18 @@ const InterventionDialog = ({
 
           {/* Tab Body */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {centerTab === 'hitl' && hitlAvailable && interventionPanel === 'solution_review' ? (
+            {centerTab === 'hitl' && hitlAvailable && interventionPanel === 'task_exec' ? (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <TaskExecReviewPanel
+                  synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
+                  scopeId={room.scopeId}
+                  initialPayload={room.taskExecPayload ?? null}
+                  blocked={room.taskExecBlocked}
+                  onDecided={() => setCenterTab('detail')}
+                />
+              </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'solution_review' ? (
               <div className="min-h-0 flex-1 overflow-hidden">
                 <SolutionReviewPanel
                   synapseApiBase={synapseApiBase || ''}
@@ -2099,6 +2128,17 @@ const InterventionDialog = ({
 
                     {detailViewMode === 'skipped' ? (
                       <SkippedNodeDetailPanel nodeName={selectedNode.name} />
+                    ) : detailViewMode === 'review' && selectedNode.id === 'task_exec' ? (
+                      <div className="min-h-0 flex-1 overflow-hidden">
+                        <TaskExecReviewPanel
+                          key={`detail-te-${room.id}`}
+                          synapseApiBase={synapseApiBase || ''}
+                          roomId={room.id}
+                          scopeId={room.scopeId}
+                          initialPayload={room.taskExecPayload ?? null}
+                          blocked={room.taskExecBlocked}
+                        />
+                      </div>
                     ) : detailViewMode === 'review' && selectedNode.id === 'solution_review' ? (
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <SolutionReviewPanel

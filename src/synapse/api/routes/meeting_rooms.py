@@ -777,6 +777,72 @@ async def submit_solution_review_decision(
     return success_response(result)
 
 
+class TaskExecDecisionBody(BaseModel):
+    decision: str = Field(..., description="approve | reject")
+    comment: str = Field("", description="人工评审意见")
+
+
+@router.get("/api/dev/meeting-rooms/{room_id}/task-exec")
+async def get_task_exec(room_id: str) -> dict:
+    """读取任务执行结构化 payload（task_exec_result.json）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.task_exec import load_task_exec_payload
+
+    payload = load_task_exec_payload(sid)
+    if payload is None:
+        return error_response(404, "task_exec_not_found")
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "payload": payload,
+            "intervention_kind": room_state.get("intervention_kind"),
+            "blocked": bool(room_state.get("task_exec_blocked")),
+            "pending_node_id": pending.get("node_id"),
+        }
+    )
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/task-exec/decision")
+async def submit_task_exec_decision(
+    room_id: str,
+    body: TaskExecDecisionBody,
+    request: Request,
+) -> dict:
+    """任务执行人工评审：通过推进下一节点，不通过则阻断。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, scope_type = resolved
+
+    pool = getattr(request.app.state, "agent_pool", None)
+    detail = _service.get_room_detail(room_id) or {}
+    ticket_title = str(detail.get("ticket_title") or "")
+
+    orch = MeetingRoomOrchestrator()
+    try:
+        result = orch.confirm_task_exec_decision(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            decision=body.decision,
+            comment=body.comment or "",
+            ticket_title=ticket_title,
+            agent_pool=pool,
+        )
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("submit_task_exec_decision failed: %s", exc)
+        return error_response(500, "task_exec_decision_failed", str(exc))
+    return success_response(result)
+
+
 @router.put("/api/dev/meeting-rooms/{room_id}/solution-review/tasks")
 async def save_solution_review_tasks(
     room_id: str,

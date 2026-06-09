@@ -957,6 +957,187 @@ class MeetingRoomOrchestrator:
             **gate,
         }
 
+    def enter_task_exec_gate(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        report_body: str,
+        tokens_used: int,
+        duration_seconds: int,
+        stage_id: int,
+        ticket_title: str,
+    ) -> dict[str, Any]:
+        """任务执行节点：CLI 完成后进入专用人工评审面板。"""
+        from synapse.rd_meeting.task_exec import load_task_exec_payload
+
+        sid = scope_id.strip()
+        set_phase(sid, "result_gate")
+        te_payload = load_task_exec_payload(sid)
+        if not isinstance(te_payload, dict):
+            gate = self.mark_human_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                reason=f"{node_display_name(node_id)} 任务执行产物未就绪",
+                ticket_title=ticket_title,
+                hitl_form_schema=None,
+                pending_delivery={
+                    "node_id": node_id,
+                    "report_body": report_body,
+                    "await_confirm": False,
+                    "tokens_used": tokens_used,
+                    "duration_seconds": duration_seconds,
+                    "stage_id": stage_id,
+                },
+                intervention_kind="exception",
+            )
+            set_phase(sid, "exception_gate")
+            return {"status": "human_intervention", "node_id": node_id, "exception": True, **gate}
+
+        pending: dict[str, Any] = {
+            "node_id": node_id,
+            "report_body": report_body,
+            "await_confirm": True,
+            "tokens_used": tokens_used,
+            "duration_seconds": duration_seconds,
+            "stage_id": stage_id,
+            "task_exec_payload": te_payload,
+        }
+        gate = self.mark_human_gate(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            reason=f"{node_display_name(node_id)} 待人工评审（CLI 执行结果确认）",
+            ticket_title=ticket_title,
+            hitl_form_schema=None,
+            pending_delivery=pending,
+            intervention_kind="task_exec",
+        )
+        append_history_event(
+            sid,
+            {
+                "event": "task_exec_gate",
+                "room_id": room_id,
+                "node_id": node_id,
+                "text": f"{node_display_name(node_id)} 待人工评审任务执行结果",
+                "intervention_kind": "task_exec",
+                "tokens_used": tokens_used,
+                "duration_seconds": duration_seconds,
+                "log_type": "info",
+            },
+        )
+        return {
+            "status": "human_intervention",
+            "node_id": node_id,
+            "pending_confirm": True,
+            "task_exec_payload": te_payload,
+            **gate,
+        }
+
+    def confirm_task_exec_decision(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        decision: str,
+        comment: str = "",
+        agent_pool: Any | None = None,
+        ticket_title: str = "",
+    ) -> dict[str, Any]:
+        """任务执行人工评审：通过则推进下一节点。"""
+        sid = scope_id.strip()
+        rs = dict(load_room_state(sid) or {})
+        pending = rs.get("pending_delivery") if isinstance(rs.get("pending_delivery"), dict) else {}
+        from synapse.rd_meeting.task_exec import NODE_ID as TE_NODE_ID
+
+        node_id = str(pending.get("node_id") or rs.get("current_node_id") or TE_NODE_ID)
+        if node_id != TE_NODE_ID:
+            raise ValueError("not_task_exec_node")
+
+        dec = (decision or "").strip().lower()
+        if dec not in ("approve", "reject", "pass", "fail"):
+            raise ValueError("invalid_decision")
+
+        from synapse.rd_meeting.task_exec import _read_result, _write_result
+
+        payload = _read_result(sid) or {}
+        human = dict(payload.get("human_review") or {})
+        human["status"] = "approved" if dec in ("approve", "pass") else "rejected"
+        human["comment"] = comment.strip()
+        human["decided_at"] = datetime.now().isoformat(timespec="seconds")
+        payload["human_review"] = human
+        _write_result(sid, payload)
+
+        if dec in ("reject", "fail"):
+            rs["status"] = "human_intervention"
+            rs["intervention_kind"] = "exception"
+            rs["task_exec_blocked"] = True
+            if comment.strip():
+                rs["escalate_reason"] = comment.strip()
+            save_room_state(sid, rs)
+            append_history_event(
+                sid,
+                {
+                    "event": "task_exec_rejected",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "comment": comment.strip(),
+                    "log_type": "warning",
+                    "agent_id": "user",
+                },
+            )
+            return {"status": "blocked", "node_id": node_id, "room_state": rs}
+
+        tokens_used = int(pending.get("tokens_used") or 0)
+        duration = int(pending.get("duration_seconds") or 0)
+        stage_id = int(pending.get("stage_id") or stage_id_for_node_id(node_id))
+        from synapse.rd_meeting.paths import archive_node_dir
+        from synapse.rd_sop.nodes import stage_name_for_id
+
+        stage_name = stage_name_for_id(stage_id)
+        dest = archive_node_dir(sid, stage_name, node_id)
+        artifacts = []
+        for name in ("任务执行记录.md", "task_exec_result.json"):
+            path = dest / name
+            if path.is_file():
+                artifacts.append({"name": name, "path": str(path)})
+
+        out = self.on_node_complete(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            artifacts=artifacts,
+            tokens_used=tokens_used,
+            duration_seconds=duration,
+            sync_userwork=True,
+            advance=True,
+            ticket_title=ticket_title,
+            agent_pool=agent_pool,
+        )
+        rs = dict(load_room_state(sid) or {})
+        rs.pop("pending_delivery", None)
+        rs.pop("task_exec_blocked", None)
+        save_room_state(sid, rs)
+        append_history_event(
+            sid,
+            {
+                "event": "task_exec_approved",
+                "room_id": room_id,
+                "node_id": node_id,
+                "comment": comment.strip(),
+                "log_type": "info",
+                "agent_id": "user",
+            },
+        )
+        return {"status": "approved", "node_id": node_id, **out}
+
     def confirm_solution_review_decision(
         self,
         *,
@@ -1592,6 +1773,10 @@ class MeetingRoomOrchestrator:
 
         if is_system_node(node_id):
             raise ValueError("system_node_use_pipeline")
+        from synapse.rd_meeting.task_exec import uses_task_exec_cli
+
+        if uses_task_exec_cli(node_id):
+            raise ValueError("task_exec_use_pipeline")
         dev = skip_prep.get("dev_status") or load_dev_status(sid)
         if dev is None:
             raise ValueError("dev_status_not_found")

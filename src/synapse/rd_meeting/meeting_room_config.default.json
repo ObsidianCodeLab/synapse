@@ -162,6 +162,7 @@
     "task_exec": {
       "host_profile_id": "default",
       "worker_profile_ids": [],
+      "cli_tool": "cursor_cli",
       "node_intent": "基于函数级方案和工单进行功能点的自动化开发。"
     },
     "exception_check": {

@@ -122,6 +122,7 @@ _SAVABLE_OVERRIDE_KEYS = (
     "worker_profile_ids",
     "llm_endpoint_key",
     "hitl_form_schema",
+    "cli_tool",
 )
 
 

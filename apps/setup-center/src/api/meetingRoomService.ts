@@ -179,6 +179,8 @@ export interface MeetingRoomNodeOverride {
   host_profile_id?: string;
   worker_profile_ids?: string[];
   llm_endpoint_key?: string;
+  /** 任务执行节点：研发工具 CLI（cursor_cli / claude_code / opencode） */
+  cli_tool?: string;
 }
 
 export interface MeetingRoomConfigPayload {
@@ -522,6 +524,68 @@ export async function submitSolutionReviewDecision(
   return apiPost<SolutionReviewDecisionResult>(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/solution-review/decision`,
+    body,
+  );
+}
+
+export interface TaskExecTaskRow {
+  task_no?: string;
+  task_title?: string;
+  goal?: string;
+  coverage?: string[];
+  sandbox_path?: string;
+  product_module?: string;
+  status?: string;
+  completion?: string;
+  error?: string;
+  tokens_used?: number;
+  duration_seconds?: number;
+  report_markdown?: string;
+}
+
+export interface TaskExecPayload {
+  cli_tool?: string;
+  status?: string;
+  summary?: {
+    total?: number;
+    ok?: number;
+    failed?: number;
+    skipped?: number;
+    total_tokens?: number;
+    total_duration_sec?: number;
+  };
+  tasks?: TaskExecTaskRow[];
+  human_review?: { status?: string; comment?: string; decided_at?: string | null };
+}
+
+export interface TaskExecGetResponse {
+  room_id: string;
+  scope_id: string;
+  payload: TaskExecPayload;
+  intervention_kind?: string;
+  blocked?: boolean;
+}
+
+export async function fetchTaskExec(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<TaskExecGetResponse> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<TaskExecGetResponse>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec`,
+  );
+}
+
+export async function submitTaskExecDecision(
+  synapseApiBase: string,
+  roomId: string,
+  body: { decision: 'approve' | 'reject'; comment?: string },
+): Promise<{ status: string; node_id?: string }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPost<{ status: string; node_id?: string }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/decision`,
     body,
   );
 }

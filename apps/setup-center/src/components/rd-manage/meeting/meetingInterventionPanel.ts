@@ -1,6 +1,6 @@
 import type { NodeType } from '../../../rd-sop/constants';
 
-export type InterventionPanelKind = 'solution_review' | 'node_review' | 'hitl';
+export type InterventionPanelKind = 'solution_review' | 'task_exec' | 'node_review' | 'hitl';
 
 /** 协同型节点（ai_human）禁止配置协作智能体阵容。 */
 export function collaborationWorkersConfigurable(
@@ -35,12 +35,14 @@ export type MeetingInterventionRoomSlice = {
   hitlLocked?: boolean;
   reviewPayload?: { node_id?: string } | null;
   solutionReviewPayload?: unknown;
+  taskExecPayload?: unknown;
   /** pending_delivery.node_id：人工门控所属 SOP 节点（优先于 currentNode） */
   hitlPendingNodeId?: string | null;
 };
 
 const INTERVENTION_KIND_LABELS: Record<string, string> = {
   solution_review: '方案评审',
+  task_exec: '任务执行评审',
   result_confirm: '结果确认',
   interactive: '会中澄清',
   exception: '异常裁决',
@@ -61,6 +63,10 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
   const current = (room.currentNode || '').trim();
   const kind = (room.interventionKind || '').trim().toLowerCase();
   const panel = (room.interventionPanel || '').trim();
+
+  if (kind === 'task_exec' || panel === 'task_exec') {
+    return pendingNid || current || 'task_exec';
+  }
 
   if (
     kind === 'solution_review' ||
@@ -95,12 +101,21 @@ export function resolveMeetingInterventionPanel(
   if (room.status !== 'human_intervention' || room.hitlLocked) return null;
 
   const panel = (room.interventionPanel || '').trim();
-  if (panel === 'solution_review' || panel === 'node_review' || panel === 'hitl') {
+  if (
+    panel === 'solution_review' ||
+    panel === 'task_exec' ||
+    panel === 'node_review' ||
+    panel === 'hitl'
+  ) {
     return panel;
   }
 
   const kind = (room.interventionKind || '').toLowerCase();
   const nid = (nodeId || room.currentNode || '').trim();
+
+  if (kind === 'task_exec' || room.taskExecPayload) {
+    return 'task_exec';
+  }
 
   if (kind === 'solution_review' || room.solutionReviewPayload) {
     return 'solution_review';
@@ -110,6 +125,7 @@ export function resolveMeetingInterventionPanel(
   }
 
   if (nodeType === 'ai_human') {
+    if (nid === 'task_exec' && kind === 'task_exec') return 'task_exec';
     if (nid === 'solution_review' && room.solutionReviewPayload) return 'solution_review';
     if (room.reviewPayload) return 'node_review';
   }

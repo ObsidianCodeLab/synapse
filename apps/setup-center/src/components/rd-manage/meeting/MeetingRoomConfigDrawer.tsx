@@ -17,6 +17,7 @@ import {
   User,
   Cog,
   AlertCircle,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react';
 import type { MeetingRoomNodeBinding } from '../../../api/meetingRoomService';
@@ -47,6 +48,7 @@ import {
   type MeetingRoomConfigPayload,
   type MeetingRoomNodeOverride,
 } from '../../../api/meetingRoomService';
+import { CLI_TOOL_OPTIONS, DEFAULT_CLI_TOOL, normalizeCliTool } from './cliToolConfig';
 
 /** 主控固定为小鲸（profile id: default） */
 const HOST_PROFILE_ID = 'default';
@@ -437,6 +439,8 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const humanConfirm = effectiveHumanConfirm(override, binding);
   const showHumanConfirmSwitch = humanConfirmSwitchVisible(nodeType);
   const isSystemNode = binding?.type === 'system';
+  const isTaskExecNode = selectedNodeId === 'task_exec';
+  const cliTool = normalizeCliTool(override.cli_tool ?? binding?.cli_tool ?? DEFAULT_CLI_TOOL);
   const nodeOutputs = binding?.node_outputs ?? [];
 
   const patchRoomLevel = (
@@ -979,9 +983,61 @@ export const MeetingRoomConfigDrawer: React.FC<{
                     </div>
                   ) : null}
 
+                  {isTaskExecNode ? (
+                    <div>
+                      <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                        <Terminal className="w-3.5 h-3.5 text-amber-400" />
+                        AI 工具（研发工具终端 CLI）
+                      </label>
+                      <div className="space-y-2">
+                        {CLI_TOOL_OPTIONS.map((opt) => {
+                          const selected = cliTool === opt.id;
+                          return (
+                            <label
+                              key={opt.id}
+                              className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-colors ${
+                                selected
+                                  ? 'border-amber-500/40 bg-amber-500/10'
+                                  : 'border-border/50 bg-muted/20 hover:border-amber-500/25'
+                              } ${!opt.implemented ? 'opacity-70' : ''}`}
+                            >
+                              <input
+                                type="radio"
+                                name="task-exec-cli-tool"
+                                className="mt-1 accent-amber-500"
+                                checked={selected}
+                                disabled={!opt.implemented}
+                                onChange={() => patchOverride({ cli_tool: opt.id })}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                                  {!opt.implemented ? (
+                                    <Tag className="m-0 text-[10px]">待接入</Tag>
+                                  ) : null}
+                                  {opt.id === DEFAULT_CLI_TOOL ? (
+                                    <Tag color="gold" className="m-0 text-[10px]">
+                                      默认
+                                    </Tag>
+                                  ) : null}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-1 mb-0 leading-relaxed">
+                                  {opt.description}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+                        任务执行仅调用所选 CLI 循环处理子单，不调度小鲸与协作智能体。
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="h-px bg-gradient-to-r from-transparent via-border/80 to-transparent" />
 
-                  {!isSystemNode ? (
+                  {!isSystemNode && !isTaskExecNode ? (
                   <>
                   <div>
                     <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
@@ -1002,7 +1058,7 @@ export const MeetingRoomConfigDrawer: React.FC<{
                     </ConfigFieldBox>
                   </div>
 
-                  {collaborationWorkersConfigurable(nodeType) ? (
+                  {collaborationWorkersConfigurable(nodeType) && !isTaskExecNode ? (
                   <div>
                     <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
                       <Users className="w-3.5 h-3.5 text-emerald-400" />
