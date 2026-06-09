@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   AlertCircle,
@@ -270,23 +270,134 @@ function asStringList(value: unknown): string[] {
   return value.map((x) => String(x).trim()).filter(Boolean);
 }
 
-function FunctionPointsTickerPanel({ points }: { points: string[] }) {
-  const loopItems = [...points, ...points];
-  const durationSec = Math.max(points.length * 2.6, 10);
+function FunctionPointsHoverBlock({
+  points,
+  moduleName,
+  branchVersion,
+  patchName,
+}: {
+  points: string[];
+  moduleName?: string;
+  branchVersion?: string;
+  patchName?: string;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef(0);
+  const rafRef = useRef(0);
+  const runningRef = useRef(false);
+  const lastTsRef = useRef<number | null>(null);
+  const loopItems = useMemo(() => [...points, ...points], [points]);
+  const loopDurationSec = Math.max(points.length * 2.6, 10);
+  const pointsKey = useMemo(() => points.join('\u0000'), [points]);
+  const loopHalfRef = useRef(0);
+
+  const applyTransform = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    track.style.transform = `translate3d(0, ${-offsetRef.current}px, 0)`;
+  }, []);
+
+  const measureLoopHalf = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return loopHalfRef.current;
+    const half = track.scrollHeight / 2;
+    if (half > 0) loopHalfRef.current = half;
+    return loopHalfRef.current;
+  }, []);
+
+  const tick = useCallback(
+    (ts: number) => {
+      if (!runningRef.current) return;
+      const half = measureLoopHalf();
+      if (half > 0) {
+        const last = lastTsRef.current ?? ts;
+        const dt = Math.min((ts - last) / 1000, 0.05);
+        lastTsRef.current = ts;
+        const speed = half / loopDurationSec;
+        offsetRef.current += speed * dt;
+        if (offsetRef.current >= half) offsetRef.current -= half;
+        const track = trackRef.current;
+        if (track) {
+          track.style.transform = `translate3d(0, ${-offsetRef.current}px, 0)`;
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    },
+    [loopDurationSec, measureLoopHalf],
+  );
+
+  useEffect(() => {
+    offsetRef.current = 0;
+    loopHalfRef.current = 0;
+    applyTransform();
+  }, [pointsKey, applyTransform]);
+
+  useEffect(() => {
+    return () => {
+      runningRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  const onEnter = () => {
+    runningRef.current = true;
+    lastTsRef.current = null;
+    applyTransform();
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      measureLoopHalf();
+      applyTransform();
+      rafRef.current = requestAnimationFrame(tick);
+    });
+  };
+
+  const onLeave = () => {
+    runningRef.current = false;
+    lastTsRef.current = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  };
 
   return (
-    <div className="rd-system-fp-ticker">
-      <div className="rd-system-fp-ticker__viewport">
-        <div
-          className="rd-system-fp-ticker__track"
-          style={{ animationDuration: `${durationSec}s` }}
-        >
-          {loopItems.map((fp, i) => (
-            <div key={`${i}-${fp}`} className="rd-system-fp-ticker__item">
-              <span className="rd-system-fp-ticker__index">{(i % points.length) + 1}</span>
-              <span className="rd-system-fp-ticker__text">{fp}</span>
+    <div
+      className="rd-system-fp-hover-block mt-2"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div className="rd-system-split-table__chips">
+        {moduleName ? (
+          <span className="rd-system-chip rd-system-chip--module">
+            <Layers className="h-3 w-3" />
+            {moduleName}
+          </span>
+        ) : null}
+        {branchVersion ? (
+          <span className="rd-system-chip">
+            <GitBranch className="h-3 w-3" />
+            {branchVersion}
+          </span>
+        ) : null}
+        {patchName ? (
+          <span className="rd-system-chip">
+            <Tag className="h-3 w-3" />
+            {patchName}
+          </span>
+        ) : null}
+        <span className="rd-system-chip rd-system-chip--muted rd-system-fp-chip">
+          {points.length} 个功能点
+        </span>
+      </div>
+      <div className="rd-system-fp-ticker-slot">
+        <div className="rd-system-fp-ticker">
+          <div className="rd-system-fp-ticker__viewport">
+            <div ref={trackRef} className="rd-system-fp-ticker__track">
+              {loopItems.map((fp, i) => (
+                <div key={`${i}-${fp}`} className="rd-system-fp-ticker__item">
+                  <span className="rd-system-fp-ticker__index">{(i % points.length) + 1}</span>
+                  <span className="rd-system-fp-ticker__text">{fp}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
       </div>
     </div>
@@ -301,8 +412,7 @@ function SplitTaskDetailRow({ task, index }: { task: RowRecord; index: number })
   const statusLabel = SPLIT_STATUS_LABEL[createStatus] || createStatus;
   const taskError = String(task.error || '').trim();
   const description = String(task.comments || task.task_desc || '').trim();
-  const functionPoints = asStringList(task.function_points);
-  const [fpTickerOpen, setFpTickerOpen] = useState(false);
+  const functionPoints = useMemo(() => asStringList(task.function_points), [task.function_points]);
 
   return (
     <motion.li
@@ -318,38 +428,37 @@ function SplitTaskDetailRow({ task, index }: { task: RowRecord; index: number })
             <h4 className="rd-system-sandbox-row__title">{String(task.task_title || '（无标题）')}</h4>
             {portalNo ? <span className="rd-system-sandbox-row__task-no">{portalNo}</span> : null}
           </div>
-          <div className="rd-system-split-table__chips mt-2">
-            {task.product_module_name ? (
-              <span className="rd-system-chip rd-system-chip--module">
-                <Layers className="h-3 w-3" />
-                {String(task.product_module_name)}
-              </span>
-            ) : null}
-            {task.branch_version ? (
-              <span className="rd-system-chip">
-                <GitBranch className="h-3 w-3" />
-                {String(task.branch_version)}
-              </span>
-            ) : null}
-            {task.patch_name ? (
-              <span className="rd-system-chip">
-                <Tag className="h-3 w-3" />
-                {String(task.patch_name)}
-              </span>
-            ) : null}
-            {functionPoints.length > 0 ? (
-              <div
-                className={`rd-system-fp-zone${fpTickerOpen ? ' is-open' : ''}`}
-                onMouseEnter={() => setFpTickerOpen(true)}
-                onMouseLeave={() => setFpTickerOpen(false)}
-              >
-                <span className={`rd-system-chip rd-system-chip--muted rd-system-fp-chip${fpTickerOpen ? ' is-active' : ''}`}>
-                  {functionPoints.length} 个功能点
-                </span>
-                {fpTickerOpen ? <FunctionPointsTickerPanel points={functionPoints} /> : null}
+          {functionPoints.length > 0 ? (
+            <FunctionPointsHoverBlock
+              points={functionPoints}
+              moduleName={String(task.product_module_name || '').trim() || undefined}
+              branchVersion={String(task.branch_version || '').trim() || undefined}
+              patchName={String(task.patch_name || '').trim() || undefined}
+            />
+          ) : (
+            <div className="mt-2">
+              <div className="rd-system-split-table__chips">
+                {task.product_module_name ? (
+                  <span className="rd-system-chip rd-system-chip--module">
+                    <Layers className="h-3 w-3" />
+                    {String(task.product_module_name)}
+                  </span>
+                ) : null}
+                {task.branch_version ? (
+                  <span className="rd-system-chip">
+                    <GitBranch className="h-3 w-3" />
+                    {String(task.branch_version)}
+                  </span>
+                ) : null}
+                {task.patch_name ? (
+                  <span className="rd-system-chip">
+                    <Tag className="h-3 w-3" />
+                    {String(task.patch_name)}
+                  </span>
+                ) : null}
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
           {description ? (
             <p className="rd-system-sandbox-row__desc whitespace-pre-wrap mt-2">{description}</p>
           ) : null}
@@ -426,7 +535,6 @@ function SandboxTaskRow({ binding, index }: { binding: RowRecord; index: number 
   const noModule = String(binding.match_status || '') === 'no_module';
   const taskNo = String(binding.task_no || '').trim();
   const comments = String(binding.comments || '').trim();
-  const impact = String(binding.task_impact_desc || '').trim();
   const fpCount = Number(binding.function_point_count || 0);
   const key = `plan-${String(binding.plan_index ?? index)}`;
 
@@ -467,7 +575,6 @@ function SandboxTaskRow({ binding, index }: { binding: RowRecord; index: number 
               <span className="rd-system-chip rd-system-chip--muted">{fpCount} 个功能点</span>
             ) : null}
           </div>
-          {impact ? <p className="rd-system-sandbox-row__impact">{impact}</p> : null}
           {comments ? <p className="rd-system-sandbox-row__desc">{truncateText(comments, 180)}</p> : null}
         </div>
         <div className="rd-system-sandbox-row__status">
