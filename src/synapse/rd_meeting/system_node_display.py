@@ -51,90 +51,64 @@ def _modules_match(module_a: str, module_b: str) -> bool:
 
 
 def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """汇总拆单任务行（create_task 结果 + split_plan + local_tasks 状态）。"""
+    """按 split_plan 条数汇总拆单结果：每条计划对应一行，合并同序 create_task 结果。"""
     assets = auto_split_assets or {}
-    rows: list[dict[str, Any]] = []
-    seen: set[str] = set()
-
-    for raw in assets.get("create_task_results") or []:
-        if not isinstance(raw, dict):
-            continue
-        wi = raw.get("work_item") if isinstance(raw.get("work_item"), dict) else {}
-        task_no = str(raw.get("task_no") or wi.get("task_no") or "").strip()
-        title = str(raw.get("taskTitle") or wi.get("task_title") or "").strip()
-        key = task_no or title
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(
-            {
-                "task_no": task_no,
-                "task_title": title,
-                "product_module_name": str(
-                    wi.get("product_module_name") or raw.get("productModuleName") or ""
-                ).strip(),
-                "branch_version": str(
-                    wi.get("branch_version") or raw.get("branchVersionName") or ""
-                ).strip(),
-                "patch_name": str(wi.get("patch_name") or raw.get("patchName") or "").strip(),
-                "create_status": str(raw.get("status") or ""),
-                "source": "create_task",
-            }
-        )
-
-    for raw in assets.get("split_plan_tasks") or []:
-        if not isinstance(raw, dict):
-            continue
-        task_no = str(raw.get("taskNo") or "").strip()
-        title = str(raw.get("taskTitle") or "").strip()
-        key = task_no or title
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        rows.append(
-            {
-                "task_no": task_no,
-                "task_title": title,
-                "product_module_name": str(raw.get("productModuleName") or "").strip(),
-                "branch_version": str(raw.get("branchVersionName") or "").strip(),
-                "patch_name": str(raw.get("patchName") or "").strip(),
-                "create_status": "planned",
-                "source": "split_plan",
-            }
-        )
-
+    plan_tasks = [
+        dict(t) for t in (assets.get("split_plan_tasks") or []) if isinstance(t, dict)
+    ]
+    create_results = [
+        dict(r) for r in (assets.get("create_task_results") or []) if isinstance(r, dict)
+    ]
     local_by_no = {
         str(t.get("task_no") or "").strip(): t
         for t in (assets.get("local_tasks") or [])
         if isinstance(t, dict) and str(t.get("task_no") or "").strip()
     }
-    for row in rows:
-        lt = local_by_no.get(row["task_no"])
+
+    rows: list[dict[str, Any]] = []
+    if plan_tasks:
+        for index, plan in enumerate(plan_tasks):
+            created = create_results[index] if index < len(create_results) else {}
+            wi = created.get("work_item") if isinstance(created.get("work_item"), dict) else {}
+            portal_no = str(created.get("task_no") or wi.get("task_no") or "").strip()
+            create_status = str(created.get("status") or "pending").strip() or "pending"
+            row: dict[str, Any] = {
+                "plan_index": index,
+                "plan_task_no": str(plan.get("taskNo") or "").strip(),
+                "task_no": portal_no,
+                "task_title": str(plan.get("taskTitle") or created.get("taskTitle") or "").strip(),
+                "product_module_name": str(plan.get("productModuleName") or "").strip(),
+                "branch_version": str(plan.get("branchVersionName") or "").strip(),
+                "patch_name": str(plan.get("patchName") or "").strip(),
+                "create_status": create_status,
+                "error": str(created.get("error") or "").strip(),
+            }
+            lt = local_by_no.get(portal_no)
+            if lt:
+                row["sop_node"] = str(lt.get("sop_node") or "")
+                row["local_process_state"] = str(lt.get("local_process_state") or "")
+            rows.append(row)
+        return rows
+
+    for index, created in enumerate(create_results):
+        wi = created.get("work_item") if isinstance(created.get("work_item"), dict) else {}
+        portal_no = str(created.get("task_no") or wi.get("task_no") or "").strip()
+        row = {
+            "plan_index": index,
+            "plan_task_no": "",
+            "task_no": portal_no,
+            "task_title": str(created.get("taskTitle") or wi.get("task_title") or "").strip(),
+            "product_module_name": str(wi.get("product_module_name") or "").strip(),
+            "branch_version": "",
+            "patch_name": "",
+            "create_status": str(created.get("status") or ""),
+            "error": str(created.get("error") or "").strip(),
+        }
+        lt = local_by_no.get(portal_no)
         if lt:
             row["sop_node"] = str(lt.get("sop_node") or "")
             row["local_process_state"] = str(lt.get("local_process_state") or "")
-
-    for raw in assets.get("local_tasks") or []:
-        if not isinstance(raw, dict):
-            continue
-        task_no = str(raw.get("task_no") or "").strip()
-        if not task_no or task_no in seen:
-            continue
-        seen.add(task_no)
-        rows.append(
-            {
-                "task_no": task_no,
-                "task_title": str(raw.get("task_title") or ""),
-                "product_module_name": "",
-                "branch_version": "",
-                "patch_name": "",
-                "create_status": "local",
-                "source": "userwork",
-                "sop_node": str(raw.get("sop_node") or ""),
-                "local_process_state": str(raw.get("local_process_state") or ""),
-            }
-        )
-
+        rows.append(row)
     return rows
 
 
@@ -304,18 +278,20 @@ def group_env_paths_by_engineering(entries: list[dict[str, Any]]) -> list[dict[s
 
 def build_auto_split_display(result: dict[str, Any]) -> dict[str, Any]:
     tasks = collect_task_rows(result)
+    plan_count = len(result.get("split_plan_tasks") or [])
+    ok_count = sum(1 for t in tasks if str(t.get("create_status") or "") == "ok")
+    fail_count = sum(
+        1 for t in tasks if str(t.get("create_status") or "") in ("failed", "skipped")
+    )
     return {
         "node_id": "auto_split",
         "status": result.get("status"),
         "demand_no": result.get("demand_no"),
         "errors": result.get("errors") or [],
         "tasks": tasks,
-        "local_tasks": result.get("local_tasks") or [],
-        "portal_task_nos": result.get("portal_task_nos") or [],
-        "only_in_portal": result.get("only_in_portal") or [],
-        "only_in_local": result.get("only_in_local") or [],
-        "create_task_results": result.get("create_task_results") or [],
-        "split_plan_tasks": result.get("split_plan_tasks") or [],
+        "plan_count": plan_count,
+        "ok_count": ok_count,
+        "fail_count": fail_count,
         "materialized_at": result.get("materialized_at"),
     }
 

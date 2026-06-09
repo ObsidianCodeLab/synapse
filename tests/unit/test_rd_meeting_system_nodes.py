@@ -142,35 +142,31 @@ def test_auto_split_from_userwork(monkeypatch, tmp_path):
             }
         ],
     )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.auto_split_assets._fetch_portal_task_nos",
-        lambda _dn: (["T001", "T002"], ""),
-    )
-
     assets = bootstrap_auto_split("demand", scope_id)
     assert assets["status"] == "ok"
     assert assets["userwork_added_task_nos"] == ["T002"]
-    assert len(assets["local_tasks"]) == 2
-    assert "T002" in assets["portal_task_nos"]
+    assert len(assets["local_tasks"]) == 1
+    assert assets["local_tasks"][0]["task_no"] == "T002"
     assert assets["create_task_results"][0]["task_no"] == "T002"
+    assert len(assets["split_plan_tasks"]) == 1
     report = format_auto_split_report(assets, node_name="自动拆单")
     assert "研发子单拆分清单" in report
-    assert "create_task" in report
-    assert "T001" in report
+    assert "拆单结果" in report
+    assert "T002" in report
+    assert "T001" not in report
 
     saved = json.loads(uw_path.read_text(encoding="utf-8"))
     task_nos = [t["task_no"] for t in saved["list"][0]["owned_work_items"]]
     assert task_nos == ["T001", "T002"]
 
 
-@pytest.mark.asyncio
-async def test_auto_split_portal_fetch_from_running_event_loop(monkeypatch):
+def test_auto_split_does_not_fetch_portal_task_list(monkeypatch):
     scope_id = "D99999"
     calls: list[str] = []
 
-    async def _fake_get_task_list(body):
-        calls.append(body.demandNo)
-        return {"errorcode": 0, "message": "success", "data": [{"taskNo": "T900"}]}
+    def _forbidden_portal_fetch(_dn):
+        calls.append(_dn)
+        raise AssertionError("portal task list should not be fetched during auto_split")
 
     monkeypatch.setattr(
         "synapse.rd_meeting.auto_split_assets._load_split_plan_tasks",
@@ -185,14 +181,14 @@ async def test_auto_split_portal_fetch_from_running_event_loop(monkeypatch):
         lambda: [{"demand_no": scope_id, "owned_work_items": []}],
     )
     monkeypatch.setattr(
-        "synapse.api.routes.dev_iwhalecloud._get_task_list_from_demand",
-        _fake_get_task_list,
+        "synapse.rd_meeting.auto_split_assets._fetch_portal_task_nos",
+        _forbidden_portal_fetch,
     )
 
     assets = bootstrap_auto_split("demand", scope_id)
-    assert assets["portal_task_nos"] == ["T900"]
-    assert assets.get("portal_error") == ""
-    assert calls == [scope_id]
+    assert assets["status"] == "ok"
+    assert assets["create_task_results"][0]["task_no"] == "T901"
+    assert calls == []
 
 
 @pytest.mark.asyncio

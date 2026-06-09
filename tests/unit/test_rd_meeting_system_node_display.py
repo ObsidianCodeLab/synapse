@@ -43,6 +43,53 @@ def test_collect_task_rows_merges_sources():
     assert rows[0]["sop_node"] == "pending"
 
 
+def test_collect_task_rows_one_row_when_plan_and_portal_nos_differ():
+    assets = {
+        "split_plan_tasks": [
+            {
+                "taskNo": "21881451",
+                "taskTitle": "子单A",
+                "productModuleName": "ZMDB",
+                "branchVersionName": "BR",
+                "patchName": "P1",
+            },
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "taskTitle": "子单A",
+                "task_no": "11923497",
+                "work_item": {"task_no": "11923497", "product_module_name": "ZMDB"},
+            }
+        ],
+    }
+    rows = collect_task_rows(assets)
+    assert len(rows) == 1
+    assert rows[0]["plan_task_no"] == "21881451"
+    assert rows[0]["task_no"] == "11923497"
+
+
+def test_build_auto_split_display_plan_aligned_counts():
+    payload = build_auto_split_display(
+        {
+            "status": "partial",
+            "demand_no": "D1",
+            "split_plan_tasks": [
+                {"taskTitle": "A", "productModuleName": "M"},
+                {"taskTitle": "B", "productModuleName": "M"},
+            ],
+            "create_task_results": [
+                {"status": "ok", "taskTitle": "A", "task_no": "T1"},
+                {"status": "failed", "taskTitle": "B", "error": "boom"},
+            ],
+        }
+    )
+    assert payload["plan_count"] == 2
+    assert payload["ok_count"] == 1
+    assert payload["fail_count"] == 1
+    assert len(payload["tasks"]) == 2
+
+
 def test_build_task_sandbox_bindings_matches_module():
     auto_split = {
         "split_plan_tasks": [
@@ -82,11 +129,12 @@ def test_build_auto_split_display_includes_tasks():
             "status": "ok",
             "demand_no": "D1",
             "split_plan_tasks": [{"taskTitle": "A", "productModuleName": "M"}],
-            "local_tasks": [],
+            "create_task_results": [{"status": "ok", "taskTitle": "A", "task_no": "T1"}],
         }
     )
     assert payload["node_id"] == "auto_split"
-    assert payload["tasks"]
+    assert payload["plan_count"] == 1
+    assert len(payload["tasks"]) == 1
 
 
 def test_build_env_path_inventory_lists_engineering_files():

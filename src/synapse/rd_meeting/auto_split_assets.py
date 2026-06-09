@@ -272,7 +272,7 @@ def bootstrap_auto_split(
     scope_type: ScopeType,
     scope_id: str,
 ) -> dict[str, Any]:
-    """读 split_plan.json 创建子单，并汇总本地 userwork 与门户任务列表。"""
+    """读 split_plan.json 按 tasks 逐条 create_task，并同步本轮成功子单到 userwork。"""
     sid = (scope_id or "").strip()
     demand_no = _resolve_demand_no(scope_type, sid)
     split_plan_tasks = _load_split_plan_tasks(sid)
@@ -283,8 +283,6 @@ def bootstrap_auto_split(
         "split_plan_tasks": split_plan_tasks,
         "create_task_results": [],
         "local_tasks": [],
-        "portal_task_nos": [],
-        "portal_error": "",
         "status": "ok",
         "errors": [],
         "materialized_at": _now_iso(),
@@ -331,6 +329,11 @@ def bootstrap_auto_split(
     else:
         result["userwork_added_task_nos"] = []
 
+    created_nos = {
+        str(r.get("task_no") or "").strip()
+        for r in create_results
+        if r.get("status") == "ok" and str(r.get("task_no") or "").strip()
+    }
     local = _local_owned_tasks(demand_no)
     result["local_tasks"] = [
         {
@@ -340,118 +343,68 @@ def bootstrap_auto_split(
             "local_process_state": str(t.get("local_process_state") or ""),
         }
         for t in local
+        if str(t.get("task_no") or "").strip() in created_nos
     ]
-
-    portal_nos, portal_err = _fetch_portal_task_nos(demand_no)
-    result["portal_task_nos"] = portal_nos
-    result["portal_error"] = portal_err
-
-    local_nos = {_norm_id(str(t.get("task_no") or "")) for t in local if t.get("task_no")}
-    portal_norm = {_norm_id(n) for n in portal_nos}
-    only_portal = sorted(portal_norm - local_nos - {""})
-    only_local = sorted(local_nos - portal_norm - {""})
-
-    result["only_in_portal"] = only_portal
-    result["only_in_local"] = only_local
-
-    if portal_err and not local and result["status"] == "ok":
-        result["status"] = "failed"
-        result["errors"].append(portal_err)
-    elif portal_err:
-        if result["status"] == "ok":
-            result["status"] = "partial"
-        result["errors"].append(portal_err)
-    elif not local and not portal_nos and not any(r.get("status") == "ok" for r in create_results):
-        if result["status"] == "ok":
-            result["status"] = "partial"
-        result["errors"].append("本地与门户均无研发子单，请确认 create_task 是否成功")
 
     return result
 
 
 def format_auto_split_report(assets: dict[str, Any], *, node_name: str) -> str:
-    """生成 ``研发子单拆分清单.md`` 正文。"""
+    """生成 ``研发子单拆分清单.md`` 正文（按 split_plan 条数展示拆单成败）。"""
+    from synapse.rd_meeting.system_node_display import collect_task_rows
+
+    status = str(assets.get("status") or "—")
+    tasks = collect_task_rows(assets)
+    plan_n = len(assets.get("split_plan_tasks") or [])
+    ok_n = sum(1 for t in tasks if str(t.get("create_status") or "") == "ok")
+
+    if status == "failed":
+        conclusion = "自动拆单失败：split_plan 中的研发子单未能全部创建成功。"
+    elif status == "partial":
+        conclusion = f"自动拆单部分成功：计划 {plan_n} 条，成功 {ok_n} 条。"
+    elif not plan_n:
+        conclusion = "未找到 split_plan 拆单计划，无法执行自动拆单。"
+    else:
+        conclusion = f"自动拆单成功：计划 {plan_n} 条，均已创建研发子单。"
+
     lines = [
         f"# {node_name} — 研发子单拆分清单",
         "",
         "",
-        "本节点由系统脚本执行（split_plan → create_task + userwork/门户同步），未调用大模型与人工确认。",
+        "本节点按方案评审 split_plan 逐条调用 create_task，未调用大模型与人工确认。",
         "",
         f"- **需求单号**：{assets.get('demand_no') or '—'}",
-        f"- **同步时间**：{assets.get('materialized_at') or '—'}",
-        f"- **总体状态**：{assets.get('status') or '—'}",
+        f"- **执行时间**：{assets.get('materialized_at') or '—'}",
+        f"- **计划条数**：{plan_n}",
+        f"- **总体状态**：{status}",
         "",
-        "## 本地 userwork 子单",
+        "## 拆单结果",
         "",
     ]
-    local = assets.get("local_tasks") if isinstance(assets.get("local_tasks"), list) else []
-    if not local:
-        lines.append("（无）")
-    else:
-        for row in local:
-            if not isinstance(row, dict):
-                continue
-            lines.append(
-                f"- **{row.get('task_no') or '—'}** {row.get('task_title') or ''} "
-                f"— sop={row.get('sop_node') or '—'} / {row.get('local_process_state') or '—'}"
-            )
-
-    portal = assets.get("portal_task_nos") if isinstance(assets.get("portal_task_nos"), list) else []
-    lines.extend(["", "## 门户任务列表", ""])
-    if assets.get("portal_error"):
-        lines.append(f"（门户同步失败：{assets.get('portal_error')}）")
-    elif not portal:
-        lines.append("（无）")
-    else:
-        for tn in portal:
-            lines.append(f"- {tn}")
-
-    only_p = assets.get("only_in_portal") or []
-    only_l = assets.get("only_in_local") or []
-    if only_p or only_l:
-        lines.extend(["", "## 差异", ""])
-        if only_p:
-            lines.append(f"- 仅门户：{', '.join(only_p)}")
-        if only_l:
-            lines.append(f"- 仅本地：{', '.join(only_l)}")
-
-    created = assets.get("create_task_results") if isinstance(assets.get("create_task_results"), list) else []
-    lines.extend(["", "## create_task 执行结果", ""])
-    if not created:
-        lines.append("（无）")
-    else:
-        for row in created:
-            if not isinstance(row, dict):
-                continue
-            tn = row.get("task_no") or "—"
-            lines.append(
-                f"- **{row.get('taskTitle') or '—'}** → {tn} "
-                f"（{row.get('status') or '—'}"
-                + (f"：{row.get('error')}" if row.get("error") else "）")
-            )
-
-    plan_tasks = assets.get("split_plan_tasks") if isinstance(assets.get("split_plan_tasks"), list) else []
-    lines.extend(["", "## 方案评审拆单计划（split_plan.json）", ""])
-    if not plan_tasks:
+    if not tasks:
         lines.append("（无 — 须先通过方案评审并落盘 split_plan.json）")
     else:
-        for row in plan_tasks:
-            if not isinstance(row, dict):
-                continue
-            lines.append(
-                f"- **{row.get('taskTitle') or '—'}** "
-                f"模块={row.get('productModuleName') or '—'} "
-                f"分支={row.get('branchVersionName') or '—'} "
-                f"补丁={row.get('patchName') or '—'}"
+        for row in tasks:
+            title = row.get("task_title") or "—"
+            portal_no = row.get("task_no") or "—"
+            create_status = row.get("create_status") or "—"
+            module = row.get("product_module_name") or "—"
+            branch = row.get("branch_version") or "—"
+            patch = row.get("patch_name") or "—"
+            err = row.get("error") or ""
+            line = (
+                f"- **{title}** → 子单号 {portal_no} （{create_status}）"
+                f" 模块={module} 分支={branch} 补丁={patch}"
             )
+            if err:
+                line += f" — {err}"
+            lines.append(line)
 
-    lines.extend(
-        [
-            "",
-            "## 结论",
-            "",
-            "自动拆单已完成：已按 split_plan 调用 create_task，并汇总本地与门户研发子单。",
-            "",
-        ]
-    )
+    global_errors = assets.get("errors") if isinstance(assets.get("errors"), list) else []
+    if global_errors:
+        lines.extend(["", "## 错误", ""])
+        for err in global_errors:
+            lines.append(f"- {err}")
+
+    lines.extend(["", "## 结论", "", conclusion, ""])
     return "\n".join(lines)

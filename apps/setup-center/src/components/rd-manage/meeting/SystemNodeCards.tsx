@@ -75,13 +75,6 @@ function asRows(value: unknown): RowRecord[] {
   return Array.isArray(value) ? value.filter((r): r is RowRecord => !!r && typeof r === 'object') : [];
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  create_task: '门户创建',
-  split_plan: '评审计划',
-  userwork: '本地子单',
-  local: '本地登记',
-};
-
 function HeroBanner({
   gradient,
   icon,
@@ -119,32 +112,57 @@ function HeroBanner({
   );
 }
 
+const SPLIT_STATUS_LABEL: Record<string, string> = {
+  ok: '成功',
+  failed: '失败',
+  skipped: '跳过',
+  pending: '待执行',
+  partial: '部分成功',
+};
+
 export function SystemAutoSplitCard({ payload }: { payload: Record<string, unknown> }) {
   const display = (payload.display as Record<string, unknown>) || payload;
-  const tasks = asRows(display.tasks?.length ? display.tasks : display.local_tasks);
+  const tasks = asRows(display.tasks);
   const errors = (display.errors as string[]) || [];
-  const demandNo = String(display.demand_no || '—');
   const status = String(display.status || payload.status || '—');
-  const okCount = tasks.filter((t) => ['ok', 'planned', 'local'].includes(String(t.create_status || ''))).length;
+  const planCount = Number(display.plan_count ?? tasks.length);
+  const okCount = Number(
+    display.ok_count ?? tasks.filter((t) => String(t.create_status || '') === 'ok').length,
+  );
+  const failCount = Number(
+    display.fail_count
+      ?? tasks.filter((t) => ['failed', 'skipped'].includes(String(t.create_status || ''))).length,
+  );
+
+  const heroTitle =
+    status === 'failed'
+      ? '自动拆单失败'
+      : status === 'partial'
+        ? '自动拆单部分成功'
+        : status === 'ok'
+          ? '自动拆单成功'
+          : '自动拆单';
 
   const summaryLine = useMemo(() => {
-    if (!tasks.length) return '尚未生成研发子单，请确认方案评审拆单计划与 create_task 是否成功。';
-    const modules = [...new Set(tasks.map((t) => String(t.product_module_name || '').trim()).filter(Boolean))];
-    const modHint = modules.length ? `，覆盖 ${modules.length} 个应用模块` : '';
-    return `已从需求单 ${demandNo !== '—' ? demandNo : '（当前工单）'} 拆出 ${tasks.length} 张研发子单${modHint}。`;
-  }, [tasks, demandNo]);
+    if (!planCount) return '未找到 split_plan 拆单计划。';
+    if (status === 'failed') return `split_plan 共 ${planCount} 条，均未成功创建研发子单。`;
+    if (status === 'partial') {
+      return `split_plan 共 ${planCount} 条，成功 ${okCount} 条，失败 ${failCount} 条。`;
+    }
+    return `split_plan 共 ${planCount} 条，均已创建研发子单。`;
+  }, [planCount, okCount, failCount, status]);
 
   return (
     <div className="rd-chat-card rd-chat-card--system-split">
       <HeroBanner
         gradient="rd-system-hero--split"
         icon={<ListTree className="h-6 w-6" />}
-        title="自动拆单完成"
+        title={heroTitle}
         subtitle={summaryLine}
         stats={[
-          { label: '子单数', value: tasks.length },
-          { label: '就绪', value: okCount },
-          { label: '状态', value: status },
+          { label: '计划', value: planCount },
+          { label: '成功', value: okCount },
+          { label: '失败', value: failCount },
         ]}
       />
 
@@ -161,15 +179,17 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
 
       <div className="mt-4">
         {tasks.length === 0 ? (
-          <p className="rd-chat-card__desc text-center py-6">暂无子单数据</p>
+          <p className="rd-chat-card__desc text-center py-6">暂无 split_plan 拆单任务</p>
         ) : (
           <div className="rd-system-task-grid">
             {tasks.map((task, idx) => {
-              const taskNo = String(task.task_no || '—');
-              const key = taskNo !== '—' ? taskNo : `task-${idx}`;
-              const source = String(task.source || task.create_status || '');
-              const sourceLabel = SOURCE_LABEL[source] || (source && source !== '—' ? source : '拆单');
-              const isOk = ['ok', 'planned', 'local'].includes(String(task.create_status || ''));
+              const createStatus = String(task.create_status || 'pending');
+              const portalNo = String(task.task_no || '').trim();
+              const taskNo = portalNo || '—';
+              const key = `plan-${String(task.plan_index ?? idx)}`;
+              const isOk = createStatus === 'ok';
+              const statusLabel = SPLIT_STATUS_LABEL[createStatus] || createStatus;
+              const taskError = String(task.error || '').trim();
               return (
                 <motion.div
                   key={key}
@@ -182,7 +202,7 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
                     <span className="rd-system-task-card__no">{taskNo}</span>
                     <span className={`rd-system-task-card__status ${isOk ? 'is-ok' : ''}`}>
                       {isOk ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-                      <StatusBadge status={String(task.create_status || source)} />
+                      <StatusBadge status={statusLabel} />
                     </span>
                   </div>
                   <p className="rd-system-task-card__title">{String(task.task_title || '（无标题）')}</p>
@@ -205,8 +225,10 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
                         {String(task.patch_name)}
                       </span>
                     ) : null}
-                    <span className="rd-system-chip rd-system-chip--muted">{sourceLabel}</span>
                   </div>
+                  {taskError ? (
+                    <p className="rd-system-task-card__meta text-red-300">{taskError}</p>
+                  ) : null}
                   {task.sop_node || task.local_process_state ? (
                     <div className="rd-system-task-card__meta">
                       {task.sop_node ? <span>SOP · {String(task.sop_node)}</span> : null}
