@@ -441,6 +441,36 @@ def _wire_row_for_sandbox(scope_id: str, prod: str) -> dict[str, Any] | None:
     return match_prod_row_by_prod(rows, prod_key) if rows else None
 
 
+def _display_from_history(scope_id: str, node_id: str) -> dict[str, Any] | None:
+    """历史节点：从 ``room_history.jsonl`` 的 ``system_node_executed`` 事件恢复展示。"""
+    from synapse.rd_meeting.room_runtime import read_history
+
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if not sid or not nid:
+        return None
+    for ev in reversed(read_history(sid, node_id=nid)):
+        if str(ev.get("event") or "").strip() != "system_node_executed":
+            continue
+        if str(ev.get("node_id") or "").strip() not in ("", nid):
+            continue
+        result = ev.get("result") if isinstance(ev.get("result"), dict) else {}
+        embedded = result.get("display") if isinstance(result.get("display"), dict) else {}
+        if embedded:
+            return {**embedded, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
+        if result:
+            rebuilt = attach_system_node_display(
+                nid,
+                dict(result),
+                scope_id=sid,
+                wire_row=_wire_row_for_sandbox(sid, str(result.get("prod") or "")),
+            )
+            display = rebuilt.get("display")
+            if isinstance(display, dict) and display:
+                return {**display, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
+    return None
+
+
 def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] | None:
     """从 pipeline 上下文重建系统节点结构化展示（供节点详情 / API）。"""
     nid = (node_id or "").strip()
@@ -456,34 +486,38 @@ def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] |
 
     if nid == "auto_split":
         assets = _load_pipeline_context_asset(scope_id, "auto_split_assets")
-        if not assets:
-            return None
-        return {
-            **build_auto_split_display(assets),
-            "display_kind": display_kind_for_system_node(nid),
-        }
+        if assets:
+            return {
+                **build_auto_split_display(assets),
+                "display_kind": display_kind_for_system_node(nid),
+            }
+        return _display_from_history(scope_id, nid)
 
     if nid == "sandbox_build":
         assets = _load_pipeline_context_asset(scope_id, "sandbox_assets")
         if not assets:
-            if last and str(last.get("status") or ""):
-                assets = {k: last[k] for k in ("status", "sandbox_root", "repos", "prod", "errors", "materialized_at") if k in last}
-            else:
-                return None
-        prod = str(assets.get("prod") or last.get("prod") or "").strip()
-        wire = _wire_row_for_sandbox(scope_id, prod)
-        return {
-            **build_sandbox_build_display(assets, scope_id=scope_id, wire_row=wire),
-            "display_kind": display_kind_for_system_node(nid),
-        }
+            if str(last.get("node_id") or "").strip() == nid:
+                assets = {
+                    k: last[k]
+                    for k in ("status", "sandbox_root", "repos", "prod", "errors", "materialized_at")
+                    if k in last
+                }
+        if assets:
+            prod = str(assets.get("prod") or last.get("prod") or "").strip()
+            wire = _wire_row_for_sandbox(scope_id, prod)
+            return {
+                **build_sandbox_build_display(assets, scope_id=scope_id, wire_row=wire),
+                "display_kind": display_kind_for_system_node(nid),
+            }
+        return _display_from_history(scope_id, nid)
 
     if nid == "env_pregen":
         assets = _load_pipeline_context_asset(scope_id, "env_pregen_assets")
-        if not assets:
-            return None
-        return {
-            **build_env_pregen_display(assets),
-            "display_kind": display_kind_for_system_node(nid),
-        }
+        if assets:
+            return {
+                **build_env_pregen_display(assets),
+                "display_kind": display_kind_for_system_node(nid),
+            }
+        return _display_from_history(scope_id, nid)
 
-    return None
+    return _display_from_history(scope_id, nid)

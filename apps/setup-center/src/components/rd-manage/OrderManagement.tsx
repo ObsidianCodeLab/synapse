@@ -426,7 +426,7 @@ function OwnedWorkItemsScrollList({ items }: { items: OwnedWorkItem[] }) {
         <span className="font-mono text-[10px] text-muted-foreground">{items.length}</span>
       </div>
       <div
-        className={`rd-order-owned-popover__viewport ${items.length > 3 ? 'rd-order-owned-popover__viewport--scroll' : ''}`}
+        className={`rd-order-owned-popover__viewport ${items.length >= 2 ? 'rd-order-owned-popover__viewport--scroll' : ''}`}
       >
         <div
           className="rd-order-owned-popover__track"
@@ -446,32 +446,46 @@ function OwnedWorkItemsScrollList({ items }: { items: OwnedWorkItem[] }) {
   );
 }
 
-function OwnedWorkItemsHoverTrigger({
+function OwnedWorkItemsCardHover({
   items,
-  className,
+  children,
 }: {
   items: OwnedWorkItem[];
-  className?: string;
+  children: React.ReactElement;
 }) {
-  if (!items.length) return null;
   return (
     <Popover
       trigger="hover"
-      placement="right"
-      mouseEnterDelay={0.12}
-      overlayClassName="rd-order-owned-popover-overlay"
+      placement="rightTop"
+      mouseEnterDelay={0.08}
+      mouseLeaveDelay={0.1}
+      arrow={false}
+      getPopupContainer={() => document.body}
+      destroyOnHidden
+      zIndex={1200}
+      classNames={{ root: 'rd-order-owned-popover-overlay' }}
+      styles={{
+        container: {
+          padding: 0,
+          overflow: 'hidden',
+          borderRadius: 12,
+          background: 'var(--panel2)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.38)',
+        },
+      }}
       content={<OwnedWorkItemsScrollList items={items} />}
     >
-      <button
-        type="button"
-        className={`rd-order-owned-trigger ${className ?? ''}`}
-        onClick={(e) => e.stopPropagation()}
-        aria-label={`${items.length} 个研发子单`}
-      >
-        <GitBranch className="h-3 w-3 shrink-0" />
-        <span className="font-mono text-[10px]">{items.length}</span>
-        <span className="hidden sm:inline">研发单</span>
-      </button>
+      <div className="rd-order-ticket-hover-anchor relative mb-1 block w-full shrink-0">
+        {children}
+        <div
+          className="rd-order-owned-chip pointer-events-none absolute bottom-2 right-2 z-[5] flex items-center gap-1 rounded-full border border-primary/40 bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary shadow-[0_0_12px_color-mix(in_srgb,var(--primary)_22%,transparent)]"
+          aria-hidden
+        >
+          <GitBranch className="h-3 w-3 shrink-0" />
+          <span className="font-mono">{items.length}</span>
+          <span>研发单</span>
+        </div>
+      </div>
     </Popover>
   );
 }
@@ -1808,9 +1822,8 @@ export const OrderManagement: React.FC<{
                       : 'bg-muted-foreground/40';
               const isActive = activeTicketId === ticket.id;
 
-              return (
+              const ticketCard = (
                 <motion.div
-                  key={ticket.id}
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   onClick={() => {
@@ -1822,15 +1835,19 @@ export const OrderManagement: React.FC<{
                       void navigateToMeetingRoom('demand', ticket.id);
                     }
                   }}
-                  className={`rd-order-ticket-card group relative mb-1 shrink-0 cursor-pointer overflow-hidden rounded-[10px] px-2.5 py-3 transition-[background,box-shadow] duration-150 ${
+                  className={`rd-order-ticket-card group relative shrink-0 cursor-pointer overflow-hidden rounded-[10px] px-2.5 py-3 transition-[background,box-shadow] duration-150 ${
+                    ticket.ownedWorkItems.length > 0 ? 'pb-9 ' : ''
+                  }${
                     isActive
                       ? 'bg-[rgba(37,99,235,0.09)] ring-1 ring-border'
                       : 'hover:bg-[rgba(37,99,235,0.05)]'
                   } ${!rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl) ? 'hover:ring-1 hover:ring-primary/30' : ''}`}
                   title={
-                    !rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl)
-                      ? t('rdManageOrder.clickToOpenMeeting', { defaultValue: '点击进入研发会议室' })
-                      : undefined
+                    ticket.ownedWorkItems.length > 0
+                      ? t('rdManageOrder.hoverOwnedWorkItems', { defaultValue: '悬停查看研发子单' })
+                      : !rowActionOverlay && (ticket.status === 'processing' || ticket.status === 'error' || rowHitl)
+                        ? t('rdManageOrder.clickToOpenMeeting', { defaultValue: '点击进入研发会议室' })
+                        : undefined
                   }
                 >
                   <div className={`absolute bottom-0 left-0 top-0 w-1 ${statusBorderColor}`} />
@@ -1919,7 +1936,6 @@ export const OrderManagement: React.FC<{
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2 font-mono text-[10px]">
-                      <OwnedWorkItemsHoverTrigger items={ticket.ownedWorkItems} />
                       <span className="relative flex items-center gap-1">
                         <Coins
                           className={`h-3 w-3 ${ticket.status === 'processing' || rowHitl ? 'text-amber-500' : 'text-amber-500/70'}`}
@@ -1961,6 +1977,16 @@ export const OrderManagement: React.FC<{
                   </div>
                 </motion.div>
               );
+
+              if (ticket.ownedWorkItems.length > 0) {
+                return (
+                  <OwnedWorkItemsCardHover key={ticket.id} items={ticket.ownedWorkItems}>
+                    {ticketCard}
+                  </OwnedWorkItemsCardHover>
+                );
+              }
+
+              return <React.Fragment key={ticket.id}><div className="mb-1 shrink-0">{ticketCard}</div></React.Fragment>;
             })}
           </div>
         </div>

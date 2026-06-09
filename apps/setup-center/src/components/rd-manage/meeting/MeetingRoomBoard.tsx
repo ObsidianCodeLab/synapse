@@ -53,6 +53,7 @@ import {
   type SopPipelineNodeState,
 } from '../../../rd-sop/nodePresentation';
 import { MeetingNodeDetailPanel, type MeetingNodeVisualState } from './panels/MeetingNodeDetailPanel';
+import { SYSTEM_STRUCTURED_NODE_IDS } from './SystemNodeCards';
 import { CrossNodeReprocessIcon } from './CrossNodeReprocessIcon';
 import { StopNodeRunIcon } from './StopNodeRunIcon';
 import {
@@ -591,11 +592,24 @@ const getNodeStateGlobal = (
 
 type NodeDetailViewMode = 'live' | 'review' | 'skipped';
 
+function isStructuredSystemNode(nodeId: string, nodeType: string): boolean {
+  return (
+    nodeType === 'system' &&
+    SYSTEM_STRUCTURED_NODE_IDS.includes(nodeId as (typeof SYSTEM_STRUCTURED_NODE_IDS)[number])
+  );
+}
+
 function resolveNodeDetailViewMode(
   state: ReturnType<typeof getNodeStateGlobal>,
+  nodeId: string,
+  nodeType: string,
 ): NodeDetailViewMode {
   if (state === 'skipped') return 'skipped';
-  if (state === 'completed') return 'review';
+  if (state === 'completed') {
+    // 系统节点（拆单/沙箱/环境预生成）用结构化产出面板，不走 node-review Markdown
+    if (isStructuredSystemNode(nodeId, nodeType)) return 'live';
+    return 'review';
+  }
   return 'live';
 }
 
@@ -2027,7 +2041,11 @@ const InterventionDialog = ({
             ) : selectedNode ? (
               (() => {
                 const selectedNodeState = getNodeStateGlobal(room, selectedNode.id, disabledSopNodeIds);
-                const detailViewMode = resolveNodeDetailViewMode(selectedNodeState);
+                const detailViewMode = resolveNodeDetailViewMode(
+                  selectedNodeState,
+                  selectedNode.id,
+                  selectedNode.type,
+                );
                 const typeInfo = getSopNodeTypeInfo(selectedNode.type);
 
                 return (

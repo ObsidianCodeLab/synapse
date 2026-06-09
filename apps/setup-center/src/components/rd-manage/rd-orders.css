@@ -29,30 +29,24 @@
   min-height: 5.75rem;
 }
 
-/* 研发子单悬停触发器 */
-.rdOrdersRoot .rd-order-owned-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
-  background: color-mix(in srgb, var(--primary) 8%, transparent);
-  padding: 0.1rem 0.45rem;
-  color: var(--primary);
-  line-height: 1.2;
+/* 研发子单：整卡悬停浮动面板 */
+.rdOrdersRoot .rd-order-ticket-hover-anchor {
+  cursor: pointer;
+}
+.rdOrdersRoot .rd-order-owned-chip {
+  backdrop-filter: blur(6px);
   transition:
     border-color 0.2s ease,
-    background 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.2s ease;
 }
-.rdOrdersRoot .rd-order-owned-trigger:hover {
-  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 28%, transparent);
+.rdOrdersRoot .rd-order-ticket-hover-anchor:hover .rd-order-owned-chip {
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 32%, transparent);
   transform: translateY(-1px);
 }
 
+.rd-order-owned-popover-overlay .ant-tooltip-container,
 .rd-order-owned-popover-overlay .ant-popover-inner {
   padding: 0 !important;
   overflow: hidden;
@@ -66,6 +60,10 @@
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.35),
     0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent) !important;
+}
+.rd-order-owned-popover-overlay .ant-tooltip-content,
+.rd-order-owned-popover-overlay .ant-popover-inner-content {
+  padding: 0 !important;
 }
 
 .rd-order-owned-popover {
