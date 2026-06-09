@@ -245,13 +245,17 @@ def test_build_env_path_inventory_lists_engineering_files():
                     }
                 ]
             },
-            "entropy": {"status": "ok", "local_path": "/work/x/env/entropy", "files": ["agent.md"]},
-        }
+        },
+        scope_id="x",
     )
     paths = {e["path"] for e in entries}
+    categories = {e["category"] for e in entries}
     assert "/work/x/sandbox/demo/src/AGENTS.md" in paths
-    assert "/work/x/sandbox/demo/src/synapse_archive/需求分析/req_clarify/需求澄清.md" in paths
-    assert "/work/x/env/entropy/agent.md" in paths
+    assert "sop_artifact" in categories
+    assert "entropy" not in categories
+    sop_rows = [e for e in entries if e.get("category") == "sop_artifact"]
+    assert len(sop_rows) == 9
+    assert any(e.get("file_name") == "需求澄清.md" for e in sop_rows)
 
 
 def test_build_sandbox_build_display_has_bindings(monkeypatch):

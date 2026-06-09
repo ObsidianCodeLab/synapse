@@ -102,12 +102,18 @@ export function MeetingChatMessage({
   agent,
   showAvatar,
   onAvatarClick,
+  roomId,
+  scopeId,
+  synapseApiBase,
 }: {
   log: MeetingChatLog;
   speakerName: string;
   agent?: RoomAgent;
   showAvatar: boolean;
   onAvatarClick?: () => void;
+  roomId?: string;
+  scopeId?: string;
+  synapseApiBase?: string;
 }) {
   const kind = useMemo(() => classifyMeetingChat(log), [log]);
   const isUser = kind === 'user';
@@ -151,7 +157,14 @@ export function MeetingChatMessage({
 
   let body: React.ReactNode;
   if (isStructured) {
-    body = <StructuredChatBody log={log} />;
+    body = (
+      <StructuredChatBody
+        log={log}
+        roomId={roomId}
+        scopeId={scopeId}
+        synapseApiBase={synapseApiBase}
+      />
+    );
   } else if (kind === 'pipeline') {
     body = <PipelineCard text={log.text} />;
   } else if (kind === 'delegation') {

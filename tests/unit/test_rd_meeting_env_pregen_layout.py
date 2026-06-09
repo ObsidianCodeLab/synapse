@@ -89,6 +89,21 @@ def test_copy_work_order_docs_only_template_list(work_root):
     assert not (eng / "synapse_archive" / "方案评审结论.md").exists()
 
 
+def test_copy_product_arch_copies_functional_and_tech_arch(work_root):
+    scope_id = "D-arch"
+    doc_root = work_root / scope_id / "doc" / "产品架构"
+    doc_root.mkdir(parents=True)
+    (doc_root / "FUNCTIONAL_ARCH.md").write_text("# functional", encoding="utf-8")
+    (doc_root / "TECH_ARCH.md").write_text("# tech", encoding="utf-8")
+
+    eng = work_root / scope_id / "sandbox" / "mod"
+    row = copy_work_order_docs_to_engineering(scope_id, eng)
+    arch_root = eng / "synapse_archive" / "产品架构"
+    assert row["status"] in ("ok", "partial")
+    assert (arch_root / "FUNCTIONAL_ARCH.md").read_text(encoding="utf-8") == "# functional"
+    assert (arch_root / "TECH_ARCH.md").read_text(encoding="utf-8") == "# tech"
+
+
 def test_bootstrap_engineering_layout_end_to_end(work_root, tmp_path):
     scope_id = "D-3"
     dev_dir = tmp_path / "dev"

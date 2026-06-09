@@ -4,9 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from synapse.rd_meeting.env_pregen_layout import _pipe_name_part
-from synapse.rd_meeting.paths import meeting_pipeline_path
+from pathlib import Path
+
+from synapse.rd_meeting.binding import resolve_node_binding
+from synapse.rd_meeting.env_pregen_layout import (
+    _ARCHIVE_ARTIFACT_LAYOUT,
+    _PRODUCT_DOC_LAYOUT,
+    _pipe_name_part,
+)
+from synapse.rd_meeting.paths import (
+    archive_node_dir,
+    meeting_pipeline_path,
+    product_doc_dir,
+)
+from synapse.rd_meeting.prior_outputs import load_skipped_node_ids
 from synapse.rd_meeting.room_runtime import read_json_file
+from synapse.rd_sop.nodes import node_display_name, stage_id_for_node_id, stage_name_for_id
 
 SYSTEM_NODE_DISPLAY_KINDS: dict[str, str] = {
     "auto_split": "system_auto_split",
@@ -217,7 +230,150 @@ def build_task_sandbox_bindings(
     return bindings
 
 
-def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
+def _first_engineering_root(assets: dict[str, Any]) -> str:
+    engineering = assets.get("engineering") if isinstance(assets.get("engineering"), dict) else {}
+    for layout in engineering.get("layouts") or []:
+        if not isinstance(layout, dict):
+            continue
+        root = str(layout.get("engineering_root") or "").strip()
+        if root:
+            return root
+    return ""
+
+
+def _copied_work_order_rels(assets: dict[str, Any]) -> set[str]:
+    rels: set[str] = set()
+    engineering = assets.get("engineering") if isinstance(assets.get("engineering"), dict) else {}
+    for layout in engineering.get("layouts") or []:
+        if not isinstance(layout, dict):
+            continue
+        wo = layout.get("work_order_docs") if isinstance(layout.get("work_order_docs"), dict) else {}
+        for rel in wo.get("files") or []:
+            name = str(rel or "").strip()
+            if name:
+                rels.add(name)
+    return rels
+
+
+def build_upstream_sop_artifact_entries(scope_id: str, assets: dict[str, Any]) -> list[dict[str, Any]]:
+    """列出环境预生成模板内全部上游 SOP 产出，并标注关闭/跳过/未归档。"""
+    sid = (scope_id or "").strip()
+    skipped_ids = load_skipped_node_ids(sid) if sid else set()
+    eng_root = _first_engineering_root(assets)
+    copied = _copied_work_order_rels(assets)
+    entries: list[dict[str, Any]] = []
+
+    for node_id, filename, rel in _ARCHIVE_ARTIFACT_LAYOUT:
+        binding = resolve_node_binding(node_id)
+        enabled = bool(binding.get("enabled", True))
+        node_skipped = node_id in skipped_ids
+        node_name = str(binding.get("node_name") or node_display_name(node_id))
+
+        archive_path: Path | None = None
+        archive_exists = False
+        if sid:
+            stage_name = stage_name_for_id(stage_id_for_node_id(node_id))
+            archive_path = archive_node_dir(sid, stage_name, node_id) / filename
+            archive_exists = archive_path.is_file()
+
+        if not enabled:
+            status = "skipped"
+            skip_reason = "环节已关闭"
+        elif node_skipped:
+            status = "skipped"
+            skip_reason = "环节已跳过"
+        elif rel in copied or archive_exists:
+            status = "ok"
+            skip_reason = ""
+        else:
+            status = "missing"
+            skip_reason = "尚未归档"
+
+        if eng_root and rel in copied:
+            path = f"{eng_root}/synapse_archive/{rel}".replace("\\", "/")
+        elif archive_exists and archive_path is not None:
+            path = str(archive_path)
+        elif eng_root:
+            path = f"{eng_root}/synapse_archive/{rel}".replace("\\", "/")
+        else:
+            path = str(rel)
+
+        entries.append(
+            {
+                "path": path,
+                "category": "sop_artifact",
+                "label": rel,
+                "file_name": filename,
+                "node_id": node_id,
+                "node_name": node_name,
+                "status": status,
+                "skip_reason": skip_reason,
+            }
+        )
+    return entries
+
+
+def build_product_doc_file_entries(scope_id: str, assets: dict[str, Any]) -> list[dict[str, Any]]:
+    """将产品文档展开为具体 Markdown 文件（如 FUNCTIONAL_ARCH / TECH_ARCH）。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return []
+
+    product_docs = assets.get("product_docs") if isinstance(assets.get("product_docs"), dict) else {}
+    available_types = {str(t) for t in (product_docs.get("doc_types") or [])}
+    eng_root = _first_engineering_root(assets)
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for doc_type, mappings in _PRODUCT_DOC_LAYOUT.items():
+        by_dest: dict[str, list[str]] = {}
+        for src_name, rel in mappings:
+            by_dest.setdefault(rel, []).append(src_name)
+
+        for rel, src_names in by_dest.items():
+            if rel in seen:
+                continue
+            seen.add(rel)
+            filename = rel.rsplit("/", 1)[-1]
+            src_path: Path | None = None
+            for src_name in src_names:
+                candidate = product_doc_dir(sid, doc_type) / src_name
+                if candidate.is_file():
+                    src_path = candidate
+                    break
+
+            sandbox_path = (
+                Path(f"{eng_root}/synapse_archive/{rel}") if eng_root else None
+            )
+            sandbox_exists = sandbox_path.is_file() if sandbox_path else False
+
+            if sandbox_exists and sandbox_path is not None:
+                path = str(sandbox_path)
+                status = "ok"
+            elif src_path is not None:
+                path = str(src_path)
+                status = "ok"
+            elif doc_type in available_types:
+                path = str(product_doc_dir(sid, doc_type) / filename)
+                status = "missing"
+            else:
+                path = str(product_doc_dir(sid, doc_type) / filename)
+                status = "skipped"
+
+            entries.append(
+                {
+                    "path": path,
+                    "category": "product_doc",
+                    "label": rel,
+                    "file_name": filename,
+                    "doc_type": doc_type,
+                    "status": status,
+                }
+            )
+    return entries
+
+
+def build_env_path_inventory(assets: dict[str, Any], *, scope_id: str = "") -> list[dict[str, Any]]:
     """按落盘路径汇总环境预生成内容，便于前端逐路径检查。"""
     entries: list[dict[str, Any]] = []
 
@@ -235,7 +391,10 @@ def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
         )
 
     product_docs = assets.get("product_docs") if isinstance(assets.get("product_docs"), dict) else {}
-    if product_docs.get("status") == "ok":
+    if scope_id:
+        entries.extend(build_product_doc_file_entries(scope_id, assets))
+        entries.extend(build_upstream_sop_artifact_entries(scope_id, assets))
+    elif product_docs.get("status") == "ok":
         base = str(product_docs.get("local_path") or "").strip()
         for doc_type in product_docs.get("doc_types") or []:
             entries.append(
@@ -246,22 +405,6 @@ def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
                     "status": "ok",
                 }
             )
-
-    entropy = assets.get("entropy") if isinstance(assets.get("entropy"), dict) else {}
-    entropy_root = str(entropy.get("local_path") or "").strip()
-    for name in entropy.get("files") or []:
-        rel = str(name or "").strip()
-        if not rel:
-            continue
-        path = f"{entropy_root}/{rel}".replace("\\", "/") if entropy_root else rel
-        entries.append(
-            {
-                "path": path,
-                "category": "entropy",
-                "label": rel,
-                "status": str(entropy.get("status") or ""),
-            }
-        )
 
     engineering = assets.get("engineering") if isinstance(assets.get("engineering"), dict) else {}
     for layout in engineering.get("layouts") or []:
@@ -290,22 +433,23 @@ def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
                     "status": str(dev.get("status") or layout.get("status") or ""),
                 }
             )
-        wo = layout.get("work_order_docs") if isinstance(layout.get("work_order_docs"), dict) else {}
-        for rel in wo.get("files") or []:
-            rel_path = str(rel or "").strip()
-            if not rel_path:
-                continue
-            entries.append(
-                {
-                    "path": f"{eng_root}/synapse_archive/{rel_path}".replace("\\", "/"),
-                    "category": "work_order_doc",
-                    "label": rel_path,
-                    "module": module,
-                    "code_path": code_path,
-                    "engineering_root": eng_root,
-                    "status": str(wo.get("status") or layout.get("status") or ""),
-                }
-            )
+        if not scope_id:
+            wo = layout.get("work_order_docs") if isinstance(layout.get("work_order_docs"), dict) else {}
+            for rel in wo.get("files") or []:
+                rel_path = str(rel or "").strip()
+                if not rel_path:
+                    continue
+                entries.append(
+                    {
+                        "path": f"{eng_root}/synapse_archive/{rel_path}".replace("\\", "/"),
+                        "category": "work_order_doc",
+                        "label": rel_path,
+                        "module": module,
+                        "code_path": code_path,
+                        "engineering_root": eng_root,
+                        "status": str(wo.get("status") or layout.get("status") or ""),
+                    }
+                )
 
     return entries
 
@@ -426,15 +570,20 @@ def build_sandbox_build_display(
     }
 
 
-def build_env_pregen_display(result: dict[str, Any]) -> dict[str, Any]:
-    path_entries = build_env_path_inventory(result)
+def build_env_pregen_display(result: dict[str, Any], *, scope_id: str = "") -> dict[str, Any]:
+    path_entries = build_env_path_inventory(result, scope_id=scope_id)
+    errors = [
+        str(err)
+        for err in (result.get("errors") or [])
+        if str(err).strip() and not str(err).startswith("控熵")
+    ]
     return {
         "node_id": "env_pregen",
         "status": result.get("status"),
         "prod": result.get("prod"),
         "env_root": result.get("env_root"),
         "doc_root": result.get("doc_root"),
-        "errors": result.get("errors") or [],
+        "errors": errors,
         "docs": result.get("docs") or [],
         "product_docs": result.get("product_docs") or {},
         "entropy": result.get("entropy") or {},
@@ -486,7 +635,7 @@ def attach_system_node_display(
     elif nid == "sandbox_build":
         result["display"] = build_sandbox_build_display(result, scope_id=scope_id, wire_row=wire_row)
     elif nid == "env_pregen":
-        result["display"] = build_env_pregen_display(result)
+        result["display"] = build_env_pregen_display(result, scope_id=scope_id)
     elif nid == "exception_check":
         result["display"] = build_code_commit_display(result)
     elif nid == "env_start":
@@ -631,7 +780,7 @@ def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] |
         assets = _load_pipeline_context_asset(scope_id, "env_pregen_assets")
         if assets:
             return {
-                **build_env_pregen_display(assets),
+                **build_env_pregen_display(assets, scope_id=scope_id),
                 "display_kind": display_kind_for_system_node(nid),
             }
         return _display_from_history(scope_id, nid)

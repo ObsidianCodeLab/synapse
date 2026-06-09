@@ -2,7 +2,7 @@
  * MeetingNodeDetailPanel — 会议室节点详情（产出 / 消耗 / 流程）
  * 节点 token/耗时取自 meeting-summary（room_state.node_metrics）；流程/产出等仍拉 agent-contexts 等。
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Spin, Tabs, Tooltip } from 'antd';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -30,7 +30,6 @@ import {
   Zap,
 } from 'lucide-react';
 import {
-  fetchArtifactFile,
   fetchMeetingAgentContexts,
   fetchMeetingSummary,
   fetchNodeReview,
@@ -39,7 +38,7 @@ import {
   type NodeReviewPayload,
   type ProcessingHistoryEntry,
 } from '../../../../api/meetingRoomService';
-import { ReviewMarkdown } from '../ReviewMarkdown';
+import { MarkdownArtifactsPanel, toMarkdownArtifactFiles } from '../MarkdownArtifactsPanel';
 import {
   SYSTEM_STRUCTURED_NODE_IDS,
   SystemNodeDetailCard,
@@ -232,96 +231,6 @@ function ProcessTimelineItem({ entry, index }: { entry: ProcessingHistoryEntry; 
   );
 }
 
-type PreviewState = 'idle' | 'loading' | 'ready' | 'error';
-
-function ArtifactCard({
-  synapseApiBase,
-  roomId,
-  file,
-}: {
-  synapseApiBase: string;
-  roomId: string;
-  file: { name: string; relative_path: string; size: number; ext?: string };
-}) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const [previewState, setPreviewState] = useState<PreviewState>('idle');
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const isMd = /\.(md|markdown)$/i.test(file.name);
-
-  useEffect(() => {
-    setPreview(null);
-    setPreviewState('idle');
-    setPreviewError(null);
-  }, [file.relative_path, file.name]);
-
-  const loadPreview = useCallback(async () => {
-    if (!isMd || previewState === 'loading' || previewState === 'ready') return;
-    setPreviewState('loading');
-    setPreviewError(null);
-    try {
-      const data = await fetchArtifactFile(synapseApiBase, roomId, file.relative_path);
-      const text = (data.content ?? '').slice(0, 12000);
-      setPreview(text);
-      setPreviewState('ready');
-      if (!text.trim()) setPreviewError('文件为空或无法解析为文本');
-    } catch (e) {
-      setPreview(null);
-      setPreviewState('error');
-      setPreviewError(e instanceof Error ? e.message : '加载预览失败');
-    }
-  }, [file.relative_path, isMd, previewState, roomId, synapseApiBase]);
-
-  return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      className="group rounded-xl border border-border/60 bg-[color:var(--panel)]/50 p-3 transition hover:border-primary/40 hover:shadow-lg"
-    >
-      <div className="flex items-start gap-3">
-        <div className="rounded-lg bg-primary/10 p-2 text-primary">
-          <FileCode2 className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-sm text-foreground">{file.name}</div>
-          <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{file.relative_path}</div>
-          <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span>{formatBytes(file.size)}</span>
-            {isMd ? (
-              <Button
-                size="small"
-                className="!h-auto !min-h-0 !border-2 !border-primary/40 !px-2.5 !py-0.5 !text-[10px] !leading-tight !shadow-none hover:!border-primary/60"
-                onClick={() => void loadPreview()}
-                loading={previewState === 'loading'}
-              >
-                {previewState === 'ready'
-                  ? '已加载'
-                  : previewState === 'error'
-                    ? '重试预览'
-                    : '预览'}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-      {previewState === 'loading' ? (
-        <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-border/40 bg-black/20 py-6 text-xs text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          正在加载文档…
-        </div>
-      ) : null}
-      {previewError ? (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          {previewError}
-        </div>
-      ) : null}
-      {preview && previewState === 'ready' ? (
-        <div className="mt-3 max-h-[min(52vh,480px)] overflow-y-auto rounded-lg border border-border/40 bg-black/20 p-3 text-xs custom-scrollbar">
-          <ReviewMarkdown content={preview} />
-        </div>
-      ) : null}
-    </motion.div>
-  );
-}
-
 function PendingLivePlaceholder() {
   return (
     <div className="flex h-48 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -464,6 +373,17 @@ export function MeetingNodeDetailPanel({
 
   const metrics = review?.metrics;
   const artifacts = review?.artifacts?.length ? review.artifacts : fallbackArtifacts;
+  const mdArtifacts = useMemo(
+    () =>
+      toMarkdownArtifactFiles(
+        artifacts.filter((f) => /\.(md|markdown)$/i.test(f.name)),
+      ),
+    [artifacts],
+  );
+  const otherArtifacts = useMemo(
+    () => artifacts.filter((f) => !/\.(md|markdown)$/i.test(f.name)),
+    [artifacts],
+  );
 
   const tokenTotal = summaryNode?.metrics?.tokens ?? 0;
   const durationSec = summaryNode?.metrics?.deal_seconds ?? 0;
@@ -568,7 +488,13 @@ export function MeetingNodeDetailPanel({
   const outputTab = (
     <div className="space-y-4">
       {isStructuredSystemNode && systemDisplay ? (
-        <SystemNodeDetailCard nodeId={nodeId} display={systemDisplay} />
+        <SystemNodeDetailCard
+          nodeId={nodeId}
+          display={systemDisplay}
+          roomId={roomId}
+          scopeId={scopeId}
+          synapseApiBase={synapseApiBase}
+        />
       ) : isStructuredSystemNode ? (
         <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
           <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
@@ -577,11 +503,31 @@ export function MeetingNodeDetailPanel({
             <p className="mt-1 text-xs text-primary/80">脚本执行中，完成后将展示拆单/沙箱结构化结果</p>
           ) : null}
         </div>
-      ) : artifacts.length ? (
-        <div className="grid grid-cols-1 gap-3">
-          {artifacts.map((f) => (
-            <ArtifactCard key={f.relative_path} synapseApiBase={synapseApiBase} roomId={roomId} file={f} />
-          ))}
+      ) : mdArtifacts.length || otherArtifacts.length ? (
+        <div className="space-y-3">
+          {otherArtifacts.length ? (
+            <div className="flex flex-wrap gap-2">
+              {otherArtifacts.map((f) => (
+                <span
+                  key={f.relative_path}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/20 px-2.5 py-1 text-[11px] text-muted-foreground"
+                  title={f.relative_path}
+                >
+                  <FileCode2 className="h-3 w-3" />
+                  {f.name}
+                  <span className="font-mono text-[10px] opacity-70">{formatBytes(f.size)}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {mdArtifacts.length ? (
+            <MarkdownArtifactsPanel
+              files={mdArtifacts}
+              synapseApiBase={synapseApiBase}
+              roomId={roomId}
+              emptyMessage="本节点归档产物尚未生成"
+            />
+          ) : null}
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">

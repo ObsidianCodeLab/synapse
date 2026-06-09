@@ -5,7 +5,7 @@
  * 的老 MeetingHitlForm；其他 intervention_kind（interactive / exception）维持原逻辑。
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Input, Tooltip, message } from 'antd';
 import {
   AlertTriangle,
@@ -13,15 +13,12 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Copy,
   Crown,
   FileCode2,
   FileText,
   Hash,
   Hammer,
   Loader2,
-  Maximize2,
-  Minimize2,
   RefreshCw,
   Sparkles,
   Timer,
@@ -32,7 +29,6 @@ import {
 } from 'lucide-react';
 
 import {
-  fetchArtifactFile,
   fetchNodeReview,
   submitReviewDecision,
   type NodeReviewAgentRow,
@@ -41,7 +37,8 @@ import {
   type NodeReviewSummary,
   type ReviewDecisionMode,
 } from '../../../api/meetingRoomService';
-import { extractMarkdownHeadings, MarkdownToc, ReviewMarkdown } from './ReviewMarkdown';
+import { MarkdownArtifactsPanel, toMarkdownArtifactFiles } from './MarkdownArtifactsPanel';
+import { ReviewMarkdown } from './ReviewMarkdown';
 
 interface Props {
   synapseApiBase: string;
@@ -238,20 +235,6 @@ const AgentSummaryItem: React.FC<{ summary: NodeReviewSummary; defaultOpen?: boo
 
 // ─── Artifacts ──────────────────────────────────────────────────────────
 
-function countMarkdownStats(md: string) {
-  const text = (md || '').trim();
-  const lines = text ? text.split('\n').length : 0;
-  const chars = text.length;
-  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
-  return { lines, chars, words };
-}
-
-async function copyText(text: string) {
-  if (!text) return;
-  await navigator.clipboard.writeText(text);
-  message.success('已复制');
-}
-
 const ArtifactsSection: React.FC<{
   files: NodeReviewArtifactFile[];
   synapseApiBase: string;
@@ -259,62 +242,7 @@ const ArtifactsSection: React.FC<{
 }> = ({ files, synapseApiBase, roomId }) => {
   const mdFiles = useMemo(() => files.filter((f) => MD_EXTS.has(f.ext)), [files]);
   const otherFiles = useMemo(() => files.filter((f) => !MD_EXTS.has(f.ext)), [files]);
-  const [selectedPath, setSelectedPath] = useState<string>(() => mdFiles[0]?.relative_path || '');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [contentCache, setContentCache] = useState<Record<string, string>>({});
-  const [expanded, setExpanded] = useState(true);
-  const [focusMode, setFocusMode] = useState(false);
-  const readerRef = useRef<HTMLDivElement>(null);
-
-  const selected = mdFiles.find((f) => f.relative_path === selectedPath) || mdFiles[0] || null;
-  const content = selected ? contentCache[selected.relative_path] : undefined;
-  const headings = useMemo(() => extractMarkdownHeadings(content || ''), [content]);
-  const stats = useMemo(() => countMarkdownStats(content || ''), [content]);
-
-  const cacheRef = useRef<Record<string, string>>({});
-  cacheRef.current = contentCache;
-
-  const loadFile = useCallback(
-    async (file: NodeReviewArtifactFile) => {
-      if (cacheRef.current[file.relative_path] != null) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await fetchArtifactFile(synapseApiBase, roomId, file.relative_path);
-        setContentCache((prev) => ({ ...prev, [file.relative_path]: data.content }));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [roomId, synapseApiBase],
-  );
-
-  useEffect(() => {
-    if (!mdFiles.length) return;
-    const first = mdFiles[0].relative_path;
-    if (!selectedPath || !mdFiles.some((f) => f.relative_path === selectedPath)) {
-      setSelectedPath(first);
-    }
-  }, [mdFiles, selectedPath]);
-
-  useEffect(() => {
-    if (selected && expanded) void loadFile(selected);
-  }, [expanded, loadFile, selected]);
-
-  const onSelect = (path: string) => {
-    setSelectedPath(path);
-    setError(null);
-    const file = mdFiles.find((f) => f.relative_path === path);
-    if (file) void loadFile(file);
-  };
-
-  const onTocJump = (slug: string) => {
-    const el = readerRef.current?.querySelector(`#${CSS.escape(slug)}`);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const markdownEntries = useMemo(() => toMarkdownArtifactFiles(mdFiles), [mdFiles]);
 
   if (!files.length) {
     return <div className="text-muted-foreground text-sm italic">本节点暂无归档文件</div>;
@@ -322,123 +250,28 @@ const ArtifactsSection: React.FC<{
 
   return (
     <div className="space-y-3">
-      {/* 文件选择条 */}
-      <div className="flex flex-wrap items-center gap-2">
-        {mdFiles.map((f) => {
-          const active = f.relative_path === (selected?.relative_path || '');
-          return (
-            <button
+      {otherFiles.length ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {otherFiles.map((f) => (
+            <span
               key={f.relative_path}
-              type="button"
-              onClick={() => onSelect(f.relative_path)}
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] font-medium transition-all ${
-                active
-                  ? 'border-cyan-400/50 bg-gradient-to-r from-cyan-500/20 to-blue-500/15 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.15)]'
-                  : 'border-border/50 bg-white/[0.03] text-muted-foreground hover:text-foreground hover:border-border'
-              }`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/40 bg-muted/20 text-[11px] text-muted-foreground"
+              title={f.relative_path}
             >
-              <FileText className="w-3.5 h-3.5 shrink-0" />
-              <span className="max-w-[200px] truncate">{f.name}</span>
+              <FileCode2 className="w-3 h-3" />
+              {f.name}
               <span className="text-[10px] opacity-70 font-mono">{formatBytes(f.size)}</span>
-            </button>
-          );
-        })}
-        {otherFiles.map((f) => (
-          <span
-            key={f.relative_path}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border/40 bg-muted/20 text-[11px] text-muted-foreground"
-            title={f.relative_path}
-          >
-            <FileCode2 className="w-3 h-3" />
-            {f.name}
-          </span>
-        ))}
-      </div>
-
-      {/* Markdown 阅读器 */}
-      {selected ? (
-        <div
-          className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
-            focusMode
-              ? 'border-cyan-400/40 shadow-[0_0_40px_rgba(34,211,238,0.12)]'
-              : 'border-border/50 shadow-lg shadow-black/20'
-          } bg-gradient-to-br from-[#0a0e14] via-[color:var(--panel,#0f0f12)] to-[#0a1018]`}
-        >
-          {/* 顶栏 */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-gradient-to-r from-blue-500/[0.08] via-transparent to-cyan-500/[0.06]">
-            <div className="p-2 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
-              <FileText className="w-4 h-4" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-foreground truncate">{selected.name}</div>
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground font-mono mt-0.5">
-                <span>{formatBytes(selected.size)}</span>
-                <span>·</span>
-                <span>{selected.mtime}</span>
-                {content ? (
-                  <>
-                    <span>·</span>
-                    <span>{stats.lines} 行</span>
-                    <span>·</span>
-                    <span>{stats.chars.toLocaleString()} 字</span>
-                  </>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Tooltip title="复制全文">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<Copy className="w-3.5 h-3.5" />}
-                  disabled={!content}
-                  onClick={() => void copyText(content || '')}
-                />
-              </Tooltip>
-              <Tooltip title={focusMode ? '退出专注' : '专注阅读'}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={focusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                  onClick={() => setFocusMode((v) => !v)}
-                />
-              </Tooltip>
-              <Button
-                type="text"
-                size="small"
-                icon={expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                onClick={() => setExpanded((v) => !v)}
-              />
-            </div>
-          </div>
-
-          {expanded ? (
-            <div className={`flex gap-0 ${focusMode ? 'min-h-[520px]' : ''}`}>
-              {headings.length >= 2 ? (
-                <aside className="hidden lg:block w-[180px] shrink-0 p-3 border-r border-border/30 bg-black/20">
-                  <MarkdownToc headings={headings} onJump={onTocJump} />
-                </aside>
-              ) : null}
-              <div
-                ref={readerRef}
-                className={`flex-1 min-w-0 px-6 py-5 overflow-y-auto custom-scrollbar text-[13.5px] leading-relaxed ${
-                  focusMode ? 'max-h-[min(72vh,720px)]' : 'max-h-[560px]'
-                }`}
-              >
-                {loading && content == null ? (
-                  <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin text-cyan-400" />
-                    <span>正在渲染文档…</span>
-                  </div>
-                ) : error ? (
-                  <div className="py-8 text-center text-red-300 text-sm">读取失败：{error}</div>
-                ) : (
-                  <ReviewMarkdown content={content || ''} />
-                )}
-              </div>
-            </div>
-          ) : null}
+            </span>
+          ))}
         </div>
+      ) : null}
+
+      {markdownEntries.length ? (
+        <MarkdownArtifactsPanel
+          files={markdownEntries}
+          synapseApiBase={synapseApiBase}
+          roomId={roomId}
+        />
       ) : otherFiles.length ? null : (
         <div className="text-muted-foreground text-sm italic">暂无可预览的 Markdown 产出物</div>
       )}

@@ -210,16 +210,20 @@ def copy_work_order_docs_to_engineering(scope_id: str, engineering_root: Path) -
             copied.append(rel)
 
     for doc_type, mappings in _PRODUCT_DOC_LAYOUT.items():
+        by_dest: dict[str, list[str]] = {}
         for src_name, rel in mappings:
+            by_dest.setdefault(rel, []).append(src_name)
+        for rel, src_names in by_dest.items():
             if (archive_root / rel).is_file():
                 continue
-            src = _product_doc_source(sid, doc_type, src_name)
-            if src is None:
-                continue
-            dest = archive_root / rel
-            if _copy_file_to_dest(src, dest):
-                copied.append(rel)
-                break
+            for src_name in src_names:
+                src = _product_doc_source(sid, doc_type, src_name)
+                if src is None:
+                    continue
+                dest = archive_root / rel
+                if _copy_file_to_dest(src, dest):
+                    copied.append(rel)
+                    break
 
     status = "ok" if copied else "skipped"
     if copied and missing:

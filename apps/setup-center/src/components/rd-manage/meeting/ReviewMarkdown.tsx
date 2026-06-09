@@ -227,32 +227,74 @@ export function ReviewMarkdown({
   );
 }
 
+/** 在可滚动容器内定位到标题（index / slug / text 三重兜底） */
+export function jumpToMarkdownHeading(container: HTMLElement, heading: MarkdownHeading): void {
+  const headingNodes = container.querySelectorAll('h1,h2,h3,h4,h5,h6');
+  let el: HTMLElement | null = null;
+
+  if (heading.index >= 0 && heading.index < headingNodes.length) {
+    el = headingNodes[heading.index] as HTMLElement;
+  }
+  if (!el && heading.slug) {
+    try {
+      el = container.querySelector(`#${CSS.escape(heading.slug)}`) as HTMLElement | null;
+    } catch {
+      el = null;
+    }
+  }
+  if (!el && heading.text) {
+    for (const node of headingNodes) {
+      if ((node.textContent || '').trim() === heading.text) {
+        el = node as HTMLElement;
+        break;
+      }
+    }
+  }
+  if (!el) return;
+
+  const top =
+    el.getBoundingClientRect().top -
+    container.getBoundingClientRect().top +
+    container.scrollTop -
+    12;
+  container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
 export function MarkdownToc({
   headings,
   onJump,
 }: {
   headings: MarkdownHeading[];
-  onJump: (slug: string) => void;
+  onJump: (heading: MarkdownHeading) => void;
 }) {
-  const items = headings.filter((h) => h.level >= 2 && h.level <= 3);
-  if (items.length < 2) return null;
+  const items = headings.filter((h) => h.level >= 1 && h.level <= 6);
+  if (!items.length) {
+    return (
+      <p className="px-3 py-6 text-[12px] text-muted-foreground leading-relaxed">
+        当前文档未解析到标题，无法生成目录。
+      </p>
+    );
+  }
   return (
-    <nav className="rounded-xl border border-border/40 bg-black/25 p-3 text-[11px]">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 font-medium">目录</div>
-      <ul className="space-y-1 max-h-[220px] overflow-y-auto custom-scrollbar">
-        {items.map((h, i) => (
-          <li key={`${h.slug}-${i}`} style={{ paddingLeft: h.level === 3 ? 12 : 0 }}>
-            <button
-              type="button"
-              onClick={() => onJump(h.slug)}
-              className="text-left w-full truncate text-cyan-200/85 hover:text-cyan-100 transition-colors"
-              title={h.text}
-            >
-              {h.text}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <ul className="rd-stage2-toc__list">
+      {items.map((h, i) => (
+        <li key={`${h.slug}-${i}`}>
+          <button
+            type="button"
+            className="rd-stage2-toc__item"
+            style={{ paddingLeft: `${8 + (h.level - 1) * 12}px` }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onJump(h);
+            }}
+            title={h.text}
+          >
+            <span className="rd-stage2-toc__level">H{h.level}</span>
+            <span className="truncate">{h.text}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

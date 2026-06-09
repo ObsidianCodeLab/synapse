@@ -1093,9 +1093,12 @@ export interface ArtifactFileContent {
 }
 
 /** meeting-summary archive_index 曾用 archive 内相对路径；artifact-file 需要 scope 根下路径。 */
+const ARTIFACT_SCOPE_PREFIXES = ['archive/', 'sandbox/', 'doc/', 'env/', 'code/'] as const;
+
 export function normalizeArtifactRelativePath(path: string): string {
   const p = (path || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
-  if (!p || p.startsWith('archive/') || p.includes('..')) return p;
+  if (!p || p.includes('..')) return p;
+  if (ARTIFACT_SCOPE_PREFIXES.some((prefix) => p.startsWith(prefix))) return p;
   return `archive/${p}`;
 }
 

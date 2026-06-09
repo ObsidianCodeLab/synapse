@@ -6008,3 +6008,310 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   min-height: 0;
   overscroll-behavior: contain;
 }
+
+/* 环境预生成 · 四类文档卡片 */
+.rd-env-pregen-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+@media (max-width: 720px) {
+  .rd-env-pregen-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.rd-env-pregen-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border-radius: 0.875rem;
+  border: 1px dashed rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.02);
+  font-size: 12px;
+  color: rgb(161 161 170);
+  text-align: center;
+}
+.rd-env-pregen-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: linear-gradient(165deg, rgb(12 14 20 / 0.92), rgb(8 10 16 / 0.88));
+  padding: 1rem;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+.rd-env-pregen-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
+}
+.rd-env-pregen-card--empty {
+  opacity: 0.72;
+}
+.rd-env-pregen-card__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  filter: blur(48px);
+  opacity: 0.35;
+}
+.rd-env-pregen-card--agents .rd-env-pregen-card__glow {
+  background: rgb(139 92 246);
+}
+.rd-env-pregen-card--spec .rd-env-pregen-card__glow {
+  background: rgb(245 158 11);
+}
+.rd-env-pregen-card--process .rd-env-pregen-card__glow {
+  background: rgb(34 211 238);
+}
+.rd-env-pregen-card--product .rd-env-pregen-card__glow {
+  background: rgb(52 211 153);
+}
+.rd-env-pregen-card--agents {
+  border-color: rgb(139 92 246 / 0.28);
+}
+.rd-env-pregen-card--spec {
+  border-color: rgb(245 158 11 / 0.28);
+}
+.rd-env-pregen-card--process {
+  border-color: rgb(34 211 238 / 0.28);
+}
+.rd-env-pregen-card--product {
+  border-color: rgb(52 211 153 / 0.28);
+}
+.rd-env-pregen-card__header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.625rem;
+}
+.rd-env-pregen-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  background: rgb(255 255 255 / 0.06);
+  flex-shrink: 0;
+}
+.rd-env-pregen-card__title {
+  font-size: 13px;
+  font-weight: 650;
+  color: rgb(244 244 245);
+  line-height: 1.3;
+}
+.rd-env-pregen-card__subtitle {
+  margin-top: 0.125rem;
+  font-size: 10px;
+  color: rgb(161 161 170);
+}
+.rd-env-pregen-card__count {
+  margin-left: auto;
+  text-align: center;
+  min-width: 2.5rem;
+}
+.rd-env-pregen-card__count-num {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: rgb(244 244 245);
+}
+.rd-env-pregen-card__count-label {
+  font-size: 10px;
+  color: rgb(161 161 170);
+}
+.rd-env-pregen-card__purpose {
+  position: relative;
+  margin: 0 0 0.75rem;
+  font-size: 11px;
+  line-height: 1.55;
+  color: rgb(161 161 170);
+}
+.rd-env-pregen-card__list {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 168px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.rd-env-pregen-doc-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.625rem;
+  border: 1px solid rgb(255 255 255 / 0.06);
+  background: rgb(255 255 255 / 0.03);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rd-env-pregen-doc-row:hover {
+  border-color: rgb(34 211 238 / 0.35);
+  background: rgb(34 211 238 / 0.06);
+}
+.rd-env-pregen-doc-row__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(165 243 252);
+  flex-shrink: 0;
+}
+.rd-env-pregen-doc-row__main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.rd-env-pregen-doc-row__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(228 228 231);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rd-env-pregen-doc-row__desc {
+  font-size: 10px;
+  color: rgb(161 161 170);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rd-env-pregen-doc-row__status {
+  flex-shrink: 0;
+  font-size: 9px;
+  padding: 0.125rem 0.375rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  color: rgb(161 161 170);
+}
+.rd-env-pregen-doc-row__status--ok {
+  border-color: rgb(52 211 153 / 0.35);
+  color: rgb(110 231 183);
+  background: rgb(52 211 153 / 0.08);
+}
+.rd-env-pregen-card__empty-hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgb(113 113 122);
+  padding: 1.5rem 0;
+}
+.rd-env-pregen-card__footer {
+  margin-top: 0.625rem;
+  font-size: 10px;
+  color: rgb(251 191 36);
+}
+.rd-env-pregen-drawer.ant-drawer-content {
+  background: rgb(8 10 16 / 0.98);
+}
+.rd-env-pregen-drawer .ant-drawer-content-wrapper,
+.rd-env-pregen-drawer .ant-drawer-content,
+.rd-env-pregen-drawer .ant-drawer-body {
+  height: 100vh;
+  max-height: 100vh;
+}
+.rd-env-pregen-drawer__shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.rd-env-pregen-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.125rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+}
+.rd-env-pregen-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.04);
+  color: rgb(161 161 170);
+  transition: color 0.15s, border-color 0.15s;
+}
+.rd-env-pregen-drawer__close:hover {
+  color: rgb(244 244 245);
+  border-color: rgb(255 255 255 / 0.16);
+}
+.rd-env-pregen-drawer__tabs {
+  padding: 0.625rem 1rem 0;
+}
+.rd-env-pregen-drawer__header,
+.rd-env-pregen-drawer__tabs {
+  flex-shrink: 0;
+}
+.rd-env-pregen-drawer__preview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0.75rem 1rem 1rem;
+  border: none;
+  background: transparent;
+  overflow: hidden;
+}
+.rd-env-pregen-drawer .rd-stage2-artifacts {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rd-env-pregen-drawer__body {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+.rd-env-pregen-drawer .rd-stage2-artifacts__body {
+  height: 100% !important;
+  max-height: none !important;
+  flex: 1;
+  min-height: 0;
+}
+.rd-env-pregen-doc-row__status--skipped {
+  border-color: rgb(161 161 170 / 0.35);
+  color: rgb(161 161 170);
+  background: rgb(255 255 255 / 0.04);
+}
+.rd-env-pregen-doc-row__status--missing {
+  border-color: rgb(251 191 36 / 0.35);
+  color: rgb(251 191 36);
+  background: rgb(251 191 36 / 0.08);
+}
+.rd-env-pregen-drawer .rd-stage2-artifacts__preview,
+.rd-env-pregen-drawer .rd-stage2-artifacts__sidebar {
+  min-height: 0;
+}

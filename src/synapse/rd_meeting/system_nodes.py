@@ -248,7 +248,12 @@ def handle_env_pregen(
             "entropy": {},
         }
 
-    from synapse.rd_meeting.env_pregen_assets import bootstrap_env_pregen, format_env_pregen_report
+    from synapse.rd_meeting.env_pregen_assets import (
+        _ENV_PREGEN_FORCE_FAIL_FLAG,
+        _env_pregen_force_fail_enabled,
+        bootstrap_env_pregen,
+        format_env_pregen_report,
+    )
     from synapse.rd_meeting.product_context import match_prod_row_by_prod
 
     catalog_rows = _load_catalog_rows(sid, pipe)
@@ -281,6 +286,25 @@ def handle_env_pregen(
             "artifacts": artifacts,
             "report_body": report_body,
             **assets,
+        }
+        return attach_system_node_display(node_id, out, scope_id=sid)
+
+    if ok and _env_pregen_force_fail_enabled():
+        logger.warning(
+            "env_pregen: force fail after successful materialization (%s=1)",
+            _ENV_PREGEN_FORCE_FAIL_FLAG,
+        )
+        out = {
+            **assets,
+            "env_root": assets.get("env_root"),
+            "docs": assets.get("docs") or [],
+            "entropy": assets.get("entropy") or {},
+            "engineering": assets.get("engineering") or {},
+            "artifacts": artifacts,
+            "report_body": report_body,
+            "prod": prod,
+            "status": "failed",
+            "error": "测试模式：环境预生成内容已落盘，故意置失败以便检查",
         }
         return attach_system_node_display(node_id, out, scope_id=sid)
 

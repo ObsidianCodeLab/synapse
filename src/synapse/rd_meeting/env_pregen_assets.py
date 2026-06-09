@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-import time
 from pathlib import Path
 from typing import Any
 
@@ -28,21 +27,18 @@ from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
 
-# 测试用阻塞时长（秒）；设置环境变量 SYNAPSE_ENV_PREGEN_TEST_SLEEP=1 后生效
-_ENV_PREGEN_TEST_SLEEP_SECONDS = 100_000
+# 测试：环境预生成落盘完成后强制置失败，便于检查产出（不再使用 sleep 阻塞）
+_ENV_PREGEN_FORCE_FAIL_FLAG = "SYNAPSE_ENV_PREGEN_FORCE_FAIL"
+
+
+def _env_pregen_force_fail_enabled() -> bool:
+    flag = os.environ.get(_ENV_PREGEN_FORCE_FAIL_FLAG, "").strip().lower()
+    return flag in ("1", "true", "yes", "on")
 
 
 def _env_pregen_test_sleep() -> None:
-    """测试用：环境预生成开始前阻塞，便于观察/中断流程。"""
-    flag = os.environ.get("SYNAPSE_ENV_PREGEN_TEST_SLEEP", "").strip().lower()
-    if flag not in ("1", "true", "yes", "on"):
-        return
-    logger.warning(
-        "env_pregen: test sleep %ss (SYNAPSE_ENV_PREGEN_TEST_SLEEP=%s)",
-        _ENV_PREGEN_TEST_SLEEP_SECONDS,
-        flag,
-    )
-    time.sleep(_ENV_PREGEN_TEST_SLEEP_SECONDS)
+    """已废弃：请改用 SYNAPSE_ENV_PREGEN_FORCE_FAIL=1 在落盘完成后置失败。"""
+    return
 
 _ENTROPY_SOURCE_NODE = "entropy_gen"
 _ENTROPY_SOURCE_STAGE_ID = 2
@@ -173,8 +169,6 @@ def bootstrap_env_pregen(
 
     entropy = _copy_entropy_from_archive(sid)
     result["entropy"] = entropy
-    if entropy.get("status") != "ok":
-        result["errors"].append(f"控熵: {entropy.get('error')}")
 
     from synapse.rd_meeting.env_pregen_layout import bootstrap_engineering_layout
 

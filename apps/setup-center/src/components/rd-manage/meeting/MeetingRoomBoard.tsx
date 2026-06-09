@@ -2241,6 +2241,9 @@ const InterventionDialog = ({
                       speakerName={speaker}
                       agent={showAvatar ? avatarAgent : undefined}
                       showAvatar={showAvatar}
+                      roomId={room.id}
+                      scopeId={room.scopeId}
+                      synapseApiBase={synapseApiBase || ''}
                       onAvatarClick={
                         showAvatar && avatarAgent && log.speakerRole !== 'system'
                           ? () => openAgentContext(avatarAgent)

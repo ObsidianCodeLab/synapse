@@ -17,6 +17,9 @@ import {
   Tag,
 } from 'lucide-react';
 
+import { EnvPregenDocsPanel } from './EnvPregenDocsPanel';
+import { collectEnvPregenDocs } from './envPregenDocs';
+
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="rd-chat-card__title">
@@ -796,34 +799,38 @@ function PathGroupBlock({ group }: { group: RowRecord }) {
   );
 }
 
-export function SystemEnvPregenCard({ payload }: { payload: Record<string, unknown> }) {
+export function SystemEnvPregenCard({
+  payload,
+  roomId,
+  scopeId,
+  synapseApiBase,
+  variant = 'summary',
+}: {
+  payload: Record<string, unknown>;
+  roomId?: string;
+  scopeId?: string;
+  synapseApiBase?: string;
+  /** summary：协作会议流仅展示摘要卡片；detail：节点详情展示四类文档与预览 */
+  variant?: 'summary' | 'detail';
+}) {
   const display = (payload.display as Record<string, unknown>) || payload;
-  const pathGroups = useMemo(() => {
-    const grouped = asRows(display.path_groups);
-    if (grouped.length) return grouped;
-    const flat = asRows(display.path_entries);
-    if (!flat.length) return [];
-    const map = new Map<string, RowRecord>();
-    for (const entry of flat) {
-      const root =
-        String(entry.engineering_root || '').trim() ||
-        String(entry.path || '').replace(/[/\\][^/\\]+$/, '') ||
-        '—';
-      const bucket = map.get(root) || {
-        engineering_root: root,
-        module: entry.module || '',
-        code_path: entry.code_path || '',
-        entries: [] as RowRecord[],
-      };
-      bucket.entries.push(entry);
-      map.set(root, bucket);
-    }
-    return Array.from(map.values());
-  }, [display.path_groups, display.path_entries]);
+  const docs = useMemo(() => collectEnvPregenDocs(display, scopeId || ''), [display, scopeId]);
+  const errors = useMemo(
+    () =>
+      ((display.errors as string[]) || []).filter(
+        (err) => err && !String(err).startsWith('控熵'),
+      ),
+    [display.errors],
+  );
+  const okCount = docs.filter((d) => d.status === 'ok').length;
+  const status = String(display.status || '—');
 
-  const errors = (display.errors as string[]) || [];
-  const entropy = (display.entropy as RowRecord) || {};
-  const fileCount = pathGroups.reduce((n, g) => n + asRows(g.entries).length, 0);
+  const summaryLine = useMemo(() => {
+    if (!docs.length) return '暂无预生成文档，请等待环境预生成完成。';
+    if (status === 'failed') return `预生成失败，共 ${docs.length} 项文档未全部落盘。`;
+    if (status === 'partial') return `已预生成 ${okCount}/${docs.length} 篇文档，明细见节点详情。`;
+    return `已完成 ${docs.length} 篇文档预生成，明细见节点详情。`;
+  }, [docs.length, okCount, status]);
 
   return (
     <div className="rd-chat-card rd-chat-card--meta">
@@ -831,11 +838,11 @@ export function SystemEnvPregenCard({ payload }: { payload: Record<string, unkno
         gradient="rd-system-hero--env"
         icon={<Server className="h-6 w-6" />}
         title="环境预生成"
-        subtitle={`已在 ${pathGroups.length} 个工程路径下预生成 ${fileCount} 项文档与模板。`}
+        subtitle={summaryLine}
         stats={[
-          { label: '工程路径', value: pathGroups.length },
-          { label: '文件项', value: fileCount },
-          { label: '状态', value: String(display.status || '—') },
+          { label: '文档总数', value: docs.length },
+          { label: '已落盘', value: okCount },
+          { label: '状态', value: status },
         ]}
       />
 
@@ -847,26 +854,14 @@ export function SystemEnvPregenCard({ payload }: { payload: Record<string, unkno
         </ul>
       ) : null}
 
-      <div className="mt-3">
-        {pathGroups.length === 0 ? (
-          <p className="rd-chat-card__desc">暂无工程路径预生成记录</p>
-        ) : (
-          <ul className="space-y-2">
-            {pathGroups.map((group, idx) => (
-              <PathGroupBlock key={`${String(group.engineering_root)}-${idx}`} group={group} />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {entropy.status ? (
-        <div className="mt-3 rd-chat-card__section">
-          <div className="rd-chat-card__label mb-1">控熵归档</div>
-          <div className="rd-chat-card__meta-row">
-            <StatusBadge status={String(entropy.status)} />
-            <CopyPath value={String(entropy.local_path || '')} />
-            {Array.isArray(entropy.files) ? <span>{entropy.files.length} 个文件</span> : null}
-          </div>
+      {variant === 'detail' ? (
+        <div className="mt-4">
+          <EnvPregenDocsPanel
+            display={display}
+            scopeId={scopeId}
+            roomId={roomId}
+            synapseApiBase={synapseApiBase}
+          />
         </div>
       ) : null}
     </div>
@@ -1020,9 +1015,15 @@ export const SYSTEM_STRUCTURED_NODE_IDS = [
 export function SystemNodeDetailCard({
   nodeId,
   display,
+  roomId,
+  scopeId,
+  synapseApiBase,
 }: {
   nodeId: string;
   display: Record<string, unknown>;
+  roomId?: string;
+  scopeId?: string;
+  synapseApiBase?: string;
 }) {
   const payload = { ...display, display };
   switch (nodeId) {
@@ -1031,7 +1032,15 @@ export function SystemNodeDetailCard({
     case 'sandbox_build':
       return <SystemSandboxBuildCard payload={payload} variant="detail" />;
     case 'env_pregen':
-      return <SystemEnvPregenCard payload={payload} />;
+      return (
+        <SystemEnvPregenCard
+          payload={payload}
+          roomId={roomId}
+          scopeId={scopeId}
+          synapseApiBase={synapseApiBase}
+          variant="detail"
+        />
+      );
     case 'exception_check':
       return <SystemCodeCommitCard payload={payload} />;
     case 'env_start':

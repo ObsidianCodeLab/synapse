@@ -429,7 +429,17 @@ export function FlowMetaCard({ payload, title }: { payload: Record<string, unkno
   );
 }
 
-export function StructuredChatBody({ log }: { log: MeetingChatLog }) {
+export function StructuredChatBody({
+  log,
+  roomId,
+  scopeId,
+  synapseApiBase,
+}: {
+  log: MeetingChatLog;
+  roomId?: string;
+  scopeId?: string;
+  synapseApiBase?: string;
+}) {
   const kind = log.displayKind;
   const payload = log.payload || {};
 
@@ -447,7 +457,14 @@ export function StructuredChatBody({ log }: { log: MeetingChatLog }) {
     case 'system_sandbox_build':
       return <SystemSandboxBuildCard payload={payload} />;
     case 'system_env_pregen':
-      return <SystemEnvPregenCard payload={payload} />;
+      return (
+        <SystemEnvPregenCard
+          payload={payload}
+          roomId={roomId}
+          scopeId={scopeId}
+          synapseApiBase={synapseApiBase}
+        />
+      );
     case 'system_code_commit':
       return <SystemCodeCommitCard payload={payload} />;
     case 'system_task_check':

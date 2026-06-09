@@ -257,14 +257,78 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
     assert rows[0]["work_item"]["feature_id"] == "feat-branch-1"
 
 
-def test_env_pregen_test_sleep(monkeypatch):
-    slept: list[float] = []
-    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_TEST_SLEEP", "1")
-    monkeypatch.setattr("synapse.rd_meeting.env_pregen_assets.time.sleep", lambda s: slept.append(s))
+def test_env_pregen_force_fail_flag(monkeypatch):
+    monkeypatch.delenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", raising=False)
+    from synapse.rd_meeting.env_pregen_assets import _env_pregen_force_fail_enabled
+
+    assert _env_pregen_force_fail_enabled() is False
+    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", "1")
+    assert _env_pregen_force_fail_enabled() is True
+
+
+def test_env_pregen_test_sleep_is_noop():
     from synapse.rd_meeting.env_pregen_assets import _env_pregen_test_sleep
 
     _env_pregen_test_sleep()
-    assert slept == [100_000]
+
+
+def test_env_pregen_force_fail_overrides_assets_status(monkeypatch, tmp_path):
+    monkeypatch.setenv("SYNAPSE_ENV_PREGEN_FORCE_FAIL", "1")
+    scope_id = "env-force-fail"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    assets = {
+        "prod": "demo",
+        "env_root": str(tmp_path / "work" / scope_id / "env"),
+        "doc_root": str(tmp_path / "work" / scope_id / "doc"),
+        "docs": [{"doc_type": "产品架构", "status": "ok"}],
+        "entropy": {"status": "ok"},
+        "product_docs": {"status": "ok"},
+        "engineering": {"status": "partial"},
+        "status": "partial",
+        "errors": [],
+        "materialized_at": "2026-06-09T00:00:00",
+    }
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_nodes._resolve_prod",
+        lambda *_a, **_k: "demo",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_nodes._load_catalog_rows",
+        lambda *_a, **_k: [],
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.env_pregen_assets.bootstrap_env_pregen",
+        lambda *_a, **_k: assets,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_nodes._save_pipeline_context_assets",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.env_pregen_assets.format_env_pregen_report",
+        lambda *_a, **_k: "# report",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_nodes._write_system_archive",
+        lambda *_a, **_k: [],
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.system_node_display.attach_system_node_display",
+        lambda _nid, result, **_k: result,
+    )
+
+    from synapse.rd_meeting.system_nodes import handle_env_pregen
+
+    result = handle_env_pregen(
+        scope_type="demand",
+        scope_id=scope_id,
+        node_id="env_pregen",
+        dev={"stage_id": 3},
+    )
+    assert result["status"] == "failed"
+    assert "故意置失败" in str(result.get("error") or "")
 
 
 def test_env_pregen_copies_entropy(monkeypatch, tmp_path):
