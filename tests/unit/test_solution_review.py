@@ -11,12 +11,15 @@ from synapse.rd_meeting.solution_review import (
     MAX_SPLIT_TASKS,
     MIN_HUMAN_REVIEW_COMMENT_LEN,
     apply_human_decision,
+    build_demand_function_with_assignments,
     ensure_human_review_pending_for_gate,
     enrich_payload_from_archive,
     parse_func_solution_impact_assessment,
     parse_func_solution_md,
+    parse_module_func_md,
     render_conclusion_markdown,
     save_split_tasks_draft,
+    validate_function_point_assignment,
     validate_human_review_comment,
     validate_split_tasks_draft,
     validate_solution_review_json,
@@ -110,6 +113,42 @@ def test_enrich_payload_from_archive_reparses_impact(tmp_path, monkeypatch):
     out = enrich_payload_from_archive(scope_id, payload)
     sections = out["func_solution_parsed"]["impact_assessment"]["sections"]
     assert len(sections) == 2
+
+
+SAMPLE_MODULE_FUNC = """# 模块功能
+
+## 需求功能拆分
+
+| # | 功能点 | 说明 |
+|---|--------|------|
+| 1 | 在线调优先级 | 支持运营调整任务优先级 |
+| 2 | 账单导出 | 导出 PDF/Excel 账单 |
+"""
+
+
+def test_parse_module_func_md():
+    rows = parse_module_func_md(SAMPLE_MODULE_FUNC)
+    assert len(rows) == 2
+    assert rows[0]["functionPoint"] == "在线调优先级"
+    assert rows[1]["functionDesc"] == "导出 PDF/Excel 账单"
+
+
+def test_validate_function_point_duplicate_rejected():
+    demand = [{"functionPoint": "A", "functionDesc": ""}, {"functionPoint": "B", "functionDesc": ""}]
+    tasks = [
+        {"taskTitle": "t1", "functionPoints": ["A", "B"]},
+        {"taskTitle": "t2", "functionPoints": ["A"]},
+    ]
+    with pytest.raises(ValueError, match="function_point_duplicate:A"):
+        validate_function_point_assignment(tasks, demand)
+
+
+def test_build_demand_function_with_assignments():
+    demand = [{"functionPoint": "A", "functionDesc": "desc A"}]
+    tasks = [{"taskTitle": "子单-计费", "functionPoints": ["A"]}]
+    out = build_demand_function_with_assignments(demand, tasks)
+    assert out[0]["assignedTaskTitle"] == "子单-计费"
+    assert out[0]["functionDesc"] == "desc A"
 
 
 def test_validate_human_review_comment_min_length():

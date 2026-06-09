@@ -279,6 +279,123 @@ def parse_func_solution_impact_assessment(md: str) -> dict[str, Any]:
     return out
 
 
+def parse_module_func_md(md: str) -> list[dict[str, str]]:
+    """从模块功能.md「需求功能拆分」表解析功能点清单。"""
+    section = _extract_section(md, "需求功能拆分")
+    rows = _parse_md_table_rows(section)
+    out: list[dict[str, str]] = []
+    for i, row in enumerate(rows):
+        point = str(row.get("功能点") or row.get("功能点名称") or "").strip()
+        if not point:
+            continue
+        desc = str(row.get("说明") or row.get("功能描述") or row.get("描述") or "").strip()
+        out.append(
+            {
+                "id": f"fp-{i + 1}",
+                "functionPoint": point,
+                "functionDesc": desc,
+            }
+        )
+    return out
+
+
+def _module_func_archive_path(scope_id: str) -> Path:
+    return archive_node_dir(scope_id, "需求分析", "module_func") / "模块功能.md"
+
+
+def resolve_demand_functions(payload: dict[str, Any], scope_id: str) -> list[dict[str, Any]]:
+    """优先 payload.demand_function，否则从归档模块功能.md 解析。"""
+    existing = payload.get("demand_function")
+    if isinstance(existing, list) and existing:
+        cleaned: list[dict[str, Any]] = []
+        for i, row in enumerate(existing):
+            if not isinstance(row, dict):
+                continue
+            point = str(row.get("functionPoint") or "").strip()
+            if not point:
+                continue
+            cleaned.append(
+                {
+                    "id": str(row.get("id") or f"fp-{i + 1}").strip() or f"fp-{i + 1}",
+                    "functionPoint": point,
+                    "functionDesc": str(row.get("functionDesc") or "").strip(),
+                }
+            )
+        if cleaned:
+            return cleaned
+    fpath = _module_func_archive_path(scope_id)
+    if not fpath.is_file():
+        return []
+    try:
+        md = fpath.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return parse_module_func_md(md)
+
+
+def normalize_function_points(task: dict[str, Any]) -> list[str]:
+    raw = task.get("functionPoints")
+    if not isinstance(raw, list):
+        return []
+    return [str(x).strip() for x in raw if str(x).strip()]
+
+
+def validate_function_point_assignment(
+    tasks: list[dict[str, Any]],
+    demand_functions: list[dict[str, Any]],
+    *,
+    require_full_coverage: bool = False,
+) -> None:
+    """禁止多工单重复认领同一功能点；通过时可要求全覆盖。"""
+    known = {
+        str(f.get("functionPoint") or "").strip()
+        for f in demand_functions
+        if isinstance(f, dict) and str(f.get("functionPoint") or "").strip()
+    }
+    seen: dict[str, int] = {}
+    for i, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            continue
+        for fp in normalize_function_points(task):
+            if known and fp not in known:
+                raise ValueError(f"function_point_unknown:{fp}")
+            if fp in seen:
+                raise ValueError(f"function_point_duplicate:{fp}")
+            seen[fp] = i
+    if require_full_coverage and known:
+        missing = sorted(known - set(seen.keys()))
+        if missing:
+            raise ValueError(f"function_point_unassigned:{','.join(missing)}")
+
+
+def build_demand_function_with_assignments(
+    demand_functions: list[dict[str, Any]],
+    tasks: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    fp_to_title: dict[str, str] = {}
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        title = str(task.get("taskTitle") or "").strip()
+        for fp in normalize_function_points(task):
+            fp_to_title[fp] = title
+    out: list[dict[str, Any]] = []
+    for f in demand_functions:
+        if not isinstance(f, dict):
+            continue
+        point = str(f.get("functionPoint") or "").strip()
+        if not point:
+            continue
+        out.append(
+            {
+                "functionPoint": point,
+                "functionDesc": str(f.get("functionDesc") or "").strip(),
+                "assignedTaskTitle": fp_to_title.get(point, ""),
+            }
+        )
+    return out
+
+
 def parse_func_solution_md(md: str) -> dict[str, Any]:
     """从函数级方案 Markdown 抽取 §1.3 仓库表与 §1.10 影响评估。"""
     repos_raw = _parse_md_table_rows(_extract_section(md, "涉及仓库"))
@@ -354,6 +471,19 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
     return out
 
 
+def enrich_demand_functions(scope_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """补全 demand_function，并按 split_tasks_draft 刷新 assignedTaskTitle。"""
+    out = dict(payload)
+    demand = resolve_demand_functions(out, scope_id)
+    if demand:
+        out["demand_function"] = demand
+    draft = out.get("split_tasks_draft")
+    demand_list = out.get("demand_function")
+    if isinstance(draft, list) and isinstance(demand_list, list) and demand_list:
+        out["demand_function"] = build_demand_function_with_assignments(demand_list, draft)
+    return out
+
+
 def collect_stage2_artifact_inputs(
     scope_id: str,
     *,
@@ -396,6 +526,7 @@ def load_solution_review_payload(
     if data is None:
         return None
     data = enrich_payload_from_archive(scope_id, data)
+    data = enrich_demand_functions(scope_id, data)
     if "inputs" not in data or not isinstance(data.get("inputs"), dict):
         data["inputs"] = {}
     data["inputs"]["stage2_artifacts"] = collect_stage2_artifact_inputs(
@@ -448,17 +579,30 @@ def ensure_human_review_pending_for_gate(
     return out
 
 
-def validate_split_tasks_draft(tasks: list[Any]) -> None:
-    """校验拆单草案：非空且不超过 MAX_SPLIT_TASKS。"""
+def validate_split_tasks_draft(
+    tasks: list[Any],
+    *,
+    demand_functions: list[dict[str, Any]] | None = None,
+    require_full_function_coverage: bool = False,
+) -> None:
+    """校验拆单草案：非空、条数上限、功能点不重复（可选全覆盖）。"""
     if not isinstance(tasks, list) or not tasks:
         raise ValueError("split_tasks_draft_required")
     if len(tasks) > MAX_SPLIT_TASKS:
         raise ValueError(f"split_tasks_draft_too_many:{MAX_SPLIT_TASKS}")
+    dict_tasks: list[dict[str, Any]] = []
     for i, task in enumerate(tasks):
         if not isinstance(task, dict):
             raise ValueError(f"split_tasks_draft_invalid:{i}")
         if not str(task.get("taskTitle") or "").strip():
             raise ValueError(f"split_task_title_required:{i}")
+        dict_tasks.append(task)
+    if demand_functions is not None:
+        validate_function_point_assignment(
+            dict_tasks,
+            demand_functions,
+            require_full_coverage=require_full_function_coverage,
+        )
 
 
 def validate_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
@@ -563,6 +707,11 @@ def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[di
     impacts = _build_impact_strings(impact)
     task_impact = _default_task_impact_desc(impact)
     title_base = str(payload.get("requirement_name") or payload.get("demand_title") or demand_no).strip()
+    all_fps = [
+        str(f.get("functionPoint") or "").strip()
+        for f in resolve_demand_functions(payload, str(payload.get("demand_no") or demand_no))
+        if isinstance(f, dict) and str(f.get("functionPoint") or "").strip()
+    ]
 
     if not repos:
         return [
@@ -576,6 +725,7 @@ def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[di
                 "taskImpactDesc": task_impact,
                 **impacts,
                 "branch_version_id": "",
+                "functionPoints": all_fps,
             }
         ]
 
@@ -596,6 +746,7 @@ def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[di
                 "taskImpactDesc": task_impact,
                 **impacts,
                 "branch_version_id": str(repo.get("branch_version_id") or "").strip(),
+                "functionPoints": [],
             }
         )
     return tasks or [
@@ -609,6 +760,7 @@ def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[di
             "taskImpactDesc": task_impact,
             **impacts,
             "branch_version_id": "",
+            "functionPoints": all_fps,
         }
     ]
 
@@ -680,9 +832,15 @@ HumanDecision = Literal["approve", "reject"]
 
 def save_split_tasks_draft(scope_id: str, tasks: list[dict[str, Any]]) -> dict[str, Any]:
     """人工编辑拆单草案后落盘（不改变 human_review 状态）。"""
-    validate_split_tasks_draft(tasks)
     payload = load_solution_review_payload(scope_id) or {}
-    payload["split_tasks_draft"] = [dict(x) for x in tasks if isinstance(x, dict)]
+    demand_functions = resolve_demand_functions(payload, scope_id)
+    validate_split_tasks_draft(tasks, demand_functions=demand_functions or None)
+    normalized = [dict(x) for x in tasks if isinstance(x, dict)]
+    payload["split_tasks_draft"] = normalized
+    if demand_functions:
+        payload["demand_function"] = build_demand_function_with_assignments(
+            demand_functions, normalized
+        )
     _write_json_file(json_path(scope_id), payload)
     return payload
 
@@ -719,11 +877,16 @@ def apply_human_decision(
     }
     payload["reviewed_at"] = payload.get("reviewed_at") or _now_iso()
 
+    demand_functions = resolve_demand_functions(payload, scope_id)
     if tasks_override is not None:
         tasks = [dict(x) for x in tasks_override if isinstance(x, dict)]
     else:
         tasks = ensure_split_tasks_draft(payload, demand_no)
-    validate_split_tasks_draft(tasks)
+    validate_split_tasks_draft(
+        tasks,
+        demand_functions=demand_functions or None,
+        require_full_function_coverage=decision == "approve" and bool(demand_functions),
+    )
     if decision == "approve":
         if not patches:
             raise ValueError("patches_required")
@@ -734,16 +897,20 @@ def apply_human_decision(
                 raise ValueError(f"patch_required_for_branch:{bid or 'unknown'}")
 
     payload["split_tasks_draft"] = tasks
+    if demand_functions:
+        payload["demand_function"] = build_demand_function_with_assignments(demand_functions, tasks)
     _write_json_file(json_path(scope_id), payload)
 
     if decision == "approve":
-        plan = {
+        plan: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
             "demand_no": demand_no,
             "approved_at": _now_iso(),
             "human_comment": (comment or "").strip(),
             "tasks": tasks,
         }
+        if demand_functions:
+            plan["demand_function"] = build_demand_function_with_assignments(demand_functions, tasks)
         _write_json_file(split_plan_path(scope_id), plan)
     else:
         if split_plan_path(scope_id).is_file():

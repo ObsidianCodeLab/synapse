@@ -634,6 +634,10 @@ class SolutionReviewSplitTaskRow(BaseModel):
     securityImpact: str = Field("", description="安全影响")
     compatibilityImpact: str = Field("", description="兼容性影响")
     branch_version_id: str = Field("", description="产品分支ID")
+    functionPoints: list[str] = Field(
+        default_factory=list,
+        description="本研发子单认领的功能点（不得跨工单重复）",
+    )
 
 
 class SolutionReviewDecisionBody(BaseModel):
@@ -731,7 +735,7 @@ async def submit_solution_review_decision(
         code = 400
         if msg.startswith("patch_required") or msg.startswith("human_review_comment_too_short"):
             code = 422
-        if msg.startswith("split_tasks_draft"):
+        if msg.startswith("split_tasks_draft") or msg.startswith("function_point_"):
             code = 422
         return error_response(code, msg)
     except Exception as exc:

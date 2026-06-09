@@ -391,6 +391,13 @@ export interface SolutionReviewArtifactInput {
   included?: boolean;
 }
 
+export interface DemandFunctionItem {
+  id?: string;
+  functionPoint: string;
+  functionDesc?: string;
+  assignedTaskTitle?: string;
+}
+
 export interface SplitTaskDraft {
   taskNo?: string;
   taskTitle?: string;
@@ -406,7 +413,18 @@ export interface SplitTaskDraft {
   securityImpact?: string;
   compatibilityImpact?: string;
   branch_version_id?: string;
+  /** 本研发子单实现的功能点（不得跨工单重复） */
+  functionPoints?: string[];
 }
+
+export const SPLIT_TASK_IMPACT_FIELDS = [
+  { key: 'performanceImpact', label: '性能影响', accent: 'sky' },
+  { key: 'functionalImpact', label: '功能影响', accent: 'violet' },
+  { key: 'cfgChangeDescription', label: '配置变更', accent: 'amber' },
+  { key: 'upgradeRisk', label: '升级风险', accent: 'orange' },
+  { key: 'securityImpact', label: '安全影响', accent: 'rose' },
+  { key: 'compatibilityImpact', label: '兼容性影响', accent: 'teal' },
+] as const;
 
 export const MAX_SPLIT_TASKS = 5;
 
@@ -428,6 +446,8 @@ export interface SolutionReviewPayload {
     impact_assessment?: SolutionReviewImpactAssessment;
   };
   split_tasks_draft?: SplitTaskDraft[];
+  /** 需求功能点清单（落盘至 split_plan.demand_function） */
+  demand_function?: DemandFunctionItem[];
   /** 自动拆单策略与理由（优先于从 summary_markdown 推断） */
   split_strategy_rationale?: string;
   human_review?: SolutionReviewHumanReview;

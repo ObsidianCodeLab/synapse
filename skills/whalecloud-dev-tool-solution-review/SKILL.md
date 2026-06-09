@@ -93,6 +93,13 @@ label: 方案评审
     }
   },
   "split_strategy_rationale": "与 whale_review.split_strategy_rationale 相同，供前端拆单区直接展示",
+  "demand_function": [
+    {
+      "id": "fp-1",
+      "functionPoint": "功能点名称",
+      "functionDesc": "功能描述（来自模块功能.md 需求功能拆分）"
+    }
+  ],
   "split_tasks_draft": [
     {
       "taskNo": "需求单号",
@@ -108,7 +115,8 @@ label: 方案评审
       "upgradeRisk": "",
       "securityImpact": "",
       "compatibilityImpact": "",
-      "branch_version_id": ""
+      "branch_version_id": "",
+      "functionPoints": ["功能点名称"]
     }
   ],
   "human_review": {
@@ -159,6 +167,8 @@ label: 方案评审
 - `taskImpactDesc` 与 `performanceImpact` 等从 §1.10 **仅归纳本任务范围** 内的影响，勿把全方案影响复制到每条；
 - `branch_version_id` / `productModuleName` / `branchVersionName` 须与函数级方案 §1.3 一致；
 - `patchName` 在 SKILL 阶段 **一律留空**（人工在评审面板选择）；
+- `demand_function`：从 **模块功能.md → 需求功能拆分** 表复制功能点与说明；评审通过时落盘至 `split_plan.json` 的 `demand_function`（含 `assignedTaskTitle`）；
+- `functionPoints`：每条 `split_tasks_draft` **必须**列出本研发子单实现的功能点名称；**禁止**多工单重复认领同一功能点；单任务方案可认领全部功能点；
 - 无仓库表时生成 **单条** 草案。
 
 #### 决策流程（生成前自检）

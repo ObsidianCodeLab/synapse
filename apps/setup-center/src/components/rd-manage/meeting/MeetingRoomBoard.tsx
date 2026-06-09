@@ -167,7 +167,8 @@ interface MeetingRoom {
   /** 当前对话绑定的 SOP 作用域（stage:node） */
   chatSopKey?: string;
   skippedNodeIds?: string[];
-  reprocessing?: boolean;
+  /** 正在发起重新处理的节点 ID；仅该节点卡片/按钮显示 loading */
+  reprocessingNodeId?: string | null;
 }
 
 
@@ -458,7 +459,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     skippedNodeIds: live.skipped_node_ids?.length
       ? live.skipped_node_ids
       : room.skippedNodeIds,
-    reprocessing: false,
+    reprocessingNodeId: room.reprocessingNodeId ?? null,
   };
 }
 
@@ -1839,14 +1840,17 @@ const InterventionDialog = ({
                     <Tooltip title="跨节点重新处理（清理本节点至当前节点之间的过程数据后，从本节点重跑）">
                       <button
                         type="button"
-                        disabled={room.reprocessing}
+                        disabled={Boolean(room.reprocessingNodeId)}
                         className="rd-meeting-node-reprocess-btn absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={(e) => {
                           e.stopPropagation();
                           openReprocessModal(node.id);
                         }}
                       >
-                        <CrossNodeReprocessIcon className="h-5 w-5" spinning={room.reprocessing} />
+                        <CrossNodeReprocessIcon
+                          className="h-5 w-5"
+                          spinning={room.reprocessingNodeId === node.id}
+                        />
                       </button>
                     </Tooltip>
                   ) : null}
@@ -1953,11 +1957,13 @@ const InterventionDialog = ({
                 <Button
                   type="primary"
                   danger={room.status === 'failed'}
-                  disabled={room.reprocessing}
+                  disabled={Boolean(room.reprocessingNodeId)}
                   icon={
                     <RotateCw
                       className={`w-4 h-4 ${
-                        room.reprocessing ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin' : ''
+                        room.reprocessingNodeId === selectedNode?.id
+                          ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin'
+                          : ''
                       }`}
                     />
                   }
@@ -2213,7 +2219,7 @@ const InterventionDialog = ({
         onOk={confirmReprocess}
         okText="开始重新处理"
         cancelText="取消"
-        okButtonProps={{ disabled: room.reprocessing }}
+        okButtonProps={{ disabled: Boolean(room.reprocessingNodeId) }}
         destroyOnClose
         centered
         width={520}
@@ -2226,7 +2232,7 @@ const InterventionDialog = ({
           onChange={(e) => setReprocessReason(e.target.value)}
           placeholder="例如：上次遗漏了 XX 模块边界，请重新梳理并补充接口契约…（可选）"
           autoSize={{ minRows: 4, maxRows: 10 }}
-          disabled={room.reprocessing}
+          disabled={Boolean(room.reprocessingNodeId)}
           className="!bg-black/30 !text-foreground !border-border/60"
         />
       </Modal>
@@ -2446,18 +2452,18 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
-    setActiveRoom((prev) => (prev ? { ...prev, reprocessing: true } : prev));
+    setActiveRoom((prev) => (prev ? { ...prev, reprocessingNodeId: nodeId } : prev));
     void reprocessMeetingRoom(base, activeRoom.id, nodeId, reason)
       .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '正在重新处理节点…';
-        updatedRoom.reprocessing = false;
+        updatedRoom.reprocessingNodeId = null;
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
         toast.success('已清理过程数据，正在从节点初始化重跑');
       })
       .catch((e) => {
-        setActiveRoom((prev) => (prev ? { ...prev, reprocessing: false } : prev));
+        setActiveRoom((prev) => (prev ? { ...prev, reprocessingNodeId: null } : prev));
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes('cross_stage_reprocess_forbidden')) {
           toast.error('不允许跨阶段重新处理');
