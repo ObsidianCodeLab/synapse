@@ -232,9 +232,119 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     payload = load_task_exec_payload(scope_id)
     assert payload is not None
     assert payload["human_review"]["status"] == "pending"
+    assert payload["status"] in ("ok", "partial", "failed")
+    assert payload.get("progress", {}).get("phase") == "finished"
     md = render_task_exec_report_markdown(payload)
     assert "任务执行记录" in md
     assert "T1" in md
+
+
+def test_bootstrap_task_exec_persists_running_progress(tmp_path, monkeypatch):
+    scope_id = "te-progress"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution").mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution" / "函数级方案.md").write_text(
+        "# 方案", encoding="utf-8"
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_room_id", lambda _sid: "room-1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._emit_task_exec_progress", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec._collect_work_orders",
+        lambda _st, _sid: [
+            {
+                "task_no": "T1",
+                "task_title": "子单",
+                "goal": "实现功能点",
+                "coverage": ["功能A"],
+                "sandbox_path": str(sandbox),
+                "product_module": "ZMDB",
+            }
+        ],
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
+
+    seen_statuses: list[str] = []
+    seen_phases: list[str] = []
+
+    def capture_persist(sid: str, doc: dict) -> None:
+        seen_statuses.append(str(doc.get("status") or ""))
+        progress = doc.get("progress") if isinstance(doc.get("progress"), dict) else {}
+        seen_phases.append(str(progress.get("phase") or ""))
+        from synapse.rd_meeting.task_exec import _save_task_exec_assets, _write_result
+
+        _write_result(sid, doc)
+        _save_task_exec_assets(sid, doc)
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._persist_task_exec_state", capture_persist)
+
+    def fake_cli_round(**kwargs):
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        return {
+            "status": "ok",
+            "tokens_used": 1,
+            "duration_seconds": 1,
+            "log_path": str(log_path),
+            "error": "",
+        }
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._run_cursor_cli_round", fake_cli_round)
+
+    result = bootstrap_task_exec("demand", scope_id)
+    assert "running" in seen_statuses
+    assert "develop" in seen_phases
+    assert "verify" in seen_phases
+    assert "finished" in seen_phases
+    assert result["status"] == "ok"
+
+
+def test_read_task_exec_live_tail_from_running_log(tmp_path, monkeypatch):
+    from synapse.rd_meeting.task_exec import read_task_exec_live_tail
+
+    scope_id = "te-live-tail"
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / "task_exec"
+    archive.mkdir(parents=True)
+    log_path = tmp_path / "develop.log"
+    log_path.write_text(
+        "\n".join(
+            [
+                "[2026-06-10 02:00:00] === 第 1 轮 Cursor 开发 ===",
+                '[2026-06-10 02:00:01] [raw] {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"正在修改代码"}]}}',
+                "[2026-06-10 02:00:02] [tool] editToolCall src/main.cpp",
+                "[2026-06-10 02:00:03] [cursor-output] 已完成文件修改",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    payload = {
+        "status": "running",
+        "progress": {
+            "phase": "develop",
+            "message": "开发中",
+            "live_log_path": str(log_path),
+            "updated_at": "2026-06-10T02:00:03",
+        },
+        "tasks": [],
+    }
+    (archive / "task_exec_result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.archive_node_dir", lambda _sid, _stage, _node: archive)
+
+    tail = read_task_exec_live_tail(scope_id)
+    assert tail["path"] == str(log_path)
+    joined = "\n".join(tail["lines"])
+    assert "assistant:" in joined
+    assert "editToolCall" in joined or "[tool]" in joined
+    assert "已完成文件修改" in joined
 
 
 def test_bootstrap_task_exec_stops_when_agent_cli_missing(tmp_path, monkeypatch):

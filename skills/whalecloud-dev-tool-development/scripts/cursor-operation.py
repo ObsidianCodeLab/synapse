@@ -17,12 +17,42 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import AsyncIterator, Callable, Optional
 
 MAX_ASSISTANT_ECHO = 2000
+# asyncio StreamReader.readline 默认 64KiB；stream-json 单行（含大段 tool 输出）可能更长
+STREAM_JSON_LINE_LIMIT = 16 * 1024 * 1024
 
 FUNC_SOLUTION_REL = Path("synapse_archive") / "需求设计" / "func_solution" / "函数级方案.md"
 ACCEPTANCE_REL = Path("synapse_archive") / "需求分析" / "acceptance" / "验收标准.md"
+
+
+async def _iter_subprocess_lines(
+    reader: asyncio.StreamReader,
+    *,
+    max_line_bytes: int = STREAM_JSON_LINE_LIMIT,
+) -> AsyncIterator[str]:
+    """按行读取子进程 stdout，避免 readline() 默认 64KiB 上限触发 LimitOverrunError。"""
+    buffer = bytearray()
+    while True:
+        chunk = await reader.read(65536)
+        if not chunk:
+            if buffer:
+                yield buffer.decode(errors="replace")
+            return
+        buffer.extend(chunk)
+        while True:
+            newline = buffer.find(b"\n")
+            if newline < 0:
+                if len(buffer) > max_line_bytes:
+                    raise ValueError(
+                        f"stream-json 单行超过 {max_line_bytes} 字节"
+                        "（多为工具输出过大）；请缩小单次修改范围或提高 STREAM_JSON_LINE_LIMIT"
+                    )
+                break
+            line = buffer[: newline + 1]
+            del buffer[: newline + 1]
+            yield line.decode(errors="replace")
 
 
 def find_repo_root_with_synapse_archive(start: Path) -> Optional[Path]:
@@ -166,6 +196,47 @@ def validate_agent_executable(resolved: str) -> Optional[str]:
     if Path(resolved).is_file():
         return None
     return format_agent_not_found_error(resolved)
+
+
+def resolve_agent_launch_argv(agent_path: str) -> list[str]:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import resolve_agent_launch_argv as _resolve
+
+        return _resolve(agent_path)
+    except ImportError:
+        pass
+    return [resolve_agent_executable(agent_path)]
+
+
+def is_workspace_trust_error(stderr: str) -> bool:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import is_workspace_trust_error as _check
+
+        return _check(stderr)
+    except ImportError:
+        pass
+    return "Workspace Trust Required" in (stderr or "")
+
+
+def format_workspace_trust_error_hint(workspace: Optional[str] = None) -> str:
+    try:
+        from synapse.rd_meeting.cursor_agent_cli import format_workspace_trust_error_hint as _fmt
+
+        return _fmt(workspace)
+    except ImportError:
+        pass
+    ws = (workspace or "").strip() or "(workspace)"
+    return f"Cursor Agent 工作区未信任：{ws}。请在本机执行 agent login 后，用 --trust --force 试跑一次。"
+
+
+def format_agent_argv_for_log(argv: list[str], *, prompt_placeholder: str = "<prompt>") -> str:
+    """日志用：隐藏末尾 prompt positional，保留实际 flag 顺序。"""
+    if not argv:
+        return ""
+    display = list(argv)
+    if display and not display[-1].startswith("-"):
+        display[-1] = prompt_placeholder
+    return " ".join(part if len(part) <= 120 else f"{part[:117]}..." for part in display)
 
 
 @dataclass
@@ -479,38 +550,30 @@ class CursorCLI:
         self.model = model
         self.continue_session = continue_session
 
-    def build_argv(self, prompt: str) -> list[str]:
-        argv: list[str] = [
-            self.agent_path,
-            "-p",
-            prompt,
-            "--output-format",
-            "stream-json",
-        ]
+    def build_argv(self, prompt: str, *, use_yolo: bool = False) -> list[str]:
+        """构造 agent argv：所有 flag 在前，prompt 作为末尾 positional（官方推荐）。"""
+        argv = list(resolve_agent_launch_argv(self.agent_path))
+        argv.append("-p")
+        argv.extend(["--output-format", "stream-json"])
         if self.workspace:
             argv.extend(["--workspace", str(self.workspace)])
-        argv.extend(["--force", "--trust"])
+        argv.extend(["--force", "--trust", "--approve-mcps"])
+        if use_yolo:
+            argv.append("--yolo")
         model = (self.model or "").strip()
         if model and model.lower() != "auto":
             argv.extend(["--model", model])
         if self.continue_session:
             argv.append("--continue")
+        argv.append(prompt)
         return argv
 
-    async def agent_stream(
+    async def _run_agent_once(
         self,
-        prompt: str,
+        argv: list[str],
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
         on_stream_line: Optional[Callable[[str], None]] = None,
     ) -> CursorResult:
-        agent_err = validate_agent_executable(self.agent_path)
-        if agent_err:
-            if on_stream_line:
-                for line in agent_err.splitlines():
-                    on_stream_line(f"[stderr] {line}")
-            return CursorResult(success=False, stderr=agent_err, exit_code=127)
-
-        argv = self.build_argv(prompt)
         try:
             process = await asyncio.create_subprocess_exec(
                 *argv,
@@ -518,6 +581,7 @@ class CursorCLI:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(self.workspace) if self.workspace else None,
+                limit=STREAM_JSON_LINE_LIMIT,
             )
         except FileNotFoundError:
             detail = format_agent_not_found_error(self.agent_path)
@@ -543,23 +607,38 @@ class CursorCLI:
 
         async def _read_stdout() -> None:
             assert process.stdout is not None
-            while True:
-                line = await process.stdout.readline()
-                if not line:
-                    break
-                text = line.decode(errors="replace")
-                stdout_chunks.append(text)
+            try:
+                async for text in _iter_subprocess_lines(process.stdout):
+                    stdout_chunks.append(text)
+                    if on_stream_line:
+                        on_stream_line(text.rstrip("\n\r"))
+                    if on_progress:
+                        progress = parse_progress_line(text)
+                        if progress:
+                            on_progress(progress)
+            except ValueError as exc:
+                stderr_chunks.append(str(exc))
                 if on_stream_line:
-                    on_stream_line(text.rstrip("\n\r"))
-                if on_progress:
-                    progress = parse_progress_line(text)
-                    if progress:
-                        on_progress(progress)
+                    on_stream_line(f"[stderr] {exc}")
 
         try:
             await asyncio.wait_for(
                 asyncio.gather(_read_stdout(), _drain_stderr(), process.wait()),
                 timeout=self.timeout,
+            )
+        except asyncio.LimitOverrunError as exc:
+            process.kill()
+            await process.wait()
+            detail = (
+                "读取 Cursor CLI stream-json 失败：单行输出超过 asyncio 缓冲上限。"
+                " 已切换为大缓冲读取；若仍出现请缩小单次工具输出。"
+                f" ({exc})"
+            )
+            return CursorResult(
+                success=False,
+                stdout="".join(stdout_chunks),
+                stderr="".join(stderr_chunks) + f"\n{detail}",
+                exit_code=-1,
             )
         except TimeoutError:
             process.kill()
@@ -594,6 +673,41 @@ class CursorCLI:
             stdout=stdout,
             stderr=stderr,
             exit_code=exit_code,
+        )
+
+    async def agent_stream(
+        self,
+        prompt: str,
+        on_progress: Optional[Callable[[ProgressEvent], None]] = None,
+        on_stream_line: Optional[Callable[[str], None]] = None,
+    ) -> CursorResult:
+        agent_err = validate_agent_executable(self.agent_path)
+        if agent_err:
+            if on_stream_line:
+                for line in agent_err.splitlines():
+                    on_stream_line(f"[stderr] {line}")
+            return CursorResult(success=False, stderr=agent_err, exit_code=127)
+
+        argv = self.build_argv(prompt)
+        result = await self._run_agent_once(argv, on_progress, on_stream_line)
+        if result.success or not is_workspace_trust_error(result.stderr):
+            return result
+
+        if on_stream_line:
+            on_stream_line("[stderr] 检测到工作区信任失败，使用 --yolo 重试一次…")
+        retry_argv = self.build_argv(prompt, use_yolo=True)
+        retry = await self._run_agent_once(retry_argv, on_progress, on_stream_line)
+        if retry.success or not is_workspace_trust_error(retry.stderr):
+            return retry
+
+        ws = str(self.workspace) if self.workspace else None
+        hint = format_workspace_trust_error_hint(ws)
+        merged_stderr = f"{result.stderr.strip()}\n\n{hint}".strip()
+        return CursorResult(
+            success=False,
+            stdout=retry.stdout or result.stdout,
+            stderr=merged_stderr,
+            exit_code=retry.exit_code if retry.exit_code is not None else result.exit_code,
         )
 
     async def agent(self, prompt: str) -> CursorResult:
@@ -804,12 +918,9 @@ async def main() -> int:
             logger.log("模式: 纠偏轮", echo=echo)
         if args.continue_session:
             logger.log("会话: --continue（续接上一轮 Cursor Agent）", echo=echo)
-        ws = str(cursor.workspace) if cursor.workspace else "(cwd)"
+        preview_argv = cursor.build_argv(prompt)
         logger.log(
-            f"命令: {cursor.agent_path} -p <prompt> --workspace {ws} "
-            f"--output-format stream-json --force --trust"
-            + (f" --model {cursor.model.strip()}" if cursor.model and cursor.model.strip() else "")
-            + (" --continue" if cursor.continue_session else ""),
+            f"命令: {format_agent_argv_for_log(preview_argv)}",
             echo=echo,
         )
         logger.log(f"日志文件: {args.log}", echo=echo)

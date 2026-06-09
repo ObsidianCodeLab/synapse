@@ -1,7 +1,7 @@
 /**
  * 任务执行评审面板：展示 CLI 批量执行结果，供人工确认后推进。
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Input, message } from 'antd';
 import {
   Bot,
@@ -13,6 +13,7 @@ import {
   FolderGit2,
   ListTree,
   Loader2,
+  Sparkles,
   Target,
   Terminal,
   XCircle,
@@ -22,6 +23,7 @@ import {
   reprocessMeetingRoom,
   submitTaskExecDecision,
   type TaskExecPayload,
+  type TaskExecLiveTail,
   type TaskExecTaskRow,
 } from '../../../api/meetingRoomService';
 import { CLI_TOOL_OPTIONS } from './cliToolConfig';
@@ -37,6 +39,16 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
   partial: { label: '部分完成', className: 'rd-task-exec-status--partial' },
   failed: { label: '失败', className: 'rd-task-exec-status--failed' },
   skipped: { label: '已跳过', className: 'rd-task-exec-status--skipped' },
+  running: { label: '执行中', className: 'rd-task-exec-status--running' },
+};
+
+const PHASE_LABEL: Record<string, string> = {
+  prepare: '准备',
+  develop: '开发轮',
+  verify: '完成检测',
+  done: '子单收尾',
+  finished: '全部结束',
+  skipped: '已跳过',
 };
 
 interface Props {
@@ -45,6 +57,8 @@ interface Props {
   scopeId?: string;
   initialPayload?: TaskExecPayload | null;
   blocked?: boolean;
+  /** 节点仍在 processing 时轮询 task-exec 增量结果 */
+  live?: boolean;
   onDecided?: () => void;
 }
 
@@ -88,6 +102,8 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
   const status = String(task.status || '—');
   const meta = statusMeta(status);
   const cov = Array.isArray(task.coverage) ? task.coverage : [];
+  const phase = String(task.phase || '').trim();
+  const isRunning = status === 'running';
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-amber-950/20 p-4 shadow-[0_8px_32px_rgba(251,191,36,0.08)]">
@@ -100,9 +116,24 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
           {task.product_module ? (
             <p className="text-[11px] text-muted-foreground mt-1 mb-0">{task.product_module}</p>
           ) : null}
+          {isRunning && phase ? (
+            <p className="text-[11px] text-blue-300 mt-1 mb-0 inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {PHASE_LABEL[phase] || phase}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[11px] text-muted-foreground">
-          <span className={`rd-task-exec-status ${meta.className}`}>{meta.label}</span>
+          <span className={`rd-task-exec-status ${meta.className}`}>
+            {isRunning ? (
+              <span className="inline-flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {meta.label}
+              </span>
+            ) : (
+              meta.label
+            )}
+          </span>
           <span className="inline-flex items-center gap-1">
             <Coins className="h-3 w-3 text-amber-400" />
             {task.tokens_used ?? 0}
@@ -180,6 +211,7 @@ export function TaskExecReviewPanel({
   roomId,
   initialPayload,
   blocked,
+  live = false,
   onDecided,
 }: Props) {
   const [payload, setPayload] = useState<TaskExecPayload | null>(initialPayload ?? null);
@@ -189,23 +221,42 @@ export function TaskExecReviewPanel({
   const [error, setError] = useState('');
   const [installOpen, setInstallOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [liveTail, setLiveTail] = useState<TaskExecLiveTail | null>(null);
+  const liveTailEndRef = useRef<HTMLDivElement>(null);
+
+  const isRunning = live || String(payload?.status || '') === 'running';
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    if (!isRunning) setLoading(true);
     setError('');
     try {
       const res = await fetchTaskExec(synapseApiBase, roomId);
       setPayload(res.payload);
+      if (res.live_tail) setLiveTail(res.live_tail);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
+      const msg = e instanceof Error ? e.message : '加载失败';
+      if (!isRunning || !msg.includes('404')) {
+        if (!isRunning) setError(msg);
+      }
     } finally {
-      setLoading(false);
+      if (!isRunning) setLoading(false);
     }
-  }, [synapseApiBase, roomId]);
+  }, [isRunning, synapseApiBase, roomId]);
 
   useEffect(() => {
-    if (!initialPayload) void refresh();
-  }, [initialPayload, refresh]);
+    if (!initialPayload || isRunning) void refresh();
+  }, [initialPayload, isRunning, refresh]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => void refresh(), 2000);
+    return () => window.clearInterval(timer);
+  }, [isRunning, refresh]);
+
+  useEffect(() => {
+    if (!isRunning || !liveTail?.lines?.length) return;
+    liveTailEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [isRunning, liveTail?.lines?.length, liveTail?.updated_at]);
 
   const summary = payload?.summary;
   const tasks = useMemo(
@@ -257,11 +308,20 @@ export function TaskExecReviewPanel({
     }
   };
 
-  if (loading && !payload) {
+  if (loading && !payload && !isRunning) {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
         加载任务执行结果…
+      </div>
+    );
+  }
+
+  if (isRunning && !payload) {
+    return (
+      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        任务执行进行中，等待首批进度…
       </div>
     );
   }
@@ -284,6 +344,12 @@ export function TaskExecReviewPanel({
 
   const ok = Number(summary?.ok || 0);
   const total = Number(summary?.total || tasks.length);
+  const progress = payload.progress;
+  const progressText =
+    (progress?.message || '').trim() ||
+    (progress?.task_total
+      ? `工单 ${progress.task_index || 0}/${progress.task_total} · ${PHASE_LABEL[String(progress.phase || '')] || progress.phase || '执行中'}`
+      : 'CLI 任务执行进行中…');
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -295,6 +361,54 @@ export function TaskExecReviewPanel({
         onReady={() => void onAgentReady()}
       />
       <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
+      {isRunning ? (
+        <Alert
+          type="info"
+          showIcon
+          icon={<Loader2 className="h-4 w-4 animate-spin" />}
+          message="CLI 任务执行进行中"
+          description={
+            <div className="space-y-1 text-[12px]">
+              <p className="m-0">{progressText}</p>
+              {progress?.task_total ? (
+                <p className="m-0 text-muted-foreground">
+                  进度 {progress.task_index || 0}/{progress.task_total}
+                  {progress.task_no ? ` · 当前工单 ${progress.task_no}` : ''}
+                </p>
+              ) : null}
+            </div>
+          }
+        />
+      ) : null}
+
+      {isRunning ? (
+        <div className="rounded-xl border border-slate-700/60 bg-slate-950/80 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+              CLI 实时输出
+            </span>
+            {liveTail?.path ? (
+              <span className="truncate font-mono text-[10px] opacity-70" title={liveTail.path}>
+                {liveTail.path.split(/[/\\]/).pop()}
+              </span>
+            ) : null}
+          </div>
+          <pre className="max-h-72 overflow-y-auto custom-scrollbar p-3 text-[11px] leading-relaxed text-slate-300 font-mono m-0">
+            {liveTail?.lines?.length ? (
+              liveTail.lines.map((line, idx) => (
+                <div key={`${idx}-${line.slice(0, 24)}`} className="whitespace-pre-wrap break-all">
+                  {line}
+                </div>
+              ))
+            ) : (
+              <span className="text-muted-foreground">等待 Cursor CLI stream-json 输出…</span>
+            )}
+            <div ref={liveTailEndRef} />
+          </pre>
+        </div>
+      ) : null}
+
       <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-violet-500/10 to-slate-900 p-6 shadow-[0_16px_48px_rgba(251,191,36,0.12)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,191,36,0.15),transparent_55%)]" />
         <div className="relative flex items-start gap-4">
@@ -304,7 +418,7 @@ export function TaskExecReviewPanel({
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2 flex-nowrap overflow-hidden">
               <h2 className="text-lg font-bold text-foreground m-0 tracking-tight shrink-0 whitespace-nowrap">
-                任务执行评审
+                {isRunning ? '任务执行进度' : '任务执行评审'}
               </h2>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-200 shrink-0 whitespace-nowrap">
                 <Terminal className="h-3 w-3" />
@@ -321,7 +435,9 @@ export function TaskExecReviewPanel({
               </span>
             </div>
             <p className="text-sm text-muted-foreground m-0 leading-relaxed">
-              {agentCliMissing
+              {isRunning
+                ? `Cursor CLI 正在处理研发子单，页面每 3 秒自动刷新。${total ? `共 ${total} 个子单。` : ''}`
+                : agentCliMissing
                 ? payload?.status === 'agent_cli_login_required'
                   ? '任务执行尚未开始：Cursor Agent CLI 已安装，请先完成账号登录。'
                   : '任务执行尚未开始：本机缺少 Cursor Agent CLI（agent），请先安装后再重新执行。'
@@ -383,14 +499,14 @@ export function TaskExecReviewPanel({
           <ListTree className="h-3.5 w-3.5 text-amber-400" />
           子单明细
         </div>
-        {tasks.length === 0 && !agentCliMissing ? (
+        {tasks.length === 0 && !agentCliMissing && !isRunning ? (
           <Alert type="warning" message="无子单执行记录" showIcon />
         ) : (
           tasks.map((t) => <TaskRowCard key={String(t.task_no)} task={t} />)
         )}
       </div>
 
-      {!agentCliMissing ? (
+      {!agentCliMissing && !isRunning ? (
       <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
         <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5">
           <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />

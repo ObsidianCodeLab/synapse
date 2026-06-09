@@ -41,6 +41,9 @@ NODE_ID = "task_exec"
 DEV_STAGE_NAME = stage_name_for_id(4)
 RESULT_JSON = "task_exec_result.json"
 REPORT_MD = "任务执行记录.md"
+LIVE_TAIL_MAX_BYTES = 512 * 1024
+LIVE_TAIL_MAX_LINES = 80
+LIVE_DISPLAY_LINE_MAX = 600
 
 ScopeType = Literal["demand", "task"]
 
@@ -265,6 +268,12 @@ def _run_cursor_cli_round(
         }
 
     started = time.monotonic()
+    logger.info(
+        "task_exec: cursor CLI round begin log=%s continue=%s model=%s",
+        log_path,
+        continue_session,
+        model,
+    )
     argv = [
         sys.executable,
         str(script),
@@ -437,6 +446,122 @@ def _resolve_demand_no(scope_type: ScopeType, scope_id: str) -> str:
     return _resolve_demand_no(scope_type, scope_id)
 
 
+def _resolve_room_id(scope_id: str) -> str:
+    from synapse.rd_meeting.dev_status import load_dev_status
+
+    data = load_dev_status(scope_id) or {}
+    meeting_room = data.get("meeting_room")
+    if isinstance(meeting_room, dict):
+        return str(meeting_room.get("room_id") or "").strip()
+    return ""
+
+
+def _task_exec_progress_snapshot(
+    *,
+    phase: str,
+    message: str,
+    task_index: int,
+    task_total: int,
+    task_no: str = "",
+    live_log_path: str = "",
+) -> dict[str, Any]:
+    snap = {
+        "phase": phase,
+        "message": message,
+        "task_index": task_index,
+        "task_total": task_total,
+        "task_no": task_no,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    if live_log_path:
+        snap["live_log_path"] = live_log_path
+    return snap
+
+
+def _summary_from_rows(task_rows: list[dict[str, Any]], *, task_total: int) -> dict[str, Any]:
+    return {
+        "total": task_total,
+        "ok": sum(1 for t in task_rows if t.get("status") == "ok"),
+        "failed": sum(1 for t in task_rows if t.get("status") == "failed"),
+        "skipped": sum(1 for t in task_rows if t.get("status") == "skipped"),
+        "running": sum(1 for t in task_rows if t.get("status") == "running"),
+        "total_tokens": sum(int(t.get("tokens_used") or 0) for t in task_rows),
+        "total_duration_sec": sum(int(t.get("duration_seconds") or 0) for t in task_rows),
+    }
+
+
+def _persist_task_exec_state(scope_id: str, result_doc: dict[str, Any]) -> None:
+    _write_result(scope_id, result_doc)
+    _save_task_exec_assets(scope_id, result_doc)
+
+
+def write_task_exec_cli_starting(
+    scope_id: str,
+    *,
+    cli_tool: str,
+    cli_model: str,
+    cli_model_custom: str,
+    cli_model_label: str,
+    demand_no: str = "",
+) -> None:
+    """CLI bootstrap 开始前写入 running 占位，便于 reprocess 后前端立即轮询。"""
+    started_at = datetime.now().isoformat(timespec="seconds")
+    result_doc: dict[str, Any] = {
+        "cli_tool": cli_tool,
+        "cli_model": cli_model,
+        "cli_model_custom": cli_model_custom,
+        "cli_model_label": cli_model_label,
+        "demand_no": demand_no,
+        "started_at": started_at,
+        "finished_at": None,
+        "status": "running",
+        "progress": _task_exec_progress_snapshot(
+            phase="starting",
+            message="正在启动 Cursor CLI…",
+            task_index=0,
+            task_total=0,
+        ),
+        "summary": _summary_from_rows([], task_total=0),
+        "tasks": [],
+        "human_review": {"status": "pending", "comment": "", "decided_at": None},
+    }
+    _persist_task_exec_state(scope_id, result_doc)
+
+
+def _emit_task_exec_progress(
+    scope_id: str,
+    *,
+    event: str,
+    message: str,
+    room_id: str,
+    task_no: str = "",
+    phase: str = "",
+    task_index: int = 0,
+    task_total: int = 0,
+    log_type: str = "info",
+) -> None:
+    from synapse.rd_meeting.room_runtime import append_history_event
+
+    payload: dict[str, Any] = {
+        "event": event,
+        "room_id": room_id,
+        "node_id": NODE_ID,
+        "message": message,
+        "flow_stage": "任务执行 CLI",
+        "log_type": log_type,
+        "agent_id": "system",
+        "system_node": True,
+    }
+    if task_no:
+        payload["task_no"] = task_no
+    if phase:
+        payload["phase"] = phase
+    if task_total:
+        payload["task_index"] = task_index
+        payload["task_total"] = task_total
+    append_history_event(scope_id, payload)
+
+
 def bootstrap_task_exec(
     scope_type: ScopeType,
     scope_id: str,
@@ -512,18 +637,70 @@ def bootstrap_task_exec(
         }
 
     demand_no = _resolve_demand_no(scope_type, sid)
+    room_id = _resolve_room_id(sid)
     work_dir = scope_dir(sid)
     log_root = work_dir / "agents" / NODE_ID / "cli_logs"
     log_root.mkdir(parents=True, exist_ok=True)
 
     task_rows: list[dict[str, Any]] = []
-    total_tokens = 0
-    total_duration = 0
-    ok_count = 0
+    task_total = len(orders)
+    started_at = datetime.now().isoformat(timespec="seconds")
 
-    for order in orders:
+    _emit_task_exec_progress(
+        sid,
+        event="task_exec_cli_running",
+        message=f"开始 CLI 任务执行，共 {task_total} 个研发子单",
+        room_id=room_id,
+        task_total=task_total,
+    )
+
+    result_doc: dict[str, Any] = {
+        "cli_tool": tool,
+        "cli_model": preset,
+        "cli_model_custom": custom if preset == "custom" else "",
+        "cli_model_label": model_label,
+        "demand_no": demand_no,
+        "started_at": started_at,
+        "finished_at": None,
+        "status": "running",
+        "progress": _task_exec_progress_snapshot(
+            phase="prepare",
+            message=f"准备执行 {task_total} 个研发子单",
+            task_index=0,
+            task_total=task_total,
+        ),
+        "summary": _summary_from_rows(task_rows, task_total=task_total),
+        "tasks": task_rows,
+        "human_review": {"status": "pending", "comment": "", "decided_at": None},
+    }
+    _persist_task_exec_state(sid, result_doc)
+
+    def _sync_running(
+        *,
+        phase: str,
+        message: str,
+        task_index: int,
+        task_no: str = "",
+        tasks: list[dict[str, Any]] | None = None,
+        live_log_path: str = "",
+    ) -> None:
+        result_doc["progress"] = _task_exec_progress_snapshot(
+            phase=phase,
+            message=message,
+            task_index=task_index,
+            task_total=task_total,
+            task_no=task_no,
+            live_log_path=live_log_path,
+        )
+        result_doc["tasks"] = tasks if tasks is not None else list(task_rows)
+        result_doc["summary"] = _summary_from_rows(result_doc["tasks"], task_total=task_total)
+        _persist_task_exec_state(sid, result_doc)
+
+    for order_index, order in enumerate(orders):
+        task_index = order_index + 1
         sandbox_path = str(order.get("sandbox_path") or "").strip()
         task_key = str(order.get("task_no") or order.get("index"))
+        task_no = str(order.get("task_no") or task_key)
         dev_log = log_root / f"{task_key}_develop.log"
         verify_log = log_root / f"{task_key}_verify.log"
         func_doc, accept_doc = _archive_doc_paths(sandbox_path) if sandbox_path else ("", "")
@@ -550,19 +727,67 @@ def bootstrap_task_exec(
         )
 
         if not sandbox_path or not Path(sandbox_path).is_dir():
-            task_rows.append(
-                {
-                    **row_base,
-                    "develop_prompt": develop_prompt,
-                    "verify_prompt": verify_prompt,
-                    "status": "skipped",
-                    "error": "未匹配沙箱工程路径",
-                    "tokens_used": 0,
-                    "duration_seconds": 0,
-                    "report_markdown": "",
-                }
+            skipped_row = {
+                **row_base,
+                "develop_prompt": develop_prompt,
+                "verify_prompt": verify_prompt,
+                "status": "skipped",
+                "error": "未匹配沙箱工程路径",
+                "tokens_used": 0,
+                "duration_seconds": 0,
+                "report_markdown": "",
+            }
+            task_rows.append(skipped_row)
+            _emit_task_exec_progress(
+                sid,
+                event="task_exec_task_skipped",
+                message=f"工单 {task_no} 跳过：未匹配沙箱工程路径",
+                room_id=room_id,
+                task_no=task_no,
+                phase="skipped",
+                task_index=task_index,
+                task_total=task_total,
+                log_type="warning",
+            )
+            _sync_running(
+                phase="skipped",
+                message=f"工单 {task_no} 已跳过（{task_index}/{task_total}）",
+                task_index=task_index,
+                task_no=task_no,
             )
             continue
+
+        running_row = {
+            **row_base,
+            "develop_prompt": develop_prompt,
+            "verify_prompt": verify_prompt,
+            "status": "running",
+            "phase": "develop",
+            "error": "",
+            "tokens_used": 0,
+            "duration_seconds": 0,
+            "develop_log": str(dev_log),
+            "verify_log": str(verify_log),
+            "report_markdown": "",
+        }
+        _emit_task_exec_progress(
+            sid,
+            event="task_exec_develop_started",
+            message=f"工单 {task_no} · 开发轮（{task_index}/{task_total}）",
+            room_id=room_id,
+            task_no=task_no,
+            phase="develop",
+            task_index=task_index,
+            task_total=task_total,
+        )
+        _sync_running(
+            phase="develop",
+            message=f"工单 {task_no} · Cursor 开发轮（{task_index}/{task_total}）",
+            task_index=task_index,
+            task_no=task_no,
+            tasks=[*task_rows, running_row],
+            live_log_path=str(dev_log),
+        )
 
         dev_result = _run_cursor_cli_round(
             code_path=sandbox_path,
@@ -571,6 +796,37 @@ def bootstrap_task_exec(
             accept_doc=accept_doc,
             log_path=dev_log,
             model=model_arg,
+        )
+        _emit_task_exec_progress(
+            sid,
+            event="task_exec_develop_finished",
+            message=f"工单 {task_no} · 开发轮结束：{dev_result.get('status') or 'unknown'}",
+            room_id=room_id,
+            task_no=task_no,
+            phase="develop",
+            task_index=task_index,
+            task_total=task_total,
+            log_type="info" if dev_result.get("status") == "ok" else "warning",
+        )
+
+        running_row = {**running_row, "phase": "verify"}
+        _emit_task_exec_progress(
+            sid,
+            event="task_exec_verify_started",
+            message=f"工单 {task_no} · 完成检测轮（{task_index}/{task_total}）",
+            room_id=room_id,
+            task_no=task_no,
+            phase="verify",
+            task_index=task_index,
+            task_total=task_total,
+        )
+        _sync_running(
+            phase="verify",
+            message=f"工单 {task_no} · Cursor 完成检测（{task_index}/{task_total}）",
+            task_index=task_index,
+            task_no=task_no,
+            tasks=[*task_rows, running_row],
+            live_log_path=str(verify_log),
         )
 
         verify_result = _run_cursor_cli_round(
@@ -588,13 +844,9 @@ def bootstrap_task_exec(
         status = "ok" if completion == "completed" and verify_result.get("status") == "ok" else (
             "partial" if completion == "partial" else "failed"
         )
-        if status == "ok":
-            ok_count += 1
 
         tokens = int(dev_result.get("tokens_used") or 0) + int(verify_result.get("tokens_used") or 0)
         duration = int(dev_result.get("duration_seconds") or 0) + int(verify_result.get("duration_seconds") or 0)
-        total_tokens += tokens
-        total_duration += duration
 
         row = {
             **row_base,
@@ -610,6 +862,23 @@ def bootstrap_task_exec(
             "report_markdown": report_md,
         }
         task_rows.append(row)
+        _emit_task_exec_progress(
+            sid,
+            event="task_exec_task_finished",
+            message=f"工单 {task_no} 完成：{status}（{task_index}/{task_total}）",
+            room_id=room_id,
+            task_no=task_no,
+            phase="done",
+            task_index=task_index,
+            task_total=task_total,
+            log_type="info" if status == "ok" else "warning",
+        )
+        _sync_running(
+            phase="done",
+            message=f"工单 {task_no} 已结束（{task_index}/{task_total}）",
+            task_index=task_index,
+            task_no=task_no,
+        )
 
         patch_owned_work_item_task_exec(
             demand_no,
@@ -621,30 +890,26 @@ def bootstrap_task_exec(
             report_excerpt=report_md[:500],
         )
 
+    ok_count = sum(1 for t in task_rows if t.get("status") == "ok")
     overall = "ok" if ok_count == len(task_rows) and ok_count > 0 else (
         "partial" if ok_count > 0 else "failed"
     )
-    result_doc = {
-        "cli_tool": tool,
-        "cli_model": preset,
-        "cli_model_custom": custom if preset == "custom" else "",
-        "cli_model_label": model_label,
-        "started_at": datetime.now().isoformat(timespec="seconds"),
-        "finished_at": datetime.now().isoformat(timespec="seconds"),
-        "status": overall,
-        "summary": {
-            "total": len(task_rows),
-            "ok": ok_count,
-            "failed": sum(1 for t in task_rows if t.get("status") == "failed"),
-            "skipped": sum(1 for t in task_rows if t.get("status") == "skipped"),
-            "total_tokens": total_tokens,
-            "total_duration_sec": total_duration,
-        },
-        "tasks": task_rows,
-        "human_review": {"status": "pending", "comment": "", "decided_at": None},
-    }
-    _write_result(sid, result_doc)
-    _save_task_exec_assets(sid, result_doc)
+    finished_at = datetime.now().isoformat(timespec="seconds")
+    result_doc.update(
+        {
+            "finished_at": finished_at,
+            "status": overall,
+            "progress": _task_exec_progress_snapshot(
+                phase="finished",
+                message=f"CLI 任务执行结束：{overall}",
+                task_index=task_total,
+                task_total=task_total,
+            ),
+            "summary": _summary_from_rows(task_rows, task_total=task_total),
+            "tasks": task_rows,
+        }
+    )
+    _persist_task_exec_state(sid, result_doc)
 
     patch_userwork_summary(
         scope_type=scope_type,
@@ -661,6 +926,118 @@ def load_task_exec_payload(scope_id: str) -> dict[str, Any] | None:
     if not isinstance(data, dict):
         return None
     return data
+
+
+def _tail_log_file(path: Path, *, max_bytes: int, max_lines: int) -> list[str]:
+    if not path.is_file():
+        return []
+    size = path.stat().st_size
+    if size <= 0:
+        return []
+    read_size = min(size, max_bytes)
+    with path.open("rb") as handle:
+        if size > read_size:
+            handle.seek(size - read_size)
+        chunk = handle.read(read_size)
+    text = chunk.decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    if size > read_size and lines:
+        lines = lines[1:]
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+    return lines
+
+
+def _summarize_stream_json_line(raw: str) -> str | None:
+    body = raw.strip()
+    if not body.startswith("{"):
+        return None
+    try:
+        event = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(event, dict):
+        return None
+    etype = str(event.get("type") or "")
+    if etype == "assistant":
+        msg = event.get("message")
+        if isinstance(msg, dict):
+            content = msg.get("content")
+            if isinstance(content, list):
+                parts: list[str] = []
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        parts.append(str(block.get("text") or ""))
+                text = "".join(parts).strip()
+                if text:
+                    return f"assistant: {text[:240]}"
+        return "assistant: …"
+    if etype == "tool_call":
+        subtype = str(event.get("subtype") or "")
+        tool_call = event.get("tool_call") if isinstance(event.get("tool_call"), dict) else {}
+        label = next(iter(tool_call.keys()), "tool") if tool_call else "tool"
+        return f"tool {subtype}: {label.replace('ToolCall', '')}"
+    if etype == "result":
+        return f"result: {event.get('subtype') or 'unknown'}"
+    if etype == "system":
+        return f"system: {event.get('subtype') or 'init'}"
+    return f"{etype}: …"
+
+
+def _format_live_log_display_lines(raw_lines: list[str]) -> list[str]:
+    display: list[str] = []
+    for line in raw_lines:
+        text = line.strip()
+        if not text:
+            continue
+        if "[raw]" in text:
+            raw_json = text.split("[raw]", 1)[-1].strip()
+            summary = _summarize_stream_json_line(raw_json)
+            if summary:
+                prefix = text.split("[raw]", 1)[0].strip()
+                display.append(f"{prefix} {summary}".strip())
+            continue
+        if any(
+            tag in text
+            for tag in (
+                "[cursor-output]",
+                "[cursor-think]",
+                "[tool]",
+                "[stderr]",
+                "=== 第",
+                "任务执行",
+                "Cursor CLI",
+            )
+        ):
+            if len(text) > LIVE_DISPLAY_LINE_MAX:
+                text = text[: LIVE_DISPLAY_LINE_MAX - 3] + "..."
+            display.append(text)
+    return display[-LIVE_TAIL_MAX_LINES:]
+
+
+def read_task_exec_live_tail(
+    scope_id: str,
+    *,
+    max_bytes: int = LIVE_TAIL_MAX_BYTES,
+    max_lines: int = LIVE_TAIL_MAX_LINES,
+) -> dict[str, Any]:
+    """读取当前 CLI 日志尾部，供前端轮询展示 stream-json 解析后的实时输出。"""
+    payload = load_task_exec_payload(scope_id)
+    if not isinstance(payload, dict):
+        return {"path": "", "lines": [], "updated_at": ""}
+    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+    log_path = str(progress.get("live_log_path") or "").strip()
+    if not log_path:
+        return {"path": "", "lines": [], "updated_at": str(progress.get("updated_at") or "")}
+    path = Path(log_path)
+    raw_lines = _tail_log_file(path, max_bytes=max_bytes, max_lines=max_lines * 3)
+    lines = _format_live_log_display_lines(raw_lines)
+    return {
+        "path": log_path,
+        "lines": lines,
+        "updated_at": str(progress.get("updated_at") or ""),
+        "line_count": len(lines),
+    }
 
 
 def render_task_exec_report_markdown(data: dict[str, Any]) -> str:

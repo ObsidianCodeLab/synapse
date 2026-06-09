@@ -1375,7 +1375,14 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
 
 def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     """任务执行：CLI 循环处理子单，完成后进入专用人工评审门控（不调用小鲸）。"""
-    from synapse.rd_meeting.task_exec import bootstrap_task_exec, uses_task_exec_cli
+    from synapse.rd_meeting.cli_models import display_cli_model_label, resolve_cli_model_arg
+    from synapse.rd_meeting.cli_tools import normalize_cli_tool
+    from synapse.rd_meeting.task_exec import (
+        _resolve_demand_no,
+        bootstrap_task_exec,
+        uses_task_exec_cli,
+        write_task_exec_cli_starting,
+    )
 
     sid = ctx.scope_id
     scope_type = ctx.scope_type
@@ -1420,6 +1427,24 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     rs["agents_active"] = [{"profile_id": "cli", "role": "system", "display_name": "CLI"}]
     save_room_state(sid, rs)
     ctx.room_state = rs
+
+    tool_norm = normalize_cli_tool(cli_tool or "cursor_cli")
+    model_arg = resolve_cli_model_arg(tool_norm, cli_model, cli_model_custom)
+    model_label = display_cli_model_label(tool_norm, cli_model, cli_model_custom)
+    write_task_exec_cli_starting(
+        sid,
+        cli_tool=tool_norm,
+        cli_model=cli_model,
+        cli_model_custom=cli_model_custom,
+        cli_model_label=model_label,
+        demand_no=_resolve_demand_no(scope_type, sid),
+    )
+    logger.info(
+        "task_exec_cli: bootstrap begin scope=%s tool=%s model=%s",
+        sid,
+        tool_norm,
+        model_arg,
+    )
 
     result = bootstrap_task_exec(
         scope_type,  # type: ignore[arg-type]
@@ -1592,16 +1617,19 @@ def run_pipeline_until_waiting(
     guard = 0
     while pipe.flow_step not in (STEP_WAITING, STEP_DONE, STEP_IDLE) and guard < 16:
         guard += 1
-        handler = FLOW_STEP_HANDLERS.get(pipe.flow_step)
+        step = pipe.flow_step
+        handler = FLOW_STEP_HANDLERS.get(step)
         if handler is None:
             logger.info(
                 "pipeline: no handler for flow_step=%s scope=%s",
-                pipe.flow_step,
+                step,
                 ctx.scope_id,
             )
             break
+        logger.info("pipeline: running step=%s scope=%s", step, ctx.scope_id)
         handler(pipe, ctx)
         pipe.save()
+        logger.info("pipeline: completed step=%s scope=%s next=%s", step, ctx.scope_id, pipe.flow_step)
     ctx.detail["pipeline"] = pipe.snapshot_for_api()
     return pipe
 
@@ -1676,7 +1704,7 @@ def schedule_node_finish(
 
 
 async def _run_node_finish_coro(fn: Callable[[], None]) -> None:
-    fn()
+    await asyncio.to_thread(fn)
 
 
 def get_flow_step(scope_id: str) -> str:

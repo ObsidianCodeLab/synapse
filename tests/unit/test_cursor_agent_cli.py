@@ -49,3 +49,26 @@ def test_validate_existing_agent(tmp_path):
     agent = tmp_path / "agent.cmd"
     agent.write_text("@echo off", encoding="utf-8")
     assert validate_agent_executable(str(agent)) is None
+
+
+def test_resolve_agent_launch_argv_uses_version_node(tmp_path):
+    from synapse.rd_meeting.cursor_agent_cli import resolve_agent_launch_argv
+
+    version_dir = tmp_path / "versions" / "2026.06.04-abc123"
+    version_dir.mkdir(parents=True)
+    node = version_dir / "node.exe"
+    index = version_dir / "index.js"
+    node.write_text("", encoding="utf-8")
+    index.write_text("", encoding="utf-8")
+    agent = tmp_path / "agent.cmd"
+    agent.write_text("@echo off", encoding="utf-8")
+
+    argv = resolve_agent_launch_argv(str(agent))
+    assert argv == [str(node.resolve()), str(index.resolve())]
+
+
+def test_is_workspace_trust_error():
+    from synapse.rd_meeting.cursor_agent_cli import is_workspace_trust_error
+
+    assert is_workspace_trust_error("⚠ Workspace Trust Required\nPass --trust")
+    assert not is_workspace_trust_error("some other error")

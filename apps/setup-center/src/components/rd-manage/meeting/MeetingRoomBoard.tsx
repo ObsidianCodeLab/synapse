@@ -2139,6 +2139,19 @@ const InterventionDialog = ({
                           blocked={room.taskExecBlocked}
                         />
                       </div>
+                    ) : selectedNode.id === 'task_exec' &&
+                      (selectedNodeState === 'processing' || room.status === 'processing') ? (
+                      <div className="min-h-0 flex-1 overflow-hidden">
+                        <TaskExecReviewPanel
+                          key={`detail-te-live-${room.id}`}
+                          synapseApiBase={synapseApiBase || ''}
+                          roomId={room.id}
+                          scopeId={room.scopeId}
+                          initialPayload={room.taskExecPayload ?? null}
+                          blocked={room.taskExecBlocked}
+                          live
+                        />
+                      </div>
                     ) : detailViewMode === 'review' && selectedNode.id === 'solution_review' ? (
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <SolutionReviewPanel

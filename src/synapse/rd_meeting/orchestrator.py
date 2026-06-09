@@ -8,7 +8,7 @@ import os
 import time
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from synapse.rd_meeting.agent_activity import (
     record_input,
@@ -102,6 +102,54 @@ _MAX_SKIP_CHAIN = len(ALL_NODES) + 2
 logger = logging.getLogger(__name__)
 
 _running_tasks: dict[str, asyncio.Task[None]] = {}
+_pipeline_tasks: dict[str, asyncio.Task[None]] = {}
+
+
+def _room_task_key(room_id: str, scope_id: str = "") -> str:
+    return (room_id or scope_id or "").strip()
+
+
+def schedule_pipeline_background(
+    room_id: str,
+    fn: Callable[[], None],
+    *,
+    scope_id: str = "",
+) -> str:
+    """在后台线程跑 pipeline（reprocess 等），避免阻塞 FastAPI 事件循环。"""
+    key = _room_task_key(room_id, scope_id)
+    if not key:
+        fn()
+        return key
+
+    existing = _running_tasks.get(key) or _pipeline_tasks.get(key)
+    if existing and not existing.done():
+        return key
+
+    async def _runner() -> None:
+        try:
+            await asyncio.to_thread(fn)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("background pipeline failed room=%s: %s", key, exc)
+            sid = (scope_id or "").strip()
+            if sid:
+                rs = dict(load_room_state(sid) or {})
+                rs["status"] = "failed"
+                rs["last_error"] = str(exc)[:500]
+                save_room_state(sid, rs)
+        finally:
+            _pipeline_tasks.pop(key, None)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        fn()
+        return key
+
+    task = loop.create_task(_runner())
+    _pipeline_tasks[key] = task
+    return key
 
 
 def _now_iso() -> str:
@@ -2642,16 +2690,23 @@ def schedule_enter_node_review(
 
 
 def is_room_run_in_progress(room_id: str) -> bool:
-    t = _running_tasks.get(room_id.strip())
-    return t is not None and not t.done()
+    key = room_id.strip()
+    for bucket in (_running_tasks, _pipeline_tasks):
+        task = bucket.get(key)
+        if task is not None and not task.done():
+            return True
+    return False
 
 
 def cancel_room_run(room_id: str) -> bool:
-    """取消进行中的节点执行任务（重新处理前调用）。"""
+    """取消进行中的节点执行任务或后台 pipeline（重新处理前调用）。"""
     key = room_id.strip()
-    t = _running_tasks.get(key)
-    if t is None or t.done():
-        return False
-    t.cancel()
-    _running_tasks.pop(key, None)
-    return True
+    cancelled = False
+    for bucket in (_running_tasks, _pipeline_tasks):
+        task = bucket.get(key)
+        if task is None or task.done():
+            continue
+        task.cancel()
+        bucket.pop(key, None)
+        cancelled = True
+    return cancelled

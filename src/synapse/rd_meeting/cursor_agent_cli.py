@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,6 +93,78 @@ def validate_agent_executable(resolved: str) -> str | None:
     if Path(resolved).is_file():
         return None
     return format_agent_not_found_error(resolved)
+
+
+_VERSION_DIR_RE = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,2}-[a-f0-9]+$")
+
+
+def _version_dir_sort_key(name: str) -> tuple[int, ...]:
+    date_part = name.split("-", 1)[0]
+    parts = date_part.split(".")
+    if len(parts) != 3:
+        return (0, 0, 0)
+    try:
+        return tuple(int(part) for part in parts)
+    except ValueError:
+        return (0, 0, 0)
+
+
+def resolve_agent_launch_argv(agent_path: str = "agent") -> list[str]:
+    """解析 agent 启动 argv；Windows 上优先 node.exe + index.js，避免 .cmd 丢参。"""
+    resolved = resolve_agent_executable(agent_path)
+    path = Path(resolved)
+    if path.suffix.lower() not in {".cmd", ".exe", ".bat"}:
+        return [resolved]
+
+    script_dir = path.parent
+    root_node = script_dir / "node.exe"
+    root_index = script_dir / "index.js"
+    if root_node.is_file() and root_index.is_file():
+        return [str(root_node.resolve()), str(root_index.resolve())]
+
+    versions = script_dir / "versions"
+    if versions.is_dir():
+        version_dirs = sorted(
+            (
+                child
+                for child in versions.iterdir()
+                if child.is_dir() and _VERSION_DIR_RE.match(child.name)
+            ),
+            key=lambda child: _version_dir_sort_key(child.name),
+            reverse=True,
+        )
+        for version_dir in version_dirs:
+            node = version_dir / "node.exe"
+            index = version_dir / "index.js"
+            if node.is_file() and index.is_file():
+                return [str(node.resolve()), str(index.resolve())]
+
+    return [resolved]
+
+
+WORKSPACE_TRUST_ERROR_MARKERS = (
+    "Workspace Trust Required",
+    "Do you trust the contents of this directory?",
+)
+
+
+def is_workspace_trust_error(stderr: str) -> bool:
+    text = (stderr or "").strip()
+    if not text:
+        return False
+    return any(marker in text for marker in WORKSPACE_TRUST_ERROR_MARKERS)
+
+
+def format_workspace_trust_error_hint(workspace: str | None = None) -> str:
+    ws = (workspace or "").strip() or "(workspace)"
+    return (
+        "Cursor Agent 要求信任工作区，但 --trust 未生效。\n"
+        f"工作区：{ws}\n"
+        "常见原因：agent 刚安装尚未完成首次登录，或 Windows 下经 agent.cmd 传参丢失。\n"
+        "请在本机终端执行一次：\n"
+        f'  agent -p "ok" --trust --force --workspace "{ws}" --output-format text\n'
+        "若仍失败，请重新 agent login 后重试任务执行。"
+    )
 
 
 def _query_agent_version(resolved: str) -> str | None:

@@ -574,10 +574,23 @@ class MeetingRoomService:
             PipelineRunContext,
             run_pipeline_until_waiting,
         )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
 
         cancel_room_run(rid)
 
         dev = load_dev_status(sid) or {}
+        rs = load_room_state(sid) or {}
+        current = str(
+            rs.get("current_node_id") or detail.get("current_node_id") or "pending"
+        ).strip()
+        dev["local_process_state"] = "处理中"
+        save_dev_status(sid, dev)
+        if isinstance(rs, dict):
+            rs = dict(rs)
+            rs["status"] = "processing"
+            rs["phase"] = "running"
+            save_room_state(sid, rs)
+
         ctx = PipelineRunContext(
             scope_type=scope_type,
             scope_id=sid,
@@ -588,11 +601,6 @@ class MeetingRoomService:
             detail=dict(detail),
         )
 
-        rs = load_room_state(sid) or {}
-        current = str(
-            rs.get("current_node_id") or detail.get("current_node_id") or "pending"
-        ).strip()
-
         pipe = MeetingPipeline.load(sid)
         self._stash_reprocess_reason_on_pipeline(
             pipe,
@@ -602,11 +610,17 @@ class MeetingRoomService:
         pipe.set_flow_step(STEP_REPROCESS_PREP, reason="用户触发重新处理")
         pipe.save()
 
-        run_pipeline_until_waiting(ctx, initial_flow_step=STEP_REPROCESS_PREP)
+        def _run_reprocess_pipeline() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_REPROCESS_PREP)
+
+        schedule_pipeline_background(rid, _run_reprocess_pipeline, scope_id=sid)
 
         dev = load_dev_status(sid) or {}
         titles = build_title_index()
-        return self._room_detail_payload(dev, sid, titles)
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
 
     @staticmethod
     def _stash_reprocess_reason_on_pipeline(
@@ -712,6 +726,7 @@ class MeetingRoomService:
             PipelineRunContext,
             run_pipeline_until_waiting,
         )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
 
         cancel_room_run(room_id)
 
@@ -731,6 +746,10 @@ class MeetingRoomService:
                 current_node_id=target,
                 local_process_state="处理中",
             )
+        rs = dict(load_room_state(scope_id) or {})
+        rs["status"] = "processing"
+        rs["phase"] = "running"
+        save_room_state(scope_id, rs)
 
         patch_userwork_summary(
             scope_type=scope_type,
@@ -766,11 +785,18 @@ class MeetingRoomService:
             dev_status=dev,
             detail=dict(detail),
         )
-        run_pipeline_until_waiting(ctx, initial_flow_step=STEP_REPROCESS_PREP)
+
+        def _run_reprocess_pipeline() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_REPROCESS_PREP)
+
+        schedule_pipeline_background(room_id_val or room_id, _run_reprocess_pipeline, scope_id=scope_id)
 
         dev = load_dev_status(scope_id) or {}
         titles = build_title_index()
-        return self._room_detail_payload(dev, scope_id, titles)
+        payload = self._room_detail_payload(dev, scope_id, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
 
     def stop_room_run(self, room_id: str, *, reason: str = "user_stop") -> dict[str, Any]:
         """终止当前节点后台运行，会议室标为 stopped。"""

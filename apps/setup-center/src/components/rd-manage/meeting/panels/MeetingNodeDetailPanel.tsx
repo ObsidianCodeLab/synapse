@@ -34,6 +34,7 @@ import {
   fetchMeetingSummary,
   fetchNodeReview,
   fetchSystemNodeDisplay,
+  fetchTaskExec,
   type MeetingSummaryNode,
   type NodeReviewPayload,
   type ProcessingHistoryEntry,
@@ -276,7 +277,8 @@ export function MeetingNodeDetailPanel({
       try {
         const sid = (scopeId || '').trim();
         const skipNodeReview = nodeId === 'solution_review';
-        const [reviewRes, ctxRes, summaryRes, systemRes] = await Promise.allSettled([
+        const isTaskExecLive = nodeId === 'task_exec' && nodeState === 'processing';
+        const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
             : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh }),
@@ -287,6 +289,7 @@ export function MeetingNodeDetailPanel({
           isStructuredSystemNode
             ? fetchSystemNodeDisplay(synapseApiBase, roomId, nodeId)
             : Promise.resolve(null),
+          isTaskExecLive ? fetchTaskExec(synapseApiBase, roomId) : Promise.resolve(null),
         ]);
 
         if (reviewRes.status === 'fulfilled' && reviewRes.value) {
@@ -305,6 +308,33 @@ export function MeetingNodeDetailPanel({
           }
         }
         entries.sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
+
+        if (taskExecRes.status === 'fulfilled' && taskExecRes.value?.payload) {
+          const te = taskExecRes.value.payload;
+          const progress = te.progress;
+          if (progress?.message) {
+            entries.push({
+              id: `task-exec-${progress.updated_at || progress.phase || 'live'}`,
+              ts: progress.updated_at,
+              category: 'tool',
+              display_title: 'CLI 任务执行',
+              summary: progress.message,
+              node_id: nodeId,
+            });
+          }
+          for (const task of te.tasks || []) {
+            if (String(task.status || '') !== 'running') continue;
+            entries.push({
+              id: `task-exec-row-${task.task_no}-${task.phase || 'running'}`,
+              ts: progress?.updated_at,
+              category: 'tool',
+              display_title: `${task.task_no || '工单'} · ${task.phase === 'verify' ? '完成检测' : '开发轮'}`,
+              summary: task.task_title || task.goal || '执行中',
+              node_id: nodeId,
+            });
+          }
+          entries.sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
+        }
         setProcessEntries(entries);
 
         if (systemRes.status === 'fulfilled' && systemRes.value?.display) {

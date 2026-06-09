@@ -6343,6 +6343,11 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   background: rgb(248 113 113 / 0.1);
   color: rgb(252 165 165);
 }
+.rd-task-exec-status--running {
+  border-color: rgb(96 165 250 / 0.35);
+  background: rgb(59 130 246 / 0.12);
+  color: rgb(147 197 253);
+}
 .rd-task-exec-status--skipped,
 .rd-task-exec-status--default {
   border-color: rgb(161 161 170 / 0.3);

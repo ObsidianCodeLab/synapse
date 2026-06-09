@@ -545,11 +545,31 @@ export interface TaskExecTaskRow {
   develop_prompt?: string;
   verify_prompt?: string;
   status?: string;
+  phase?: string;
   completion?: string;
   error?: string;
   tokens_used?: number;
   duration_seconds?: number;
+  develop_log?: string;
+  verify_log?: string;
   report_markdown?: string;
+}
+
+export interface TaskExecProgress {
+  phase?: string;
+  message?: string;
+  task_index?: number;
+  task_total?: number;
+  task_no?: string;
+  live_log_path?: string;
+  updated_at?: string;
+}
+
+export interface TaskExecLiveTail {
+  path?: string;
+  lines?: string[];
+  updated_at?: string;
+  line_count?: number;
 }
 
 export interface TaskExecPayload {
@@ -559,6 +579,9 @@ export interface TaskExecPayload {
   cli_model_label?: string;
   status?: string;
   error?: string;
+  started_at?: string;
+  finished_at?: string | null;
+  progress?: TaskExecProgress;
   agent_cli?: {
     installed?: boolean;
     logged_in?: boolean;
@@ -575,6 +598,7 @@ export interface TaskExecPayload {
     ok?: number;
     failed?: number;
     skipped?: number;
+    running?: number;
     total_tokens?: number;
     total_duration_sec?: number;
   };
@@ -586,6 +610,7 @@ export interface TaskExecGetResponse {
   room_id: string;
   scope_id: string;
   payload: TaskExecPayload;
+  live_tail?: TaskExecLiveTail | null;
   intervention_kind?: string;
   blocked?: boolean;
 }
