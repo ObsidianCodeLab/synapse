@@ -2518,10 +2518,9 @@ def _feature_id_from_branch_data(data: dict[str, Any] | None) -> str:
     """从创建特性分支响应 data 提取特性分支 ID（即 git checkout 分支名）。"""
     if not isinstance(data, dict):
         return ""
-    for key in ("feature_id", "featureId", "branchName"):
-        val = data.get(key)
-        if val is not None and str(val).strip():
-            return str(val).strip()
+    val = data.get("branchName")
+    if val is not None and str(val).strip():
+        return str(val).strip()
     return ""
 
 
