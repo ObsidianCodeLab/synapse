@@ -303,34 +303,99 @@ def _module_func_archive_path(scope_id: str) -> Path:
     return archive_node_dir(scope_id, "需求分析", "module_func") / "模块功能.md"
 
 
-def resolve_demand_functions(payload: dict[str, Any], scope_id: str) -> list[dict[str, Any]]:
-    """优先 payload.demand_function，否则从归档模块功能.md 解析。"""
+def _normalize_demand_function_row(row: dict[str, Any], *, fallback_id: str) -> dict[str, Any] | None:
+    point = str(row.get("functionPoint") or row.get("function_point") or row.get("功能点") or "").strip()
+    if not point:
+        return None
+    return {
+        "id": str(row.get("id") or fallback_id).strip() or fallback_id,
+        "functionPoint": point,
+        "functionDesc": str(
+            row.get("functionDesc") or row.get("function_desc") or row.get("说明") or ""
+        ).strip(),
+    }
+
+
+def _demand_functions_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     existing = payload.get("demand_function")
-    if isinstance(existing, list) and existing:
-        cleaned: list[dict[str, Any]] = []
-        for i, row in enumerate(existing):
+    if not isinstance(existing, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for i, row in enumerate(existing):
+        if not isinstance(row, dict):
+            continue
+        norm = _normalize_demand_function_row(row, fallback_id=f"fp-{i + 1}")
+        if norm:
+            out.append(norm)
+    return out
+
+
+def _demand_functions_from_archive(scope_id: str) -> list[dict[str, Any]]:
+    base = archive_node_dir(scope_id, "需求分析", "module_func")
+    for name in ("模块功能.md", "功能模块.md"):
+        fpath = base / name
+        if not fpath.is_file():
+            continue
+        try:
+            md = fpath.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        parsed = parse_module_func_md(md)
+        if parsed:
+            return parsed
+    return []
+
+
+def _demand_functions_from_split_tasks(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    draft = payload.get("split_tasks_draft")
+    if not isinstance(draft, list):
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for task in draft:
+        if not isinstance(task, dict):
+            continue
+        for fp in normalize_function_points(task):
+            if fp in seen:
+                continue
+            seen.add(fp)
+            out.append({"id": f"fp-{len(out) + 1}", "functionPoint": fp, "functionDesc": ""})
+    return out
+
+
+def _merge_demand_functions(lists: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """按来源优先级合并功能点，保留最先出现的描述。"""
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for lst in lists:
+        for row in lst:
             if not isinstance(row, dict):
                 continue
-            point = str(row.get("functionPoint") or "").strip()
+            point = str(row.get("functionPoint") or row.get("function_point") or "").strip()
             if not point:
                 continue
-            cleaned.append(
-                {
-                    "id": str(row.get("id") or f"fp-{i + 1}").strip() or f"fp-{i + 1}",
+            desc = str(row.get("functionDesc") or row.get("function_desc") or "").strip()
+            if point not in merged:
+                merged[point] = {
+                    "id": str(row.get("id") or f"fp-{len(order) + 1}").strip() or f"fp-{len(order) + 1}",
                     "functionPoint": point,
-                    "functionDesc": str(row.get("functionDesc") or "").strip(),
+                    "functionDesc": desc,
                 }
-            )
-        if cleaned:
-            return cleaned
-    fpath = _module_func_archive_path(scope_id)
-    if not fpath.is_file():
-        return []
-    try:
-        md = fpath.read_text(encoding="utf-8")
-    except OSError:
-        return []
-    return parse_module_func_md(md)
+                order.append(point)
+            elif desc and not str(merged[point].get("functionDesc") or "").strip():
+                merged[point]["functionDesc"] = desc
+    return [merged[p] for p in order]
+
+
+def resolve_demand_functions(payload: dict[str, Any], scope_id: str) -> list[dict[str, Any]]:
+    """合并 payload、模块功能.md 与拆单草案中的功能点清单。"""
+    return _merge_demand_functions(
+        [
+            _demand_functions_from_payload(payload),
+            _demand_functions_from_archive(scope_id),
+            _demand_functions_from_split_tasks(payload),
+        ]
+    )
 
 
 def normalize_function_points(task: dict[str, Any]) -> list[str]:
@@ -348,9 +413,9 @@ def validate_function_point_assignment(
 ) -> None:
     """禁止多工单重复认领同一功能点；通过时可要求全覆盖。"""
     known = {
-        str(f.get("functionPoint") or "").strip()
+        str(f.get("functionPoint") or f.get("function_point") or "").strip()
         for f in demand_functions
-        if isinstance(f, dict) and str(f.get("functionPoint") or "").strip()
+        if isinstance(f, dict) and str(f.get("functionPoint") or f.get("function_point") or "").strip()
     }
     seen: dict[str, int] = {}
     for i, task in enumerate(tasks):
@@ -383,13 +448,13 @@ def build_demand_function_with_assignments(
     for f in demand_functions:
         if not isinstance(f, dict):
             continue
-        point = str(f.get("functionPoint") or "").strip()
+        point = str(f.get("functionPoint") or f.get("function_point") or "").strip()
         if not point:
             continue
         out.append(
             {
                 "functionPoint": point,
-                "functionDesc": str(f.get("functionDesc") or "").strip(),
+                "functionDesc": str(f.get("functionDesc") or f.get("function_desc") or "").strip(),
                 "assignedTaskTitle": fp_to_title.get(point, ""),
             }
         )
@@ -708,9 +773,10 @@ def ensure_split_tasks_draft(payload: dict[str, Any], demand_no: str) -> list[di
     task_impact = _default_task_impact_desc(impact)
     title_base = str(payload.get("requirement_name") or payload.get("demand_title") or demand_no).strip()
     all_fps = [
-        str(f.get("functionPoint") or "").strip()
+        str(f.get("functionPoint") or f.get("function_point") or "").strip()
         for f in resolve_demand_functions(payload, str(payload.get("demand_no") or demand_no))
-        if isinstance(f, dict) and str(f.get("functionPoint") or "").strip()
+        if isinstance(f, dict)
+        and str(f.get("functionPoint") or f.get("function_point") or "").strip()
     ]
 
     if not repos:

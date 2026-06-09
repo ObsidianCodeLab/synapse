@@ -261,7 +261,7 @@ def test_bootstrap_env_pregen_partial_without_catalog(monkeypatch, tmp_path):
     (doc_root / "产品架构" / "arch.md").write_text("doc", encoding="utf-8")
 
     monkeypatch.setattr(
-        "synapse.rd_meeting.env_pregen_assets._materialize_doc_to_env",
+        "synapse.rd_meeting.env_pregen_assets._materialize_doc",
         lambda *a, **k: {"doc_type": "x", "status": "skipped", "error": "skip"},
     )
 
@@ -287,7 +287,7 @@ def test_bootstrap_env_pregen_partial_without_catalog(monkeypatch, tmp_path):
     assets = bootstrap_env_pregen(scope_id, "prod-x", wire_row=wire)
     assert assets["status"] in ("ok", "partial")
     assert assets["entropy"].get("status") == "ok"
-    assert assets["product_doc_mirror"].get("status") == "ok"
+    assert assets["product_docs"].get("status") == "ok"
     engineering = assets.get("engineering") or {}
     assert engineering.get("status") in ("ok", "partial")
     layouts = engineering.get("layouts") or []

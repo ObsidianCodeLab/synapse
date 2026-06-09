@@ -157,17 +157,6 @@ def env_entropy_dir(scope_id: str) -> Path:
     return env_root(scope_id) / "entropy"
 
 
-def env_doc_root(scope_id: str) -> Path:
-    """环境预生成文档根目录：``work/<scope>/env/doc/``。"""
-    return env_root(scope_id) / "doc"
-
-
-def env_doc_dir(scope_id: str, doc_type: str) -> Path:
-    """单类文档目录：``work/<scope>/env/doc/<doc_type>/``。"""
-    seg = sanitize_fs_segment(doc_type or "default")
-    return env_doc_root(scope_id) / seg
-
-
 def agents_root(scope_id: str) -> Path:
     """工单维度的智能体沉淀根目录：``work/<scope>/agents/``。"""
     return scope_dir(scope_id) / "agents"

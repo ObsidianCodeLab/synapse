@@ -10,7 +10,6 @@ from typing import Any
 
 from synapse.rd_meeting.paths import (
     archive_node_dir,
-    env_doc_root,
     product_doc_root,
     sandbox_engineering_dir,
 )
@@ -154,11 +153,8 @@ def _archive_artifact_path(scope_id: str, node_id: str, filename: str) -> Path |
 
 
 def _product_doc_source(scope_id: str, doc_type: str, filename: str) -> Path | None:
-    for root in (product_doc_root(scope_id), env_doc_root(scope_id)):
-        candidate = root / doc_type / filename
-        if candidate.is_file():
-            return candidate
-    return None
+    candidate = product_doc_root(scope_id) / doc_type / filename
+    return candidate if candidate.is_file() else None
 
 
 def copy_dev_templates_to_engineering(engineering_root: Path, *, dev_dir: Path | None = None) -> dict[str, Any]:

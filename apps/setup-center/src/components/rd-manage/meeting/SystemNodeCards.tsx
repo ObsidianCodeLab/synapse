@@ -269,7 +269,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   work_order_doc: '工单归档文档',
   catalog_doc: 'catalog 文档',
   entropy: '控熵文件',
-  product_doc_mirror: '开门文档镜像',
+  product_doc: '产品文档',
 };
 
 function PathGroupBlock({ group }: { group: RowRecord }) {
@@ -357,9 +357,13 @@ export function SystemEnvPregenCard({ payload }: { payload: Record<string, unkno
         <dd>
           <StatusBadge status={String(display.status || payload.status || '—')} />
         </dd>
-        <dt>环境目录</dt>
+        <dt>控熵目录</dt>
         <dd>
           <MonoPath value={String(display.env_root || payload.env_root || '')} />
+        </dd>
+        <dt>文档目录</dt>
+        <dd>
+          <MonoPath value={String(display.doc_root || payload.doc_root || '')} />
         </dd>
         {display.prod || payload.prod ? (
           <>

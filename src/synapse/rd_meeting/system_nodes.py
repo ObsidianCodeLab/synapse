@@ -265,7 +265,7 @@ def handle_env_pregen(
     ok = assets.get("status") in ("ok", "partial") and (
         any(d.get("status") == "ok" for d in (assets.get("docs") or []) if isinstance(d, dict))
         or (assets.get("entropy") or {}).get("status") == "ok"
-        or (assets.get("product_doc_mirror") or {}).get("status") == "ok"
+        or (assets.get("product_docs") or {}).get("status") == "ok"
         or engineering.get("status") in ("ok", "partial")
     )
     from synapse.rd_meeting.system_node_display import attach_system_node_display

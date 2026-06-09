@@ -41,6 +41,7 @@ import {
   buildDemandFunctionRows,
   DemandFunctionMatrix,
   normalizeSplitTasksFromPayload,
+  resolveDemandFunctionsForPanel,
   repoBranchId,
   SplitTaskEditorCard,
   validateFunctionPointAssignment,
@@ -401,9 +402,8 @@ export function SolutionReviewPanel({
   }, [roomId]);
 
   useEffect(() => {
-    if (!initialPayload) void load();
-    else setPayload(initialPayload);
-  }, [initialPayload, load]);
+    void load();
+  }, [load]);
 
   const repos = useMemo(
     () => payload?.func_solution_parsed?.repos ?? [],
@@ -416,9 +416,19 @@ export function SolutionReviewPanel({
   const readOnly = blocked || humanStatus !== 'pending';
   const demandNo = payload?.demand_no ?? '';
   const requirementName = payload?.requirement_name ?? '';
+  const demandFunctionsFromPayload = useMemo(
+    () =>
+      resolveDemandFunctionsForPanel(payload?.demand_function, payload?.split_tasks_draft),
+    [payload?.demand_function, payload?.split_tasks_draft],
+  );
   const demandFunctions = useMemo(
-    () => (payload?.demand_function ?? []) as DemandFunctionItem[],
-    [payload?.demand_function],
+    () =>
+      resolveDemandFunctionsForPanel(
+        payload?.demand_function,
+        payload?.split_tasks_draft,
+        editableTasks,
+      ),
+    [payload?.demand_function, payload?.split_tasks_draft, editableTasks],
   );
   const demandFunctionRows = useMemo(
     () => buildDemandFunctionRows(demandFunctions, editableTasks),
@@ -428,13 +438,13 @@ export function SolutionReviewPanel({
   useEffect(() => {
     if (!payload || tasksDirtyRef.current) return;
     const draft = payload.split_tasks_draft ?? [];
-    const normalized = normalizeSplitTasksFromPayload(draft, demandNo, demandFunctions);
+    const normalized = normalizeSplitTasksFromPayload(draft, demandNo, demandFunctionsFromPayload);
     if (normalized.length > 0) {
       setEditableTasks(normalized);
       return;
     }
-    setEditableTasks([emptySplitTask(demandNo, requirementName, repos, demandFunctions)]);
-  }, [payload, demandNo, requirementName, repos, demandFunctions]);
+    setEditableTasks([emptySplitTask(demandNo, requirementName, repos, demandFunctionsFromPayload)]);
+  }, [payload, demandNo, requirementName, repos, demandFunctionsFromPayload]);
 
   const branchIds = useMemo(() => {
     const fromTasks = editableTasks.map((t) => (t.branch_version_id || '').trim()).filter(Boolean);

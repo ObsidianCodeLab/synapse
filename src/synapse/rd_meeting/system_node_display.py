@@ -188,7 +188,7 @@ def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
     for row in assets.get("docs") or []:
         if not isinstance(row, dict):
             continue
-        path = str(row.get("env_local_path") or row.get("local_path") or "").strip()
+        path = str(row.get("local_path") or "").strip()
         entries.append(
             {
                 "path": path,
@@ -198,14 +198,14 @@ def build_env_path_inventory(assets: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
 
-    mirror = assets.get("product_doc_mirror") if isinstance(assets.get("product_doc_mirror"), dict) else {}
-    if mirror.get("status") == "ok":
-        base = str(mirror.get("local_path") or "").strip()
-        for doc_type in mirror.get("doc_types") or []:
+    product_docs = assets.get("product_docs") if isinstance(assets.get("product_docs"), dict) else {}
+    if product_docs.get("status") == "ok":
+        base = str(product_docs.get("local_path") or "").strip()
+        for doc_type in product_docs.get("doc_types") or []:
             entries.append(
                 {
                     "path": f"{base}/{doc_type}" if base else str(doc_type),
-                    "category": "product_doc_mirror",
+                    "category": "product_doc",
                     "label": str(doc_type),
                     "status": "ok",
                 }
@@ -279,7 +279,7 @@ def group_env_paths_by_engineering(entries: list[dict[str, Any]]) -> list[dict[s
     groups: dict[str, dict[str, Any]] = {}
     for entry in entries:
         root = str(entry.get("engineering_root") or entry.get("path") or "").strip()
-        if entry.get("category") in ("catalog_doc", "entropy", "product_doc_mirror"):
+        if entry.get("category") in ("catalog_doc", "entropy", "product_doc"):
             root = str(entry.get("path") or "").rsplit("/", 1)[0] or root
         if not root:
             root = "—"
@@ -349,8 +349,10 @@ def build_env_pregen_display(result: dict[str, Any]) -> dict[str, Any]:
         "status": result.get("status"),
         "prod": result.get("prod"),
         "env_root": result.get("env_root"),
+        "doc_root": result.get("doc_root"),
         "errors": result.get("errors") or [],
         "docs": result.get("docs") or [],
+        "product_docs": result.get("product_docs") or {},
         "entropy": result.get("entropy") or {},
         "engineering": result.get("engineering") or {},
         "path_entries": path_entries,

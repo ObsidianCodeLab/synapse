@@ -18,6 +18,7 @@ from synapse.rd_meeting.solution_review import (
     parse_func_solution_md,
     parse_module_func_md,
     render_conclusion_markdown,
+    resolve_demand_functions,
     save_split_tasks_draft,
     validate_function_point_assignment,
     validate_human_review_comment,
@@ -131,6 +132,31 @@ def test_parse_module_func_md():
     assert len(rows) == 2
     assert rows[0]["functionPoint"] == "在线调优先级"
     assert rows[1]["functionDesc"] == "导出 PDF/Excel 账单"
+
+
+def test_resolve_demand_functions_merges_split_tasks(tmp_path, monkeypatch):
+    scope_id = "merge-fp"
+    archive_mod = tmp_path / scope_id / "archive" / "需求分析" / "module_func"
+    archive_mod.mkdir(parents=True)
+    (archive_mod / "模块功能.md").write_text(SAMPLE_MODULE_FUNC, encoding="utf-8")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review.archive_node_dir",
+        lambda sid, stage, node: tmp_path / sid / "archive" / stage / node,
+    )
+
+    payload = {
+        "demand_function": [],
+        "split_tasks_draft": [
+            {"taskTitle": "子单A", "functionPoints": ["账单导出"]},
+            {"taskTitle": "子单B", "functionPoints": ["仅存在于拆单"]},
+        ],
+    }
+    out = resolve_demand_functions(payload, scope_id)
+    points = [row["functionPoint"] for row in out]
+    assert "在线调优先级" in points
+    assert "账单导出" in points
+    assert "仅存在于拆单" in points
 
 
 def test_validate_function_point_duplicate_rejected():
