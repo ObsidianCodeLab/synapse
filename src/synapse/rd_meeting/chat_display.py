@@ -367,18 +367,37 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
         return _expand_node_init(ev, index, host_id)
 
     if et == "system_node_executed":
-        from synapse.rd_meeting.system_node_display import display_kind_for_system_node
+        from synapse.rd_meeting.system_node_display import (
+            STRUCTURED_SYSTEM_NODES,
+            display_kind_for_system_node,
+            refresh_system_node_display_payload,
+            _wire_row_for_sandbox,
+        )
 
         raw_result = ev.get("result") if isinstance(ev.get("result"), dict) else {}
         node_id = str(ev.get("node_id") or raw_result.get("node_id") or "").strip()
-        display = raw_result.get("display") if isinstance(raw_result.get("display"), dict) else {}
-        payload = display if display else raw_result
+        scope_id = str(ev.get("scope_id") or raw_result.get("scope_id") or "").strip()
+        display_kind = display_kind_for_system_node(node_id)
+        if node_id in STRUCTURED_SYSTEM_NODES and raw_result:
+            wire = (
+                _wire_row_for_sandbox(scope_id, str(raw_result.get("prod") or ""))
+                if node_id == "sandbox_build"
+                else None
+            )
+            payload = refresh_system_node_display_payload(
+                node_id,
+                raw_result,
+                scope_id=scope_id,
+                wire_row=wire,
+            )
+        else:
+            display = raw_result.get("display") if isinstance(raw_result.get("display"), dict) else {}
+            payload = display if display else raw_result
         if node_id and isinstance(payload, dict):
             payload = {**payload, "node_id": node_id}
-        display_kind = display_kind_for_system_node(node_id)
         card_titles = {
-            "system_auto_split": "自动拆单 — 研发子单",
-            "system_sandbox_build": "沙箱构建 — 子单与代码挂钩",
+            "system_auto_split": "自动拆单结果",
+            "system_sandbox_build": "沙箱构建结果",
             "system_env_pregen": "环境预生成 — 路径内容清单",
         }
         card_title = card_titles.get(display_kind, "系统节点执行结果")

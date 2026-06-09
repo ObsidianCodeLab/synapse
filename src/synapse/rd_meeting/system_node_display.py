@@ -50,6 +50,44 @@ def _modules_match(module_a: str, module_b: str) -> bool:
     return a.lower() == b.lower()
 
 
+def _join_workspace_path(local_path: str, code_path: str) -> str:
+    """沙箱仓库根路径 + catalog 工程相对路径。"""
+    base = (local_path or "").strip().rstrip("\\/")
+    rel = (code_path or "").strip().replace("\\", "/").strip("/")
+    if not base:
+        return rel
+    if not rel:
+        return base
+    return f"{base}/{rel}".replace("\\", "/")
+
+
+def _plan_row_fields(plan: dict[str, Any]) -> dict[str, Any]:
+    fps = plan.get("functionPoints")
+    fp_list: list[str] = []
+    if isinstance(fps, list):
+        fp_list = [str(x).strip() for x in fps if str(x).strip()]
+    return {
+        "comments": str(plan.get("comments") or "").strip(),
+        "task_impact_desc": str(plan.get("taskImpactDesc") or "").strip(),
+        "function_point_count": len(fp_list),
+        "function_points": fp_list,
+    }
+
+
+def _auto_split_context_for_bindings(scope_id: str) -> dict[str, Any]:
+    """沙箱挂钩优先用 auto_split 落盘；缺 plan 时回读 split_plan.json。"""
+    assets = dict(_load_pipeline_context_asset(scope_id, "auto_split_assets") or {})
+    plan_tasks = assets.get("split_plan_tasks")
+    if isinstance(plan_tasks, list) and plan_tasks:
+        return assets
+    from synapse.rd_meeting.solution_review import load_split_plan
+
+    plan = load_split_plan(scope_id)
+    if isinstance(plan, dict) and isinstance(plan.get("tasks"), list):
+        assets["split_plan_tasks"] = [dict(t) for t in plan["tasks"] if isinstance(t, dict)]
+    return assets
+
+
 def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str, Any]]:
     """按 split_plan 条数汇总拆单结果：每条计划对应一行，合并同序 create_task 结果。"""
     assets = auto_split_assets or {}
@@ -82,7 +120,13 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
                 "patch_name": str(plan.get("patchName") or "").strip(),
                 "create_status": create_status,
                 "error": str(created.get("error") or "").strip(),
+                **_plan_row_fields(plan),
             }
+            if not row.get("comments"):
+                row["comments"] = str(wi.get("task_desc") or "").strip()
+            row["task_desc"] = str(row.get("comments") or wi.get("task_desc") or "").strip()
+            if not row.get("task_impact_desc"):
+                row["task_impact_desc"] = str(plan.get("taskImpactDesc") or "").strip()
             lt = local_by_no.get(portal_no)
             if lt:
                 row["sop_node"] = str(lt.get("sop_node") or "")
@@ -103,6 +147,8 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             "patch_name": "",
             "create_status": str(created.get("status") or ""),
             "error": str(created.get("error") or "").strip(),
+            "comments": str(wi.get("task_desc") or "").strip(),
+            "task_desc": str(wi.get("task_desc") or "").strip(),
         }
         lt = local_by_no.get(portal_no)
         if lt:
@@ -141,18 +187,23 @@ def build_task_sandbox_bindings(
                 continue
             repo_name = str(repo.get("repo_name") or "")
             sb = sandbox_repos.get(repo_name) or {}
+            code_path = str(repo.get("code_path") or sb.get("code_path") or "")
+            local_path = str(sb.get("local_path") or "")
             matched.append(
                 {
                     "repo_name": repo_name,
                     "repo_module": _module_display_name(repo_module),
-                    "code_path": str(repo.get("code_path") or ""),
-                    "repo_branch": str(repo.get("repo_branch") or ""),
-                    "local_path": str(sb.get("local_path") or ""),
+                    "code_path": code_path,
+                    "repo_branch": str(repo.get("repo_branch") or sb.get("repo_branch") or ""),
+                    "local_path": local_path,
+                    "engineering_path": _join_workspace_path(local_path, code_path),
                     "git_status": str(sb.get("status") or "unmatched"),
                     "error": str(sb.get("error") or ""),
                 }
             )
-        match_status = "ok" if matched else ("unmatched" if mod else "no_module")
+        match_status = "ok" if matched and any(r.get("git_status") == "ok" for r in matched) else (
+            "unmatched" if mod else "no_module"
+        )
         bindings.append({**task, "repos": matched, "match_status": match_status})
     return bindings
 
@@ -319,10 +370,18 @@ def _enrich_sandbox_repos(
         row = dict(raw)
         cat = catalog_by_name.get(str(row.get("repo_name") or "").strip()) or {}
         if cat:
+            code_path = str(cat.get("code_path") or row.get("code_path") or "")
+            local_path = str(row.get("local_path") or "")
             row.setdefault("repo_module", _module_display_name(cat.get("repo_module")))
-            row.setdefault("code_path", str(cat.get("code_path") or ""))
+            row.setdefault("code_path", code_path)
             row.setdefault("repo_branch", str(cat.get("repo_branch") or row.get("repo_branch") or ""))
             row.setdefault("repo_url", str(cat.get("repo_url") or row.get("repo_url") or ""))
+            row["engineering_path"] = _join_workspace_path(local_path, code_path)
+        elif row.get("local_path") and row.get("code_path"):
+            row["engineering_path"] = _join_workspace_path(
+                str(row.get("local_path") or ""),
+                str(row.get("code_path") or ""),
+            )
         enriched.append(row)
     return enriched
 
@@ -333,7 +392,7 @@ def build_sandbox_build_display(
     scope_id: str,
     wire_row: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    auto_split = _load_pipeline_context_asset(scope_id, "auto_split_assets") or {}
+    auto_split = _auto_split_context_for_bindings(scope_id)
     repos = _enrich_sandbox_repos(
         [r for r in (result.get("repos") or []) if isinstance(r, dict)],
         wire_row,
@@ -343,6 +402,7 @@ def build_sandbox_build_display(
         "sandbox_root": result.get("sandbox_root"),
     }
     bindings = build_task_sandbox_bindings(auto_split, wire_row, sandbox_assets)
+    plan_count = len(auto_split.get("split_plan_tasks") or [])
     return {
         "node_id": "sandbox_build",
         "status": result.get("status"),
@@ -351,6 +411,7 @@ def build_sandbox_build_display(
         "errors": result.get("errors") or [],
         "repos": repos,
         "task_bindings": bindings,
+        "plan_count": plan_count,
         "materialized_at": result.get("materialized_at"),
     }
 
@@ -392,6 +453,33 @@ def attach_system_node_display(
     return result
 
 
+def refresh_system_node_display_payload(
+    node_id: str,
+    result: dict[str, Any],
+    *,
+    scope_id: str = "",
+    wire_row: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """从 handler 完整 result 重建 display，忽略过期的 embedded display。"""
+    source = dict(result)
+    embedded = result.get("display") if isinstance(result.get("display"), dict) else {}
+    for key in ("demand_no", "status", "errors", "materialized_at", "prod", "sandbox_root"):
+        if not source.get(key) and embedded.get(key) not in (None, "", []):
+            source[key] = embedded[key]
+    rebuilt = attach_system_node_display(
+        node_id,
+        source,
+        scope_id=scope_id,
+        wire_row=wire_row,
+    )
+    display = rebuilt.get("display")
+    if not isinstance(display, dict):
+        return {}
+    if embedded and not display.get("tasks") and embedded.get("tasks"):
+        display = {**display, "tasks": embedded.get("tasks")}
+    return display
+
+
 def _pipeline_context(scope_id: str) -> dict[str, Any]:
     sid = (scope_id or "").strip()
     if not sid:
@@ -431,18 +519,19 @@ def _display_from_history(scope_id: str, node_id: str) -> dict[str, Any] | None:
         if str(ev.get("node_id") or "").strip() not in ("", nid):
             continue
         result = ev.get("result") if isinstance(ev.get("result"), dict) else {}
-        embedded = result.get("display") if isinstance(result.get("display"), dict) else {}
-        if embedded:
-            return {**embedded, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
         if result:
-            rebuilt = attach_system_node_display(
-                nid,
-                dict(result),
-                scope_id=sid,
-                wire_row=_wire_row_for_sandbox(sid, str(result.get("prod") or "")),
+            wire = (
+                _wire_row_for_sandbox(sid, str(result.get("prod") or ""))
+                if nid == "sandbox_build"
+                else None
             )
-            display = rebuilt.get("display")
-            if isinstance(display, dict) and display:
+            display = refresh_system_node_display_payload(
+                nid,
+                result,
+                scope_id=sid,
+                wire_row=wire,
+            )
+            if display:
                 return {**display, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
     return None
 
@@ -456,9 +545,19 @@ def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] |
     ctx = _pipeline_context(scope_id)
     last = ctx.get("last_system_node_result") if isinstance(ctx.get("last_system_node_result"), dict) else {}
     if str(last.get("node_id") or "").strip() == nid:
-        embedded = last.get("display")
-        if isinstance(embedded, dict) and embedded:
-            return {**embedded, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
+        wire = (
+            _wire_row_for_sandbox(scope_id, str(last.get("prod") or ""))
+            if nid == "sandbox_build"
+            else None
+        )
+        display = refresh_system_node_display_payload(
+            nid,
+            last,
+            scope_id=scope_id,
+            wire_row=wire,
+        )
+        if display:
+            return {**display, "node_id": nid, "display_kind": display_kind_for_system_node(nid)}
 
     if nid == "auto_split":
         assets = _load_pipeline_context_asset(scope_id, "auto_split_assets")

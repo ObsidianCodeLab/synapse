@@ -121,6 +121,68 @@ def test_build_task_sandbox_bindings_matches_module():
     assert bindings[0]["match_status"] == "ok"
     assert bindings[0]["repos"][0]["code_path"] == "src/core"
     assert bindings[0]["repos"][0]["local_path"] == "/work/x/sandbox/demo"
+    assert bindings[0]["repos"][0]["engineering_path"] == "/work/x/sandbox/demo/src/core"
+
+
+def test_collect_task_rows_falls_back_to_work_item_task_desc():
+    assets = {
+        "split_plan_tasks": [
+            {"taskNo": "D1", "taskTitle": "子单A", "productModuleName": "ZMDB"},
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "taskTitle": "子单A",
+                "task_no": "T9",
+                "work_item": {
+                    "task_no": "T9",
+                    "task_desc": "门户落盘的研发单描述",
+                    "product_module_name": "ZMDB",
+                },
+            }
+        ],
+    }
+    rows = collect_task_rows(assets)
+    assert rows[0]["comments"] == "门户落盘的研发单描述"
+    assert rows[0]["task_desc"] == "门户落盘的研发单描述"
+
+
+def test_collect_task_rows_prefers_split_plan_comments():
+    assets = {
+        "split_plan_tasks": [
+            {
+                "taskNo": "D1",
+                "taskTitle": "子单A",
+                "comments": "方案评审研发单描述",
+                "productModuleName": "ZMDB",
+            },
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "taskTitle": "子单A",
+                "task_no": "T9",
+                "work_item": {"task_no": "T9", "task_desc": "门户描述"},
+            }
+        ],
+    }
+    rows = collect_task_rows(assets)
+    assert rows[0]["comments"] == "方案评审研发单描述"
+
+
+def test_collect_task_rows_includes_function_points():
+    assets = {
+        "split_plan_tasks": [
+            {
+                "taskTitle": "子单A",
+                "functionPoints": ["功能点A", "功能点B"],
+            },
+        ],
+        "create_task_results": [{"status": "ok", "task_no": "T1"}],
+    }
+    rows = collect_task_rows(assets)
+    assert rows[0]["function_point_count"] == 2
+    assert rows[0]["function_points"] == ["功能点A", "功能点B"]
 
 
 def test_build_auto_split_display_includes_tasks():
@@ -135,6 +197,7 @@ def test_build_auto_split_display_includes_tasks():
     assert payload["node_id"] == "auto_split"
     assert payload["plan_count"] == 1
     assert len(payload["tasks"]) == 1
+    assert payload["tasks"][0].get("comments") == ""
 
 
 def test_build_env_path_inventory_lists_engineering_files():

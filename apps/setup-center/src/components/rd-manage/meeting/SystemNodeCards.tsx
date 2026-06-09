@@ -28,26 +28,35 @@ function SectionTitle({ icon, children }: { icon: React.ReactNode; children: Rea
 
 function StatusBadge({ status }: { status?: string }) {
   const s = String(status || '—');
-  const ok = s === 'ok' || s === 'completed' || s === 'planned';
-  const partial = s === 'partial';
+  const ok = s === 'ok' || s === 'completed' || s === 'planned' || s === '成功';
+  const partial = s === 'partial' || s === '部分成功';
+  const failed = s === 'failed' || s === '失败';
+  const label =
+    s === 'ok' || s === '成功'
+      ? '成功'
+      : s === 'failed' || s === '失败'
+        ? '失败'
+        : s === 'planned'
+          ? '已计划'
+          : s;
   const cls = ok
     ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
     : partial
       ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-      : s === 'failed'
+      : failed
         ? 'bg-red-500/15 text-red-400 border-red-500/30'
         : 'bg-slate-500/15 text-slate-300 border-slate-500/30';
   return (
     <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
-      {s}
+      {label}
     </span>
   );
 }
 
-function CopyPath({ value, className = '' }: { value?: string; className?: string }) {
+function CopyPath({ value, label, className = '' }: { value?: string; label?: string; className?: string }) {
   const text = String(value || '').trim();
   const [copied, setCopied] = useState(false);
-  if (!text) return <span className="text-muted-foreground">—</span>;
+  if (!text) return <span className="text-muted-foreground text-[11px]">—</span>;
 
   const onCopy = async () => {
     try {
@@ -60,13 +69,39 @@ function CopyPath({ value, className = '' }: { value?: string; className?: strin
   };
 
   return (
-    <span className={`rd-system-path ${className}`}>
-      <code className="rd-system-path__text">{text}</code>
-      <button type="button" className="rd-system-path__copy" onClick={() => void onCopy()} title="复制路径">
-        {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-      </button>
-    </span>
+    <div className={`rd-system-path-row ${className}`.trim()}>
+      {label ? <span className="rd-system-path-row__label">{label}</span> : null}
+      <div className="rd-system-path-row__body">
+        <code className="rd-system-path-row__text" title={text}>
+          {text}
+        </code>
+        <button
+          type="button"
+          className={`rd-system-path-row__btn${copied ? ' is-copied' : ''}`}
+          onClick={() => void onCopy()}
+          title="复制路径"
+        >
+          {copied ? (
+            <>
+              <CheckCircle2 className="h-3 w-3" />
+              已复制
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3" />
+              复制
+            </>
+          )}
+        </button>
+      </div>
+    </div>
   );
+}
+
+function truncateText(text: string, maxLen: number): string {
+  const t = text.trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen)}…`;
 }
 
 type RowRecord = Record<string, unknown>;
@@ -120,7 +155,14 @@ const SPLIT_STATUS_LABEL: Record<string, string> = {
   partial: '部分成功',
 };
 
-export function SystemAutoSplitCard({ payload }: { payload: Record<string, unknown> }) {
+export function SystemAutoSplitCard({
+  payload,
+  variant = 'summary',
+}: {
+  payload: Record<string, unknown>;
+  /** summary：协作会议流仅展示执行摘要；detail：节点详情展示完整拆单明细 */
+  variant?: 'summary' | 'detail';
+}) {
   const display = (payload.display as Record<string, unknown>) || payload;
   const tasks = asRows(display.tasks);
   const errors = (display.errors as string[]) || [];
@@ -133,6 +175,14 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
     display.fail_count
       ?? tasks.filter((t) => ['failed', 'skipped'].includes(String(t.create_status || ''))).length,
   );
+  const createdTaskNos = useMemo(
+    () =>
+      tasks
+        .filter((t) => String(t.create_status || '') === 'ok')
+        .map((t) => String(t.task_no || '').trim())
+        .filter(Boolean),
+    [tasks],
+  );
 
   const heroTitle =
     status === 'failed'
@@ -144,13 +194,21 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
           : '自动拆单';
 
   const summaryLine = useMemo(() => {
-    if (!planCount) return '未找到 split_plan 拆单计划。';
-    if (status === 'failed') return `split_plan 共 ${planCount} 条，均未成功创建研发子单。`;
-    if (status === 'partial') {
-      return `split_plan 共 ${planCount} 条，成功 ${okCount} 条，失败 ${failCount} 条。`;
+    if (variant === 'summary') {
+      if (!planCount) return '未找到方案评审拆单计划，无法执行自动拆单。';
+      if (status === 'failed') return `计划 ${planCount} 条研发子单，均未创建成功。`;
+      if (status === 'partial') {
+        return `计划 ${planCount} 条研发子单，成功 ${okCount} 条，失败 ${failCount} 条。`;
+      }
+      return `已按计划创建 ${okCount} 条研发子单，拆单明细见方案评审或节点详情。`;
     }
-    return `split_plan 共 ${planCount} 条，均已创建研发子单。`;
-  }, [planCount, okCount, failCount, status]);
+    if (!planCount) return '未找到方案评审拆单计划。';
+    if (status === 'failed') return `计划 ${planCount} 条研发子单，均未创建成功。`;
+    if (status === 'partial') {
+      return `计划 ${planCount} 条研发子单，成功 ${okCount} 条，失败 ${failCount} 条。`;
+    }
+    return `已按计划创建 ${okCount} 条研发子单。`;
+  }, [planCount, okCount, failCount, status, variant]);
 
   return (
     <div className="rd-chat-card rd-chat-card--system-split">
@@ -177,77 +235,151 @@ export function SystemAutoSplitCard({ payload }: { payload: Record<string, unkno
         </ul>
       ) : null}
 
+      {variant === 'summary' && createdTaskNos.length > 0 ? (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          研发子单号：
+          <span className="ml-1 font-mono text-indigo-300">{createdTaskNos.join('、')}</span>
+        </p>
+      ) : null}
+
+      {variant === 'detail' ? (
       <div className="mt-4">
         {tasks.length === 0 ? (
-          <p className="rd-chat-card__desc text-center py-6">暂无 split_plan 拆单任务</p>
+          <p className="rd-chat-card__desc text-center py-6">暂无拆单任务</p>
         ) : (
-          <div className="rd-system-task-grid">
-            {tasks.map((task, idx) => {
-              const createStatus = String(task.create_status || 'pending');
-              const portalNo = String(task.task_no || '').trim();
-              const taskNo = portalNo || '—';
-              const key = `plan-${String(task.plan_index ?? idx)}`;
-              const isOk = createStatus === 'ok';
-              const statusLabel = SPLIT_STATUS_LABEL[createStatus] || createStatus;
-              const taskError = String(task.error || '').trim();
-              return (
-                <motion.div
-                  key={key}
-                  className="rd-system-task-card"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05, duration: 0.25 }}
-                >
-                  <div className="rd-system-task-card__head">
-                    <span className="rd-system-task-card__no">{taskNo}</span>
-                    <span className={`rd-system-task-card__status ${isOk ? 'is-ok' : ''}`}>
-                      {isOk ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-                      <StatusBadge status={statusLabel} />
-                    </span>
-                  </div>
-                  <p className="rd-system-task-card__title">{String(task.task_title || '（无标题）')}</p>
-                  <div className="rd-system-task-card__tags">
-                    {task.product_module_name ? (
-                      <span className="rd-system-chip rd-system-chip--module">
-                        <Layers className="h-3 w-3" />
-                        {String(task.product_module_name)}
-                      </span>
-                    ) : null}
-                    {task.branch_version ? (
-                      <span className="rd-system-chip">
-                        <GitBranch className="h-3 w-3" />
-                        {String(task.branch_version)}
-                      </span>
-                    ) : null}
-                    {task.patch_name ? (
-                      <span className="rd-system-chip">
-                        <Tag className="h-3 w-3" />
-                        {String(task.patch_name)}
-                      </span>
-                    ) : null}
-                  </div>
-                  {taskError ? (
-                    <p className="rd-system-task-card__meta text-red-300">{taskError}</p>
-                  ) : null}
-                  {task.sop_node || task.local_process_state ? (
-                    <div className="rd-system-task-card__meta">
-                      {task.sop_node ? <span>SOP · {String(task.sop_node)}</span> : null}
-                      {task.local_process_state ? <span>{String(task.local_process_state)}</span> : null}
-                    </div>
-                  ) : null}
-                </motion.div>
-              );
-            })}
-          </div>
+          <>
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
+              <ListTree className="h-3.5 w-3.5 text-indigo-400" />
+              拆单详情
+            </div>
+            <ul className="rd-system-sandbox-list">
+              {tasks.map((task, idx) => (
+                <SplitTaskDetailRow key={`plan-${String(task.plan_index ?? idx)}`} task={task} index={idx} />
+              ))}
+            </ul>
+          </>
         )}
       </div>
+      ) : null}
     </div>
+  );
+}
+
+function asStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((x) => String(x).trim()).filter(Boolean);
+}
+
+function FunctionPointsTickerPanel({ points }: { points: string[] }) {
+  const loopItems = [...points, ...points];
+  const durationSec = Math.max(points.length * 2.6, 10);
+
+  return (
+    <div className="rd-system-fp-ticker">
+      <div className="rd-system-fp-ticker__viewport">
+        <div
+          className="rd-system-fp-ticker__track"
+          style={{ animationDuration: `${durationSec}s` }}
+        >
+          {loopItems.map((fp, i) => (
+            <div key={`${i}-${fp}`} className="rd-system-fp-ticker__item">
+              <span className="rd-system-fp-ticker__index">{(i % points.length) + 1}</span>
+              <span className="rd-system-fp-ticker__text">{fp}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SplitTaskDetailRow({ task, index }: { task: RowRecord; index: number }) {
+  const createStatus = String(task.create_status || 'pending');
+  const portalNo = String(task.task_no || '').trim();
+  const isOk = createStatus === 'ok';
+  const isFailed = createStatus === 'failed';
+  const statusLabel = SPLIT_STATUS_LABEL[createStatus] || createStatus;
+  const taskError = String(task.error || '').trim();
+  const description = String(task.comments || task.task_desc || '').trim();
+  const functionPoints = asStringList(task.function_points);
+  const [fpTickerOpen, setFpTickerOpen] = useState(false);
+
+  return (
+    <motion.li
+      className={`rd-system-sandbox-row${isOk ? ' is-ok' : isFailed ? ' is-warn' : ''}`}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+    >
+      <div className="rd-system-sandbox-row__head">
+        <span className="rd-system-sandbox-row__index">{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="rd-system-sandbox-row__title">{String(task.task_title || '（无标题）')}</h4>
+            {portalNo ? <span className="rd-system-sandbox-row__task-no">{portalNo}</span> : null}
+          </div>
+          <div className="rd-system-split-table__chips mt-2">
+            {task.product_module_name ? (
+              <span className="rd-system-chip rd-system-chip--module">
+                <Layers className="h-3 w-3" />
+                {String(task.product_module_name)}
+              </span>
+            ) : null}
+            {task.branch_version ? (
+              <span className="rd-system-chip">
+                <GitBranch className="h-3 w-3" />
+                {String(task.branch_version)}
+              </span>
+            ) : null}
+            {task.patch_name ? (
+              <span className="rd-system-chip">
+                <Tag className="h-3 w-3" />
+                {String(task.patch_name)}
+              </span>
+            ) : null}
+            {functionPoints.length > 0 ? (
+              <div
+                className={`rd-system-fp-zone${fpTickerOpen ? ' is-open' : ''}`}
+                onMouseEnter={() => setFpTickerOpen(true)}
+                onMouseLeave={() => setFpTickerOpen(false)}
+              >
+                <span className={`rd-system-chip rd-system-chip--muted rd-system-fp-chip${fpTickerOpen ? ' is-active' : ''}`}>
+                  {functionPoints.length} 个功能点
+                </span>
+                {fpTickerOpen ? <FunctionPointsTickerPanel points={functionPoints} /> : null}
+              </div>
+            ) : null}
+          </div>
+          {description ? (
+            <p className="rd-system-sandbox-row__desc whitespace-pre-wrap mt-2">{description}</p>
+          ) : null}
+        </div>
+        <div className="rd-system-sandbox-row__status">
+          <span className={`inline-flex items-center gap-1 text-[11px] ${isOk ? 'text-emerald-400' : isFailed ? 'text-red-400' : 'text-amber-400'}`}>
+            {isOk ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+            <StatusBadge status={statusLabel} />
+          </span>
+        </div>
+      </div>
+      {!portalNo ? (
+        <p className="rd-system-sandbox-row__empty">尚未生成研发子单号</p>
+      ) : null}
+      {task.sop_node || task.local_process_state ? (
+        <div className="rd-system-split-table__meta mt-2">
+          {task.sop_node ? <span>SOP · {String(task.sop_node)}</span> : null}
+          {task.local_process_state ? <span>{String(task.local_process_state)}</span> : null}
+        </div>
+      ) : null}
+      {taskError ? <p className="rd-system-split-table__error mt-2">{taskError}</p> : null}
+    </motion.li>
   );
 }
 
 function RepoRow({ repo, index }: { repo: RowRecord; index: number }) {
   const status = String(repo.git_status || repo.status || '—');
   const ok = status === 'ok';
+  const engineeringPath = String(repo.engineering_path || repo.local_path || '');
+  const repoRoot = String(repo.local_path || '');
   return (
     <motion.li
       className="rd-system-repo-card"
@@ -267,21 +399,127 @@ function RepoRow({ repo, index }: { repo: RowRecord; index: number }) {
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
           {repo.repo_module ? <span>模块 {String(repo.repo_module)}</span> : null}
           {repo.repo_branch ? <span>分支 {String(repo.repo_branch)}</span> : null}
-          {repo.code_path ? <span>工程路径 /{String(repo.code_path)}</span> : null}
+          {repo.code_path ? <span>工程 /{String(repo.code_path)}</span> : null}
         </div>
         {repo.repo_url ? (
           <p className="mt-1 truncate text-[10px] text-slate-500">{String(repo.repo_url)}</p>
         ) : null}
-        <div className="mt-1.5">
-          <CopyPath value={String(repo.local_path || '')} />
-        </div>
+        {engineeringPath ? (
+          <div className="mt-2">
+            <CopyPath value={engineeringPath} label="工程路径" />
+          </div>
+        ) : null}
+        {repoRoot && repoRoot !== engineeringPath ? (
+          <div className="mt-1.5">
+            <CopyPath value={repoRoot} label="仓库根目录" />
+          </div>
+        ) : null}
         {repo.error ? <p className="mt-1 text-[10px] text-red-400">{String(repo.error)}</p> : null}
       </div>
     </motion.li>
   );
 }
 
-export function SystemSandboxBuildCard({ payload }: { payload: Record<string, unknown> }) {
+function SandboxTaskRow({ binding, index }: { binding: RowRecord; index: number }) {
+  const matchedRepos = asRows(binding.repos);
+  const unmatched = String(binding.match_status || '') === 'unmatched';
+  const noModule = String(binding.match_status || '') === 'no_module';
+  const taskNo = String(binding.task_no || '').trim();
+  const comments = String(binding.comments || '').trim();
+  const impact = String(binding.task_impact_desc || '').trim();
+  const fpCount = Number(binding.function_point_count || 0);
+  const key = `plan-${String(binding.plan_index ?? index)}`;
+
+  return (
+    <motion.li
+      className={`rd-system-sandbox-row${unmatched || noModule ? ' is-warn' : ' is-ok'}`}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+    >
+      <div className="rd-system-sandbox-row__head">
+        <span className="rd-system-sandbox-row__index">{index + 1}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="rd-system-sandbox-row__title">{String(binding.task_title || '（无标题）')}</h4>
+            {taskNo ? <span className="rd-system-sandbox-row__task-no">{taskNo}</span> : null}
+          </div>
+          <div className="rd-system-split-table__chips mt-2">
+            {binding.product_module_name ? (
+              <span className="rd-system-chip rd-system-chip--module">
+                <Layers className="h-3 w-3" />
+                {String(binding.product_module_name)}
+              </span>
+            ) : null}
+            {binding.branch_version ? (
+              <span className="rd-system-chip">
+                <GitBranch className="h-3 w-3" />
+                {String(binding.branch_version)}
+              </span>
+            ) : null}
+            {binding.patch_name ? (
+              <span className="rd-system-chip">
+                <Tag className="h-3 w-3" />
+                {String(binding.patch_name)}
+              </span>
+            ) : null}
+            {fpCount > 0 ? (
+              <span className="rd-system-chip rd-system-chip--muted">{fpCount} 个功能点</span>
+            ) : null}
+          </div>
+          {impact ? <p className="rd-system-sandbox-row__impact">{impact}</p> : null}
+          {comments ? <p className="rd-system-sandbox-row__desc">{truncateText(comments, 180)}</p> : null}
+        </div>
+        <div className="rd-system-sandbox-row__status">
+          {unmatched || noModule ? (
+            <span className="inline-flex items-center gap-1 text-amber-400 text-[11px]">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {noModule ? '缺少模块' : '未匹配代码库'}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              已挂钩
+            </span>
+          )}
+        </div>
+      </div>
+
+      {matchedRepos.length > 0 ? (
+        <ul className="rd-system-sandbox-row__repos">
+          {matchedRepos.map((repo, rIdx) => {
+            const engPath = String(repo.engineering_path || repo.local_path || '');
+            return (
+              <li key={`${key}-repo-${rIdx}`} className="rd-system-sandbox-row__repo">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-200">
+                  <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="font-medium">{String(repo.repo_name || 'repo')}</span>
+                  {repo.repo_branch ? <span className="text-muted-foreground">{String(repo.repo_branch)}</span> : null}
+                  <StatusBadge status={String(repo.git_status || repo.status || '—')} />
+                </div>
+                {engPath ? <CopyPath value={engPath} label="工程路径" /> : null}
+                {repo.code_path ? (
+                  <p className="text-[10px] text-muted-foreground mt-1">相对路径 /{String(repo.code_path)}</p>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="rd-system-sandbox-row__empty">未找到与该任务模块匹配的沙箱代码仓库</p>
+      )}
+    </motion.li>
+  );
+}
+
+export function SystemSandboxBuildCard({
+  payload,
+  variant = 'summary',
+}: {
+  payload: Record<string, unknown>;
+  /** summary：协作会议流仅展示执行摘要；detail：节点详情展示完整挂钩与路径 */
+  variant?: 'summary' | 'detail';
+}) {
   const display = (payload.display as Record<string, unknown>) || payload;
   const bindings = asRows(display.task_bindings);
   const repos = asRows(display.repos);
@@ -289,105 +527,106 @@ export function SystemSandboxBuildCard({ payload }: { payload: Record<string, un
   const sandboxRoot = String(display.sandbox_root || payload.sandbox_root || '');
   const status = String(display.status || payload.status || '—');
   const prod = String(display.prod || payload.prod || '');
+  const planCount = Number(display.plan_count ?? bindings.length);
   const okRepos = repos.filter((r) => String(r.status) === 'ok').length;
+  const linkedCount = bindings.filter((b) => String(b.match_status) === 'ok').length;
+
+  const heroTitle =
+    status === 'failed' ? '沙箱构建失败' : status === 'partial' ? '沙箱构建部分成功' : '沙箱构建完成';
 
   const summaryLine = useMemo(() => {
-    if (!repos.length) return '尚未拉取沙箱代码，请确认产品 catalog 与 git 远程配置。';
-    return `已将 ${okRepos}/${repos.length} 个代码仓库落盘至沙箱，并与 ${bindings.length} 张研发子单完成挂钩。`;
-  }, [repos.length, okRepos, bindings.length]);
+    if (variant === 'summary') {
+      if (!planCount && !repos.length) return '尚未拉取沙箱代码，请确认产品 catalog 与 git 远程配置。';
+      if (status === 'failed') return '沙箱代码未全部落盘，请查看错误信息或节点详情。';
+      if (status === 'partial') {
+        return `代码仓库 ${okRepos}/${repos.length} 个落盘成功；子单挂钩 ${linkedCount}/${planCount || bindings.length} 条。明细见节点详情。`;
+      }
+      if (planCount) {
+        return `已将 ${okRepos} 个代码仓库落盘至沙箱，${linkedCount} 条研发子单已挂钩工程路径。明细见节点详情。`;
+      }
+      return `已将 ${okRepos}/${repos.length} 个代码仓库落盘至沙箱，工程路径见节点详情。`;
+    }
+    if (!planCount && !repos.length) return '尚未拉取沙箱代码，请确认产品 catalog 与 git 远程配置。';
+    if (planCount) {
+      return `split_plan ${planCount} 条任务，${linkedCount}/${planCount} 条已挂钩沙箱工程路径；代码仓库 ${okRepos}/${repos.length} 个落盘成功。`;
+    }
+    return `已将 ${okRepos}/${repos.length} 个代码仓库落盘至沙箱。`;
+  }, [planCount, linkedCount, okRepos, repos.length, status, variant, bindings.length]);
 
   return (
     <div className="rd-chat-card rd-chat-card--system-sandbox">
       <HeroBanner
         gradient="rd-system-hero--sandbox"
         icon={<FolderGit2 className="h-6 w-6" />}
-        title="沙箱构建完成"
+        title={heroTitle}
         subtitle={summaryLine}
         stats={[
+          { label: '计划', value: planCount || bindings.length },
+          { label: '已挂钩', value: linkedCount },
           { label: '仓库', value: `${okRepos}/${repos.length}` },
-          { label: '子单挂钩', value: bindings.length },
-          { label: '状态', value: status },
         ]}
       />
 
-      <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.06] px-3 py-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300/80">沙箱根目录</div>
-        <CopyPath value={sandboxRoot} className="mt-1" />
-        {prod ? <div className="mt-1.5 text-[10px] text-muted-foreground">产品 · {prod}</div> : null}
-      </div>
+      {variant === 'summary' && sandboxRoot ? (
+        <div className="mt-3 rd-system-sandbox-root">
+          <CopyPath value={sandboxRoot} label="沙箱根目录" />
+          {prod ? <div className="mt-1.5 text-[10px] text-muted-foreground">产品 · {prod}</div> : null}
+        </div>
+      ) : null}
 
-      {errors.length > 0 ? (
+      {variant === 'detail' ? (
+        <>
+          <div className="mt-3 rd-system-sandbox-root">
+            <CopyPath value={sandboxRoot} label="沙箱根目录" />
+            {prod ? <div className="mt-1.5 text-[10px] text-muted-foreground">产品 · {prod}</div> : null}
+          </div>
+
+          {errors.length > 0 ? (
+            <ul className="mt-3 space-y-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
+              {errors.map((err) => (
+                <li key={err}>{err}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          {bindings.length > 0 ? (
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
+                <Package className="h-3.5 w-3.5 text-indigo-400" />
+                split_plan 任务 → 沙箱工程路径
+              </div>
+              <ul className="rd-system-sandbox-list">
+                {bindings.map((binding, idx) => (
+                  <SandboxTaskRow
+                    key={`sandbox-plan-${String(binding.plan_index ?? idx)}`}
+                    binding={binding}
+                    index={idx}
+                  />
+                ))}
+              </ul>
+            </div>
+          ) : repos.length > 0 ? (
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
+                <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />
+                已下载代码仓库
+              </div>
+              <ul className="space-y-2">
+                {repos.map((row, idx) => (
+                  <RepoRow key={`${String(row.repo_name)}-${idx}`} repo={row} index={idx} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {variant === 'summary' && errors.length > 0 ? (
         <ul className="mt-3 space-y-1 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
           {errors.map((err) => (
             <li key={err}>{err}</li>
           ))}
         </ul>
-      ) : null}
-
-      {repos.length > 0 ? (
-        <div className="mt-4">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
-            <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />
-            已下载代码仓库
-          </div>
-          <ul className="space-y-2">
-            {repos.map((row, idx) => (
-              <RepoRow key={`${String(row.repo_name)}-${idx}`} repo={row} index={idx} />
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {bindings.length > 0 ? (
-        <div className="mt-4">
-          <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
-            <Package className="h-3.5 w-3.5 text-indigo-400" />
-            研发子单 → 沙箱路径
-          </div>
-          <ul className="space-y-2">
-            {bindings.map((binding, idx) => {
-              const taskNo = String(binding.task_no || `binding-${idx}`);
-              const matchedRepos = asRows(binding.repos);
-              const unmatched = String(binding.match_status || '') === 'unmatched';
-              return (
-                <li key={taskNo} className="rd-system-binding-card">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className="font-mono text-sm font-semibold text-indigo-300">{taskNo}</span>
-                    <span className="text-slate-200">{String(binding.task_title || '')}</span>
-                    {binding.product_module_name ? (
-                      <span className="rd-system-chip rd-system-chip--module">{String(binding.product_module_name)}</span>
-                    ) : null}
-                    {unmatched ? (
-                      <span className="inline-flex items-center gap-1 text-amber-400">
-                        <AlertCircle className="h-3 w-3" /> 未匹配代码库
-                      </span>
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                    )}
-                  </div>
-                  {matchedRepos.length > 0 ? (
-                    <ul className="mt-2 space-y-1.5 border-l-2 border-indigo-500/30 pl-3">
-                      {matchedRepos.map((repo, rIdx) => (
-                        <li key={`${taskNo}-repo-${rIdx}`} className="text-[10px]">
-                          <div className="flex flex-wrap items-center gap-2 text-slate-300">
-                            <GitBranch className="h-3 w-3" />
-                            <span className="font-medium">{String(repo.repo_name || 'repo')}</span>
-                            {repo.repo_branch ? <span className="text-muted-foreground">{String(repo.repo_branch)}</span> : null}
-                            <StatusBadge status={String(repo.git_status || repo.status || '—')} />
-                          </div>
-                          {repo.code_path ? (
-                            <div className="mt-0.5 text-muted-foreground">工程 /{String(repo.code_path)}</div>
-                          ) : null}
-                          <CopyPath value={String(repo.local_path || '')} />
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
       ) : null}
     </div>
   );
@@ -575,9 +814,9 @@ export function SystemNodeDetailCard({
   const payload = { ...display, display };
   switch (nodeId) {
     case 'auto_split':
-      return <SystemAutoSplitCard payload={payload} />;
+      return <SystemAutoSplitCard payload={payload} variant="detail" />;
     case 'sandbox_build':
-      return <SystemSandboxBuildCard payload={payload} />;
+      return <SystemSandboxBuildCard payload={payload} variant="detail" />;
     case 'env_pregen':
       return <SystemEnvPregenCard payload={payload} />;
     default:
