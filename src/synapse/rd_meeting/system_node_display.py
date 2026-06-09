@@ -129,6 +129,9 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             row["task_desc"] = str(row.get("comments") or wi.get("task_desc") or "").strip()
             if not row.get("task_impact_desc"):
                 row["task_impact_desc"] = str(plan.get("taskImpactDesc") or "").strip()
+            feature_id = str(wi.get("feature_id") or "").strip()
+            if feature_id:
+                row["feature_id"] = feature_id
             lt = local_by_no.get(portal_no)
             if lt:
                 row["sop_node"] = str(lt.get("sop_node") or "")
@@ -152,6 +155,9 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             "comments": str(wi.get("task_desc") or "").strip(),
             "task_desc": str(wi.get("task_desc") or "").strip(),
         }
+        feature_id = str(wi.get("feature_id") or "").strip()
+        if feature_id:
+            row["feature_id"] = feature_id
         lt = local_by_no.get(portal_no)
         if lt:
             row["sop_node"] = str(lt.get("sop_node") or "")
@@ -197,6 +203,7 @@ def build_task_sandbox_bindings(
                     "repo_module": _module_display_name(repo_module),
                     "code_path": code_path,
                     "repo_branch": str(repo.get("repo_branch") or sb.get("repo_branch") or ""),
+                    "feature_branch": str(task.get("feature_id") or sb.get("feature_branch") or ""),
                     "local_path": local_path,
                     "engineering_path": _join_workspace_path(local_path, code_path),
                     "git_status": str(sb.get("status") or "unmatched"),
@@ -378,6 +385,7 @@ def _enrich_sandbox_repos(
             row.setdefault("code_path", code_path)
             row.setdefault("repo_branch", str(cat.get("repo_branch") or row.get("repo_branch") or ""))
             row.setdefault("repo_url", str(cat.get("repo_url") or row.get("repo_url") or ""))
+            row.setdefault("feature_branch", str(row.get("feature_branch") or ""))
             row["engineering_path"] = _join_workspace_path(local_path, code_path)
         elif row.get("local_path") and row.get("code_path"):
             row["engineering_path"] = _join_workspace_path(

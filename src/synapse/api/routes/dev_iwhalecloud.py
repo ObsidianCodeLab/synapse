@@ -1980,6 +1980,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
         "product_module_id": "应用模块ID",
         "product_module_name": "应用模块名称",
         "repo_url": "仓库URL",
+        "feature_id": "特性分支ID（git 分支名）",
     }
     """
     userinfo = _load_userinfo_plain()
@@ -2101,6 +2102,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
         return error_response(502, "任务已创建，但创建特性分支失败", error=str(branch_result))
     branch_data = branch_result.get("data") if isinstance(branch_result, dict) else None
 
+    feature_id = _feature_id_from_branch_data(branch_data if isinstance(branch_data, dict) else None)
     return success_response(
         {
             "task_no": created_task_no,
@@ -2112,6 +2114,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
             "product_module_id": branch_data.get("productModuleId") if isinstance(branch_data, dict) else None,
             "product_module_name": branch_data.get("productModuleName") if isinstance(branch_data, dict) else (body.productModuleName or ""),
             "repo_url": branch_data.get("repoUrl") if isinstance(branch_data, dict) else "",
+            "feature_id": feature_id,
         },
         "创建任务统一流程执行成功",
     )
@@ -2505,10 +2508,22 @@ async def create_feature_branch(body: CreateFeatureBranchRequest) -> dict:
 		"repoUrl": "仓库URL",
 		"branchName": "特性分支名称",
 		"baseBranchName": "来源分支名称",
+		"feature_id": "特性分支ID（git 分支名）",
 	}
     转调：POST /portal/ai-gateway/devspace/rpc/v3/task-branch/feature/create，返回码code为“9999”表示成功
     """
     return await _create_feature_branch(body)
+
+def _feature_id_from_branch_data(data: dict[str, Any] | None) -> str:
+    """从创建特性分支响应 data 提取特性分支 ID（即 git checkout 分支名）。"""
+    if not isinstance(data, dict):
+        return ""
+    for key in ("feature_id", "featureId", "branchName"):
+        val = data.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+    return ""
+
 
 async def _create_feature_branch(body: CreateFeatureBranchRequest) -> dict:
     """内部调用：创建特性分支。"""
@@ -2540,16 +2555,19 @@ async def _create_feature_branch(body: CreateFeatureBranchRequest) -> dict:
     except ValueError:
         return error_response(502, f"研发云创建特性分支返回非 JSON：{resp.text}")
 
+    branch_data = raw.get("data") if isinstance(raw.get("data"), dict) else {}
+    feature_id = _feature_id_from_branch_data(branch_data)
     # 提取数据返回
     return success_response(
         {
-            "productModuleId": raw.get("data").get("productModuleId"),
-            "productModuleName": raw.get("data").get("productModuleName"),
-            "repoId": raw.get("data").get("repoId"),
-            "repoName": raw.get("data").get("repoName"),
-            "repoUrl": raw.get("data").get("repoUrl"),
-            "branchName": raw.get("data").get("branchName"),
-            "baseBranchName": raw.get("data").get("baseBranchName"),
+            "productModuleId": branch_data.get("productModuleId"),
+            "productModuleName": branch_data.get("productModuleName"),
+            "repoId": branch_data.get("repoId"),
+            "repoName": branch_data.get("repoName"),
+            "repoUrl": branch_data.get("repoUrl"),
+            "branchName": branch_data.get("branchName"),
+            "baseBranchName": branch_data.get("baseBranchName"),
+            "feature_id": feature_id,
         }
     )
 

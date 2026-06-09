@@ -188,6 +188,7 @@ def _build_owned_work_item_from_create(
             row.get("product_module_name") or getattr(req, "productModuleName", "") or ""
         ),
         "repo_url": str(row.get("repo_url") or ""),
+        "feature_id": str(row.get("feature_id") or "").strip(),
     }
 
 
@@ -391,10 +392,11 @@ def format_auto_split_report(assets: dict[str, Any], *, node_name: str) -> str:
             module = row.get("product_module_name") or "—"
             branch = row.get("branch_version") or "—"
             patch = row.get("patch_name") or "—"
+            feature_id = row.get("feature_id") or "—"
             err = row.get("error") or ""
             line = (
                 f"- **{title}** → 子单号 {portal_no} （{create_status}）"
-                f" 模块={module} 分支={branch} 补丁={patch}"
+                f" 模块={module} 分支={branch} 补丁={patch} 特性分支={feature_id}"
             )
             if err:
                 line += f" — {err}"

@@ -91,10 +91,39 @@ def test_build_auto_split_display_plan_aligned_counts():
     assert len(payload["tasks"]) == 2
 
 
+def test_collect_task_rows_includes_feature_id():
+    assets = {
+        "split_plan_tasks": [
+            {"taskNo": "T1", "taskTitle": "子单A", "productModuleName": "ZMDB"},
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "taskTitle": "子单A",
+                "task_no": "T1",
+                "work_item": {
+                    "product_module_name": "ZMDB",
+                    "task_no": "T1",
+                    "feature_id": "feat-T1",
+                },
+            }
+        ],
+    }
+    rows = collect_task_rows(assets)
+    assert rows[0]["feature_id"] == "feat-T1"
+
+
 def test_build_task_sandbox_bindings_matches_module():
     auto_split = {
         "split_plan_tasks": [
             {"taskNo": "T1", "taskTitle": "改造A", "productModuleName": "演示模块"},
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "task_no": "T1",
+                "work_item": {"task_no": "T1", "feature_id": "feat-T1"},
+            }
         ],
     }
     wire = {
@@ -123,6 +152,7 @@ def test_build_task_sandbox_bindings_matches_module():
     assert bindings[0]["repos"][0]["code_path"] == "src/core"
     assert bindings[0]["repos"][0]["local_path"] == "/work/x/sandbox/demo"
     assert bindings[0]["repos"][0]["engineering_path"] == "/work/x/sandbox/demo/src/core"
+    assert bindings[0]["repos"][0]["feature_branch"] == "feat-T1"
 
 
 def test_collect_task_rows_falls_back_to_work_item_task_desc():

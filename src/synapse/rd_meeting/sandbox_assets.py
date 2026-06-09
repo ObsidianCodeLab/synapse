@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from synapse.rd_meeting.paths import sandbox_code_dir, sandbox_root, scope_dir
@@ -20,9 +21,63 @@ from synapse.rd_meeting.product_context import (
 logger = logging.getLogger(__name__)
 
 
+def _checkout_feature_branch(dest: Path, feature_branch: str) -> tuple[bool, str]:
+    """在已落盘的基础分支上 fetch 并 checkout 特性分支。"""
+    branch = (feature_branch or "").strip()
+    if not branch:
+        return True, ""
+    ok, detail = _run_git(
+        ["git", "-C", str(dest), "fetch", "--depth", "1", "origin", branch],
+        timeout=300.0,
+    )
+    if not ok:
+        return False, detail
+    return _run_git(["git", "-C", str(dest), "checkout", branch], timeout=120.0)
+
+
+def _repo_feature_branch_map(
+    scope_id: str,
+    wire_row: dict[str, Any] | None,
+) -> dict[str, str]:
+    """按应用模块将 auto_split 子单的 feature_id 映射到 catalog 仓库名。"""
+    from synapse.rd_meeting.product_context import _normalize_product_wire, _repo_name_from_url
+    from synapse.rd_meeting.system_node_display import (
+        _auto_split_context_for_bindings,
+        _modules_match,
+        collect_task_rows,
+    )
+
+    task_rows = collect_task_rows(_auto_split_context_for_bindings(scope_id))
+    catalog_repos: list[dict[str, Any]] = []
+    if wire_row:
+        normalized = _normalize_product_wire(wire_row)
+        catalog_repos = [r for r in (normalized.get("repos") or []) if isinstance(r, dict)]
+
+    mapping: dict[str, str] = {}
+    for task in task_rows:
+        if str(task.get("create_status") or "") != "ok":
+            continue
+        feature_id = str(task.get("feature_id") or "").strip()
+        if not feature_id:
+            continue
+        mod = str(task.get("product_module_name") or "")
+        for repo in catalog_repos:
+            repo_module = str(repo.get("repo_module") or "")
+            if mod and not _modules_match(mod, repo_module):
+                continue
+            repo_name = str(repo.get("repo_name") or "").strip()
+            if not repo_name:
+                repo_name = _repo_name_from_url(str(repo.get("repo_url") or ""))
+            if repo_name:
+                mapping[repo_name] = feature_id
+    return mapping
+
+
 def materialize_repo_to_sandbox(
     scope_id: str,
     repo: dict[str, Any],
+    *,
+    feature_branch: str = "",
 ) -> dict[str, Any]:
     """Clone / pull 至 ``work/<scope>/sandbox/<repo_name>/``，不调用 UTF-8 转换。"""
     repo_name = str(repo.get("repo_name") or "").strip()
@@ -33,6 +88,7 @@ def materialize_repo_to_sandbox(
         "repo_name": repo_name,
         "repo_url": str(repo.get("repo_url") or ""),
         "repo_branch": str(repo.get("repo_branch") or ""),
+        "feature_branch": (feature_branch or "").strip(),
         "local_path": str(dest),
         "status": "skipped",
         "error": "",
@@ -58,6 +114,8 @@ def materialize_repo_to_sandbox(
             )
         elif ok:
             ok, detail = _run_git(["git", "-C", str(dest), "pull", "--ff-only"], timeout=300.0)
+        if ok and feature_branch:
+            ok, detail = _checkout_feature_branch(dest, feature_branch)
         entry["status"] = "ok" if ok else "failed"
         entry["error"] = "" if ok else detail
         return entry
@@ -72,6 +130,8 @@ def materialize_repo_to_sandbox(
         cmd.extend(["-b", branch])
     cmd.extend([remote, str(dest)])
     ok, detail = _run_git(cmd, timeout=600.0)
+    if ok and feature_branch:
+        ok, detail = _checkout_feature_branch(dest, feature_branch)
     entry["status"] = "ok" if ok else "failed"
     entry["error"] = "" if ok else detail
     return entry
@@ -115,9 +175,15 @@ def bootstrap_sandbox_assets(
 
     normalized = _normalize_product_wire(hit)
     repo_entries = [r for r in (normalized.get("repos") or []) if isinstance(r, dict)]
+    feature_by_repo = _repo_feature_branch_map(sid, hit)
 
     for repo in repo_entries:
-        row = materialize_repo_to_sandbox(sid, repo)
+        repo_name = str(repo.get("repo_name") or "").strip()
+        row = materialize_repo_to_sandbox(
+            sid,
+            repo,
+            feature_branch=feature_by_repo.get(repo_name, ""),
+        )
         result["repos"].append(row)
         if row.get("status") == "failed":
             result["errors"].append(f"沙箱代码 {row.get('repo_name')}: {row.get('error')}")
@@ -153,6 +219,11 @@ def format_sandbox_build_report(assets: dict[str, Any], *, node_name: str) -> st
             lines.append(
                 f"- **{row.get('repo_name') or '—'}**：`{row.get('local_path') or '—'}` "
                 f"— {row.get('status') or '—'}"
+                + (
+                    f" 特性分支={row.get('feature_branch')}"
+                    if row.get("feature_branch")
+                    else ""
+                )
                 + (f"（{row.get('error')}）" if row.get("error") else "")
             )
     lines.extend(

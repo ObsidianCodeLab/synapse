@@ -88,6 +88,34 @@ def test_materialize_repo_to_sandbox_skips_utf8(monkeypatch, tmp_path):
     assert legacy.read_bytes() == "编码测试".encode("gbk")
 
 
+def test_materialize_repo_to_sandbox_checkouts_feature_branch(monkeypatch, tmp_path):
+    scope_id = "sb-feature"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    dest = tmp_path / "work" / scope_id / "sandbox" / "demo"
+    dest.mkdir(parents=True)
+    (dest / ".git").mkdir()
+    git_calls: list[list[str]] = []
+
+    def _fake_git(args, **kwargs):
+        git_calls.append(list(args))
+        return True, ""
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.sandbox_assets._run_git",
+        _fake_git,
+    )
+
+    entry = materialize_repo_to_sandbox(
+        scope_id,
+        {"repo_name": "demo", "repo_url": "https://example.com/demo.git", "repo_branch": "main"},
+        feature_branch="feat-11923497",
+    )
+    assert entry["status"] == "ok"
+    assert entry["feature_branch"] == "feat-11923497"
+    assert any("fetch" in cmd and "feat-11923497" in cmd for cmd in git_calls)
+    assert any("checkout" in cmd and "feat-11923497" in cmd for cmd in git_calls)
+
+
 def test_auto_split_from_userwork(monkeypatch, tmp_path):
     scope_id = "D12345"
     uw_path = tmp_path / "userwork.json"
@@ -206,7 +234,14 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
 
     async def _fake_create(body):
         created.append(body)
-        return {"errorcode": 0, "data": {"task_no": "T-NEW-1"}}
+        return {
+            "errorcode": 0,
+            "data": {
+                "task_no": "T-NEW-1",
+                "task_title": body.taskTitle,
+                "feature_id": "feat-branch-1",
+            },
+        }
 
     monkeypatch.setattr("synapse.api.routes.dev_iwhalecloud.create_task", _fake_create)
 
@@ -219,6 +254,7 @@ async def test_auto_split_create_tasks_from_split_plan(monkeypatch):
     assert rows[0]["task_no"] == "T-NEW-1"
     assert rows[0]["work_item"]["task_no"] == "T-NEW-1"
     assert rows[0]["work_item"]["task_title"] == "子单A"
+    assert rows[0]["work_item"]["feature_id"] == "feat-branch-1"
 
 
 def test_env_pregen_test_sleep(monkeypatch):
