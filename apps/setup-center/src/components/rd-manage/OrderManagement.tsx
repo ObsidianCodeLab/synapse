@@ -1539,28 +1539,37 @@ export const OrderManagement: React.FC<{
           </div>
         );
       case 'exception_check':
-        if (state === 'awaiting_human') {
-          return (
-            <div className="space-y-4">
-              <div className="bg-red-950/30 border border-red-900/50 rounded-xl p-4 flex items-start gap-3">
-                <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="text-red-400 font-medium mb-1">沙箱执行异常中断</h4>
-                  <p className="text-sm text-slate-300 font-mono bg-black/40 p-2 rounded mt-2">
-                    Error: Agent lock deadlocked in module 'sync_service'. Timeout waiting for mutex release.
-                  </p>
-                </div>
-              </div>
-              <Button type="primary" block size="large" className="bg-amber-600 hover:bg-amber-500 border-none" onClick={() => handleJumpToMeeting()}>
-                跳转研发会议室 (预置 TODO)
-              </Button>
+        return (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><GitBranch className="w-4 h-4" /> 代码提交与试飞</h4>
+            <TerminalOutput lines={[
+              "[INFO] git add -A && git commit -m 'feat: auto commit'",
+              "[INFO] git push origin feature/" + ticket.branch,
+              "[INFO] Polling flight build status...",
+              state === 'awaiting_human' ? "[WARN] Flight build failed — see task check for redirect." : "[INFO] Flight build succeeded.",
+            ]} />
+          </div>
+        );
+      case 'task_feedback':
+        return (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-slate-400">试飞优化方案</h4>
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300">
+              基于特性分支试飞结果生成优化建议，并与研发人员评估方案可靠性。
             </div>
-          );
-        }
-        return <TerminalOutput lines={["[INFO] Check passed. No anomalies detected in execution logs."]} />;
+          </div>
+        );
+      case 'diff_analysis':
+        return (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-slate-400">试飞优化执行</h4>
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300">
+              根据已评估的试飞优化方案协同修改代码并准备再次提交。
+            </div>
+          </div>
+        );
       case 'sandbox_build':
       case 'env_pregen':
-      case 'env_start':
         return (
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><TerminalSquare className="w-4 h-4" /> 环境执行日志</h4>
@@ -1574,33 +1583,37 @@ export const OrderManagement: React.FC<{
             ]} />
           </div>
         );
-      case 'task_exec':
-        if (state === 'awaiting_human') {
-          return (
-            <div className="flex flex-col items-center justify-center h-48 bg-blue-950/20 border border-blue-900/50 rounded-xl border-dashed">
-              <Play className="w-12 h-12 text-blue-500 mb-4 ml-1" />
-              <p className="text-sm text-slate-300 mb-5">环境就绪，等待人工确认启动智能研发任务</p>
-              <Button type="primary" size="large" className="bg-blue-600 hover:bg-blue-500 border-none px-8" onClick={() => handleJumpToMeeting()}>
-                进入研发会议室确认启动
-              </Button>
+      case 'env_start':
+        return (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> 任务检查</h4>
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300 space-y-2">
+              <p>试飞级与需求方案级分析：对照任务执行产出、试飞优化产出与试飞结果。</p>
+              {state === 'awaiting_human' ? (
+                <p className="text-amber-400">检查未通过，将引导回试飞方案或任务执行节点继续处理。</p>
+              ) : (
+                <p className="text-green-400">检查通过，可进入测试案例节点。</p>
+              )}
             </div>
-          );
-        }
-        return <div className="text-sm text-slate-400 bg-slate-900 p-4 rounded-lg">任务已启动并由系统接管。</div>;
+          </div>
+        );
+      case 'task_exec':
+        return (
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-slate-400">协同开发</h4>
+            <div className="text-sm text-slate-400 bg-slate-900 p-4 rounded-lg">
+              基于函数级方案和工单，人机协同完成功能点自动化开发。
+            </div>
+          </div>
+        );
       case 'unit_test':
         return (
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><TestTube className="w-4 h-4" /> 单元测试结果</h4>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-slate-300">测试覆盖率</span>
-                <span className="text-green-400 font-mono">94.2%</span>
-              </div>
-              <Progress percent={94.2} strokeColor="#4ade80" trailColor="#1e293b" showInfo={false} />
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-slate-400"><CheckCircle2 className="w-4 h-4 text-green-500" /> test_vector_sync.py (Passed)</div>
-                <div className="flex items-center gap-2 text-sm text-slate-400"><CheckCircle2 className="w-4 h-4 text-green-500" /> test_db_listener.py (Passed)</div>
-              </div>
+            <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><TestTube className="w-4 h-4" /> 测试案例</h4>
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300 space-y-2">
+              <p>功能案例：覆盖本次研发涉及的核心场景与边界条件。</p>
+              <p>单元测试文件：<code className="text-cyan-400">tests/unit/test_feature_x.py</code></p>
+              <p>当前结果：通过 12 / 12</p>
             </div>
           </div>
         );

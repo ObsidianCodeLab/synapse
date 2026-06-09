@@ -12,6 +12,8 @@ SYSTEM_NODE_DISPLAY_KINDS: dict[str, str] = {
     "auto_split": "system_auto_split",
     "sandbox_build": "system_sandbox_build",
     "env_pregen": "system_env_pregen",
+    "exception_check": "system_code_commit",
+    "env_start": "system_task_check",
 }
 
 STRUCTURED_SYSTEM_NODES: frozenset[str] = frozenset(SYSTEM_NODE_DISPLAY_KINDS)
@@ -435,6 +437,33 @@ def build_env_pregen_display(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_code_commit_display(result: dict[str, Any]) -> dict[str, Any]:
+    flight = result.get("flight") if isinstance(result.get("flight"), dict) else {}
+    return {
+        "node_id": "exception_check",
+        "status": result.get("status"),
+        "errors": [result.get("error")] if result.get("error") else [],
+        "repos": result.get("repos") or [],
+        "flight": flight,
+        "task_id": result.get("task_id"),
+    }
+
+
+def build_task_check_display(result: dict[str, Any]) -> dict[str, Any]:
+    analysis = result.get("analysis") if isinstance(result.get("analysis"), dict) else {}
+    return {
+        "node_id": "env_start",
+        "status": result.get("status"),
+        "outcome": result.get("outcome"),
+        "errors": [result.get("error")] if result.get("error") else [],
+        "redirect_to_node": result.get("redirect_to_node"),
+        "redirect_reason": result.get("redirect_reason"),
+        "fail_count": result.get("fail_count"),
+        "ai_processing_blocked": bool(result.get("ai_processing_blocked")),
+        "analysis": analysis,
+    }
+
+
 def attach_system_node_display(
     node_id: str,
     result: dict[str, Any],
@@ -450,6 +479,10 @@ def attach_system_node_display(
         result["display"] = build_sandbox_build_display(result, scope_id=scope_id, wire_row=wire_row)
     elif nid == "env_pregen":
         result["display"] = build_env_pregen_display(result)
+    elif nid == "exception_check":
+        result["display"] = build_code_commit_display(result)
+    elif nid == "env_start":
+        result["display"] = build_task_check_display(result)
     return result
 
 
@@ -591,6 +624,24 @@ def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] |
         if assets:
             return {
                 **build_env_pregen_display(assets),
+                "display_kind": display_kind_for_system_node(nid),
+            }
+        return _display_from_history(scope_id, nid)
+
+    if nid == "exception_check":
+        assets = _load_pipeline_context_asset(scope_id, "code_commit_assets")
+        if assets:
+            return {
+                **build_code_commit_display(assets),
+                "display_kind": display_kind_for_system_node(nid),
+            }
+        return _display_from_history(scope_id, nid)
+
+    if nid == "env_start":
+        assets = _load_pipeline_context_asset(scope_id, "task_check_assets")
+        if assets:
+            return {
+                **build_task_check_display(assets),
                 "display_kind": display_kind_for_system_node(nid),
             }
         return _display_from_history(scope_id, nid)

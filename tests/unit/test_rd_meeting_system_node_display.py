@@ -17,7 +17,8 @@ def test_display_kind_for_system_nodes():
     assert display_kind_for_system_node("auto_split") == "system_auto_split"
     assert display_kind_for_system_node("sandbox_build") == "system_sandbox_build"
     assert display_kind_for_system_node("env_pregen") == "system_env_pregen"
-    assert display_kind_for_system_node("env_start") == "system_exec"
+    assert display_kind_for_system_node("exception_check") == "system_code_commit"
+    assert display_kind_for_system_node("env_start") == "system_task_check"
 
 
 def test_collect_task_rows_merges_sources():

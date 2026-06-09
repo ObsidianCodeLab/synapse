@@ -23,6 +23,8 @@ import type { RoomAgent } from './meetingChatTypes';
 import type { ChatDisplayKind, MeetingChatLog } from './meetingChatUtils';
 import {
   SystemAutoSplitCard,
+  SystemCodeCommitCard,
+  SystemTaskCheckCard,
   SystemEnvPregenCard,
   SystemExecCard,
   SystemSandboxBuildCard,
@@ -446,6 +448,10 @@ export function StructuredChatBody({ log }: { log: MeetingChatLog }) {
       return <SystemSandboxBuildCard payload={payload} />;
     case 'system_env_pregen':
       return <SystemEnvPregenCard payload={payload} />;
+    case 'system_code_commit':
+      return <SystemCodeCommitCard payload={payload} />;
+    case 'system_task_check':
+      return <SystemTaskCheckCard payload={payload} />;
     case 'work_plan':
       return <WorkPlanCard text={log.text} />;
     case 'delegation_start':

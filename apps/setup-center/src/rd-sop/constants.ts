@@ -84,12 +84,12 @@ export const SOP_STAGES: SOPStage[] = [
     id: 4,
     name: '开发中',
     nodes: [
-      { id: 'task_exec', name: '任务执行', type: 'human_start', desc: '人工确认启动，研发助手关联沙箱执行（禁改Prompt）' },
-      { id: 'exception_check', name: '异常检查', type: 'ai', desc: '发现无法解决的问题时，降级为人工介入处理' },
-      { id: 'task_feedback', name: '任务反馈', type: 'system', desc: '实时反馈执行情况，供人工观察智能体状态' },
-      { id: 'diff_analysis', name: '差异分析', type: 'human', desc: '强制要求研发人员对完成的代码进行差异分析' },
-      { id: 'env_start', name: '环境启动', type: 'system', desc: '自动进行环境启动并编译运行代码（或远端编译）' },
-      { id: 'unit_test', name: '单元自测', type: 'ai', desc: '根据验收标准生成测试用例，自测通过后自动提交试飞' },
+      { id: 'task_exec', name: '任务执行', type: 'ai_human', desc: '基于函数级方案和工单，协同完成功能点的自动化开发' },
+      { id: 'exception_check', name: '代码提交', type: 'system', desc: '自动触发特性分支代码提交并等待、收集试飞结果' },
+      { id: 'task_feedback', name: '试飞方案', type: 'ai', desc: '基于试飞结果生成优化方案，并与研发人员评估可靠性' },
+      { id: 'diff_analysis', name: '试飞优化', type: 'ai_human', desc: '根据试飞优化方案协同执行改动并提交代码' },
+      { id: 'env_start', name: '任务检查', type: 'system', desc: '试飞级与需求方案级检查；未通过时引导回退，三次失败禁止 AI 处理' },
+      { id: 'unit_test', name: '测试案例', type: 'ai_human', desc: '说明功能测试案例、单元测试文件与结果，辅助后续自动化测试' },
     ],
   },
   {

@@ -47,11 +47,11 @@ STAGES: list[dict] = [
         "name": "开发中",
         "nodes": [
             {"id": "task_exec", "name": "任务执行"},
-            {"id": "exception_check", "name": "异常检查"},
-            {"id": "task_feedback", "name": "任务反馈"},
-            {"id": "diff_analysis", "name": "差异分析"},
-            {"id": "env_start", "name": "环境启动"},
-            {"id": "unit_test", "name": "单元自测"},
+            {"id": "exception_check", "name": "代码提交"},
+            {"id": "task_feedback", "name": "试飞方案"},
+            {"id": "diff_analysis", "name": "试飞优化"},
+            {"id": "env_start", "name": "任务检查"},
+            {"id": "unit_test", "name": "测试案例"},
         ],
     },
     {

@@ -50,7 +50,9 @@ export type MeetingChatDisplayKindWire =
   | 'system_exec'
   | 'system_auto_split'
   | 'system_sandbox_build'
-  | 'system_env_pregen';
+  | 'system_env_pregen'
+  | 'system_code_commit'
+  | 'system_task_check';
 
 export interface MeetingRoomChatLogWire {
   id: string;

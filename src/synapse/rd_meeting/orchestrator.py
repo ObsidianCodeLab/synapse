@@ -1557,6 +1557,18 @@ class MeetingRoomOrchestrator:
         if dev is None:
             raise ValueError("dev_status_not_found")
 
+        rs_gate = load_room_state(sid) or {}
+        if rs_gate.get("task_check_blocked"):
+            raise ValueError("task_check_ai_blocked")
+        from synapse.rd_meeting.paths import meeting_pipeline_path
+        from synapse.rd_meeting.room_runtime import read_json_file
+
+        pipe_raw = read_json_file(meeting_pipeline_path(sid))
+        if isinstance(pipe_raw, dict):
+            pctx = pipe_raw.get("context") if isinstance(pipe_raw.get("context"), dict) else {}
+            if pctx.get("ai_processing_blocked"):
+                raise ValueError("task_check_ai_blocked")
+
         skip_prep = self.advance_past_disabled_nodes(
             scope_type=scope_type,
             scope_id=sid,

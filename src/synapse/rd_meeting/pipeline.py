@@ -1268,6 +1268,49 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
 
     orch = MeetingRoomOrchestrator()
+    redirect_to = str(result.get("redirect_to_node") or "").strip()
+    if redirect_to:
+        reason = str(result.get("redirect_reason") or result.get("error") or "任务检查未通过").strip()
+        node_range = sop_reprocess_node_id_range(redirect_to, run_node)
+        pctx["reprocess_node_ids"] = node_range
+        pctx["reprocess_historical_target"] = redirect_to
+        pctx["reprocess_reason"] = reason
+        pctx["reprocess_until_node_id"] = run_node
+        if result.get("ai_processing_blocked"):
+            pctx["ai_processing_blocked"] = True
+        pipe._data["context"] = pctx
+
+        rs_redirect = dict(load_room_state(sid) or {})
+        if result.get("ai_processing_blocked"):
+            rs_redirect["status"] = "human_intervention"
+            rs_redirect["intervention_kind"] = "task_check_blocked"
+            rs_redirect["task_check_blocked"] = True
+            rs_redirect["escalate_reason"] = reason
+        else:
+            rs_redirect["status"] = "human_intervention"
+            rs_redirect["intervention_kind"] = "task_check_redirect"
+            rs_redirect["redirect_to_node"] = redirect_to
+            rs_redirect["escalate_reason"] = reason
+        save_room_state(sid, rs_redirect)
+
+        append_history_event(
+            sid,
+            {
+                "event": "task_check_redirect",
+                "room_id": room_id,
+                "node_id": run_node,
+                "redirect_to_node": redirect_to,
+                "reason": reason,
+                "ai_processing_blocked": bool(result.get("ai_processing_blocked")),
+                "log_type": "warning",
+                "agent_id": "system",
+                "system_node": True,
+            },
+        )
+        pipe.mark_step_completed(STEP_SYSTEM_NODE_EXEC)
+        pipe.set_flow_step(STEP_REPROCESS_PREP, reason=f"任务检查引导回 {redirect_to}")
+        return
+
     if result.get("status") == "failed":
         rs_fail = dict(load_room_state(sid) or {})
         rs_fail["status"] = "failed"

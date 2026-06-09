@@ -298,10 +298,86 @@ def handle_env_pregen(
     return attach_system_node_display(node_id, out, scope_id=sid)
 
 
+def handle_code_commit(
+    *,
+    scope_type: ScopeType,
+    scope_id: str,
+    node_id: str,
+    dev: dict[str, Any],
+    pipe: Any = None,
+) -> dict[str, Any]:
+    """代码提交：特性分支提交并收集试飞结果。"""
+    _ = pipe
+    sid = scope_id.strip()
+    from synapse.rd_meeting.code_commit_assets import bootstrap_code_commit, format_code_commit_report
+
+    assets = bootstrap_code_commit(sid, scope_type=scope_type, task_id=sid if scope_type == "task" else "")
+    _save_pipeline_context_assets(sid, "code_commit_assets", assets)
+
+    node_name = node_display_name(node_id)
+    report_body = format_code_commit_report(assets, node_name=node_name)
+    stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
+    artifacts = _write_system_archive(sid, node_id, stage_name, report_body)
+
+    from synapse.rd_meeting.system_node_display import attach_system_node_display
+
+    out = {
+        "status": assets.get("status") or "ok",
+        "error": assets.get("error") or "",
+        "repos": assets.get("repos") or [],
+        "flight": assets.get("flight") or {},
+        "artifacts": artifacts,
+        "report_body": report_body,
+        **assets,
+    }
+    return attach_system_node_display(node_id, out, scope_id=sid)
+
+
+def handle_task_check(
+    *,
+    scope_type: ScopeType,
+    scope_id: str,
+    node_id: str,
+    dev: dict[str, Any],
+    pipe: Any = None,
+) -> dict[str, Any]:
+    """任务检查：试飞级与需求方案级分析，失败时引导回退。"""
+    _ = scope_type, pipe
+    sid = scope_id.strip()
+    from synapse.rd_meeting.task_check_assets import bootstrap_task_check, format_task_check_report
+
+    assets = bootstrap_task_check(sid)
+    _save_pipeline_context_assets(sid, "task_check_assets", assets)
+
+    node_name = node_display_name(node_id)
+    report_body = format_task_check_report(assets, node_name=node_name)
+    stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
+    artifacts = _write_system_archive(sid, node_id, stage_name, report_body)
+
+    from synapse.rd_meeting.system_node_display import attach_system_node_display
+
+    out = {
+        "status": assets.get("status") or "ok",
+        "error": assets.get("error") or "",
+        "outcome": assets.get("outcome"),
+        "redirect_to_node": assets.get("redirect_to_node") or "",
+        "redirect_reason": assets.get("redirect_reason") or "",
+        "fail_count": assets.get("fail_count"),
+        "ai_processing_blocked": bool(assets.get("ai_processing_blocked")),
+        "analysis": assets.get("analysis") or {},
+        "artifacts": artifacts,
+        "report_body": report_body,
+        **assets,
+    }
+    return attach_system_node_display(node_id, out, scope_id=sid)
+
+
 SYSTEM_NODE_HANDLERS: dict[str, SystemNodeHandler] = {
     "auto_split": handle_auto_split,
     "sandbox_build": handle_sandbox_build,
     "env_pregen": handle_env_pregen,
+    "exception_check": handle_code_commit,
+    "env_start": handle_task_check,
 }
 
 

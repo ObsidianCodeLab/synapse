@@ -42,6 +42,13 @@ def test_auto_split_and_env_pregen_are_system_type():
     assert default_human_confirm("env_pregen") is False
 
 
+def test_dev_stage_system_nodes_are_system_type():
+    assert is_system_node("exception_check")
+    assert is_system_node("env_start")
+    assert default_human_confirm("exception_check") is False
+    assert default_human_confirm("env_start") is False
+
+
 def test_system_node_binding_forbids_human_confirm(monkeypatch):
     monkeypatch.setattr(
         "synapse.rd_meeting.binding.load_meeting_room_config",

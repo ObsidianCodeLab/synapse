@@ -399,6 +399,8 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
             "system_auto_split": "自动拆单结果",
             "system_sandbox_build": "沙箱构建结果",
             "system_env_pregen": "环境预生成 — 路径内容清单",
+            "system_code_commit": "代码提交与试飞结果",
+            "system_task_check": "任务检查结果",
         }
         card_title = card_titles.get(display_kind, "系统节点执行结果")
         out: list[dict[str, Any]] = []

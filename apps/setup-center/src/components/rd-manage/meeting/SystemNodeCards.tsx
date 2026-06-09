@@ -873,6 +873,106 @@ export function SystemEnvPregenCard({ payload }: { payload: Record<string, unkno
   );
 }
 
+export function SystemCodeCommitCard({ payload }: { payload: Record<string, unknown> }) {
+  const display = (payload.display as Record<string, unknown>) || payload;
+  const repos = asRows(display.repos);
+  const flight = (display.flight as RowRecord) || {};
+  const errors = (display.errors as string[]) || [];
+
+  return (
+    <div className="rd-chat-card rd-chat-card--meta">
+      <HeroBanner
+        gradient="rd-system-hero--sandbox"
+        icon={<GitBranch className="h-6 w-6" />}
+        title="代码提交"
+        subtitle="特性分支已提交，并收集试飞构建结果。"
+        stats={[
+          { label: '仓库', value: repos.length },
+          { label: '试飞', value: String(flight.status || display.status || '—') },
+          { label: '状态', value: String(display.status || '—') },
+        ]}
+      />
+      {errors.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-[11px] text-red-400">
+          {errors.map((err) => (
+            <li key={err}>{err}</li>
+          ))}
+        </ul>
+      ) : null}
+      {repos.length > 0 ? (
+        <ul className="space-y-2 mt-3 mb-0">
+          {repos.map((row, idx) => (
+            <li key={`commit-${idx}`} className="rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge status={String(row.status || '')} />
+                <span className="text-slate-300">{String(row.repo_name || '—')}</span>
+                {row.commit_hash ? <span className="text-muted-foreground font-mono">{String(row.commit_hash).slice(0, 8)}</span> : null}
+              </div>
+              <CopyPath value={String(row.local_path || '')} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {flight.status ? (
+        <div className="mt-3 rd-chat-card__section">
+          <div className="rd-chat-card__label mb-1">试飞结果</div>
+          <div className="rd-chat-card__meta-row">
+            <StatusBadge status={String(flight.status)} />
+            {flight.error ? <span className="text-red-400">{String(flight.error)}</span> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SystemTaskCheckCard({ payload }: { payload: Record<string, unknown> }) {
+  const display = (payload.display as Record<string, unknown>) || payload;
+  const analysis = (display.analysis as RowRecord) || {};
+  const errors = (display.errors as string[]) || [];
+  const blocked = Boolean(display.ai_processing_blocked);
+
+  return (
+    <div className="rd-chat-card rd-chat-card--meta">
+      <HeroBanner
+        gradient={blocked ? 'rd-system-hero--split' : 'rd-system-hero--env'}
+        icon={<AlertCircle className="h-6 w-6" />}
+        title="任务检查"
+        subtitle="试飞级与需求方案级分析结果。"
+        stats={[
+          { label: '结论', value: String(display.outcome || '—') },
+          { label: '未通过次数', value: String(display.fail_count ?? 0) },
+          { label: '状态', value: String(display.status || '—') },
+        ]}
+      />
+      {display.redirect_to_node ? (
+        <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+          引导至节点：<span className="font-medium">{String(display.redirect_to_node)}</span>
+          {display.redirect_reason ? <p className="mt-1 text-amber-100/90">{String(display.redirect_reason)}</p> : null}
+        </div>
+      ) : null}
+      {blocked ? (
+        <div className="mt-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-300">
+          同一子单任务检查已连续三次未通过，AI 处理已禁止，请人工介入。
+        </div>
+      ) : null}
+      {errors.length > 0 ? (
+        <ul className="mt-2 space-y-1 text-[11px] text-red-400">
+          {errors.map((err) => (
+            <li key={err}>{err}</li>
+          ))}
+        </ul>
+      ) : null}
+      <dl className="rd-chat-card__kv mt-3">
+        <dt>功能完整</dt>
+        <dd>{analysis.feature_complete ? '是' : '否'}</dd>
+        <dt>试飞通过</dt>
+        <dd>{analysis.flight_ok ? '是' : '否'}</dd>
+      </dl>
+    </div>
+  );
+}
+
 export function SystemExecCard({ payload }: { payload: Record<string, unknown> }) {
   const repos = (payload.repos as Record<string, unknown>[]) || [];
   return (
@@ -909,7 +1009,13 @@ export function SystemExecCard({ payload }: { payload: Record<string, unknown> }
   );
 }
 
-export const SYSTEM_STRUCTURED_NODE_IDS = ['auto_split', 'sandbox_build', 'env_pregen'] as const;
+export const SYSTEM_STRUCTURED_NODE_IDS = [
+  'auto_split',
+  'sandbox_build',
+  'env_pregen',
+  'exception_check',
+  'env_start',
+] as const;
 
 export function SystemNodeDetailCard({
   nodeId,
@@ -926,6 +1032,10 @@ export function SystemNodeDetailCard({
       return <SystemSandboxBuildCard payload={payload} variant="detail" />;
     case 'env_pregen':
       return <SystemEnvPregenCard payload={payload} />;
+    case 'exception_check':
+      return <SystemCodeCommitCard payload={payload} />;
+    case 'env_start':
+      return <SystemTaskCheckCard payload={payload} />;
     default:
       return <SystemExecCard payload={payload} />;
   }
