@@ -52,7 +52,8 @@ export type MeetingChatDisplayKindWire =
   | 'system_sandbox_build'
   | 'system_env_pregen'
   | 'system_code_commit'
-  | 'system_task_check';
+  | 'system_task_check'
+  | 'system_task_exec';
 
 export interface MeetingRoomChatLogWire {
   id: string;
@@ -544,6 +545,10 @@ export interface TaskExecTaskRow {
   product_module?: string;
   develop_prompt?: string;
   verify_prompt?: string;
+  develop_agent_command?: string;
+  verify_agent_command?: string;
+  develop_python_command?: string;
+  verify_python_command?: string;
   status?: string;
   phase?: string;
   completion?: string;

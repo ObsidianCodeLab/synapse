@@ -179,6 +179,25 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
         <PromptBlock title="开发要求" content={task.develop_prompt} />
         <PromptBlock title="审计要求" content={task.verify_prompt} />
 
+        {task.develop_agent_command ? (
+          <details className="rd-task-exec-prompt" open>
+            <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+              开发轮 agent 命令
+            </summary>
+            <pre className="rd-task-exec-prompt__body custom-scrollbar">{task.develop_agent_command}</pre>
+          </details>
+        ) : null}
+        {task.verify_agent_command ? (
+          <details className="rd-task-exec-prompt">
+            <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
+              <Terminal className="h-3.5 w-3.5 text-sky-400" />
+              完成检测 agent 命令
+            </summary>
+            <pre className="rd-task-exec-prompt__body custom-scrollbar">{task.verify_agent_command}</pre>
+          </details>
+        ) : null}
+
         <div className="rd-task-exec-field">
           <div className="rd-task-exec-field__label">
             <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />

@@ -24,7 +24,11 @@ from synapse.rd_meeting.cli_tools import (
     normalize_cli_tool,
 )
 from synapse.rd_meeting.config_store import load_meeting_room_config
-from synapse.rd_meeting.cursor_agent_cli import check_cursor_agent_cli
+from synapse.rd_meeting.cursor_agent_cli import (
+    check_cursor_agent_cli,
+    format_argv_as_shell,
+    resolve_agent_executable,
+)
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path, scope_dir
 from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
 from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
@@ -75,6 +79,83 @@ def _repo_root() -> Path:
 
 def _cursor_operation_script() -> Path:
     return _repo_root() / "skills" / "whalecloud-dev-tool-development" / "scripts" / "cursor-operation.py"
+
+
+_cursor_operation_mod: Any = None
+
+
+def _load_cursor_operation_module() -> Any:
+    """惰性加载 cursor-operation.py（与 subprocess 调用共用同一份脚本逻辑）。"""
+    global _cursor_operation_mod
+    if _cursor_operation_mod is not None:
+        return _cursor_operation_mod
+    import importlib.util
+
+    script = _cursor_operation_script()
+    spec = importlib.util.spec_from_file_location("synapse_rd_cursor_operation", script)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"无法加载 Cursor CLI 脚本：{script}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    _cursor_operation_mod = mod
+    return mod
+
+
+def build_cursor_round_commands(
+    *,
+    code_path: str,
+    target: str,
+    func_doc: str,
+    accept_doc: str,
+    continue_session: bool = False,
+    model: str | None = None,
+    log_path: str = "",
+    timeout: int = 900,
+) -> dict[str, str]:
+    """生成任务执行轮次的完整 agent 命令与 Synapse 包装命令。"""
+    mod = _load_cursor_operation_module()
+    prompt = mod.build_develop_prompt(
+        code_path=code_path,
+        target=target,
+        doc_path=func_doc or None,
+        acceptance_doc=accept_doc or None,
+        continue_session=continue_session,
+    )
+    model_val = (model or DEFAULT_CURSOR_CLI_MODEL).strip() or DEFAULT_CURSOR_CLI_MODEL
+    cursor = mod.CursorCLI(
+        agent_path=resolve_agent_executable("agent"),
+        workspace=code_path,
+        model=model_val,
+        continue_session=continue_session,
+    )
+    agent_argv = cursor.build_argv(prompt)
+    py_argv = [
+        sys.executable,
+        str(_cursor_operation_script()),
+        "--code-path",
+        code_path,
+        "--target",
+        target,
+        "--log",
+        log_path or "(log-path)",
+        "--timeout",
+        str(timeout),
+        "--no-echo-stream",
+    ]
+    if func_doc:
+        py_argv.extend(["--doc", func_doc])
+    if accept_doc:
+        py_argv.extend(["--acceptance-doc", accept_doc])
+    if continue_session:
+        py_argv.append("--continue")
+    if model is not None:
+        py_argv.extend(["--model", model_val])
+    return {
+        "agent_command": format_argv_as_shell(agent_argv),
+        "agent_prompt": prompt,
+        "python_command": format_argv_as_shell(py_argv),
+    }
 
 
 def _result_json_path(scope_id: str) -> Path:
@@ -619,6 +700,7 @@ def _emit_task_exec_progress(
     task_index: int = 0,
     task_total: int = 0,
     log_type: str = "info",
+    display: dict[str, Any] | None = None,
 ) -> None:
     from synapse.rd_meeting.room_runtime import append_history_event
 
@@ -639,6 +721,8 @@ def _emit_task_exec_progress(
     if task_total:
         payload["task_index"] = task_index
         payload["task_total"] = task_total
+    if isinstance(display, dict) and display:
+        payload["display"] = display
     append_history_event(scope_id, payload)
 
 
@@ -837,10 +921,32 @@ def bootstrap_task_exec(
             )
             continue
 
+        develop_cmds = build_cursor_round_commands(
+            code_path=sandbox_path,
+            target=develop_prompt,
+            func_doc=func_doc,
+            accept_doc=accept_doc,
+            continue_session=False,
+            model=model_arg,
+            log_path=str(dev_log),
+        )
+        verify_cmds = build_cursor_round_commands(
+            code_path=sandbox_path,
+            target=verify_prompt,
+            func_doc=func_doc,
+            accept_doc=accept_doc,
+            continue_session=True,
+            model=model_arg,
+            log_path=str(verify_log),
+        )
         running_row = {
             **row_base,
             "develop_prompt": develop_prompt,
             "verify_prompt": verify_prompt,
+            "develop_agent_command": develop_cmds.get("agent_command") or "",
+            "verify_agent_command": verify_cmds.get("agent_command") or "",
+            "develop_python_command": develop_cmds.get("python_command") or "",
+            "verify_python_command": verify_cmds.get("python_command") or "",
             "status": "running",
             "phase": "develop",
             "error": "",
@@ -859,6 +965,19 @@ def bootstrap_task_exec(
             phase="develop",
             task_index=task_index,
             task_total=task_total,
+            display={
+                "phase": "develop",
+                "task_no": task_no,
+                "task_title": order.get("task_title") or "",
+                "task_index": task_index,
+                "task_total": task_total,
+                "sandbox_path": sandbox_path,
+                "func_doc": func_doc,
+                "acceptance_doc": accept_doc,
+                "cli_model": model_label,
+                "agent_command": develop_cmds.get("agent_command") or "",
+                "python_command": develop_cmds.get("python_command") or "",
+            },
         )
         _sync_running(
             phase="develop",
@@ -899,6 +1018,19 @@ def bootstrap_task_exec(
             phase="verify",
             task_index=task_index,
             task_total=task_total,
+            display={
+                "phase": "verify",
+                "task_no": task_no,
+                "task_title": order.get("task_title") or "",
+                "task_index": task_index,
+                "task_total": task_total,
+                "sandbox_path": sandbox_path,
+                "func_doc": func_doc,
+                "acceptance_doc": accept_doc,
+                "cli_model": model_label,
+                "agent_command": verify_cmds.get("agent_command") or "",
+                "python_command": verify_cmds.get("python_command") or "",
+            },
         )
         _sync_running(
             phase="verify",
@@ -932,6 +1064,10 @@ def bootstrap_task_exec(
             **row_base,
             "develop_prompt": develop_prompt,
             "verify_prompt": verify_prompt,
+            "develop_agent_command": develop_cmds.get("agent_command") or "",
+            "verify_agent_command": verify_cmds.get("agent_command") or "",
+            "develop_python_command": develop_cmds.get("python_command") or "",
+            "verify_python_command": verify_cmds.get("python_command") or "",
             "status": status,
             "completion": completion,
             "error": verify_result.get("error") or dev_result.get("error") or "",
