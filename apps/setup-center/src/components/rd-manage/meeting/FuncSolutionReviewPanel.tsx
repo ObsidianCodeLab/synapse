@@ -292,7 +292,7 @@ const PlanReviewCard: React.FC<{
 
           {draft.showRejectForm || needsChange ? (
             <div className="flex flex-col gap-4 rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
-              <Text className="block text-[10px] leading-relaxed text-amber-200/90">
+              <Text className="!mb-0 block text-[10px] leading-relaxed text-amber-200/90">
                 评审意见（必填，说明不合理之处或改进方向，≥{MIN_PLAN_COMMENT_LEN} 字）
               </Text>
               <TextArea
@@ -625,21 +625,23 @@ export function FuncSolutionReviewPanel({
         </section>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-5 border-t border-border/50 bg-black/20 px-6 py-4">
-        <Text className="block text-[11px] text-muted-foreground">
-          总体评审意见（全部通过时必填，≥{MIN_OVERALL_COMMENT_LEN} 字）
-        </Text>
-        <TextArea
-          rows={2}
-          value={overallComment}
-          onChange={(e) => {
-            overallCommentDirtyRef.current = true;
-            setOverallComment(e.target.value);
-          }}
-          placeholder="总结方案整体合理性；全部通过时说明同意推进的理由…"
-          className="text-[12px]"
-        />
-        <div className="flex flex-wrap justify-end gap-2">
+      <div className="shrink-0 border-t border-border/50 bg-black/20 px-6 py-4">
+        <div className="flex flex-col gap-4">
+          <Text className="!mb-0 block text-[11px] text-muted-foreground">
+            总体评审意见（全部通过时必填，≥{MIN_OVERALL_COMMENT_LEN} 字）
+          </Text>
+          <TextArea
+            rows={2}
+            value={overallComment}
+            onChange={(e) => {
+              overallCommentDirtyRef.current = true;
+              setOverallComment(e.target.value);
+            }}
+            placeholder="总结方案整体合理性；全部通过时说明同意推进的理由…"
+            className="text-[12px]"
+          />
+        </div>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button
             danger
             icon={<XCircle className="h-4 w-4" />}
