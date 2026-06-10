@@ -4550,11 +4550,12 @@ class LoginRequest(BaseModel):
             if not (self.username and self.password):
                 raise ValueError("引导验证或密码修改时 username（工号）、password 必填")
         if self.purpose == "guide":
-            if not all(
-                (self.department or "").strip()
-                and (self.team or "").strip()
-                and (self.position or "").strip()
-            ):
+            org_fields = (
+                (self.department or "").strip(),
+                (self.team or "").strip(),
+                (self.position or "").strip(),
+            )
+            if not all(org_fields):
                 raise ValueError("引导验证时 department（部门）、team（团队）、position（职位）必填")
         return self
 
