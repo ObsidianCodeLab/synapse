@@ -1402,6 +1402,9 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         ticket_title=ticket_title,
     )
     human_suggestions = str(binding.get("prompt_supplement") or "").strip()
+    from synapse.rd_meeting.room_skill import load_reprocess_reason
+
+    reprocess_reason = load_reprocess_reason(sid)
     cli_tool = str(binding.get("cli_tool") or "").strip()
     cli_model = str(binding.get("cli_model") or "").strip()
     cli_model_custom = str(binding.get("cli_model_custom") or "").strip()
@@ -1453,6 +1456,7 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         cli_model=cli_model or None,
         cli_model_custom=cli_model_custom or None,
         human_suggestions=human_suggestions,
+        reprocess_reason=reprocess_reason,
     )
 
     append_history_event(

@@ -27,6 +27,8 @@ def test_format_reprocess_instruction_renders_block(monkeypatch):
     assert "请补充接口边界说明" in text
     assert "`req_clarify`" in text
     assert "必须遵循" in text
+    assert "最高优先级" in text or "优先级" in text
+    assert "函数级方案" in text
 
 
 def test_clear_reprocess_context_if_done_only_at_anchor(monkeypatch):
@@ -53,3 +55,18 @@ def test_clear_reprocess_context_if_done_only_at_anchor(monkeypatch):
     _clear_reprocess_context_if_done(scope, "acceptance")
     assert "reprocess_reason" not in store[scope]
     assert "reprocess_until_node_id" not in store[scope]
+
+
+def test_build_task_develop_prompt_includes_reprocess_reason():
+    from synapse.rd_meeting.task_exec import build_task_develop_prompt
+
+    text = build_task_develop_prompt(
+        order={"task_no": "T-1", "task_title": "demo", "goal": "改接口", "coverage": []},
+        func_doc="/sandbox/synapse_archive/需求设计/func_solution/函数级方案.md",
+        accept_doc="",
+        human_suggestions="",
+        reprocess_reason="必须改用 JWT，不要 session",
+    )
+    assert "用户重处理要求" in text
+    assert "必须改用 JWT" in text
+    assert "高于函数级方案" in text

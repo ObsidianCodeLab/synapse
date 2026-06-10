@@ -710,16 +710,35 @@ def _format_hitl_artifact_lines(
         f"``whalecloud-dev-tool-doc-generate`` 的 ``CONTEXT_JSON`` 应指向该文件；**禁止**自写 ``clarify_context.json`` 等替代台账。",
     ]
 
-def format_reprocess_instruction(scope_id: str, node_id: str) -> str:
-    """若存在一次性重处理原因，渲染须注入 system 的说明段。"""
+def load_reprocess_reason(scope_id: str) -> str:
+    """读取一次性重处理原因（room_state.reprocess_reason）。"""
     from synapse.rd_meeting.room_runtime import load_room_state
 
     sid = (scope_id or "").strip()
-    nid = (node_id or "").strip()
     if not sid:
         return ""
     rs = load_room_state(sid) or {}
-    reason = str(rs.get("reprocess_reason") or "").strip()
+    return str(rs.get("reprocess_reason") or "").strip()
+
+
+def format_reprocess_priority_lines(reason: str) -> list[str]:
+    """用户重处理要求的核心约束（会议室 Agent / Cursor CLI 共用）。"""
+    text = (reason or "").strip()
+    if not text:
+        return []
+    return [
+        f"- **用户重处理要求**：{text}",
+        "- **优先级（最高）**：本条为**用户重处理要求**，优先级**高于**函数级方案、"
+        "验收标准、需求澄清、历史产出与本节点一切既有结论；发生冲突时**必须以用户重处理要求为准**重新执行。",
+        "- **硬性约束**：不得用旧结论搪塞；不得因方案已写定而拒绝按用户重处理要求调整。",
+    ]
+
+
+def format_reprocess_instruction(scope_id: str, node_id: str) -> str:
+    """若存在一次性重处理原因，渲染须注入 system 的说明段。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    reason = load_reprocess_reason(sid)
     if not reason:
         return ""
 
@@ -728,9 +747,7 @@ def format_reprocess_instruction(scope_id: str, node_id: str) -> str:
         "## 重新处理指令（用户发起，必须遵循）",
         "",
         f"- **状态**：本节点 {node_label} 正处于**重新处理**流程（非首次执行）。",
-        f"- **用户要求**：{reason}",
-        "- **硬性约束**：你必须按照上述用户重处理的想法与意图进行处理，"
-        "不得以旧结论搪塞；若与历史产出冲突，以用户本次重处理要求为准。",
+        *format_reprocess_priority_lines(reason),
     ]
     return "\n".join(lines)
 

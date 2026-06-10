@@ -243,16 +243,30 @@ def build_task_develop_prompt(
     func_doc: str,
     accept_doc: str,
     human_suggestions: str,
+    reprocess_reason: str = "",
 ) -> str:
     goal = str(order.get("goal") or order.get("task_title") or "完成功能点开发").strip()
     coverage = order.get("coverage") if isinstance(order.get("coverage"), list) else []
     cov_text = "、".join(str(x) for x in coverage if str(x).strip()) or "见函数级方案"
-    lines = [
-        "【任务执行 · 开发轮】",
-        f"工单：{order.get('task_no')} {order.get('task_title') or ''}".strip(),
-        f"任务目标：{goal}",
-        f"功能覆盖范围：{cov_text}",
-    ]
+    lines: list[str] = []
+    reason = (reprocess_reason or "").strip()
+    if reason:
+        lines.extend(
+            [
+                "【用户重处理要求 · 最高优先级】",
+                f"用户重处理要求：{reason}",
+                "本条优先级高于函数级方案、验收标准及一切历史结论；冲突时以用户重处理要求为准。",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "【任务执行 · 开发轮】",
+            f"工单：{order.get('task_no')} {order.get('task_title') or ''}".strip(),
+            f"任务目标：{goal}",
+            f"功能覆盖范围：{cov_text}",
+        ]
+    )
     if func_doc:
         lines.append(f"函数级方案文档：{func_doc}")
     if accept_doc:
@@ -275,16 +289,30 @@ def build_task_verify_prompt(
     func_doc: str,
     human_suggestions: str,
     develop_log_hint: str,
+    reprocess_reason: str = "",
 ) -> str:
     goal = str(order.get("goal") or "").strip()
     coverage = order.get("coverage") if isinstance(order.get("coverage"), list) else []
     cov_text = "、".join(str(x) for x in coverage if str(x).strip()) or "见函数级方案"
-    lines = [
-        "【任务执行 · 完成检测轮】",
-        "请对照任务目标、功能覆盖与函数级方案，检查刚才的开发是否已完成。",
-        f"任务目标：{goal}",
-        f"功能覆盖：{cov_text}",
-    ]
+    lines: list[str] = []
+    reason = (reprocess_reason or "").strip()
+    if reason:
+        lines.extend(
+            [
+                "【用户重处理要求 · 最高优先级】",
+                f"用户重处理要求：{reason}",
+                "完成检测时须以用户重处理要求为准；若与函数级方案冲突，以用户重处理要求优先。",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "【任务执行 · 完成检测轮】",
+            "请对照任务目标、功能覆盖与函数级方案，检查刚才的开发是否已完成。",
+            f"任务目标：{goal}",
+            f"功能覆盖：{cov_text}",
+        ]
+    )
     if func_doc:
         lines.append(f"函数级方案：{func_doc}")
     if human_suggestions.strip():
@@ -734,9 +762,17 @@ def bootstrap_task_exec(
     cli_model: str | None = None,
     cli_model_custom: str | None = None,
     human_suggestions: str = "",
+    reprocess_reason: str | None = None,
 ) -> dict[str, Any]:
     """循环处理工单：CLI 开发 + 完成检测 + 持久化。"""
     sid = (scope_id or "").strip()
+    from synapse.rd_meeting.room_skill import load_reprocess_reason
+
+    reprocess_text = (
+        str(reprocess_reason).strip()
+        if reprocess_reason is not None
+        else load_reprocess_reason(sid)
+    )
     tool = normalize_cli_tool(cli_tool or resolve_cli_tool_for_node(NODE_ID))
     preset, custom = resolve_cli_model_for_node(NODE_ID)
     if cli_model is not None:
@@ -882,12 +918,14 @@ def bootstrap_task_exec(
             func_doc=func_doc,
             accept_doc=accept_doc,
             human_suggestions=human_suggestions,
+            reprocess_reason=reprocess_text,
         )
         verify_prompt = build_task_verify_prompt(
             order=order,
             func_doc=func_doc,
             human_suggestions=human_suggestions,
             develop_log_hint=str(dev_log),
+            reprocess_reason=reprocess_text,
         )
 
         if not sandbox_path or not Path(sandbox_path).is_dir():

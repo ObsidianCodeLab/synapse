@@ -370,11 +370,12 @@ export function TaskExecReviewPanel({
   const ok = Number(summary?.ok || 0);
   const total = Number(summary?.total || tasks.length);
   const progress = payload.progress;
-  const progressText =
-    (progress?.message || '').trim() ||
-    (progress?.task_total
-      ? `工单 ${progress.task_index || 0}/${progress.task_total} · ${PHASE_LABEL[String(progress.phase || '')] || progress.phase || '执行中'}`
-      : 'CLI 任务执行进行中…');
+  const cliLogStatusHint =
+    isRunning &&
+    ((progress?.message || '').trim() ||
+      (progress?.task_total
+        ? `工单 ${progress.task_no || progress.task_index || 0} · ${PHASE_LABEL[String(progress.phase || '')] || progress.phase || '执行中'}（${progress.task_index || 0}/${progress.task_total}）`
+        : 'CLI 任务执行进行中…'));
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -386,31 +387,12 @@ export function TaskExecReviewPanel({
         onReady={() => void onAgentReady()}
       />
       <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
-      {isRunning ? (
-        <Alert
-          type="info"
-          showIcon
-          icon={<Loader2 className="h-4 w-4 animate-spin" />}
-          message="CLI 任务执行进行中"
-          description={
-            <div className="space-y-1 text-[12px]">
-              <p className="m-0">{progressText}</p>
-              {progress?.task_total ? (
-                <p className="m-0 text-muted-foreground">
-                  进度 {progress.task_index || 0}/{progress.task_total}
-                  {progress.task_no ? ` · 当前工单 ${progress.task_no}` : ''}
-                </p>
-              ) : null}
-            </div>
-          }
-        />
-      ) : null}
-
       {showCliLog ? (
         <TaskExecCliLogViewer
           entries={liveTail?.entries}
           lines={liveTail?.lines}
           path={liveTail?.path}
+          statusHint={cliLogStatusHint || undefined}
           loading={isRunning}
           footerRef={liveTailEndRef}
         />

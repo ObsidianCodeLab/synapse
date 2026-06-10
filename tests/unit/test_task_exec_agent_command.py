@@ -13,20 +13,35 @@ def test_format_argv_as_shell_quotes_spaces():
     assert cmd.startswith("agent -p --workspace")
 
 
-def test_build_cursor_round_commands_includes_prompt():
+def test_build_cursor_round_commands_includes_prompt(tmp_path):
+    sandbox = tmp_path / "ZmdbCore"
+    archive = sandbox / "synapse_archive" / "需求设计" / "func_solution"
+    archive.mkdir(parents=True)
+    (sandbox / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+    func_doc = sandbox / "synapse_archive" / "需求设计" / "func_solution" / "函数级方案.md"
+    func_doc.write_text("# 方案", encoding="utf-8")
+    accept_doc = (
+        sandbox / "synapse_archive" / "需求分析" / "acceptance" / "验收标准.md"
+    )
+    accept_doc.parent.mkdir(parents=True, exist_ok=True)
+    accept_doc.write_text("# 验收", encoding="utf-8")
+
     cmds = build_cursor_round_commands(
-        code_path="D:/sandbox/ZmdbCore",
+        code_path=str(sandbox),
         target="【任务执行 · 开发轮】\n工单：T-001",
-        func_doc="D:/sandbox/ZmdbCore/synapse_archive/需求设计/func_solution/函数级方案.md",
-        accept_doc="D:/sandbox/ZmdbCore/synapse_archive/需求分析/acceptance/验收标准.md",
+        func_doc=str(func_doc),
+        accept_doc=str(accept_doc),
         continue_session=False,
         model="composer-2.5",
-        log_path="D:/logs/develop.log",
+        log_path=str(tmp_path / "develop.log"),
     )
     agent_cmd = cmds.get("agent_command") or ""
+    prompt = cmds.get("agent_prompt") or ""
     assert "agent" in agent_cmd or "node.exe" in agent_cmd
     assert "--workspace" in agent_cmd
-    assert "函数级方案" in agent_cmd or "函数级方案.md" in agent_cmd
+    assert "函数级方案" in prompt or "函数级方案.md" in prompt
+    assert "AGENTS.md" in prompt
+    assert "忽略 AGENTS.md" in prompt
     assert cmds.get("python_command")
     assert "cursor-operation.py" in cmds.get("python_command", "")
 

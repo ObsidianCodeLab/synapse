@@ -122,6 +122,9 @@ interface Props {
   entries?: TaskExecCliLogEntry[] | null;
   lines?: string[] | null;
   path?: string;
+  /** 合并到标题右侧的执行状态（如：工单 11924053 · Cursor 开发轮（1/1）） */
+  statusHint?: string;
+  /** 右侧展示处理中 loading */
   loading?: boolean;
   emptyText?: string;
   maxHeightClass?: string;
@@ -132,30 +135,38 @@ export function TaskExecCliLogViewer({
   entries,
   lines,
   path,
+  statusHint,
   loading = false,
   emptyText = '等待 Cursor CLI 输出…',
   maxHeightClass = 'max-h-72',
   footerRef,
 }: Props) {
+  const hint = (statusHint || '').trim();
   const hasEntries = Array.isArray(entries) && entries.length > 0;
   const hasLines = Array.isArray(lines) && lines.length > 0;
 
   return (
     <div className="rounded-xl border border-slate-700/60 bg-slate-950/80 overflow-hidden">
       <div className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
-          ) : (
-            <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-          )}
-          CLI 执行日志
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <Terminal className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+          <span className="shrink-0">CLI 执行日志</span>
+          {hint ? (
+            <span className="truncate text-foreground/85" title={hint}>
+              · {hint}
+            </span>
+          ) : null}
         </span>
-        {path ? (
-          <span className="truncate font-mono text-[10px] opacity-70" title={path}>
-            {path.split(/[/\\]/).pop()}
-          </span>
-        ) : null}
+        <span className="inline-flex shrink-0 items-center gap-1.5">
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" aria-label="处理中" />
+          ) : null}
+          {path ? (
+            <span className="truncate font-mono text-[10px] opacity-70 max-w-[10rem]" title={path}>
+              {path.split(/[/\\]/).pop()}
+            </span>
+          ) : null}
+        </span>
       </div>
       <div className={`${maxHeightClass} overflow-y-auto custom-scrollbar p-2 space-y-1.5`}>
         {hasEntries ? (

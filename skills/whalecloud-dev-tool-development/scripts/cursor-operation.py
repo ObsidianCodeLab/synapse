@@ -66,6 +66,22 @@ def find_repo_root_with_synapse_archive(start: Path) -> Optional[Path]:
     return None
 
 
+def resolve_agents_md_path(code_path: str) -> Optional[Path]:
+    """解析工作区 AGENTS.md（与 synapse_archive 同级的代码根目录）。"""
+    code = Path(code_path).resolve()
+    if not code.exists():
+        return None
+    repo_root = find_repo_root_with_synapse_archive(code)
+    if repo_root is None:
+        for candidate in [code, *code.parents]:
+            agents = candidate / "AGENTS.md"
+            if agents.is_file():
+                return agents
+        return None
+    agents = repo_root / "AGENTS.md"
+    return agents if agents.is_file() else None
+
+
 def _is_workdir_archive_doc(path: Path) -> bool:
     """是否为会议室 {WORK_DIR}/archive/需求设计|需求分析 下的文档（Cursor 不可读）。"""
     parts = path.parts
@@ -504,6 +520,9 @@ def build_develop_prompt(
             fix_feedback.strip(),
             "",
         ]
+        agents_md = resolve_agents_md_path(code_path)
+        if agents_md is not None:
+            parts.append(f"请继续遵守 AGENTS.md：{agents_md}")
         if doc_path:
             parts.append(f"请继续参照函数级方案文档：{doc_path}")
         if acceptance_doc:
@@ -519,6 +538,22 @@ def build_develop_prompt(
         return continue_prefix + "\n".join(parts)
 
     parts: list[str] = []
+    agents_md = resolve_agents_md_path(code_path)
+    if agents_md is not None:
+        parts.append(
+            f"请先阅读并严格遵守 AGENTS.md（工作区研发总规范）：{agents_md}"
+        )
+        parts.append(
+            "AGENTS.md 与函数级方案、验收标准同等重要：须遵守其中研发流程、"
+            "synapse_archive 文档路径约定、语言规范与控熵规则；不得以「任务目标」为由忽略 AGENTS.md。"
+        )
+        parts.append(
+            "若任务目标或 AGENTS.md §1.8 出现「用户重处理要求」，其优先级高于函数级方案与一切历史结论。"
+        )
+    else:
+        parts.append(
+            f"若工作区存在 AGENTS.md，须先阅读并遵守；代码工作目录：{code_path}"
+        )
     if doc_path:
         parts.append(f"请阅读函数级方案文档：{doc_path}")
         parts.append("然后根据文档描述的函数实现要求，修改代码目录中的源代码。")
