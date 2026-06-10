@@ -796,7 +796,9 @@ async def get_task_exec(room_id: str) -> dict:
         return error_response(404, "task_exec_not_found")
     room_state = load_room_state(sid) or {}
     pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
-    live_tail = read_task_exec_live_tail(sid) if str(payload.get("status") or "") == "running" else None
+    live_tail = read_task_exec_live_tail(sid)
+    if not live_tail.get("path"):
+        live_tail = None
     return success_response(
         {
             "room_id": room_id,

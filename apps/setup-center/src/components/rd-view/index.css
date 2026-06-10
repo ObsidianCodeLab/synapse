@@ -366,56 +366,70 @@
   min-width: 0;
 }
 
+/* 亮色主题：wrapper 不参与布局，保持原有结构 */
+.work-order-card-inner {
+  display: contents;
+}
+
 .work-order-card {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-card);
+  border: var(--wo-item-border-width) solid var(--wo-item-border);
+  border-left-width: calc(var(--wo-item-border-width) + var(--wo-accent-width));
+  border-radius: var(--wo-item-radius);
+  background: var(--wo-item-bg);
   overflow: hidden;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.work-order-card--success {
-  background: var(--success-bg);
-  border-color: var(--success-border);
+.work-order-card--completed {
+  background: var(--wo-item-bg-completed);
+  border-color: var(--wo-item-border-completed);
+  border-left-color: var(--wo-accent-completed);
+}
+
+.work-order-card--inProgress {
+  background: var(--wo-item-bg-inProgress);
+  border-color: var(--wo-item-border-inProgress);
+  border-left-color: var(--wo-accent-inProgress);
+}
+
+.work-order-card--pending {
+  background: var(--wo-item-bg-pending);
+  border-color: var(--wo-item-border-pending);
+  border-left-color: var(--wo-accent-pending);
 }
 
 .work-order-card--error {
-  background: var(--error-bg);
-  border-color: var(--error-border);
+  background: var(--wo-item-bg-error);
+  border-color: var(--wo-item-border-error);
+  border-left-color: var(--wo-accent-error);
 }
 
-.work-order-card--default:hover {
-  border-color: var(--primary-border);
-  box-shadow: 0 2px 8px rgba(22, 93, 255, 0.08);
+.work-order-card--completed:hover,
+.work-order-card--inProgress:hover,
+.work-order-card--pending:hover,
+.work-order-card--error:hover {
+  box-shadow: var(--wo-item-hover-shadow);
 }
 
-.work-order-card--success:hover {
-  border-color: #00B42A;
-  box-shadow: 0 2px 8px rgba(0, 180, 42, 0.12);
+.work-order-card--completed:hover {
+  border-left-color: var(--wo-accent-completed);
+}
+
+.work-order-card--inProgress:hover {
+  border-left-color: var(--wo-accent-inProgress);
+}
+
+.work-order-card--pending:hover {
+  border-left-color: var(--wo-accent-pending);
 }
 
 .work-order-card--error:hover {
-  border-color: #F53F3F;
-  box-shadow: 0 2px 8px rgba(245, 63, 63, 0.12);
-}
-
-.work-order-card--success .work-order-emoji-bar {
-  background: rgba(255, 255, 255, 0.55);
-  border-top-color: #B7EB8F;
-}
-
-.work-order-card--error .work-order-emoji-bar {
-  background: rgba(255, 255, 255, 0.55);
-  border-top-color: #FFCCC7;
-}
-
-.work-order-card--default .work-order-emoji-bar {
-  background: var(--bg-muted);
+  border-left-color: var(--wo-accent-error);
 }
 
 .work-order-card-main {
@@ -426,28 +440,59 @@
   width: 100%;
   padding: 8px 10px 4px;
   border: none;
-  background: transparent;
+  border-radius: 0;
+  background: var(--wo-item-main-bg);
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
   text-align: left;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-.work-order-card-main:hover {
-  background: var(--bg-subtle);
+.work-order-card-main:hover,
+.work-order-card-main:focus-visible {
+  background: var(--wo-item-main-hover-bg);
+  border: none;
+  outline: none;
+}
+
+/* 亮色：覆盖全局 button hover 灰底/阴影，避免主内容区 hover 发灰 */
+.rdViewRoot button.work-order-card-main,
+.rdViewRoot button.work-order-card-main:hover,
+.rdViewRoot button.work-order-card-main:focus-visible {
+  background: var(--wo-item-main-bg) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-weight: inherit !important;
+  letter-spacing: normal !important;
+}
+
+.rdViewRoot .work-order-card--completed:hover,
+.rdViewRoot .work-order-card--inProgress:hover,
+.rdViewRoot .work-order-card--pending:hover,
+.rdViewRoot .work-order-card--error:hover {
+  box-shadow: none;
 }
 
 .work-order-emoji-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  padding: 4px 10px 8px;
-  border-top: 1px solid var(--border-light);
-  background: var(--bg-subtle);
-  border-radius: 0 0 8px 8px;
+  padding: 0 10px 8px;
+  border-top: var(--wo-emoji-bar-border-width) solid var(--wo-emoji-bar-border);
+  background: var(--wo-emoji-bar-bg);
+  border-radius: 0 0 var(--wo-item-radius) var(--wo-item-radius);
 }
 
 .work-order-emoji-picker-wrap {
   position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .work-order-emoji-trigger--selected {
@@ -486,12 +531,16 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--wo-emoji-trigger-border);
   border-radius: 12px;
-  background: var(--bg-card);
+  background: var(--wo-emoji-trigger-bg);
   font-size: 10px;
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-muted);
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .work-order-emoji-trigger:hover,
@@ -586,12 +635,98 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid;
+  border: 1px solid var(--wo-avatar-border);
+  background: var(--wo-avatar-bg);
+  color: var(--wo-avatar-color);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 600;
+}
+
+.work-order-status-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 6px;
+  height: 18px;
+  font-size: 10px;
+  line-height: 18px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+.work-order-status-tag--completed {
+  color: var(--wo-tag-completed-fg);
+  background: var(--wo-tag-completed-bg);
+  border-color: var(--wo-tag-completed-border);
+}
+
+.work-order-status-tag--inProgress {
+  color: var(--wo-tag-inProgress-fg);
+  background: var(--wo-tag-inProgress-bg);
+  border-color: var(--wo-tag-inProgress-border);
+}
+
+.work-order-status-tag--pending {
+  color: var(--wo-tag-pending-fg);
+  background: var(--wo-tag-pending-bg);
+  border-color: var(--wo-tag-pending-border);
+}
+
+.work-order-status-tag--error {
+  color: var(--wo-tag-error-fg, var(--wo-tag-sop-abnormal-fg));
+  background: var(--wo-tag-error-bg, var(--wo-tag-sop-abnormal-bg));
+  border-color: var(--wo-tag-error-border, var(--wo-tag-sop-abnormal-border));
+}
+
+.work-order-sop-inline-tag {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 6px;
+  height: 18px;
+  font-size: 10px;
+  line-height: 18px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-order-sop-inline-tag--completed {
+  color: var(--wo-tag-sop-completed-fg);
+  background: var(--wo-tag-sop-completed-bg);
+  border-color: var(--wo-tag-sop-completed-border);
+}
+
+.work-order-sop-inline-tag--running {
+  color: var(--wo-tag-sop-running-fg);
+  background: var(--wo-tag-sop-running-bg);
+  border-color: var(--wo-tag-sop-running-border);
+}
+
+.work-order-sop-inline-tag--manual {
+  color: var(--wo-tag-sop-manual-fg);
+  background: var(--wo-tag-sop-manual-bg);
+  border-color: var(--wo-tag-sop-manual-border);
+}
+
+.work-order-sop-inline-tag--abnormal {
+  color: var(--wo-tag-sop-abnormal-fg);
+  background: var(--wo-tag-sop-abnormal-bg);
+  border-color: var(--wo-tag-sop-abnormal-border);
+}
+
+.work-order-sop-inline-tag--pending {
+  color: var(--wo-tag-sop-pending-fg);
+  background: var(--wo-tag-sop-pending-bg);
+  border-color: var(--wo-tag-sop-pending-border);
 }
 
 .work-scroll-body {
@@ -639,6 +774,8 @@
   align-items: center;
   gap: 4px;
   min-height: 22px;
+  flex: 1;
+  min-width: 0;
 }
 
 .work-order-row-title {
@@ -680,7 +817,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 .work-order-drawer-title {
@@ -1020,9 +1157,10 @@
 }
 
 .work-order-sop-outputs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin-bottom: 10px;
 }
 
@@ -1030,16 +1168,83 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   font-size: 12px;
-  font-weight: 500;
-  color: #165DFF;
-  background: var(--primary-soft);
-  border-radius: 6px;
-  padding: 6px 10px;
-  min-width: 0;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--primary);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: left;
+  letter-spacing: normal;
+}
+
+.work-order-sop-output .anticon,
+.work-order-sop-output-label {
+  color: var(--primary);
+}
+
+.work-order-sop-output .anticon {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.work-order-sop-output-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.work-order-sop-output:hover,
+.work-order-sop-output:focus-visible {
+  color: var(--primary-hover);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.work-order-sop-output:hover .anticon,
+.work-order-sop-output:hover .work-order-sop-output-label,
+.work-order-sop-output:focus-visible .anticon,
+.work-order-sop-output:focus-visible .work-order-sop-output-label {
+  color: var(--primary-hover);
+}
+
+.rdViewRoot button.work-order-sop-output,
+.rdViewRoot button.work-order-sop-output:hover,
+.rdViewRoot button.work-order-sop-output:focus-visible,
+.work-order-drawer button.work-order-sop-output,
+.work-order-drawer button.work-order-sop-output:hover,
+.work-order-drawer button.work-order-sop-output:focus-visible {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+  color: var(--primary) !important;
+}
+
+.rdViewRoot button.work-order-sop-output:hover,
+.rdViewRoot button.work-order-sop-output:focus-visible,
+.work-order-drawer button.work-order-sop-output:hover,
+.work-order-drawer button.work-order-sop-output:focus-visible {
+  color: var(--primary-hover) !important;
+}
+
+.rdViewRoot button.work-order-sop-output .anticon,
+.rdViewRoot button.work-order-sop-output .work-order-sop-output-label,
+.work-order-drawer button.work-order-sop-output .anticon,
+.work-order-drawer button.work-order-sop-output .work-order-sop-output-label {
+  color: inherit !important;
 }
 
 .work-order-sop-dialogues-wrap {
@@ -1575,6 +1780,25 @@
   padding-right: 4px;
 }
 
+/* Drawer portal 在 rdViewRoot 外，依赖 palette 注入 + 变量兜底 */
+.person-workload-drawer .recharts-text,
+[data-theme='dark'] .person-workload-drawer .recharts-text,
+[data-theme='daltonized-dark'] .person-workload-drawer .recharts-text,
+[data-theme='high-contrast'] .person-workload-drawer .recharts-text {
+  fill: var(--text-muted) !important;
+}
+
+.person-workload-drawer .recharts-tooltip-cursor,
+[data-theme='dark'] .rdViewRoot .person-workload-chart .recharts-tooltip-cursor,
+[data-theme='dark'] .person-workload-drawer .recharts-tooltip-cursor,
+[data-theme='daltonized-dark'] .rdViewRoot .person-workload-chart .recharts-tooltip-cursor,
+[data-theme='daltonized-dark'] .person-workload-drawer .recharts-tooltip-cursor,
+[data-theme='high-contrast'] .rdViewRoot .person-workload-chart .recharts-tooltip-cursor,
+[data-theme='high-contrast'] .person-workload-drawer .recharts-tooltip-cursor {
+  fill: var(--chart-hover-row) !important;
+  fill-opacity: 1 !important;
+}
+
 /* ========== 顶栏 & 主题切换 ========== */
 .dashboard-header {
   position: relative;
@@ -1645,23 +1869,95 @@
   box-shadow: 0 4px 20px var(--shadow-card-hover);
 }
 
-[data-theme='dark'] .work-order-card-main:hover {
-  background: var(--bg-card-hover);
-}
-
-[data-theme='dark'] .work-order-card--default .work-order-emoji-bar {
-  background: rgba(255, 255, 255, 0.06);
-  border-top-color: rgba(255, 255, 255, 0.1);
-}
-
 [data-theme='dark'] .efficiency-popover-viewport--interactive .efficiency-popover-row:hover,
 [data-theme='dark'] .efficiency-popover-viewport--interactive .order-coverage-row:hover {
   background: var(--bg-muted);
 }
 
-[data-theme='dark'] .work-order-emoji-trigger {
-  background: var(--bg-elevated);
+[data-theme='dark'] .recharts-text {
+  fill: var(--text-muted);
+}
+
+/* 工作内容工单卡片 — 仅暗色系 */
+[data-theme='dark'] .rdViewRoot .work-order-card-inner,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-card-inner,
+[data-theme='high-contrast'] .rdViewRoot .work-order-card-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-card-main,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-card-main,
+[data-theme='high-contrast'] .rdViewRoot .work-order-card-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 10px 0 !important;
+  background: var(--wo-item-main-bg) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-weight: inherit !important;
+  letter-spacing: normal !important;
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-card-main:hover,
+[data-theme='dark'] .rdViewRoot .work-order-card-main:focus-visible,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-card-main:hover,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-card-main:focus-visible,
+[data-theme='high-contrast'] .rdViewRoot .work-order-card-main:hover,
+[data-theme='high-contrast'] .rdViewRoot .work-order-card-main:focus-visible {
+  background: var(--wo-item-main-hover-bg) !important;
+  border: none !important;
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-emoji-bar,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-bar,
+[data-theme='high-contrast'] .rdViewRoot .work-order-emoji-bar {
+  flex-shrink: 0;
+  padding: 4px 10px 8px;
+  border-top: none;
+  background: transparent;
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-row-status-line,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-row-status-line,
+[data-theme='high-contrast'] .rdViewRoot .work-order-row-status-line {
+  min-height: 18px;
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-sop-inline-tag--abnormal,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-sop-inline-tag--abnormal,
+[data-theme='high-contrast'] .rdViewRoot .work-order-sop-inline-tag--abnormal {
+  background: transparent;
+  border-color: var(--wo-tag-sop-abnormal-fg);
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-emoji-trigger,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger,
+[data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.12);
   color: var(--text-muted);
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-emoji-trigger:hover,
+[data-theme='dark'] .rdViewRoot .work-order-emoji-trigger--active,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger:hover,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger--active,
+[data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger:hover,
+[data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger--active {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary);
+}
+
+[data-theme='dark'] .rdViewRoot .work-order-status-tag--error,
+[data-theme='daltonized-dark'] .rdViewRoot .work-order-status-tag--error,
+[data-theme='high-contrast'] .rdViewRoot .work-order-status-tag--error {
+  color: var(--wo-tag-error-fg);
+  background: var(--wo-tag-error-bg);
+  border-color: var(--wo-tag-error-border);
 }
 
 [data-theme='dark'] .work-order-sop-node-stats,
@@ -1740,8 +2036,4 @@
 [data-theme='dark'] .recharts-cartesian-grid-horizontal line,
 [data-theme='dark'] .recharts-cartesian-grid-vertical line {
   stroke: var(--chart-grid);
-}
-
-[data-theme='dark'] .recharts-text {
-  fill: var(--text-muted);
 }

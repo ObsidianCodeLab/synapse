@@ -565,9 +565,19 @@ export interface TaskExecProgress {
   updated_at?: string;
 }
 
+export interface TaskExecCliLogEntry {
+  kind?: string;
+  time?: string;
+  text?: string;
+  tool?: string;
+  detail?: string;
+  status?: string;
+}
+
 export interface TaskExecLiveTail {
   path?: string;
   lines?: string[];
+  entries?: TaskExecCliLogEntry[];
   updated_at?: string;
   line_count?: number;
 }
