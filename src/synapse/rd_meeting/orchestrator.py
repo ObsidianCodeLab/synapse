@@ -17,7 +17,7 @@ from synapse.rd_meeting.agent_activity import (
     set_agent_activity_binding,
 )
 from synapse.rd_meeting.agent_prompt import set_meeting_prompt_node_id
-from synapse.rd_meeting.agent_runtime import apply_meeting_agent_runtime
+from synapse.rd_meeting.agent_runtime import apply_meeting_agent_runtime, meeting_skill_load_ids
 from synapse.rd_meeting.agent_session import (
     bind_meeting_agent_session,
     clear_meeting_agent_session,
@@ -96,6 +96,7 @@ from synapse.rd_sop.nodes import (
     stage_id_for_node_id,
     stage_name_for_id,
 )
+from synapse.skills.load_scope import get_or_create_with_skill_ids
 
 _MAX_SKIP_CHAIN = len(ALL_NODES) + 2
 
@@ -277,9 +278,11 @@ class MeetingRoomOrchestrator:
                 logger.warning("worker profile %s not found, skip prewarm", wid)
                 continue
             try:
-                worker_agent = await agent_pool.get_or_create(
-                    session_id=f"rd_meeting:{room_id}:{wid}",
-                    profile=profile,
+                worker_agent = await get_or_create_with_skill_ids(
+                    agent_pool,
+                    f"rd_meeting:{room_id}:{wid}",
+                    profile,
+                    meeting_skill_load_ids(profile),
                 )
             except Exception as exc:
                 logger.warning("prewarm worker %s failed: %s", wid, exc)
@@ -2194,9 +2197,11 @@ class MeetingRoomOrchestrator:
                 )
 
                 host_sid = host_session_id(room_id)
-                host_agent = await agent_pool.get_or_create(
-                    session_id=host_sid,
-                    profile=host_profile,
+                host_agent = await get_or_create_with_skill_ids(
+                    agent_pool,
+                    host_sid,
+                    host_profile,
+                    meeting_skill_load_ids(host_profile),
                 )
                 reused_prompt = self._configure_meeting_agent(
                     host_agent,

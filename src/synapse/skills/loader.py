@@ -273,12 +273,18 @@ class SkillLoader:
 
         return directories
 
-    def load_all(self, base_path: Path | None = None) -> int:
+    def load_all(
+        self,
+        base_path: Path | None = None,
+        *,
+        only_ids: set[str] | None = None,
+    ) -> int:
         """
         从所有标准目录加载技能
 
         Args:
             base_path: 基础路径
+            only_ids: 非空时仅 parse 目录名在此集合内的 skill（id = 目录名）
 
         Returns:
             加载的技能数量
@@ -312,13 +318,14 @@ class SkillLoader:
             loaded += self.load_from_directory(
                 skill_dir,
                 _readonly=is_readonly_root,
+                only_ids=only_ids,
             )
 
-        loaded += self._load_cli_anything_skills()
+        loaded += self._load_cli_anything_skills(only_ids=only_ids)
 
         return loaded
 
-    def _load_cli_anything_skills(self) -> int:
+    def _load_cli_anything_skills(self, *, only_ids: set[str] | None = None) -> int:
         """Discover and load SKILL.md files from pip-installed cli-anything-* packages.
 
         CLI-Anything generates SKILL.md alongside each CLI harness. When installed
@@ -352,6 +359,8 @@ class SkillLoader:
                         full_path = rel_path.locate()
                         if isinstance(full_path, Path) and full_path.exists():
                             skill_dir = full_path.parent
+                            if only_ids is not None and skill_dir.name not in only_ids:
+                                continue
                             skill = self.load_skill(skill_dir, force=True)
                             if skill:
                                 loaded += 1
@@ -371,6 +380,7 @@ class SkillLoader:
         *,
         force: bool = True,
         _readonly: bool = False,
+        only_ids: set[str] | None = None,
     ) -> int:
         """从目录递归加载所有技能。
 
@@ -404,6 +414,10 @@ class SkillLoader:
 
             skill_md = item / "SKILL.md"
             if skill_md.exists():
+                if only_ids is not None and item.name not in only_ids:
+                    continue
+                if not force and item.name in self._loaded_skills:
+                    continue
                 try:
                     skill = self.load_skill(item, force=force)
                     if skill:
@@ -430,6 +444,7 @@ class SkillLoader:
                     item,
                     force=force,
                     _readonly=child_readonly,
+                    only_ids=only_ids,
                 )
             elif item.name.startswith(".") or item.name.startswith("_"):
                 continue
@@ -438,6 +453,7 @@ class SkillLoader:
                     item,
                     force=force,
                     _readonly=_readonly,
+                    only_ids=only_ids,
                 )
 
         logger.info(f"Loaded {loaded} skills from {directory}")

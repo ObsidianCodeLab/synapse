@@ -671,7 +671,9 @@ class AgentOrchestrator:
             ensure_meeting_agent_configured,
             resolve_rd_meeting_pool_session_id,
         )
+        from synapse.rd_meeting.agent_runtime import meeting_skill_load_ids
         from synapse.rd_meeting.live import parse_rd_meeting_session
+        from synapse.skills.load_scope import get_or_create_with_skill_ids
 
         pool_session_id = resolve_rd_meeting_pool_session_id(
             session.id, agent_profile_id, depth=depth
@@ -690,7 +692,15 @@ class AgentOrchestrator:
                 profile.timeout_seconds,
             )
 
-        agent = await self._pool.get_or_create(pool_session_id, profile)
+        if meeting_ctx:
+            agent = await get_or_create_with_skill_ids(
+                self._pool,
+                pool_session_id,
+                profile,
+                meeting_skill_load_ids(profile),
+            )
+        else:
+            agent = await self._pool.get_or_create(pool_session_id, profile)
 
         if meeting_ctx:
             ensure_meeting_agent_configured(

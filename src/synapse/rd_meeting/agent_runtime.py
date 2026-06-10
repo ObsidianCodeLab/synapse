@@ -275,6 +275,21 @@ def format_meeting_skill_guidance_section(skill_summaries: list[str]) -> str:
     )
 
 
+def meeting_skill_load_ids(profile: AgentProfile | None) -> list[str]:
+    """会议室 host/worker 启动时应从磁盘加载的 skill_id（目录名）。"""
+    from synapse.agents.factory import ESSENTIAL_SYSTEM_SKILLS
+    from synapse.skills.load_scope import normalize_skill_dir_id
+
+    ids: list[str] = [normalize_skill_dir_id(x) for x in ESSENTIAL_SYSTEM_SKILLS]
+    seen = set(ids)
+    for sid in skill_ids_from_profile(profile):
+        key = normalize_skill_dir_id(sid)
+        if key and key not in seen:
+            seen.add(key)
+            ids.append(key)
+    return ids
+
+
 def apply_meeting_slim_tools(agent: Any, role: MeetingRole) -> None:
     """任务级裁剪工具列表；首次裁剪前保存 _meeting_orig_tools 供会议结束后恢复。"""
     allowed = meeting_tool_names_for_role(role)

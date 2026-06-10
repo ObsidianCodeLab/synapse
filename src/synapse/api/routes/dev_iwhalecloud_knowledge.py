@@ -28,6 +28,7 @@ from synapse.api.routes.dev_iwhalecloud_prompt import (
 )
 from synapse.api.schemas import error_response, success_response
 from synapse.config import settings
+from synapse.skills.load_scope import get_or_create_with_skill_ids, normalize_skill_dir_id
 from synapse.utils.whaleclouddevtool import (
     WHALECLOUD_BASE_SCRIPTS_SKILL_ID,
     is_whalecloud_dev_tool_skill_id,
@@ -44,32 +45,29 @@ def _with_base_scripts_skill_ids(ids: list[str]) -> list[str]:
     return out
 
 
-def _get_enabled_rd_skill_ids(agent: Any) -> set[str]:
-    """从 agent skill_loader 中动态获取已启用的研发工具技能 id 集合。"""
-    try:
-        loader = getattr(agent, "skill_loader", None)
-        if not loader:
-            return set()
-        # _loaded_skills: dict[skill_id, ParsedSkill]
-        loaded: dict = getattr(loader, "_loaded_skills", {})
-        return {sid for sid in loaded if is_whalecloud_dev_tool_skill_id(sid)}
-    except Exception:
-        return set()
+def _rd_skill_exists(skill_id: str) -> bool:
+    sid = normalize_skill_dir_id(skill_id)
+    if not sid:
+        return False
+    return (settings.project_root / "skills" / sid / "SKILL.md").is_file()
 
 
-def _normalize_rd_skill_ids(raw_ids: list[str], enabled_ids: set[str]) -> list[str]:
-    """规范化 skill id，并按启用集合过滤；不传或全部无效则返回空列表（服务端不再注入默认技能）。"""
+def _resolve_rd_skills(raw_ids: list[str]) -> list[str]:
+    """规范化 rd_skill_ids（目录名），校验磁盘存在，并挂载 base-scripts。"""
     result: list[str] = []
     seen: set[str] = set()
     for raw in raw_ids:
-        s = (raw or "").strip().lower().replace("_", "-")
+        s = normalize_skill_dir_id(raw)
         if not s or s in seen:
             continue
-        if enabled_ids and s not in enabled_ids:
+        if not is_whalecloud_dev_tool_skill_id(s):
+            continue
+        if not _rd_skill_exists(s):
+            logger.warning("rd skill not on disk, skip: %s", s)
             continue
         seen.add(s)
         result.append(s)
-    return result
+    return _with_base_scripts_skill_ids(result)
 
 
 def _repo_name_from_git_url(url: str | None) -> str | None:
@@ -580,19 +578,11 @@ async def _run_knowledge_generation_task(
         ep = (req.preferred_endpoint or "").strip() or None
         base_profile = get_profile_store().get("default") or AgentProfile(id="default", name="小鲸")
 
-        # 先创建临时 agent（用于读取 skill_loader），再根据动态白名单过滤技能列表
         prof_id = f"__pkg_gen_{task_id}"
-        _tmp_profile = replace(base_profile, id=prof_id, ephemeral=True, preferred_endpoint=ep)
         session_id = f"pkg_gen_{task_id}"
-        agent = await pool.get_or_create(session_id, _tmp_profile)
+        rd_skills = _resolve_rd_skills(req.rd_skill_ids)
 
-        enabled_ids = _get_enabled_rd_skill_ids(agent)
-        rd_skills = _with_base_scripts_skill_ids(
-            _normalize_rd_skill_ids(req.rd_skill_ids, enabled_ids)
-        )
-
-        # 重建 profile 挂载过滤后的技能列表
-        test_profile = replace(
+        final_profile = replace(
             base_profile,
             id=prof_id,
             skills=rd_skills,
@@ -600,9 +590,12 @@ async def _run_knowledge_generation_task(
             ephemeral=True,
             preferred_endpoint=ep,
         )
-        # 用新 profile 更新已创建的 agent（工厂会重建系统提示词）
-        pool.invalidate_profile(prof_id)
-        agent = await pool.get_or_create(session_id, test_profile)
+        agent = await get_or_create_with_skill_ids(
+            pool,
+            session_id,
+            final_profile,
+            rd_skills,
+        )
 
         repo_name, main_row = _resolve_main_repo_from_info(
             req.repo_info,
@@ -972,16 +965,7 @@ def register_product_knowledge_routes(router: APIRouter) -> None:
                 base_profile = get_profile_store().get("default") or AgentProfile(
                     id="default", name="小鲸"
                 )
-                _tmp_profile = replace(
-                    base_profile, id=prof_id, ephemeral=True, preferred_endpoint=ep
-                )
-                agent = await pool.get_or_create(run_id, _tmp_profile)
-
-                enabled_ids = _get_enabled_rd_skill_ids(agent)
-                rd_skills = _with_base_scripts_skill_ids(
-                    _normalize_rd_skill_ids(body.rd_skill_ids, enabled_ids)
-                )
-
+                rd_skills = _resolve_rd_skills(body.rd_skill_ids)
                 refine_skills = list(rd_skills)
 
                 final_profile = replace(
@@ -992,8 +976,12 @@ def register_product_knowledge_routes(router: APIRouter) -> None:
                     ephemeral=True,
                     preferred_endpoint=ep,
                 )
-                pool.invalidate_profile(prof_id)
-                agent = await pool.get_or_create(run_id, final_profile)
+                agent = await get_or_create_with_skill_ids(
+                    pool,
+                    run_id,
+                    final_profile,
+                    refine_skills,
+                )
 
                 skill_bodies: list[str] = []
                 loader = getattr(agent, "skill_loader", None)
