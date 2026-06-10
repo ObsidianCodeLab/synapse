@@ -30,6 +30,7 @@ import { CLI_TOOL_OPTIONS } from './cliToolConfig';
 import { displayCliModelLabel } from './cliModelConfig';
 import { CursorAgentInstallModal } from './CursorAgentInstallModal';
 import { ReviewMarkdown } from './ReviewMarkdown';
+import { TaskExecCliLogViewer } from './TaskExecCliLogViewer';
 
 const { TextArea } = Input;
 
@@ -254,9 +255,9 @@ export function TaskExecReviewPanel({
   }, [isRunning, refresh]);
 
   useEffect(() => {
-    if (!isRunning || !liveTail?.lines?.length) return;
+    if (!isRunning && !liveTail?.entries?.length && !liveTail?.lines?.length) return;
     liveTailEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [isRunning, liveTail?.lines?.length, liveTail?.updated_at]);
+  }, [isRunning, liveTail?.entries?.length, liveTail?.lines?.length, liveTail?.updated_at]);
 
   const summary = payload?.summary;
   const tasks = useMemo(
@@ -342,6 +343,11 @@ export function TaskExecReviewPanel({
     );
   }
 
+  const showCliLog =
+    isRunning ||
+    Boolean(liveTail?.entries?.length) ||
+    Boolean(liveTail?.lines?.length) ||
+    Boolean(liveTail?.path);
   const ok = Number(summary?.ok || 0);
   const total = Number(summary?.total || tasks.length);
   const progress = payload.progress;
@@ -381,32 +387,14 @@ export function TaskExecReviewPanel({
         />
       ) : null}
 
-      {isRunning ? (
-        <div className="rounded-xl border border-slate-700/60 bg-slate-950/80 overflow-hidden">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-700/50 px-3 py-2 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-              CLI 实时输出
-            </span>
-            {liveTail?.path ? (
-              <span className="truncate font-mono text-[10px] opacity-70" title={liveTail.path}>
-                {liveTail.path.split(/[/\\]/).pop()}
-              </span>
-            ) : null}
-          </div>
-          <pre className="max-h-72 overflow-y-auto custom-scrollbar p-3 text-[11px] leading-relaxed text-slate-300 font-mono m-0">
-            {liveTail?.lines?.length ? (
-              liveTail.lines.map((line, idx) => (
-                <div key={`${idx}-${line.slice(0, 24)}`} className="whitespace-pre-wrap break-all">
-                  {line}
-                </div>
-              ))
-            ) : (
-              <span className="text-muted-foreground">等待 Cursor CLI stream-json 输出…</span>
-            )}
-            <div ref={liveTailEndRef} />
-          </pre>
-        </div>
+      {showCliLog ? (
+        <TaskExecCliLogViewer
+          entries={liveTail?.entries}
+          lines={liveTail?.lines}
+          path={liveTail?.path}
+          loading={isRunning}
+          footerRef={liveTailEndRef}
+        />
       ) : null}
 
       <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-violet-500/10 to-slate-900 p-6 shadow-[0_16px_48px_rgba(251,191,36,0.12)]">

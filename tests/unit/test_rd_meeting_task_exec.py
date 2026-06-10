@@ -204,7 +204,13 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
         log_path = kwargs["log_path"]
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text(
-            "SYNAPSE_CURSOR_SUCCESS=1\n[cursor-output] ## 完成状态\ncompleted\n",
+            "\n".join(
+                [
+                    "SYNAPSE_CURSOR_SUCCESS=1",
+                    "[cursor-output] ## 完成状态",
+                    "**completed**",
+                ]
+            ),
             encoding="utf-8",
         )
         return {
@@ -287,9 +293,22 @@ def test_bootstrap_task_exec_persists_running_progress(tmp_path, monkeypatch):
     monkeypatch.setattr("synapse.rd_meeting.task_exec._persist_task_exec_state", capture_persist)
 
     def fake_cli_round(**kwargs):
+        target = str(kwargs.get("target") or "")
         log_path = kwargs["log_path"]
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        if "【任务执行 · 完成检测轮】" in target:
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "SYNAPSE_CURSOR_SUCCESS=1",
+                        '[raw] {"type":"result","subtype":"success","result":"## 完成状态\\n\\n**completed**\\n"}',
+                        "[2026-06-10 02:35:50] 任务执行成功",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+        else:
+            log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
         return {
             "status": "ok",
             "tokens_used": 1,
@@ -320,7 +339,8 @@ def test_read_task_exec_live_tail_from_running_log(tmp_path, monkeypatch):
             [
                 "[2026-06-10 02:00:00] === 第 1 轮 Cursor 开发 ===",
                 '[2026-06-10 02:00:01] [raw] {"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"正在修改代码"}]}}',
-                "[2026-06-10 02:00:02] [tool] editToolCall src/main.cpp",
+                "[2026-06-10 02:00:02] [tool] read src/main.cpp",
+                "[2026-06-10 02:00:02] [tool] read:completed",
                 "[2026-06-10 02:00:03] [cursor-output] 已完成文件修改",
             ]
         ),
@@ -341,10 +361,37 @@ def test_read_task_exec_live_tail_from_running_log(tmp_path, monkeypatch):
 
     tail = read_task_exec_live_tail(scope_id)
     assert tail["path"] == str(log_path)
+    assert tail.get("entries")
+    kinds = [e.get("kind") for e in tail["entries"]]
+    assert "output" in kinds
+    assert "tool" in kinds or "tool_done" in kinds
+    assert "meta" in kinds
     joined = "\n".join(tail["lines"])
-    assert "assistant:" in joined
-    assert "editToolCall" in joined or "[tool]" in joined
     assert "已完成文件修改" in joined
+
+
+def test_parse_cli_log_entries_tool_think_output():
+    from synapse.rd_meeting.task_exec import _parse_cli_log_entries
+
+    raw = [
+        "[2026-06-10 02:00:00] === 第 1 轮 Cursor 开发 ===",
+        '[2026-06-10 02:00:01] [raw] {"type":"tool_call","subtype":"started","tool_call":{"readToolCall":{}}}',
+        "[2026-06-10 02:00:01] [cursor-think] 先阅读方案",
+        "[2026-06-10 02:00:02] [tool] read synapse_archive/func_solution/函数级方案.md",
+        "[2026-06-10 02:00:03] [tool] read:completed",
+        "[2026-06-10 02:00:04] [cursor-output] 已完成文件修改",
+        '[2026-06-10 02:00:05] [raw] {"type":"result","subtype":"success","duration_ms":12000}',
+        "[2026-06-10 02:00:06] 任务执行成功",
+    ]
+    entries = _parse_cli_log_entries(raw)
+    kinds = [e["kind"] for e in entries]
+    assert kinds.count("think") == 1
+    assert "tool" in kinds
+    assert "tool_done" not in kinds
+    assert "output" in kinds
+    assert "result" in kinds
+    assert "success" in kinds
+    assert "tool_call" not in kinds
 
 
 def test_bootstrap_task_exec_stops_when_agent_cli_missing(tmp_path, monkeypatch):
@@ -465,3 +512,49 @@ async def test_run_current_node_rejects_task_exec(monkeypatch, tmp_path):
     orch = MeetingRoomOrchestrator()
     with pytest.raises(ValueError, match="task_exec_use_pipeline"):
         await orch.run_current_node(scope_type="demand", scope_id=scope_id, room_id="r1")
+
+
+def test_infer_completion_status_reads_status_section_only():
+    from synapse.rd_meeting.task_exec import _infer_completion_status
+
+    report = """# 工单 11924053 · 完成检测报告
+
+## 完成状态
+
+**completed**
+
+## 遗留问题与风险
+
+1. BACKUP_FAILED 枚举值需在联调环境验证
+2. 失败告警接口已实现
+"""
+    assert _infer_completion_status(report, develop_ok=True) == "completed"
+    assert _infer_completion_status(report, develop_ok=False) == "completed"
+
+
+def test_extract_report_from_log_prefers_stream_json_result(tmp_path):
+    from synapse.rd_meeting.task_exec import _extract_report_from_log, _infer_completion_status
+
+    log_path = tmp_path / "verify.log"
+    noise = "failed " * 20 + "completed " * 20
+    result_payload = {
+        "type": "result",
+        "subtype": "success",
+        "result": (
+            "# 工单 T1 完成检测报告\n\n## 完成状态\n\n**completed**\n\n"
+            f"noise in body should not matter: {noise}"
+        ),
+    }
+    log_path.write_text(
+        "\n".join(
+            [
+                '[2026-06-10 02:30:40] [cursor-output] ' + ("failed " * 100),
+                f'[2026-06-10 02:35:49] [raw] {json.dumps(result_payload, ensure_ascii=False)}',
+                "[2026-06-10 02:35:49] [cursor-output] result:success",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    report = _extract_report_from_log(str(log_path))
+    assert "## 完成状态" in report
+    assert _infer_completion_status(report, develop_ok=True) == "completed"

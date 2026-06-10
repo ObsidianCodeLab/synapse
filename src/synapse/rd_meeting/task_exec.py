@@ -337,6 +337,34 @@ def _run_cursor_cli_round(
     }
 
 
+_COMPLETION_SECTION_RE = re.compile(
+    r"##\s*完成状态[^\n]*\n+\s*(?:\*\*)?(completed|partial|failed)(?:\*\*)?",
+    re.IGNORECASE,
+)
+_CURSOR_OUTPUT_MAX_CHUNK = 50_000
+
+
+def _parse_stream_json_result_line(line: str) -> str:
+    """从 ``[raw] {type:result,...}`` 行提取 assistant 结果文本。"""
+    if "[raw]" not in line:
+        return ""
+    raw_json = line.split("[raw]", 1)[-1].strip()
+    if '"type":"result"' not in raw_json and '"type": "result"' not in raw_json:
+        return ""
+    try:
+        obj = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(obj, dict) or obj.get("type") != "result":
+        return ""
+    result_text = str(obj.get("result") or "").strip()
+    if not result_text:
+        return ""
+    if "完成状态" in result_text or "完成检测" in result_text:
+        return result_text
+    return ""
+
+
 def _extract_report_from_log(log_path: str) -> str:
     path = Path(log_path)
     if not path.is_file():
@@ -345,24 +373,76 @@ def _extract_report_from_log(log_path: str) -> str:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return ""
+
+    for line in reversed(text.splitlines()):
+        report = _parse_stream_json_result_line(line)
+        if report:
+            return report
+
+    for line in reversed(text.splitlines()):
+        if "[raw]" not in line or '"type":"assistant"' not in line:
+            continue
+        raw_json = line.split("[raw]", 1)[-1].strip()
+        try:
+            obj = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict) or obj.get("type") != "assistant":
+            continue
+        message = obj.get("message")
+        if not isinstance(message, dict):
+            continue
+        parts: list[str] = []
+        for block in message.get("content") or []:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text") or ""))
+        report = "\n".join(p for p in parts if p.strip()).strip()
+        if report and "完成状态" in report:
+            return report
+
     chunks: list[str] = []
-    for line in text.splitlines():
-        if "[cursor-output]" in line:
-            chunks.append(line.split("[cursor-output]", 1)[-1].strip())
+    lines = text.splitlines()
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
+        if "[cursor-output]" not in line:
+            idx += 1
+            continue
+        chunk = line.split("[cursor-output]", 1)[-1].strip()
+        body: list[str] = [chunk] if chunk else []
+        next_idx = idx + 1
+        while next_idx < len(lines):
+            follow = lines[next_idx]
+            if re.match(r"^\[\d{4}-\d{2}-\d{2}\s", follow):
+                break
+            if follow.strip():
+                body.append(follow.strip())
+            next_idx += 1
+        merged = "\n".join(body).strip()
+        if merged and len(merged) <= _CURSOR_OUTPUT_MAX_CHUNK and "[raw]" not in merged:
+            if '"tool_call"' not in merged:
+                chunks.append(merged)
+        idx = next_idx if next_idx > idx else idx + 1
     if chunks:
         return "\n".join(chunks[-40:])
     return text[-8000:] if len(text) > 8000 else text
 
 
 def _infer_completion_status(report_md: str, develop_ok: bool) -> str:
-    body = (report_md or "").lower()
-    if "completed" in body or "完成状态" in report_md and "完成" in report_md:
-        if "failed" in body or "失败" in report_md:
-            return "failed"
-        if "partial" in body or "部分" in report_md:
-            return "partial"
-        return "completed" if develop_ok else "partial"
-    return "completed" if develop_ok else "failed"
+    report = report_md or ""
+    match = _COMPLETION_SECTION_RE.search(report)
+    if match:
+        return match.group(1).lower()
+
+    body = report.lower()
+    if "## 完成状态" in report or "##完成状态" in report:
+        for status in ("completed", "partial", "failed"):
+            if re.search(rf"\b{status}\b", body):
+                return status
+
+    if develop_ok:
+        return "partial"
+    return "failed"
 
 
 def patch_owned_work_item_task_exec(
@@ -948,71 +1028,238 @@ def _tail_log_file(path: Path, *, max_bytes: int, max_lines: int) -> list[str]:
     return lines
 
 
-def _summarize_stream_json_line(raw: str) -> str | None:
-    body = raw.strip()
-    if not body.startswith("{"):
+def _split_log_timestamp(line: str) -> tuple[str, str]:
+    """Return ``(HH:MM:SS, body)`` from a timestamped CLI log line."""
+    m = re.match(r"^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\]\s*", line)
+    if not m:
+        return "", line.strip()
+    ts_full = m.group(1)
+    time_hms = ts_full.split(" ", 1)[-1] if " " in ts_full else ts_full
+    return time_hms, line[m.end() :].strip()
+
+
+def _short_display_path(path: str, *, max_len: int = 80) -> str:
+    raw = (path or "").strip().replace("\\", "/")
+    if not raw:
+        return ""
+    if len(raw) <= max_len:
+        return raw
+    parts = [p for p in raw.split("/") if p]
+    if len(parts) >= 2:
+        tail = "/".join(parts[-2:])
+        if len(tail) <= max_len:
+            return f"…/{tail}"
+    return f"…{raw[-max_len:]}"
+
+
+def _parse_tool_log_body(body: str) -> dict[str, Any] | None:
+    if "[tool]" not in body:
+        return None
+    content = body.split("[tool]", 1)[-1].strip()
+    if not content:
+        return None
+    if content.endswith(":completed"):
+        tool_name = content[: -len(":completed")].strip()
+        return {
+            "kind": "tool_done",
+            "tool": tool_name,
+            "text": f"{tool_name} 完成",
+        }
+    parts = content.split(None, 1)
+    tool_name = parts[0] if parts else "tool"
+    detail = parts[1].strip() if len(parts) > 1 else ""
+    if detail and ("/" in detail or "\\" in detail or "." in detail):
+        detail = _short_display_path(detail)
+    text = tool_name if not detail else f"{tool_name} · {detail}"
+    return {
+        "kind": "tool",
+        "tool": tool_name,
+        "detail": detail,
+        "text": text[:LIVE_DISPLAY_LINE_MAX],
+    }
+
+
+def _parse_raw_json_log_entry(time_hms: str, body: str) -> dict[str, Any] | None:
+    if "[raw]" not in body:
+        return None
+    raw_json = body.split("[raw]", 1)[-1].strip()
+    if not raw_json.startswith("{"):
         return None
     try:
-        event = json.loads(body)
+        event = json.loads(raw_json)
     except json.JSONDecodeError:
         return None
     if not isinstance(event, dict):
         return None
+
     etype = str(event.get("type") or "")
-    if etype == "assistant":
-        msg = event.get("message")
-        if isinstance(msg, dict):
-            content = msg.get("content")
-            if isinstance(content, list):
-                parts: list[str] = []
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        parts.append(str(block.get("text") or ""))
-                text = "".join(parts).strip()
-                if text:
-                    return f"assistant: {text[:240]}"
-        return "assistant: …"
     if etype == "tool_call":
-        subtype = str(event.get("subtype") or "")
-        tool_call = event.get("tool_call") if isinstance(event.get("tool_call"), dict) else {}
-        label = next(iter(tool_call.keys()), "tool") if tool_call else "tool"
-        return f"tool {subtype}: {label.replace('ToolCall', '')}"
+        return None
+    if etype == "assistant":
+        return None
+    if etype == "thinking":
+        return None
     if etype == "result":
-        return f"result: {event.get('subtype') or 'unknown'}"
+        subtype = str(event.get("subtype") or "unknown")
+        duration_ms = int(event.get("duration_ms") or 0)
+        dur_hint = f" · {duration_ms // 1000}s" if duration_ms > 0 else ""
+        if subtype == "success":
+            return {
+                "kind": "result",
+                "time": time_hms,
+                "text": f"本轮 Agent 完成{dur_hint}",
+                "status": "ok",
+            }
+        return {
+            "kind": "result",
+            "time": time_hms,
+            "text": f"本轮结束：{subtype}{dur_hint}",
+            "status": "fail",
+        }
     if etype == "system":
-        return f"system: {event.get('subtype') or 'init'}"
-    return f"{etype}: …"
+        model = str(event.get("model") or "").strip()
+        label = f"会话初始化 · {model}" if model else "会话初始化"
+        return {"kind": "system", "time": time_hms, "text": label}
+    return None
 
 
-def _format_live_log_display_lines(raw_lines: list[str]) -> list[str]:
-    display: list[str] = []
-    for line in raw_lines:
-        text = line.strip()
+def _parse_cli_log_entry(line: str) -> dict[str, Any] | None:
+    time_hms, body = _split_log_timestamp(line)
+    if not body:
+        return None
+
+    if "[cursor-think]" in body:
+        text = body.split("[cursor-think]", 1)[-1].strip()
         if not text:
+            return None
+        return {"kind": "think", "time": time_hms, "text": text[:800]}
+
+    if "[cursor-output]" in body:
+        text = body.split("[cursor-output]", 1)[-1].strip()
+        if not text:
+            return None
+        if text == "result:success":
+            return {"kind": "success", "time": time_hms, "text": "Agent 输出完成"}
+        if text.startswith("result:"):
+            return {"kind": "result", "time": time_hms, "text": text, "status": "ok"}
+        return {"kind": "output", "time": time_hms, "text": text[:LIVE_DISPLAY_LINE_MAX]}
+
+    tool_entry = _parse_tool_log_body(body)
+    if tool_entry:
+        tool_entry["time"] = time_hms
+        return tool_entry
+
+    if "[stderr]" in body:
+        text = body.split("[stderr]", 1)[-1].strip()
+        if not text:
+            return None
+        return {"kind": "error", "time": time_hms, "text": text[:400]}
+
+    raw_entry = _parse_raw_json_log_entry(time_hms, body)
+    if raw_entry:
+        return raw_entry
+
+    if body.startswith("===") or body.startswith("--- Cursor"):
+        return {"kind": "meta", "time": time_hms, "text": body[:240]}
+    if body.startswith(("代码目录:", "函数级方案:", "验收标准:", "日志文件:", "命令:", "模式:", "会话:")):
+        return {"kind": "meta", "time": time_hms, "text": body[:240]}
+    if "任务执行成功" in body:
+        return {"kind": "success", "time": time_hms, "text": "任务执行成功"}
+    if "任务执行失败" in body:
+        return {"kind": "error", "time": time_hms, "text": body[:300]}
+    return None
+
+
+def _merge_consecutive_think_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    think_buf = ""
+    think_time = ""
+    for entry in entries:
+        if entry.get("kind") == "think":
+            think_buf += str(entry.get("text") or "")
+            if not think_time:
+                think_time = str(entry.get("time") or "")
             continue
-        if "[raw]" in text:
-            raw_json = text.split("[raw]", 1)[-1].strip()
-            summary = _summarize_stream_json_line(raw_json)
-            if summary:
-                prefix = text.split("[raw]", 1)[0].strip()
-                display.append(f"{prefix} {summary}".strip())
-            continue
-        if any(
-            tag in text
-            for tag in (
-                "[cursor-output]",
-                "[cursor-think]",
-                "[tool]",
-                "[stderr]",
-                "=== 第",
-                "任务执行",
-                "Cursor CLI",
+        if think_buf:
+            merged.append(
+                {
+                    "kind": "think",
+                    "time": think_time,
+                    "text": think_buf[:1200],
+                }
             )
-        ):
-            if len(text) > LIVE_DISPLAY_LINE_MAX:
-                text = text[: LIVE_DISPLAY_LINE_MAX - 3] + "..."
-            display.append(text)
-    return display[-LIVE_TAIL_MAX_LINES:]
+            think_buf = ""
+            think_time = ""
+        merged.append(entry)
+    if think_buf:
+        merged.append({"kind": "think", "time": think_time, "text": think_buf[:1200]})
+    return merged
+
+
+def _entry_to_display_line(entry: dict[str, Any]) -> str:
+    prefix = f"[{entry.get('time')}] " if entry.get("time") else ""
+    kind = str(entry.get("kind") or "")
+    text = str(entry.get("text") or "")
+    if kind == "tool":
+        return f"{prefix}🔧 {text}"
+    if kind == "tool_done":
+        return f"{prefix}✓ {text}"
+    if kind == "think":
+        return f"{prefix}💭 {text}"
+    if kind == "output":
+        return f"{prefix}📝 {text}"
+    if kind == "system":
+        return f"{prefix}⚙ {text}"
+    if kind in ("success", "result") and entry.get("status") != "fail":
+        return f"{prefix}✅ {text}"
+    if kind == "error" or entry.get("status") == "fail":
+        return f"{prefix}✗ {text}"
+    return f"{prefix}{text}"
+
+
+def _collapse_tool_pairs(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """将 ``tool`` + ``tool_done`` 合并为单条带完成态的工具记录。"""
+    merged: list[dict[str, Any]] = []
+    pending: dict[str, int] = {}
+    for entry in entries:
+        kind = str(entry.get("kind") or "")
+        if kind == "tool":
+            tool_name = str(entry.get("tool") or "")
+            merged.append({**entry, "status": "running"})
+            if tool_name:
+                pending[tool_name] = len(merged) - 1
+            continue
+        if kind == "tool_done":
+            tool_name = str(entry.get("tool") or "")
+            idx = pending.pop(tool_name, None)
+            if idx is not None:
+                row = merged[idx]
+                row["status"] = "ok"
+                row["text"] = f"{row.get('text') or tool_name} · 完成"
+            else:
+                merged.append(entry)
+            continue
+        merged.append(entry)
+    return merged
+
+
+def _parse_cli_log_entries(raw_lines: list[str]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for line in raw_lines:
+        entry = _parse_cli_log_entry(line)
+        if entry:
+            entries.append(entry)
+    entries = _merge_consecutive_think_entries(entries)
+    entries = _collapse_tool_pairs(entries)
+    if len(entries) > LIVE_TAIL_MAX_LINES:
+        entries = entries[-LIVE_TAIL_MAX_LINES:]
+    return entries
+
+
+def _format_live_log_display_lines(raw_lines: list[str]) -> tuple[list[str], list[dict[str, Any]]]:
+    entries = _parse_cli_log_entries(raw_lines)
+    lines = [_entry_to_display_line(entry) for entry in entries]
+    return lines, entries
 
 
 def read_task_exec_live_tail(
@@ -1020,23 +1267,29 @@ def read_task_exec_live_tail(
     *,
     max_bytes: int = LIVE_TAIL_MAX_BYTES,
     max_lines: int = LIVE_TAIL_MAX_LINES,
+    log_path: str = "",
 ) -> dict[str, Any]:
-    """读取当前 CLI 日志尾部，供前端轮询展示 stream-json 解析后的实时输出。"""
-    payload = load_task_exec_payload(scope_id)
-    if not isinstance(payload, dict):
-        return {"path": "", "lines": [], "updated_at": ""}
-    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
-    log_path = str(progress.get("live_log_path") or "").strip()
-    if not log_path:
-        return {"path": "", "lines": [], "updated_at": str(progress.get("updated_at") or "")}
-    path = Path(log_path)
-    raw_lines = _tail_log_file(path, max_bytes=max_bytes, max_lines=max_lines * 3)
-    lines = _format_live_log_display_lines(raw_lines)
+    """读取 CLI 日志尾部，供前端轮询展示结构化实时输出。"""
+    resolved_path = (log_path or "").strip()
+    progress_updated = ""
+    if not resolved_path:
+        payload = load_task_exec_payload(scope_id)
+        if not isinstance(payload, dict):
+            return {"path": "", "lines": [], "entries": [], "updated_at": ""}
+        progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+        resolved_path = str(progress.get("live_log_path") or "").strip()
+        progress_updated = str(progress.get("updated_at") or "")
+    if not resolved_path:
+        return {"path": "", "lines": [], "entries": [], "updated_at": progress_updated}
+    path = Path(resolved_path)
+    raw_lines = _tail_log_file(path, max_bytes=max_bytes, max_lines=max_lines * 4)
+    lines, entries = _format_live_log_display_lines(raw_lines)
     return {
-        "path": log_path,
+        "path": resolved_path,
         "lines": lines,
-        "updated_at": str(progress.get("updated_at") or ""),
-        "line_count": len(lines),
+        "entries": entries,
+        "updated_at": progress_updated,
+        "line_count": len(entries),
     }
 
 
