@@ -1846,6 +1846,7 @@
       "accessTokenVideoLabel": "Watch Access Token Application Guide",
       "accessTokenVideoHide": "Hide Video",
       "localDetectUpgradeHint": "Local credentials found — you can continue, or add an Access Token and tap Verify to update",
+      "localDetectNeedsOrgHint": "Local credentials found, but department/team/position are missing — select them and tap Verify to save",
       "reverifyAll": "Full re-verification",
       "reverifyAccessOnly": "Update Access Token only",
       "validate": "Verify",

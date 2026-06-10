@@ -144,6 +144,34 @@ class TestLoginAndTokenHelpers:
         assert data.get("data", {}).get("exists") is False
         assert data.get("data", {}).get("access_token") == ""
 
+    async def test_userinfo_summary_include_secrets(self, client):
+        with patch.object(dev_iwhalecloud, "_load_userinfo_plain") as mock_load:
+            mock_load.return_value = {
+                "name": "张三",
+                "employee_id": "u001",
+                "password": "pw-secret",
+                "token": "api-token-xyz",
+                "access_token": "git-token",
+                "department": "BSS产品研发三部",
+                "team": "计费研发第一团队",
+                "position": "开发",
+            }
+            with patch.object(dev_iwhalecloud, "_userinfo_encryption_path") as mock_path:
+                mock_path.return_value.is_file.return_value = True
+                mock_path.return_value.stat.return_value.st_size = 128
+                resp_secret = await client.get(
+                    "/api/dev/iwhalecloud/userinfo-summary",
+                    params={"include_secrets": True},
+                )
+                resp_plain = await client.get("/api/dev/iwhalecloud/userinfo-summary")
+        assert resp_secret.status_code == 200
+        secret_row = resp_secret.json().get("data") or {}
+        assert secret_row.get("password") == "pw-secret"
+        assert secret_row.get("token") == "api-token-xyz"
+        plain_row = resp_plain.json().get("data") or {}
+        assert "password" not in plain_row
+        assert "token" not in plain_row
+
 
 class TestCreateTaskValidation:
     async def test_empty_body_422(self, client):

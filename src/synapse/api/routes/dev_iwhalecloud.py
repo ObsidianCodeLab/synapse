@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Literal, Tuple
 
 import httpx
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Body, Query, Request
 from fastapi.background import P
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -4602,11 +4602,12 @@ def local_userinfo_exists():
 
 
 @router.get("/api/dev/iwhalecloud/userinfo-summary")
-def userinfo_summary():
+def userinfo_summary(include_secrets: bool = Query(False, description="引导完整重新验证时回填密码与研发云 Token")):
     """
     返回本地 userinfo 中非敏感摘要，供引导重复验证与产品管理预填仓库 Token。
 
-    不返回 password、研发云 API token（Authorization）。
+    默认不返回 password、研发云 API token（Authorization）。
+    ``include_secrets=1`` 时一并返回，仅供 Setup Center 引导页本地回填。
     """
     path = _userinfo_encryption_path()
     if not path.is_file():
@@ -4631,6 +4632,9 @@ def userinfo_summary():
                     "employee_id": "",
                     "access_token": "",
                     "has_access_token": False,
+                    "department": "",
+                    "team": "",
+                    "position": "",
                 }
             )
     except OSError:
@@ -4651,18 +4655,20 @@ def userinfo_summary():
     except ValueError as e:
         return error_response(400, str(e))
     access = (data.get("access_token") or "").strip()
-    return success_response(
-        {
-            "exists": True,
-            "name": (data.get("name") or "").strip(),
-            "employee_id": (data.get("employee_id") or data.get("username") or "").strip(),
-            "access_token": access,
-            "has_access_token": bool(access),
-            "department": (data.get("department") or "").strip(),
-            "team": (data.get("team") or "").strip(),
-            "position": (data.get("position") or "").strip(),
-        }
-    )
+    payload: dict[str, object] = {
+        "exists": True,
+        "name": (data.get("name") or "").strip(),
+        "employee_id": (data.get("employee_id") or data.get("username") or "").strip(),
+        "access_token": access,
+        "has_access_token": bool(access),
+        "department": (data.get("department") or "").strip(),
+        "team": (data.get("team") or "").strip(),
+        "position": (data.get("position") or "").strip(),
+    }
+    if include_secrets:
+        payload["password"] = str(data.get("password") or "")
+        payload["token"] = str(data.get("token") or "").strip()
+    return success_response(payload)
 
 
 class DevserviceIpBody(BaseModel):
@@ -4911,7 +4917,15 @@ def login(body: LoginRequest):
                 page.wait_for_timeout(100)
 
             captured = csrf_token["value"]
-            token_out = body.token or captured or (file_user or {}).get("token") or ""
+            # userinfo.token = 研发云 API Authorization（用户申请/表单填写），
+            # 勿与 Playwright 抓到的门户 x-csrf-token（captured）混用——后者写入 iwhalecloud_session.json。
+            token_out = (body.token or "").strip() or str((file_user or {}).get("token") or "").strip()
+            if captured:
+                try:
+                    cookies_hdr = _cookies_to_header(context.cookies())
+                    _save_iwhalecloud_session(captured, cookies_hdr)
+                except Exception as exc:
+                    logger.warning("login 写入 iwhalecloud_session 失败: %s", exc)
             access_out = (body.access_token or "").strip() or str(
                 (file_user or {}).get("access_token") or ""
             ).strip()

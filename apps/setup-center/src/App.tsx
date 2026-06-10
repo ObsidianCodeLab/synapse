@@ -556,7 +556,7 @@ export function App() {
   const [obIwcEmployeeId, setObIwcEmployeeId] = useState("");
   const [obIwcDepartment, setObIwcDepartment] = useState(IWHALECLOUD_DEPARTMENTS[0] ?? "");
   const [obIwcTeam, setObIwcTeam] = useState(IWHALECLOUD_DEPARTMENT_TEAMS[IWHALECLOUD_DEPARTMENTS[0] ?? ""]?.[0] ?? "");
-  const [obIwcPosition, setObIwcPosition] = useState("");
+  const [obIwcPosition, setObIwcPosition] = useState(IWHALECLOUD_POSITIONS[0] ?? "开发");
   const [obIwcPassword, setObIwcPassword] = useState("");
   const [obIwcToken, setObIwcToken] = useState("");
   const [obIwcAccessToken, setObIwcAccessToken] = useState("");
@@ -574,8 +574,54 @@ export function App() {
   const [obIwcLocalDetecting, setObIwcLocalDetecting] = useState(false);
   /** 自动检测通过：已有非空 userinfo.encryption，可直接下一步 */
   const [obIwcLocalDetectPassed, setObIwcLocalDetectPassed] = useState(false);
+  /** 本地凭据缺少 department/team/position，须重新验证后才能下一步 */
+  const [obIwcNeedsOrgInfo, setObIwcNeedsOrgInfo] = useState(false);
   /** 自动检测结束且未通过时可选提示（如未找到凭据、无法连接后端） */
   const [obIwcLocalDetectHint, setObIwcLocalDetectHint] = useState<string | null>(null);
+
+  type ObIwcUserinfoSummary = {
+    access_token?: string;
+    name?: string;
+    employee_id?: string;
+    department?: string;
+    team?: string;
+    position?: string;
+    password?: string;
+    token?: string;
+  };
+
+  const applyObIwcUserinfoPrefill = useCallback((data: ObIwcUserinfoSummary) => {
+    if (data.access_token) setObIwcAccessToken(String(data.access_token));
+    if (data.name) setObIwcFullName(String(data.name));
+    if (data.employee_id) setObIwcEmployeeId(String(data.employee_id));
+    if (data.department) setObIwcDepartment(String(data.department));
+    if (data.team) setObIwcTeam(String(data.team));
+    if (data.position) setObIwcPosition(String(data.position));
+    if (data.password !== undefined) setObIwcPassword(String(data.password));
+    if (data.token !== undefined) setObIwcToken(String(data.token));
+    const hasOrg = Boolean(
+      data.department?.trim() && data.team?.trim() && data.position?.trim(),
+    );
+    setObIwcNeedsOrgInfo(!hasOrg);
+  }, []);
+
+  const fetchObIwcUserinfoPrefill = useCallback(async (includeSecrets: boolean) => {
+    const base = IS_TAURI
+      ? (dataMode === "remote" ? apiBaseUrl : "http://127.0.0.1:18900")
+      : (apiBaseUrl || window.location.origin);
+    const q = includeSecrets ? "?include_secrets=1" : "";
+    const sumRes = await fetch(
+      `${String(base).replace(/\/$/, "")}/api/dev/iwhalecloud/userinfo-summary${q}`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!sumRes.ok) return null;
+    const sumJ = (await sumRes.json()) as { errorcode?: number; data?: ObIwcUserinfoSummary };
+    if (sumJ?.errorcode === 0 && sumJ.data) {
+      applyObIwcUserinfoPrefill(sumJ.data);
+      return sumJ.data;
+    }
+    return null;
+  }, [apiBaseUrl, applyObIwcUserinfoPrefill, dataMode]);
 
   /** 核心智能体配置是否已完成所有任务项（用于点亮“下一步”按钮） */
   const [obCoreAgentReady, setObCoreAgentReady] = useState(false);
@@ -762,32 +808,9 @@ export function App() {
           setObIwcLocalDetectHint(null);
           setObIwcValidated(false);
           setObIwcReverifyAll(false);
+          setObIwcNeedsOrgInfo(false);
           try {
-            const sumRes = await fetch(
-              `${String(base).replace(/\/$/, "")}/api/dev/iwhalecloud/userinfo-summary`,
-              { signal: AbortSignal.timeout(8000) },
-            );
-            if (!cancelled && sumRes.ok) {
-              const sumJ = (await sumRes.json()) as {
-                errorcode?: number;
-                data?: {
-                  access_token?: string;
-                  name?: string;
-                  employee_id?: string;
-                  department?: string;
-                  team?: string;
-                  position?: string;
-                };
-              };
-              if (sumJ?.errorcode === 0 && sumJ.data) {
-                if (sumJ.data.access_token) setObIwcAccessToken(String(sumJ.data.access_token));
-                if (sumJ.data.name) setObIwcFullName(String(sumJ.data.name));
-                if (sumJ.data.employee_id) setObIwcEmployeeId(String(sumJ.data.employee_id));
-                if (sumJ.data.department) setObIwcDepartment(String(sumJ.data.department));
-                if (sumJ.data.team) setObIwcTeam(String(sumJ.data.team));
-                if (sumJ.data.position) setObIwcPosition(String(sumJ.data.position));
-              }
-            }
+            await fetchObIwcUserinfoPrefill(true);
           } catch {
             /* 摘要可选 */
           }
@@ -812,7 +835,7 @@ export function App() {
     };
     // 仅依赖步骤与 API 基址；文案用当前 t()，不在语言切换时重复请求
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t intentionally omitted to avoid refetch on i18n change
-  }, [obStep, dataMode, apiBaseUrl]);
+  }, [obStep, dataMode, apiBaseUrl, fetchObIwcUserinfoPrefill]);
 
   useEffect(() => {
     if (obStep !== "ob-claude-code" || !IS_TAURI || !obClaudeShowLlmVideo) {
@@ -4996,6 +5019,7 @@ export function App() {
       case "ob-iwhalecloud": {
         const iwcCoreFieldsLocked = obIwcLocalDetecting || (obIwcLocalDetectPassed && !obIwcReverifyAll);
         const iwcTeamOptions = IWHALECLOUD_DEPARTMENT_TEAMS[obIwcDepartment] ?? [];
+        const iwcCanProceed = obIwcValidated || (obIwcLocalDetectPassed && !obIwcNeedsOrgInfo);
         return (
           <TooltipProvider>
             <div className="obPage">
@@ -5009,16 +5033,28 @@ export function App() {
                   <CardContent className="py-5 px-5 space-y-4">
                     {obIwcLocalDetectPassed && (
                       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <span>{t("onboarding.iwhalecloud.localDetectUpgradeHint")}</span>
+                        <span>
+                          {obIwcNeedsOrgInfo
+                            ? t("onboarding.iwhalecloud.localDetectNeedsOrgHint")
+                            : t("onboarding.iwhalecloud.localDetectUpgradeHint")}
+                        </span>
                         <Button
                           type="button"
                           variant="link"
                           className="h-auto p-0 text-xs"
                           disabled={obIwcLocalDetecting}
-                          onClick={() => {
-                            setObIwcReverifyAll((v) => !v);
+                          onClick={async () => {
+                            const next = !obIwcReverifyAll;
+                            setObIwcReverifyAll(next);
                             setObIwcValidated(false);
                             setObIwcError(null);
+                            if (next) {
+                              try {
+                                await fetchObIwcUserinfoPrefill(true);
+                              } catch {
+                                /* 回填失败时用户仍可手动输入 */
+                              }
+                            }
                           }}
                         >
                           {obIwcReverifyAll
@@ -5196,15 +5232,20 @@ export function App() {
                         onClick={async () => {
                           if (obIwcLocalDetecting) return;
                           const partialReverify = obIwcLocalDetectPassed && !obIwcReverifyAll;
+                          if (
+                            !obIwcDepartment.trim()
+                            || !obIwcTeam.trim()
+                            || !obIwcPosition.trim()
+                          ) {
+                            setObIwcError(t("onboarding.iwhalecloud.fieldRequired"));
+                            return;
+                          }
                           if (!partialReverify) {
                             if (
                               !obIwcFullName.trim()
                               || !obIwcEmployeeId.trim()
                               || !obIwcPassword.trim()
                               || !obIwcToken.trim()
-                              || !obIwcDepartment.trim()
-                              || !obIwcTeam.trim()
-                              || !obIwcPosition.trim()
                             ) {
                               setObIwcError(t("onboarding.iwhalecloud.fieldRequired"));
                               return;
@@ -5223,11 +5264,11 @@ export function App() {
                               const loginBody = partialReverify
                                 ? {
                                     purpose: "normal",
+                                    department: obIwcDepartment.trim(),
+                                    team: obIwcTeam.trim(),
+                                    position: obIwcPosition.trim(),
                                     ...(obIwcAccessToken.trim() ? { access_token: obIwcAccessToken.trim() } : {}),
                                     ...(obIwcToken.trim() ? { token: obIwcToken.trim() } : {}),
-                                    ...(obIwcDepartment.trim() ? { department: obIwcDepartment.trim() } : {}),
-                                    ...(obIwcTeam.trim() ? { team: obIwcTeam.trim() } : {}),
-                                    ...(obIwcPosition.trim() ? { position: obIwcPosition.trim() } : {}),
                                   }
                                 : {
                                     purpose: "guide",
@@ -5259,6 +5300,7 @@ export function App() {
                               })();
                               if (data?.errorcode === 0) {
                                 setObIwcValidated(true);
+                                setObIwcNeedsOrgInfo(false);
                                 setObIwcError(null);
                               } else {
                                 setObIwcError(errText || t("onboarding.iwhalecloud.validateFailed"));
@@ -5302,10 +5344,10 @@ export function App() {
                 <div className="obFooterBtns">
                   <Button variant="outline" onClick={() => setObStep("ob-welcome")}>{t("config.prev")}</Button>
                   <Button
-                    disabled={obIwcLocalDetecting || !(obIwcValidated || obIwcLocalDetectPassed)}
-                    title={obIwcLocalDetecting || !(obIwcValidated || obIwcLocalDetectPassed) ? t("onboarding.iwhalecloud.validateRequired") : undefined}
+                    disabled={obIwcLocalDetecting || !iwcCanProceed}
+                    title={obIwcLocalDetecting || !iwcCanProceed ? t("onboarding.iwhalecloud.validateRequired") : undefined}
                     onClick={() => {
-                      if (obIwcValidated || obIwcLocalDetectPassed) setObStep("ob-core-agent");
+                      if (iwcCanProceed) setObStep("ob-core-agent");
                     }}
                   >
                     {t("onboarding.iwhalecloud.proceed")}

@@ -1848,6 +1848,7 @@
       "accessTokenVideoLabel": "查看 Access Token 申请流程",
       "accessTokenVideoHide": "收起视频",
       "localDetectUpgradeHint": "已检测到本地凭据，可直接下一步；也可补充 Access Token 后点击「验证」更新保存",
+      "localDetectNeedsOrgHint": "已检测到本地凭据，但缺少部门/团队/职位，请选择后点击「验证」保存",
       "reverifyAll": "完整重新验证",
       "reverifyAccessOnly": "仅更新 Access Token",
       "validate": "验证",
