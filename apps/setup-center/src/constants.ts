@@ -32,6 +32,21 @@ export const COMPILER_COMPANY_DEFAULTS = {
  */
 export const IWHALECLOUD_ONBOARDING_VALIDATION_MOCK = false;
 
+/** 浩鲸研发云引导：部门 → 团队（后续可扩展更多部门） */
+export const IWHALECLOUD_DEPARTMENT_TEAMS: Record<string, readonly string[]> = {
+  "BSS产品研发三部": [
+    "计费研发第一团队",
+    "计费研发第二团队",
+    "计费研发第三团队",
+    "计费研发第四团队",
+  ],
+} as const;
+
+export const IWHALECLOUD_DEPARTMENTS = Object.keys(IWHALECLOUD_DEPARTMENT_TEAMS);
+
+/** 浩鲸研发云引导：职位选项 */
+export const IWHALECLOUD_POSITIONS = ["开发", "团队负责人", "部门领导"] as const;
+
 /** Windows 本地受控安装的 Claude Code 版本（与 `main.rs` 中 bundled 路径一致） */
 export const CLAUDE_CODE_BUNDLED_VERSION = "2.1.81";
 

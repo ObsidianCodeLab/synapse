@@ -410,7 +410,10 @@ def _save_userinfo_encrypted(
     password: str,
     token: str,
     access_token: str = "",
-    user_id: int = None,
+    user_id: int | None = None,
+    department: str = "",
+    team: str = "",
+    position: str = "",
 ) -> tuple[bool, str]:
     crypt_helper = _crypt_helper()
     payload = {
@@ -420,6 +423,9 @@ def _save_userinfo_encrypted(
         "token": token,
         "access_token": access_token,
         "userId": user_id,
+        "department": department,
+        "team": team,
+        "position": position,
     }
     raw = json.dumps(payload, ensure_ascii=False)
     enc = crypt_helper.encrypt(raw, False)
@@ -4534,12 +4540,22 @@ class LoginRequest(BaseModel):
         None,
         description="Git 仓库 Access Token；可选，未传则保留 userinfo 中已有值",
     )
+    department: str | None = Field(None, description="部门（引导验证必填）")
+    team: str | None = Field(None, description="团队（引导验证必填）")
+    position: str | None = Field(None, description="职位（引导验证必填）")
 
     @model_validator(mode="after")
     def _require_creds_when_guide(self) -> LoginRequest:
         if self.purpose in ("guide", "password_change"):
             if not (self.username and self.password):
                 raise ValueError("引导验证或密码修改时 username（工号）、password 必填")
+        if self.purpose == "guide":
+            if not all(
+                (self.department or "").strip()
+                and (self.team or "").strip()
+                and (self.position or "").strip()
+            ):
+                raise ValueError("引导验证时 department（部门）、team（团队）、position（职位）必填")
         return self
 
 
@@ -4600,6 +4616,9 @@ def userinfo_summary():
                 "employee_id": "",
                 "access_token": "",
                 "has_access_token": False,
+                "department": "",
+                "team": "",
+                "position": "",
             }
         )
     try:
@@ -4621,6 +4640,9 @@ def userinfo_summary():
                 "employee_id": "",
                 "access_token": "",
                 "has_access_token": False,
+                "department": "",
+                "team": "",
+                "position": "",
             }
         )
     try:
@@ -4635,6 +4657,9 @@ def userinfo_summary():
             "employee_id": (data.get("employee_id") or data.get("username") or "").strip(),
             "access_token": access,
             "has_access_token": bool(access),
+            "department": (data.get("department") or "").strip(),
+            "team": (data.get("team") or "").strip(),
+            "position": (data.get("position") or "").strip(),
         }
     )
 
@@ -4896,6 +4921,16 @@ def login(body: LoginRequest):
             else:
                 name_out = (file_user or {}).get("name") or ""
 
+            prev = file_user or {}
+            if body.purpose == "guide":
+                dept_out = (body.department or "").strip()
+                team_out = (body.team or "").strip()
+                pos_out = (body.position or "").strip()
+            else:
+                dept_out = (body.department or "").strip() or str(prev.get("department") or "").strip()
+                team_out = (body.team or "").strip() or str(prev.get("team") or "").strip()
+                pos_out = (body.position or "").strip() or str(prev.get("position") or "").strip()
+
             ok, err = _save_userinfo_encrypted(
                 name=name_out,
                 employee_id=username,
@@ -4903,6 +4938,9 @@ def login(body: LoginRequest):
                 token=token_out,
                 access_token=access_out,
                 user_id=logged_user_id["value"],
+                department=dept_out,
+                team=team_out,
+                position=pos_out,
             )
             if not ok:
                 return error_response(500, err or "保存用户信息失败")

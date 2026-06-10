@@ -72,6 +72,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import logoUrl from "./assets/logo.png";
 import "highlight.js/styles/github.css";
 import { getThemePref, setThemePref, THEME_CHANGE_EVENT, type Theme } from "./theme";
@@ -80,6 +81,9 @@ import {
   BUILTIN_PROVIDERS,
   PIP_INDEX_PRESETS,
   IWHALECLOUD_ONBOARDING_VALIDATION_MOCK,
+  IWHALECLOUD_DEPARTMENT_TEAMS,
+  IWHALECLOUD_DEPARTMENTS,
+  IWHALECLOUD_POSITIONS,
 } from "./constants";
 import { safeFetch } from "./providers";
 import { whalecloudHeart } from "./api/rdUnifiedService";
@@ -550,6 +554,9 @@ export function App() {
   // iWhaleCloud 身份验证（引导）
   const [obIwcFullName, setObIwcFullName] = useState("");
   const [obIwcEmployeeId, setObIwcEmployeeId] = useState("");
+  const [obIwcDepartment, setObIwcDepartment] = useState(IWHALECLOUD_DEPARTMENTS[0] ?? "");
+  const [obIwcTeam, setObIwcTeam] = useState(IWHALECLOUD_DEPARTMENT_TEAMS[IWHALECLOUD_DEPARTMENTS[0] ?? ""]?.[0] ?? "");
+  const [obIwcPosition, setObIwcPosition] = useState("");
   const [obIwcPassword, setObIwcPassword] = useState("");
   const [obIwcToken, setObIwcToken] = useState("");
   const [obIwcAccessToken, setObIwcAccessToken] = useState("");
@@ -763,12 +770,22 @@ export function App() {
             if (!cancelled && sumRes.ok) {
               const sumJ = (await sumRes.json()) as {
                 errorcode?: number;
-                data?: { access_token?: string; name?: string; employee_id?: string };
+                data?: {
+                  access_token?: string;
+                  name?: string;
+                  employee_id?: string;
+                  department?: string;
+                  team?: string;
+                  position?: string;
+                };
               };
               if (sumJ?.errorcode === 0 && sumJ.data) {
                 if (sumJ.data.access_token) setObIwcAccessToken(String(sumJ.data.access_token));
                 if (sumJ.data.name) setObIwcFullName(String(sumJ.data.name));
                 if (sumJ.data.employee_id) setObIwcEmployeeId(String(sumJ.data.employee_id));
+                if (sumJ.data.department) setObIwcDepartment(String(sumJ.data.department));
+                if (sumJ.data.team) setObIwcTeam(String(sumJ.data.team));
+                if (sumJ.data.position) setObIwcPosition(String(sumJ.data.position));
               }
             }
           } catch {
@@ -4978,6 +4995,7 @@ export function App() {
 
       case "ob-iwhalecloud": {
         const iwcCoreFieldsLocked = obIwcLocalDetecting || (obIwcLocalDetectPassed && !obIwcReverifyAll);
+        const iwcTeamOptions = IWHALECLOUD_DEPARTMENT_TEAMS[obIwcDepartment] ?? [];
         return (
           <TooltipProvider>
             <div className="obPage">
@@ -5026,6 +5044,63 @@ export function App() {
                         onChange={(e) => { setObIwcEmployeeId(e.target.value); setObIwcValidated(false); setObIwcError(null); }}
                         placeholder={t("onboarding.iwhalecloud.employeeIdPlaceholder")}
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("onboarding.iwhalecloud.department")} <span className="text-destructive">*</span></Label>
+                      <Select
+                        disabled={obIwcLocalDetecting}
+                        value={obIwcDepartment}
+                        onValueChange={(v) => {
+                          setObIwcDepartment(v);
+                          const teams = IWHALECLOUD_DEPARTMENT_TEAMS[v] ?? [];
+                          setObIwcTeam(teams[0] ?? "");
+                          setObIwcValidated(false);
+                          setObIwcError(null);
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={t("onboarding.iwhalecloud.departmentPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {IWHALECLOUD_DEPARTMENTS.map((d) => (
+                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("onboarding.iwhalecloud.team")} <span className="text-destructive">*</span></Label>
+                      <Select
+                        disabled={obIwcLocalDetecting || iwcTeamOptions.length === 0}
+                        value={obIwcTeam}
+                        onValueChange={(v) => { setObIwcTeam(v); setObIwcValidated(false); setObIwcError(null); }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={t("onboarding.iwhalecloud.teamPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {iwcTeamOptions.map((team) => (
+                            <SelectItem key={team} value={team}>{team}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("onboarding.iwhalecloud.position")} <span className="text-destructive">*</span></Label>
+                      <Select
+                        disabled={obIwcLocalDetecting}
+                        value={obIwcPosition}
+                        onValueChange={(v) => { setObIwcPosition(v); setObIwcValidated(false); setObIwcError(null); }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={t("onboarding.iwhalecloud.positionPlaceholder")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {IWHALECLOUD_POSITIONS.map((p) => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>{t("onboarding.iwhalecloud.password")} <span className="text-destructive">*</span></Label>
@@ -5122,7 +5197,15 @@ export function App() {
                           if (obIwcLocalDetecting) return;
                           const partialReverify = obIwcLocalDetectPassed && !obIwcReverifyAll;
                           if (!partialReverify) {
-                            if (!obIwcFullName.trim() || !obIwcEmployeeId.trim() || !obIwcPassword.trim() || !obIwcToken.trim()) {
+                            if (
+                              !obIwcFullName.trim()
+                              || !obIwcEmployeeId.trim()
+                              || !obIwcPassword.trim()
+                              || !obIwcToken.trim()
+                              || !obIwcDepartment.trim()
+                              || !obIwcTeam.trim()
+                              || !obIwcPosition.trim()
+                            ) {
                               setObIwcError(t("onboarding.iwhalecloud.fieldRequired"));
                               return;
                             }
@@ -5142,6 +5225,9 @@ export function App() {
                                     purpose: "normal",
                                     ...(obIwcAccessToken.trim() ? { access_token: obIwcAccessToken.trim() } : {}),
                                     ...(obIwcToken.trim() ? { token: obIwcToken.trim() } : {}),
+                                    ...(obIwcDepartment.trim() ? { department: obIwcDepartment.trim() } : {}),
+                                    ...(obIwcTeam.trim() ? { team: obIwcTeam.trim() } : {}),
+                                    ...(obIwcPosition.trim() ? { position: obIwcPosition.trim() } : {}),
                                   }
                                 : {
                                     purpose: "guide",
@@ -5149,6 +5235,9 @@ export function App() {
                                     username: obIwcEmployeeId.trim(),
                                     password: obIwcPassword.trim(),
                                     token: obIwcToken.trim(),
+                                    department: obIwcDepartment.trim(),
+                                    team: obIwcTeam.trim(),
+                                    position: obIwcPosition.trim(),
                                     ...(obIwcAccessToken.trim() ? { access_token: obIwcAccessToken.trim() } : {}),
                                   };
                               const res = await fetch(`${base}/api/dev/iwhalecloud/login`, {

@@ -120,6 +120,20 @@ class TestLoginAndTokenHelpers:
         )
         assert resp.status_code == 422
 
+    async def test_login_guide_missing_org_fields_422(self, client):
+        resp = await client.post(
+            "/api/dev/iwhalecloud/login",
+            json={
+                "purpose": "guide",
+                "username": "u001",
+                "password": "secret",
+                "name": "测试",
+                "department": "BSS产品研发三部",
+                "team": "计费研发第一团队",
+            },
+        )
+        assert resp.status_code == 422
+
     async def test_userinfo_summary_when_missing_file(self, client):
         with patch.object(dev_iwhalecloud, "_userinfo_encryption_path") as mock_path:
             mock_path.return_value.is_file.return_value = False
