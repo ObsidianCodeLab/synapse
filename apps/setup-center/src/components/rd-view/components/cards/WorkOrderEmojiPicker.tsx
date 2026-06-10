@@ -95,7 +95,7 @@ export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrde
   );
 
   return (
-    <div className="work-order-emoji-bar" onClick={(e) => e.stopPropagation()}>
+    <div className="work-order-emoji-picker-wrap" onClick={(e) => e.stopPropagation()}>
       <Popover
         content={panel}
         trigger="click"

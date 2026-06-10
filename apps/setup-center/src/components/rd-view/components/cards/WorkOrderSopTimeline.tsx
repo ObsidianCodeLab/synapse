@@ -103,10 +103,15 @@ function SopNodeBlock({ node, isLast }: { node: WorkOrderSopNode; isLast: boolea
         {node.outputs.length > 0 && (
           <div className="work-order-sop-outputs">
             {node.outputs.map((output) => (
-              <span key={output.label} className="work-order-sop-output">
+              <button
+                key={output.label}
+                type="button"
+                className="work-order-sop-output"
+                title={output.label}
+              >
                 <OutputIcon type={output.type} />
-                {output.label}
-              </span>
+                <span className="work-order-sop-output-label">{output.label}</span>
+              </button>
             ))}
           </div>
         )}
