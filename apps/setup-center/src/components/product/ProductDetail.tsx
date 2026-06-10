@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertCircle,
   PanelLeft,
+  Activity,
 } from "lucide-react";
 import {
   Product,
@@ -63,6 +64,7 @@ import {
 } from "@/utils/whalecloudDevToolSkill";
 import type { SkillInfo } from "@/types";
 import { ProductDocumentEditor } from "./ProductDocumentEditor";
+import { EntropyAnalysisPanel } from "./EntropyAnalysisPanel";
 import type { RefineContext, RefineCatalog } from "./ProductDocumentEditor";
 import {
   buildCodeGraphEmbedUrl,
@@ -1562,6 +1564,32 @@ export function ProductDetail({
                 </div>
               </div>
             </div>
+
+            {/* 熵分析 */}
+            <div>
+              <h5 className="text-[13px] font-semibold text-primary uppercase tracking-wider mb-4">
+                {t("workbench.products.detail.entropySection", "指标分析")}
+              </h5>
+              <div
+                onClick={() => {
+                  if (activeTab === "entropy-analysis") return;
+                  runOrConfirmUnsaved(() => setActiveTab("entropy-analysis"));
+                }}
+                className={`p-4 rounded-md border cursor-pointer transition-all ${
+                  activeTab === "entropy-analysis" ? "bg-primary/10 border-primary/30" : "bg-muted/30 border-border/50 hover:border-border"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Activity
+                    size={16}
+                    className={activeTab === "entropy-analysis" ? "text-primary" : "text-muted-foreground"}
+                  />
+                  <span className="font-semibold text-foreground text-sm">
+                    {t("workbench.products.detail.entropyAnalysis", "熵分析")}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Main Content Area */}
@@ -1790,6 +1818,10 @@ export function ProductDetail({
                   )}
                 </div>
               </div>
+            )}
+
+            {activeTab === "entropy-analysis" && product && (
+              <EntropyAnalysisPanel product={product} synapseApiBase={synapseApiBase} />
             )}
 
             {activeTab === "knowledge-graph" && (
