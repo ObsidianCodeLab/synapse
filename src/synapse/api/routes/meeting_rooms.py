@@ -869,6 +869,111 @@ async def save_solution_review_tasks(
     return success_response({"scope_id": sid, "payload": payload})
 
 
+class FuncSolutionPlanReviewRow(BaseModel):
+    id: str = Field(..., description="改造方案 id")
+    status: str | None = Field(None, description="pending | approved | needs_change")
+    comment: str | None = Field(None, description="评审意见")
+
+
+class FuncSolutionPlansBody(BaseModel):
+    plans: list[FuncSolutionPlanReviewRow] = Field(default_factory=list)
+
+
+class FuncSolutionDecisionBody(BaseModel):
+    decision: Literal["approve", "revise"] = Field(..., description="全部方案通过后推进 / 需修订")
+    comment: str = Field("", description="总体评审意见")
+    plans: list[FuncSolutionPlanReviewRow] = Field(
+        default_factory=list,
+        description="逐条改造方案评审状态",
+    )
+
+
+@router.get("/api/dev/meeting-rooms/{room_id}/func-solution-review")
+async def get_func_solution_review(room_id: str) -> dict:
+    """读取函数级方案评审结构化 payload。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.func_solution_review import load_func_solution_review_payload
+
+    payload = load_func_solution_review_payload(sid)
+    if payload is None:
+        return error_response(404, "func_solution_review_not_found")
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "payload": payload,
+            "intervention_kind": room_state.get("intervention_kind"),
+            "blocked": bool(room_state.get("func_solution_blocked")),
+            "pending_node_id": pending.get("node_id"),
+        }
+    )
+
+
+@router.put("/api/dev/meeting-rooms/{room_id}/func-solution-review/plans")
+async def save_func_solution_plan_reviews(
+    room_id: str,
+    body: FuncSolutionPlansBody,
+) -> dict:
+    """保存逐条改造方案评审状态（不触发节点裁决）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.func_solution_review import load_func_solution_review_payload, save_plan_reviews
+
+    if load_func_solution_review_payload(sid) is None:
+        return error_response(404, "func_solution_review_not_found")
+    updates = [p.model_dump(exclude_none=True) for p in body.plans]
+    try:
+        payload = save_plan_reviews(sid, updates)
+    except ValueError as exc:
+        return error_response(422, str(exc))
+    return success_response({"scope_id": sid, "payload": payload})
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/func-solution-review/decision")
+async def submit_func_solution_review_decision(
+    room_id: str,
+    body: FuncSolutionDecisionBody,
+    request: Request,
+) -> dict:
+    """函数级方案评审裁决：全部改造方案通过后推进；需修订则阻断。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, scope_type = resolved
+    pool = getattr(request.app.state, "agent_pool", None)
+    detail = _service.get_room_detail(room_id) or {}
+    ticket_title = str(detail.get("ticket_title") or "")
+    orch = MeetingRoomOrchestrator()
+    plan_updates = [p.model_dump(exclude_none=True) for p in body.plans]
+    try:
+        result = orch.confirm_func_solution_review_decision(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            decision=body.decision,
+            comment=body.comment,
+            plan_updates=plan_updates or None,
+            ticket_title=ticket_title,
+            agent_pool=pool,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code in ("not_all_plans_approved", "comment_too_short", "no_pending_delivery"):
+            return error_response(422, code)
+        return error_response(400, code)
+    except Exception as exc:
+        logger.exception("submit_func_solution_review_decision failed: %s", exc)
+        return error_response(500, "func_solution_review_decision_failed", str(exc))
+    return success_response(result)
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/patch-versions")
 async def list_patch_versions_for_room(
     room_id: str,

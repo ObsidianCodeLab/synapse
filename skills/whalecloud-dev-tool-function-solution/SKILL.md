@@ -1,14 +1,60 @@
 ---
 name: whalecloud-dev-tool-function-solution
-description: "函数级方案技能 - 将上游模块级改造需求下钻到函数级别，输出结构化伪代码与数据设计，严格依赖产品知识体系事实确认函数存在性和签名一致性；交付物通过 whalecloud-dev-tool-doc-generate 落盘为 函数级方案.md。"
+description: "函数级方案技能 - 总分架构（Mermaid）+ 需求-模块-改造方案关联的函数级设计，输出 函数级方案.md 与 func_solution_review.json，经专用评审面板确认后推进。"
 label: 函数级方案技能
 ---
 
 # 函数级方案技能
 
-将上游模块级改造需求下钻到函数级别，输出结构化伪代码与数据设计，严格依赖产品知识体系事实（代码、文档）确认函数存在性和签名一致性。**严禁臆断想象**，所有结论必须有实际存在的内容作为依据。
+将上游**模块级**改造需求下钻到函数级，采用 **「总 + 分」** 结构：**总** = Mermaid 流程/关系/时序图 + 架构总览；**分** = 按 **需求 → 模块 → 改造方案** 逐条展开的设计说明（非直接给代码）。严格依赖产品知识体系事实确认函数存在性和签名一致性。**严禁臆断想象**。
 
-**文档落地**：分析完成后，**必须**调用 [`whalecloud-dev-tool-doc-generate`](../whalecloud-dev-tool-doc-generate/SKILL.md) 将方案写入 `{ARCHIVE_DIR}/函数级方案.md`，不得绕过该技能直接写盘。
+**文档落地**：
+1. 分析完成后，**必须**调用 [`whalecloud-dev-tool-doc-generate`](../whalecloud-dev-tool-doc-generate/SKILL.md) 将方案写入 `{ARCHIVE_DIR}/函数级方案.md`
+2. **必须**以 `write_file` 写入 `{ARCHIVE_DIR}/func_solution_review.json`（供前端评审面板渲染，见 Step 11）
+3. 不得绕过上述路径直接宣称完成
+
+---
+
+## 总分架构（强制）
+
+### 总：方案全局视图
+
+在 `func_solution_review.json` 的 `overview` 与 `函数级方案.md` 开篇须包含：
+
+| 要素 | 要求 |
+|------|------|
+| **Mermaid 图（至少 2 张）** | 须用 **mermaid** 语法：① 主业务流程/改造流程（flowchart）；② 模块关系或关键时序（graph / sequenceDiagram 二选一） |
+| **架构总述** | `architecture_summary`：说明改造在系统中的位置、主链路与关键决策（3～8 句） |
+
+Mermaid 图须可渲染、节点命名与 MODULE_DOC / 代码模块一致；禁止空图或仅占位符。
+
+### 分：改造方案条目
+
+每条 `transformation_plans[]` 须完整填写：
+
+| 字段 | 要求 |
+|------|------|
+| `requirement_ref` / `requirement_summary` | 对应需求澄清或模块功能文档中的哪条需求 |
+| `module_name` | 与 MODULE_DOC / FUNCTIONAL_ARCH 一致的模块名 |
+| `title` | 本改造方案标题（一条可落地的设计单元） |
+| `design_rationale` | **为什么这样设计**（设计意图 + 约束） |
+| `design_evidence` | **设计依据**（代码路径、架构章节、澄清条目等，数组） |
+| `expected_effect` | **这样设计的效果**（行为/能力变化，可验证） |
+| `content_markdown` | 方案细节：**文字描述为主**；伪代码/代码片段**仅在有助说明逻辑时**使用，不得用代码代替方案叙述 |
+
+### 方案表述原则（强制）
+
+- **不是直接给代码**：优先用结构化 prose + 表格 + 伪代码说明设计；完整实现代码属于下游「任务执行」
+- **代码/伪代码是手段**：仅用于解释分支、调用关系、数据流；单条 `content_markdown` 内代码块不宜超过 40 行
+- **需求-模块-方案三角一致**：每条改造方案必须可回答「为哪条需求、改哪个模块、达成什么效果」
+
+### 合理性与兼容性（强制）
+
+完成所有 `transformation_plans` 后，**必须**编写 `consistency_analysis`：
+
+- 汇总各方案间是否存在**逻辑悖论**（同一数据两种互斥写法、重复改造同一入口、破坏已声明 OUT 范围等）
+- 说明与 TECH_ARCH / 模块功能「验证方式」的**兼容性**
+- 若发现冲突，须在对应 plan 中修订或在 `contradiction_checks` 中列出已消除的冲突点；**禁止**输出相互矛盾的方案
 
 ---
 
@@ -16,7 +62,7 @@ label: 函数级方案技能
 
 | Parameter | 必填 | 说明 / 示例 |
 |-----------|------|----------------|
-| `WORK_ORDER_DIR` | 是 | 工单工作目录（研发会议室注入），如 `work/21881451`。所有上游文档的固定推导路径如下：<br>`CLARIFY_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/req_clarify/需求澄清.md`<br>`MODULE_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/module_func/功能模块.md`<br>`BOUNDARY_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/boundary/边界确认说明.md`<br>`ACCEPTANCE_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/acceptance/验收标准.md`<br>`RISK_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/req_risk/需求风险评估.md` |
+| `WORK_ORDER_DIR` | 是 | 工单工作目录（研发会议室注入），如 `work/21881451`。所有上游文档的固定推导路径如下：<br>`CLARIFY_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/req_clarify/需求澄清.md`<br>`MODULE_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/module_func/模块功能.md`<br>`BOUNDARY_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/boundary/边界确认说明.md`<br>`ACCEPTANCE_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/acceptance/验收标准.md`<br>`RISK_DOC` = `{WORK_ORDER_DIR}/archive/需求分析/req_risk/需求风险评估.md` |
 | `PRODUCT_CODE_ROOT` | 是 | 产品代码根目录，如 `work/21881451/code`。用于代码检索和确认，支撑 Step 5 代码确认环节。 |
 | `PRODUCT_DOC_ROOT` | 是 | 产品文档根目录。功能架构和技术架构文档的固定路径如下：<br>`FUNC_ARCH_DOC` = `{PRODUCT_DOC_ROOT}/产品架构/FUNCTIONAL_ARCH.md`<br>`TECH_ARCH_DOC` = `{PRODUCT_DOC_ROOT}/产品架构/TECH_ARCH.md` |
 | `REPO_INFO` | 是 | 产品涉及的所有仓库信息列表，格式为：`应用模块`、`产品分支ID`、`产品分支`、`仓库地址`。示例：`- 应用模块：ZMDB - 产品分支ID: 4531 - 产品分支: CBOSS_BSS_ZMDB_V9.0_主分支 - 仓库地址: https://git-nj.iwhalecloud.com/xmjfbss/ZMDB.git`。从中抽取本次改造涉及的所有仓库，提取**产品分支ID**和**仓库地址**（可能有多组）。 |
@@ -87,7 +133,7 @@ Step 0 — 参数校验与环境准备
   0a. 校验必填参数：WORK_ORDER_DIR, PRODUCT_CODE_ROOT, PRODUCT_DOC_ROOT, REPO_INFO
       - 推导文档路径：
         CLARIFY_DOC = `{WORK_ORDER_DIR}/archive/需求分析/req_clarify/需求澄清.md`
-        MODULE_DOC = `{WORK_ORDER_DIR}/archive/需求分析/module_func/功能模块.md`
+        MODULE_DOC = `{WORK_ORDER_DIR}/archive/需求分析/module_func/模块功能.md`
         BOUNDARY_DOC = `{WORK_ORDER_DIR}/archive/需求分析/boundary/边界确认说明.md`
         ACCEPTANCE_DOC = `{WORK_ORDER_DIR}/archive/需求分析/acceptance/验收标准.md`
         RISK_DOC = `{WORK_ORDER_DIR}/archive/需求分析/req_risk/需求风险评估.md`
@@ -333,6 +379,16 @@ Step 10 — 文档落地（调用 whalecloud-dev-tool-doc-generate）
       - 无 `{{` / `{{#each` 残留；含模板固定章节与表头
       - 与模板对照：章节层级、表格列名、页眉字段名一致
       - 中文可读，无乱码；落盘失败则**中止**
+
+Step 11 — 结构化评审 JSON（func_solution_review.json）
+  11a. 组装 `func_solution_review.json`（schema_version=1），**必须**包含：
+      - `overview.diagrams[]`：至少 2 条 Mermaid（flowchart + graph/sequenceDiagram）
+      - `overview.architecture_summary`
+      - `consistency_analysis`：summary + compatibility_notes + contradiction_checks
+      - `transformation_plans[]`：每条含 requirement_ref、module_name、title、design_rationale、design_evidence、expected_effect、content_markdown；`human_review.status` 初始为 `pending`
+  11b. 使用 `write_file` UTF-8 写入 `{ARCHIVE_DIR}/func_solution_review.json`
+  11c. 若存在人工评审意见（修订重跑）：**须优先理解** `human_review.comment` 与各 plan 的 `human_review.comment`，合理则调整方案后重新落盘双文件
+  11d. 自检：plans 覆盖 MODULE_DOC 全部改造模块；无 consistency 悖论；JSON 可被前端评审面板解析
 ```
 
 ---

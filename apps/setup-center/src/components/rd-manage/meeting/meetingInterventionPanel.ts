@@ -1,6 +1,11 @@
 import type { NodeType } from '../../../rd-sop/constants';
 
-export type InterventionPanelKind = 'solution_review' | 'task_exec' | 'node_review' | 'hitl';
+export type InterventionPanelKind =
+  | 'solution_review'
+  | 'func_solution_review'
+  | 'task_exec'
+  | 'node_review'
+  | 'hitl';
 
 /** 协同型节点（ai_human）禁止配置协作智能体阵容。 */
 export function collaborationWorkersConfigurable(
@@ -35,6 +40,8 @@ export type MeetingInterventionRoomSlice = {
   hitlLocked?: boolean;
   reviewPayload?: { node_id?: string } | null;
   solutionReviewPayload?: unknown;
+  funcSolutionReviewPayload?: unknown;
+  funcSolutionBlocked?: boolean;
   taskExecPayload?: unknown;
   /** pending_delivery.node_id：人工门控所属 SOP 节点（优先于 currentNode） */
   hitlPendingNodeId?: string | null;
@@ -42,6 +49,7 @@ export type MeetingInterventionRoomSlice = {
 
 const INTERVENTION_KIND_LABELS: Record<string, string> = {
   solution_review: '方案评审',
+  func_solution_review: '函数级方案评审',
   task_exec: '任务执行评审',
   result_confirm: '结果确认',
   interactive: '会中澄清',
@@ -76,6 +84,14 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
     return pendingNid || current || 'solution_review';
   }
 
+  if (
+    kind === 'func_solution_review' ||
+    panel === 'func_solution_review' ||
+    room.funcSolutionReviewPayload
+  ) {
+    return pendingNid || current || 'func_solution';
+  }
+
   if (panel === 'node_review' || kind === 'result_confirm') {
     const fromReview = (room.reviewPayload?.node_id || '').trim();
     return fromReview || pendingNid || current;
@@ -103,6 +119,7 @@ export function resolveMeetingInterventionPanel(
   const panel = (room.interventionPanel || '').trim();
   if (
     panel === 'solution_review' ||
+    panel === 'func_solution_review' ||
     panel === 'task_exec' ||
     panel === 'node_review' ||
     panel === 'hitl'
@@ -120,6 +137,9 @@ export function resolveMeetingInterventionPanel(
   if (kind === 'solution_review' || room.solutionReviewPayload) {
     return 'solution_review';
   }
+  if (kind === 'func_solution_review' || room.funcSolutionReviewPayload) {
+    return 'func_solution_review';
+  }
   if (kind === 'result_confirm' || room.reviewPayload) {
     return 'node_review';
   }
@@ -127,6 +147,7 @@ export function resolveMeetingInterventionPanel(
   if (nodeType === 'ai_human') {
     if (nid === 'task_exec' && kind === 'task_exec') return 'task_exec';
     if (nid === 'solution_review' && room.solutionReviewPayload) return 'solution_review';
+    if (nid === 'func_solution' && room.funcSolutionReviewPayload) return 'func_solution_review';
     if (room.reviewPayload) return 'node_review';
   }
 

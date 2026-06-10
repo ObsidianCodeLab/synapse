@@ -314,6 +314,19 @@ def match_prod_row_by_prod(
     return None
 
 
+def _strip_owner_info_from_prod_wire(row: dict[str, Any]) -> dict[str, Any]:
+    """持久化前移除 get_prod_info 行内的 ``owner_info`` 密文，仅保留 ``owner`` 显示名。"""
+    if not isinstance(row, dict):
+        return {}
+    out = dict(row)
+    out.pop("owner_info", None)
+    return out
+
+
+def _strip_owner_info_from_prod_catalog(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [_strip_owner_info_from_prod_wire(r) for r in rows if isinstance(r, dict)]
+
+
 def load_prod_catalog_from_pipeline(scope_id: str) -> list[dict[str, Any]] | None:
     """读取 open_meeting 阶段缓存的产品全量列表。"""
     raw = read_json_file(meeting_pipeline_path((scope_id or "").strip()))
@@ -339,7 +352,7 @@ def save_prod_catalog_to_pipeline(scope_id: str, rows: list[dict[str, Any]], *, 
     ctx = raw.get("context")
     if not isinstance(ctx, dict):
         ctx = {}
-    ctx["prod_catalog"] = rows
+    ctx["prod_catalog"] = _strip_owner_info_from_prod_catalog(rows)
     if selected_prod:
         ctx["selected_prod"] = selected_prod
     raw["context"] = ctx
@@ -373,7 +386,9 @@ def save_product_session_cache(scope_id: str, cache: dict[str, Any]) -> None:
     ctx = raw.get("context")
     if not isinstance(ctx, dict):
         ctx = {}
-    ctx["product"] = cache
+    cache_to_write = dict(cache)
+    cache_to_write.pop("wire", None)
+    ctx["product"] = cache_to_write
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
     write_json_file(path, raw)
@@ -466,7 +481,6 @@ def resolve_product_for_meeting(
             "message": parsed.message if parsed else "",
             "total": parsed.total if parsed else len(rows),
         },
-        "wire": hit,
         **normalized,
     }
     save_product_session_cache(sid, cache_payload)

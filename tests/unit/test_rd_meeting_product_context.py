@@ -12,10 +12,13 @@ from synapse.rd_meeting.devservice import (
     unified_service_base_url,
 )
 from synapse.rd_meeting.init_context import normalize_node_init_log_data
+from synapse.rd_meeting.paths import meeting_pipeline_path
 from synapse.rd_meeting.product_context import (
     match_prod_row_by_prod,
     parse_get_prod_info_response,
     resolve_product_for_meeting,
+    save_prod_catalog_to_pipeline,
+    save_product_session_cache,
 )
 
 
@@ -119,6 +122,62 @@ def test_resolve_product_by_userwork_prod(monkeypatch, tmp_path):
     assert product["prod_feature"] == "客户管理:CRM模块|订单中心:订单处理"
     assert product["function"] == product["prod_feature"]
     assert product["repos"][0]["repo_name"] == "foo"
+
+    saved = json.loads(meeting_pipeline_path(scope_id).read_text(encoding="utf-8"))
+    assert "wire" not in saved["context"]["product"]
+
+
+def test_save_prod_catalog_strips_owner_info(monkeypatch, tmp_path):
+    scope_id = "strip-catalog-1"
+    work = tmp_path / "work" / scope_id
+    work.mkdir(parents=True)
+    pipe_path = work / "meeting_pipeline.json"
+    pipe_path.write_text(
+        json.dumps({"schema_version": 1, "scope_id": scope_id, "context": {}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    rows = [
+        {
+            "prod": "p1",
+            "owner": "张三",
+            "owner_info": "secret-cipher",
+        }
+    ]
+    save_prod_catalog_to_pipeline(scope_id, rows, selected_prod="p1")
+
+    saved = json.loads(meeting_pipeline_path(scope_id).read_text(encoding="utf-8"))
+    row = saved["context"]["prod_catalog"][0]
+    assert row["owner"] == "张三"
+    assert "owner_info" not in row
+    assert saved["context"]["selected_prod"] == "p1"
+
+
+def test_save_product_session_cache_omits_wire(monkeypatch, tmp_path):
+    scope_id = "strip-product-1"
+    work = tmp_path / "work" / scope_id
+    work.mkdir(parents=True)
+    pipe_path = work / "meeting_pipeline.json"
+    pipe_path.write_text(
+        json.dumps({"schema_version": 1, "scope_id": scope_id, "context": {}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    save_product_session_cache(
+        scope_id,
+        {
+            "prod": "p1",
+            "owner": "李四",
+            "wire": {"prod": "p1", "owner": "李四", "owner_info": "secret-cipher"},
+        },
+    )
+
+    saved = json.loads(meeting_pipeline_path(scope_id).read_text(encoding="utf-8"))
+    product = saved["context"]["product"]
+    assert product["owner"] == "李四"
+    assert "wire" not in product
 
 
 def test_normalize_node_init_backfills_prod_feature_from_function():

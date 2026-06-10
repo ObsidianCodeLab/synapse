@@ -347,6 +347,7 @@ class MeetingRoomService:
             "hitl_submission": room_state.get("hitl_submission"),
             "pending_delivery": room_state.get("pending_delivery"),
             "solution_review_blocked": bool(room_state.get("solution_review_blocked")),
+            "func_solution_blocked": bool(room_state.get("func_solution_blocked")),
             "skipped_node_ids": extract_skipped_node_ids(all_history),
         }
 
@@ -1023,6 +1024,8 @@ class MeetingRoomService:
 
         if rs.get("solution_review_blocked") and resume_run:
             raise ValueError("solution_review_blocked")
+        if rs.get("func_solution_blocked") and resume_run:
+            raise ValueError("func_solution_blocked")
 
         effective_resume = resume_run
         if message_type == "instruction":

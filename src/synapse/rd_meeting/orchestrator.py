@@ -1005,6 +1005,109 @@ class MeetingRoomOrchestrator:
             **gate,
         }
 
+    async def enter_func_solution_review_gate(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        report_body: str,
+        tokens_used: int,
+        duration_seconds: int,
+        stage_id: int,
+        ticket_title: str,
+    ) -> dict[str, Any]:
+        """函数级方案节点：加载 func_solution_review.json，进入专用人工评审面板。"""
+        from synapse.rd_meeting.func_solution_review import (
+            ensure_human_review_pending_for_gate,
+            load_func_solution_review_payload,
+            validate_func_solution_review_json,
+        )
+
+        sid = scope_id.strip()
+        set_phase(sid, "result_gate")
+        ok, val_errors = validate_func_solution_review_json(sid)
+        if not ok:
+            gate = self.mark_human_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                reason=(
+                    f"{node_display_name(node_id)} 结构化评审产物未就绪："
+                    + "; ".join(val_errors)
+                ),
+                ticket_title=ticket_title,
+                hitl_form_schema=resolve_hitl_schema_for_gate(
+                    resolve_node_binding(node_id),
+                    dynamic_schema=None,
+                    reason="; ".join(val_errors),
+                    intervention_kind="exception",
+                ),
+                pending_delivery={
+                    "node_id": node_id,
+                    "report_body": report_body,
+                    "await_confirm": False,
+                    "tokens_used": tokens_used,
+                    "duration_seconds": duration_seconds,
+                    "stage_id": stage_id,
+                },
+                intervention_kind="exception",
+            )
+            set_phase(sid, "exception_gate")
+            return {
+                "status": "human_intervention",
+                "node_id": node_id,
+                "exception": True,
+                "validation_errors": val_errors,
+                **gate,
+            }
+
+        fs_payload = load_func_solution_review_payload(sid)
+        if isinstance(fs_payload, dict):
+            fs_payload = ensure_human_review_pending_for_gate(sid, fs_payload)
+        pending: dict[str, Any] = {
+            "node_id": node_id,
+            "report_body": report_body,
+            "await_confirm": True,
+            "tokens_used": tokens_used,
+            "duration_seconds": duration_seconds,
+            "stage_id": stage_id,
+            "func_solution_review_payload": fs_payload,
+        }
+        gate = self.mark_human_gate(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            reason=f"{node_display_name(node_id)} 待人工函数级方案评审（逐条改造方案确认）",
+            ticket_title=ticket_title,
+            hitl_form_schema=None,
+            pending_delivery=pending,
+            intervention_kind="func_solution_review",
+        )
+        append_history_event(
+            sid,
+            {
+                "event": "func_solution_review_gate",
+                "room_id": room_id,
+                "node_id": node_id,
+                "text": f"{node_display_name(node_id)} 待人工函数级方案评审",
+                "intervention_kind": "func_solution_review",
+                "tokens_used": tokens_used,
+                "duration_seconds": duration_seconds,
+                "log_type": "info",
+            },
+        )
+        return {
+            "status": "human_intervention",
+            "node_id": node_id,
+            "pending_confirm": True,
+            "func_solution_review_payload": fs_payload,
+            **gate,
+        }
+
     def enter_task_exec_gate(
         self,
         *,
@@ -1308,6 +1411,121 @@ class MeetingRoomOrchestrator:
             **out,
         }
 
+    def confirm_func_solution_review_decision(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        decision: str,
+        comment: str = "",
+        plan_updates: list[dict[str, Any]] | None = None,
+        ticket_title: str = "",
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """函数级方案评审：全部改造方案通过后推进；需修订则落盘意见并阻断。"""
+        from synapse.rd_meeting.func_solution_review import apply_human_decision
+
+        sid = scope_id.strip()
+        room_state = load_room_state(sid) or {}
+        pending = room_state.get("pending_delivery")
+        if not isinstance(pending, dict):
+            raise ValueError("no_pending_delivery")
+        node_id = str(pending.get("node_id") or room_state.get("current_node_id") or "")
+        if node_id != "func_solution":
+            raise ValueError("not_func_solution_node")
+
+        dec = (decision or "").strip().lower()
+        if dec not in ("approve", "revise"):
+            raise ValueError("invalid_decision")
+
+        try:
+            payload = apply_human_decision(
+                sid,
+                decision="approve" if dec == "approve" else "revise",
+                comment=comment,
+                plan_updates=plan_updates,
+            )
+        except ValueError as exc:
+            code = str(exc)
+            if code in ("not_all_plans_approved", "comment_too_short"):
+                raise
+            raise
+
+        if dec == "revise":
+            room_state = dict(load_room_state(sid) or {})
+            room_state["status"] = "human_intervention"
+            room_state["intervention_kind"] = "exception"
+            room_state["func_solution_blocked"] = True
+            pending = dict(pending)
+            pending["func_solution_review_payload"] = payload
+            room_state["pending_delivery"] = pending
+            finalize_node_metrics(room_state, scope_id=sid, node_id=node_id)
+            save_room_state(sid, room_state)
+            set_phase(sid, "exception_gate")
+            append_history_event(
+                sid,
+                {
+                    "event": "func_solution_needs_revision",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "comment": comment.strip(),
+                    "log_type": "warning",
+                    "agent_id": "user",
+                },
+            )
+            return {
+                "status": "blocked",
+                "node_id": node_id,
+                "func_solution_review_payload": payload,
+                "room_state": room_state,
+            }
+
+        stage_id = int(pending.get("stage_id") or stage_id_for_node_id(node_id))
+        stage_name = stage_name_for_id(stage_id)
+        validation = validate_node_archive_artifacts(sid, stage_name, node_id)
+        if not validation.ok:
+            raise ValueError("node_archive_validation_failed: " + "; ".join(validation.errors))
+
+        tokens_used = int(pending.get("tokens_used") or 0)
+        duration = int(pending.get("duration_seconds") or 0)
+        out = self.on_node_complete(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            artifacts=validation.artifacts,
+            tokens_used=tokens_used,
+            duration_seconds=duration,
+            sync_userwork=True,
+            advance=True,
+            ticket_title=ticket_title,
+            agent_pool=agent_pool,
+        )
+        rs = dict(load_room_state(sid) or {})
+        rs.pop("pending_delivery", None)
+        rs.pop("hitl_form_schema", None)
+        rs.pop("func_solution_blocked", None)
+        rs.pop("intervention_kind", None)
+        save_room_state(sid, rs)
+        append_history_event(
+            sid,
+            {
+                "event": "func_solution_review_approved",
+                "room_id": room_id,
+                "node_id": node_id,
+                "comment": comment.strip(),
+                "log_type": "info",
+                "agent_id": "user",
+            },
+        )
+        return {
+            "status": "approved",
+            "node_id": node_id,
+            "func_solution_review_payload": payload,
+            **out,
+        }
+
     async def enter_node_review_gate(
         self,
         *,
@@ -1325,6 +1543,7 @@ class MeetingRoomOrchestrator:
         skipped_nodes: list[str] | None = None,
     ) -> dict[str, Any]:
         """human_confirm 且会中问卷已满足：装配 node_review 并进入 result_confirm 门控。"""
+        from synapse.rd_meeting.func_solution_review import uses_func_solution_gate
         from synapse.rd_meeting.solution_review import uses_solution_review_gate
 
         if uses_solution_review_gate(node_id):
@@ -1339,6 +1558,18 @@ class MeetingRoomOrchestrator:
                 stage_id=stage_id,
                 ticket_title=ticket_title,
                 skipped_nodes=skipped_nodes,
+            )
+        if uses_func_solution_gate(node_id):
+            return await self.enter_func_solution_review_gate(
+                scope_type=scope_type,
+                scope_id=scope_id,
+                room_id=room_id,
+                node_id=node_id,
+                report_body=report_body,
+                tokens_used=tokens_used,
+                duration_seconds=duration_seconds,
+                stage_id=stage_id,
+                ticket_title=ticket_title,
             )
 
         sid = scope_id.strip()
@@ -2183,6 +2414,10 @@ class MeetingRoomOrchestrator:
         need_human_confirm = bool(binding.get("human_confirm"))
         room_rs = load_room_state(sid) or {}
 
+        from synapse.rd_meeting.func_solution_review import (
+            FUNC_SOLUTION_HITL_FORBIDDEN,
+            uses_func_solution_gate,
+        )
         from synapse.rd_meeting.solution_review import (
             SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG,
             uses_solution_review_gate,
@@ -2195,6 +2430,19 @@ class MeetingRoomOrchestrator:
                     "room_id": room_id,
                     "node_id": node_id,
                     "detail": SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG,
+                    "log_type": "warning",
+                    "agent_id": str(binding.get("host_profile_id") or "default"),
+                },
+            )
+            tool_questionnaire = None
+        if need_human_confirm and tool_questionnaire and uses_func_solution_gate(node_id):
+            append_history_event(
+                sid,
+                {
+                    "event": "func_solution_questionnaire_rejected",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "detail": FUNC_SOLUTION_HITL_FORBIDDEN,
                     "log_type": "warning",
                     "agent_id": str(binding.get("host_profile_id") or "default"),
                 },
@@ -2359,6 +2607,10 @@ class MeetingRoomOrchestrator:
                     **gate,
                 }
 
+            from synapse.rd_meeting.func_solution_review import (
+                uses_func_solution_gate,
+                validate_func_solution_review_json,
+            )
             from synapse.rd_meeting.solution_review import (
                 uses_solution_review_gate,
                 validate_solution_review_json,
@@ -2376,6 +2628,18 @@ class MeetingRoomOrchestrator:
                     stage_id=stage_id,
                     ticket_title=ticket_title,
                     skipped_nodes=skipped_nodes or None,
+                )
+            if uses_func_solution_gate(node_id):
+                return await self.enter_func_solution_review_gate(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    node_id=node_id,
+                    report_body=report_body,
+                    tokens_used=tokens_used,
+                    duration_seconds=int(duration),
+                    stage_id=stage_id,
+                    ticket_title=ticket_title,
                 )
             if ready_for_review:
                 return await self.enter_node_review_gate(
@@ -2448,9 +2712,10 @@ class MeetingRoomOrchestrator:
                 "node_id": node_id,
                 "validation_errors": validation.errors,
             }
+        from synapse.rd_meeting.func_solution_review import uses_func_solution_gate
         from synapse.rd_meeting.solution_review import uses_solution_review_gate
 
-        if not uses_solution_review_gate(node_id):
+        if not uses_solution_review_gate(node_id) and not uses_func_solution_gate(node_id):
             try:
                 from synapse.rd_meeting.agent_session import resolve_meeting_orchestrator
                 from synapse.rd_meeting.node_review import build_node_review_payload, save_node_review

@@ -128,9 +128,12 @@ def resolve_ready_for_node_review_after_hitl(
     feedback_mode: HitlFeedbackMode,
 ) -> bool:
     """会中问卷提交后：仅「仅选项」且归档文件已存在时才标记 NodeReview 就绪。"""
+    from synapse.rd_meeting.func_solution_review import uses_func_solution_gate
     from synapse.rd_meeting.solution_review import uses_solution_review_gate
 
     if uses_solution_review_gate(node_id):
+        return False
+    if uses_func_solution_gate(node_id):
         return False
     if feedback_mode != "options_only":
         return False

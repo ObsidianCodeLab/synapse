@@ -30,10 +30,12 @@ import { consumeMeetingRoomFocus } from '../../../rd-meeting/focus';
 import { MeetingRoomConfigDrawer } from './MeetingRoomConfigDrawer';
 import { MeetingHitlForm, type HitlFormSchema, type HitlFormValues } from './MeetingHitlForm';
 import { SolutionReviewPanel } from './SolutionReviewPanel';
+import { FuncSolutionReviewPanel } from './FuncSolutionReviewPanel';
 import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
 import type {
   NodeReviewPayload,
+  FuncSolutionReviewPayload,
   SolutionReviewPayload,
   TaskExecPayload,
 } from '../../../api/meetingRoomService';
@@ -163,6 +165,8 @@ interface MeetingRoom {
   interventionPanel?: InterventionPanelKind | string | null;
   solutionReviewPayload?: SolutionReviewPayload | null;
   solutionReviewBlocked?: boolean;
+  funcSolutionReviewPayload?: FuncSolutionReviewPayload | null;
+  funcSolutionBlocked?: boolean;
   taskExecPayload?: TaskExecPayload | null;
   taskExecBlocked?: boolean;
   /** pending_delivery.node_id：当前人工门控所属节点 */
@@ -372,6 +376,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         node_id?: string;
         review_payload?: NodeReviewPayload;
         solution_review_payload?: SolutionReviewPayload;
+        func_solution_review_payload?: FuncSolutionReviewPayload;
         task_exec_payload?: TaskExecPayload;
         report_body?: string;
       }
@@ -403,6 +408,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
           : pendingDelivery?.review_payload ?? room.reviewPayload,
         solutionReviewPayload:
           pendingDelivery?.solution_review_payload ?? room.solutionReviewPayload,
+        funcSolutionReviewPayload:
+          pendingDelivery?.func_solution_review_payload ?? room.funcSolutionReviewPayload,
         hitlPendingNodeId:
           pendingDelivery?.node_id != null
             ? String(pendingDelivery.node_id)
@@ -413,6 +420,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     );
   const isSolutionReview =
     interventionKind === 'solution_review' || interventionPanel === 'solution_review';
+  const isFuncSolutionReview =
+    interventionKind === 'func_solution_review' || interventionPanel === 'func_solution_review';
   return {
     ...room,
     currentNode: nextNodeId,
@@ -447,7 +456,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       pendingDelivery?.node_id != null
         ? String(pendingDelivery.node_id)
         : room.hitlPendingNodeId ?? null,
-    reviewPayload: isSolutionReview
+    reviewPayload: isSolutionReview || isFuncSolutionReview
       ? null
       : ((pendingDelivery?.review_payload as NodeReviewPayload | undefined) ??
         (live.pending_delivery !== undefined ? null : room.reviewPayload ?? null)),
@@ -459,9 +468,16 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       : live.pending_delivery !== undefined
         ? null
         : room.solutionReviewPayload ?? null,
+    funcSolutionReviewPayload: isFuncSolutionReview
+      ? ((pendingDelivery?.func_solution_review_payload as FuncSolutionReviewPayload | undefined) ??
+        (live.pending_delivery !== undefined ? null : room.funcSolutionReviewPayload ?? null))
+      : live.pending_delivery !== undefined
+        ? null
+        : room.funcSolutionReviewPayload ?? null,
     solutionReviewBlocked: Boolean(
       live.solution_review_blocked ?? room.solutionReviewBlocked,
     ),
+    funcSolutionBlocked: Boolean(live.func_solution_blocked ?? room.funcSolutionBlocked),
     taskExecPayload:
       (pendingDelivery?.task_exec_payload as TaskExecPayload | undefined) ??
       room.taskExecPayload ??
@@ -567,6 +583,9 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
         solutionReviewPayload: (item.room_state?.pending_delivery as {
           solution_review_payload?: unknown;
         })?.solution_review_payload,
+        funcSolutionReviewPayload: (item.room_state?.pending_delivery as {
+          func_solution_review_payload?: unknown;
+        })?.func_solution_review_payload,
         hitlPendingNodeId: (item.room_state?.pending_delivery as { node_id?: string })?.node_id,
       },
       undefined,
@@ -576,6 +595,10 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
       ((item.room_state?.pending_delivery as { solution_review_payload?: SolutionReviewPayload })
         ?.solution_review_payload as SolutionReviewPayload | undefined) ?? null,
     solutionReviewBlocked: Boolean(item.room_state?.solution_review_blocked),
+    funcSolutionReviewPayload:
+      ((item.room_state?.pending_delivery as { func_solution_review_payload?: FuncSolutionReviewPayload })
+        ?.func_solution_review_payload as FuncSolutionReviewPayload | undefined) ?? null,
+    funcSolutionBlocked: Boolean(item.room_state?.func_solution_blocked),
     taskExecPayload:
       ((item.room_state?.pending_delivery as { task_exec_payload?: TaskExecPayload })
         ?.task_exec_payload as TaskExecPayload | undefined) ?? null,
@@ -1455,6 +1478,7 @@ const InterventionDialog = ({
   );
   const hitlBadgeText = useMemo(() => {
     if (interventionPanel === 'solution_review') return '方案评审';
+    if (interventionPanel === 'func_solution_review') return '函数级方案评审';
     if (interventionPanel === 'task_exec') return '任务执行评审';
     if (interventionPanel === 'node_review') return '结果待确认';
     const k = (room?.interventionKind || '').toLowerCase();
@@ -2024,6 +2048,17 @@ const InterventionDialog = ({
                   scopeId={room.scopeId}
                   initialPayload={room.taskExecPayload ?? null}
                   blocked={room.taskExecBlocked}
+                  onDecided={() => setCenterTab('detail')}
+                />
+              </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'func_solution_review' ? (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <FuncSolutionReviewPanel
+                  synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
+                  scopeId={room.scopeId}
+                  initialPayload={room.funcSolutionReviewPayload ?? null}
+                  blocked={room.funcSolutionBlocked}
                   onDecided={() => setCenterTab('detail')}
                 />
               </div>

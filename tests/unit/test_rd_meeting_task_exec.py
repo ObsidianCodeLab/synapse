@@ -380,7 +380,7 @@ def test_parse_cli_log_entries_tool_think_output():
         "[2026-06-10 02:00:02] [tool] read synapse_archive/func_solution/函数级方案.md",
         "[2026-06-10 02:00:03] [tool] read:completed",
         "[2026-06-10 02:00:04] [cursor-output] 已完成文件修改",
-        '[2026-06-10 02:00:05] [raw] {"type":"result","subtype":"success","duration_ms":12000}',
+        '[2026-06-10 02:00:05] [raw] {"type":"result","subtype":"success","duration_ms":12000,"usage":{"inputTokens":10,"outputTokens":2}}',
         "[2026-06-10 02:00:06] 任务执行成功",
     ]
     entries = _parse_cli_log_entries(raw)
@@ -392,6 +392,9 @@ def test_parse_cli_log_entries_tool_think_output():
     assert "result" in kinds
     assert "success" in kinds
     assert "tool_call" not in kinds
+    result_entry = next(e for e in entries if e.get("kind") == "result")
+    assert result_entry.get("duration_ms") == 12000
+    assert result_entry.get("tokens_used") == 12
 
 
 def test_bootstrap_task_exec_stops_when_agent_cli_missing(tmp_path, monkeypatch):
@@ -558,3 +561,78 @@ def test_extract_report_from_log_prefers_stream_json_result(tmp_path):
     report = _extract_report_from_log(str(log_path))
     assert "## 完成状态" in report
     assert _infer_completion_status(report, develop_ok=True) == "completed"
+
+
+def test_parse_cli_round_metrics_from_log_uses_result_usage_and_duration(tmp_path):
+    from synapse.rd_meeting.task_exec import _parse_cli_round_metrics_from_log
+
+    log_path = tmp_path / "develop.log"
+    result_payload = {
+        "type": "result",
+        "subtype": "success",
+        "duration_ms": 315533,
+        "duration_api_ms": 315533,
+        "is_error": False,
+        "result": "定时备份能力已完成实现。",
+        "session_id": "476cdea0-a615-48cb-8a62-78c3dd03561e",
+        "request_id": "7888a592-8999-47e3-9bca-0d316f66e13c",
+        "usage": {
+            "inputTokens": 64462,
+            "outputTokens": 9283,
+            "cacheReadTokens": 746680,
+            "cacheWriteTokens": 0,
+        },
+    }
+    log_path.write_text(
+        f'[2026-06-10 14:30:07] [raw] {json.dumps(result_payload, ensure_ascii=False)}\n',
+        encoding="utf-8",
+    )
+    metrics = _parse_cli_round_metrics_from_log(log_path)
+    assert metrics["session_id"] == "476cdea0-a615-48cb-8a62-78c3dd03561e"
+    assert metrics["duration_ms"] == 315533
+    assert metrics["duration_seconds"] == 315
+    assert metrics["tokens_used"] == 73745
+    assert metrics["usage"]["input_tokens"] == 64462
+    assert metrics["usage"]["output_tokens"] == 9283
+    assert metrics["usage"]["cache_read_tokens"] == 746680
+
+
+def test_run_cursor_cli_round_prefers_result_metrics(tmp_path, monkeypatch):
+    from synapse.rd_meeting import task_exec as te
+
+    script = tmp_path / "cursor-operation.py"
+    script.write_text("# stub", encoding="utf-8")
+    log_path = tmp_path / "round.log"
+    result_payload = {
+        "type": "result",
+        "subtype": "success",
+        "duration_ms": 12000,
+        "session_id": "sess-abc",
+        "usage": {"inputTokens": 100, "outputTokens": 20},
+    }
+    log_path.write_text(
+        f'[2026-06-10 02:00:05] [raw] {json.dumps(result_payload)}\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(te, "_cursor_operation_script", lambda: script)
+
+    class _Proc:
+        returncode = 0
+        stdout = f"SYNAPSE_CURSOR_SUCCESS=1\nSYNAPSE_CURSOR_LOG={log_path}\n"
+        stderr = ""
+
+    monkeypatch.setattr(te.subprocess, "run", lambda *a, **k: _Proc())
+    monkeypatch.setattr(te.time, "monotonic", lambda: 1000.0)
+
+    out = te._run_cursor_cli_round(
+        code_path=str(tmp_path),
+        target="demo",
+        func_doc="",
+        accept_doc="",
+        log_path=log_path,
+    )
+    assert out["duration_ms"] == 12000
+    assert out["duration_seconds"] == 12
+    assert out["tokens_used"] == 120
+    assert out["session_id"] == "sess-abc"

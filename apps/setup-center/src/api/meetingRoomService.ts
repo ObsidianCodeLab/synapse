@@ -667,6 +667,103 @@ export async function saveSolutionReviewTasks(
   );
 }
 
+export type FuncSolutionPlanReviewStatus = 'pending' | 'approved' | 'needs_change';
+
+export interface FuncSolutionDiagram {
+  id?: string;
+  title?: string;
+  kind?: string;
+  mermaid?: string;
+}
+
+export interface FuncSolutionTransformationPlan {
+  id: string;
+  requirement_ref?: string;
+  requirement_summary?: string;
+  module_name?: string;
+  title?: string;
+  design_rationale?: string;
+  design_evidence?: string[];
+  expected_effect?: string;
+  content_markdown?: string;
+  human_review?: {
+    status?: FuncSolutionPlanReviewStatus;
+    comment?: string;
+  };
+}
+
+export interface FuncSolutionReviewPayload {
+  schema_version?: number;
+  demand_no?: string;
+  requirement_name?: string;
+  reviewed_at?: string | null;
+  overview?: {
+    architecture_summary?: string;
+    diagrams?: FuncSolutionDiagram[];
+  };
+  consistency_analysis?: {
+    summary?: string;
+    compatibility_notes?: string[];
+    contradiction_checks?: string[];
+  };
+  transformation_plans?: FuncSolutionTransformationPlan[];
+  human_review?: {
+    status?: string;
+    comment?: string;
+    decided_at?: string | null;
+  };
+}
+
+export interface FuncSolutionReviewGetResponse {
+  room_id: string;
+  scope_id: string;
+  payload: FuncSolutionReviewPayload;
+  intervention_kind?: string;
+  blocked?: boolean;
+  pending_node_id?: string;
+}
+
+export async function fetchFuncSolutionReview(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<FuncSolutionReviewGetResponse> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<FuncSolutionReviewGetResponse>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/func-solution-review`,
+  );
+}
+
+export async function saveFuncSolutionPlanReviews(
+  synapseApiBase: string,
+  roomId: string,
+  plans: Array<{ id: string; status?: FuncSolutionPlanReviewStatus; comment?: string }>,
+): Promise<{ scope_id: string; payload: FuncSolutionReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPut<{ scope_id: string; payload: FuncSolutionReviewPayload }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/func-solution-review/plans`,
+    { plans },
+  );
+}
+
+export async function submitFuncSolutionReviewDecision(
+  synapseApiBase: string,
+  roomId: string,
+  body: {
+    decision: 'approve' | 'revise';
+    comment: string;
+    plans?: Array<{ id: string; status?: FuncSolutionPlanReviewStatus; comment?: string }>;
+  },
+): Promise<{ status: string; node_id?: string; func_solution_review_payload?: FuncSolutionReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPost(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/func-solution-review/decision`,
+    body,
+  );
+}
+
 export async function fetchMeetingRoomLive(
   synapseApiBase: string,
   roomId: string,

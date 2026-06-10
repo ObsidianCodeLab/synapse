@@ -334,6 +334,110 @@ def build_task_verify_prompt(
     return "\n".join(lines)
 
 
+def _usage_int(raw: dict[str, Any], *keys: str) -> int:
+    for key in keys:
+        value = raw.get(key)
+        if value is None:
+            continue
+        try:
+            return max(0, int(value))
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _normalize_cli_usage(raw: Any) -> dict[str, int]:
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        "input_tokens": _usage_int(raw, "inputTokens", "input_tokens", "billable_input_tokens"),
+        "output_tokens": _usage_int(raw, "outputTokens", "output_tokens", "billable_output_tokens"),
+        "cache_read_tokens": _usage_int(raw, "cacheReadTokens", "cache_read_tokens"),
+        "cache_write_tokens": _usage_int(raw, "cacheWriteTokens", "cache_write_tokens"),
+    }
+
+
+def _billable_tokens_from_usage(usage: dict[str, int]) -> int:
+    return int(usage.get("input_tokens") or 0) + int(usage.get("output_tokens") or 0)
+
+
+def _metrics_from_cli_result_event(event: dict[str, Any]) -> dict[str, Any]:
+    if event.get("type") != "result":
+        return {}
+    duration_ms = max(int(event.get("duration_ms") or 0), 0)
+    usage = _normalize_cli_usage(event.get("usage"))
+    tokens_used = _billable_tokens_from_usage(usage)
+    session_id = str(event.get("session_id") or "").strip()
+    return {
+        "duration_ms": duration_ms,
+        "duration_seconds": duration_ms // 1000 if duration_ms > 0 else 0,
+        "tokens_used": tokens_used,
+        "session_id": session_id,
+        "usage": usage,
+    }
+
+
+def _parse_cli_round_metrics_from_log(log_path: str | Path) -> dict[str, Any]:
+    """从 CLI 日志末尾的 ``[raw] {type:result,...}`` 行读取 session / usage / duration。"""
+    path = Path(log_path)
+    if not path.is_file():
+        return {}
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    for line in reversed(text.splitlines()):
+        if "[raw]" not in line:
+            continue
+        raw_json = line.split("[raw]", 1)[-1].strip()
+        if '"type":"result"' not in raw_json and '"type": "result"' not in raw_json:
+            continue
+        try:
+            event = json.loads(raw_json)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        metrics = _metrics_from_cli_result_event(event)
+        if metrics:
+            return metrics
+    return {}
+
+
+def _merge_cli_round_metrics(*metrics_list: dict[str, Any]) -> dict[str, Any]:
+    merged_usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+    }
+    duration_ms = 0
+    duration_seconds = 0
+    tokens_used = 0
+    session_id = ""
+    for metrics in metrics_list:
+        if not metrics:
+            continue
+        duration_ms += int(metrics.get("duration_ms") or 0)
+        duration_seconds += int(metrics.get("duration_seconds") or 0)
+        tokens_used += int(metrics.get("tokens_used") or 0)
+        sid = str(metrics.get("session_id") or "").strip()
+        if sid:
+            session_id = sid
+        usage = metrics.get("usage") if isinstance(metrics.get("usage"), dict) else {}
+        for key in merged_usage:
+            merged_usage[key] += int(usage.get(key) or 0)
+    out: dict[str, Any] = {
+        "duration_ms": duration_ms,
+        "duration_seconds": duration_seconds,
+        "tokens_used": tokens_used,
+        "usage": merged_usage,
+    }
+    if session_id:
+        out["session_id"] = session_id
+    return out
+
+
 def _parse_cursor_subprocess_output(stdout: str) -> dict[str, Any]:
     success = False
     log_path = ""
@@ -343,16 +447,13 @@ def _parse_cursor_subprocess_output(stdout: str) -> dict[str, Any]:
             success = line.split("=", 1)[-1].strip() in ("1", "true", "True")
         elif line.startswith("SYNAPSE_CURSOR_LOG="):
             log_path = line.split("=", 1)[-1].strip()
-    tokens = 0
-    if log_path and Path(log_path).is_file():
-        try:
-            text = Path(log_path).read_text(encoding="utf-8", errors="replace")
-            for pat in (r'"input_tokens"\s*:\s*(\d+)', r'"output_tokens"\s*:\s*(\d+)'):
-                for m in re.finditer(pat, text):
-                    tokens += int(m.group(1))
-        except OSError:
-            pass
-    return {"success": success, "log_path": log_path, "tokens_used": tokens}
+    metrics = _parse_cli_round_metrics_from_log(log_path) if log_path else {}
+    return {
+        "success": success,
+        "log_path": log_path,
+        "tokens_used": int(metrics.get("tokens_used") or 0),
+        **metrics,
+    }
 
 
 def _run_cursor_cli_round(
@@ -434,16 +535,35 @@ def _run_cursor_cli_round(
 
     parsed = _parse_cursor_subprocess_output(proc.stdout)
     ok = parsed["success"] and proc.returncode == 0
-    duration = int(time.monotonic() - started)
+    effective_log = str(parsed.get("log_path") or log_path)
+    log_metrics = _parse_cli_round_metrics_from_log(effective_log)
+    fallback_duration = int(time.monotonic() - started)
+    duration_ms = int(log_metrics.get("duration_ms") or parsed.get("duration_ms") or 0)
+    duration_seconds = int(
+        log_metrics.get("duration_seconds")
+        or parsed.get("duration_seconds")
+        or (duration_ms // 1000 if duration_ms > 0 else fallback_duration)
+    )
+    tokens_used = int(
+        log_metrics.get("tokens_used") or parsed.get("tokens_used") or 0
+    )
     stderr = (proc.stderr or "").strip()
-    return {
+    result: dict[str, Any] = {
         "status": "ok" if ok else "failed",
         "error": "" if ok else (stderr or proc.stdout or f"exit={proc.returncode}")[:2000],
-        "duration_seconds": duration,
-        "tokens_used": int(parsed.get("tokens_used") or 0),
-        "log_path": str(parsed.get("log_path") or log_path),
+        "duration_ms": duration_ms,
+        "duration_seconds": duration_seconds,
+        "tokens_used": tokens_used,
+        "log_path": effective_log,
         "exit_code": proc.returncode,
     }
+    session_id = str(log_metrics.get("session_id") or parsed.get("session_id") or "").strip()
+    if session_id:
+        result["session_id"] = session_id
+    usage = log_metrics.get("usage") or parsed.get("usage")
+    if isinstance(usage, dict) and usage:
+        result["usage"] = usage
+    return result
 
 
 _COMPLETION_SECTION_RE = re.compile(
@@ -676,6 +796,7 @@ def _summary_from_rows(task_rows: list[dict[str, Any]], *, task_total: int) -> d
         "running": sum(1 for t in task_rows if t.get("status") == "running"),
         "total_tokens": sum(int(t.get("tokens_used") or 0) for t in task_rows),
         "total_duration_sec": sum(int(t.get("duration_seconds") or 0) for t in task_rows),
+        "total_duration_ms": sum(int(t.get("duration_ms") or 0) for t in task_rows),
     }
 
 
@@ -1095,8 +1216,10 @@ def bootstrap_task_exec(
             "partial" if completion == "partial" else "failed"
         )
 
-        tokens = int(dev_result.get("tokens_used") or 0) + int(verify_result.get("tokens_used") or 0)
-        duration = int(dev_result.get("duration_seconds") or 0) + int(verify_result.get("duration_seconds") or 0)
+        round_metrics = _merge_cli_round_metrics(dev_result, verify_result)
+        tokens = int(round_metrics.get("tokens_used") or 0)
+        duration = int(round_metrics.get("duration_seconds") or 0)
+        duration_ms = int(round_metrics.get("duration_ms") or 0)
 
         row = {
             **row_base,
@@ -1111,10 +1234,17 @@ def bootstrap_task_exec(
             "error": verify_result.get("error") or dev_result.get("error") or "",
             "tokens_used": tokens,
             "duration_seconds": duration,
+            "duration_ms": duration_ms,
             "develop_log": str(dev_log),
             "verify_log": str(verify_log),
             "report_markdown": report_md,
         }
+        session_id = str(round_metrics.get("session_id") or "").strip()
+        if session_id:
+            row["session_id"] = session_id
+        usage = round_metrics.get("usage")
+        if isinstance(usage, dict) and any(int(usage.get(k) or 0) for k in usage):
+            row["usage"] = usage
         task_rows.append(row)
         _emit_task_exec_progress(
             sid,
@@ -1275,21 +1405,37 @@ def _parse_raw_json_log_entry(time_hms: str, body: str) -> dict[str, Any] | None
         return None
     if etype == "result":
         subtype = str(event.get("subtype") or "unknown")
-        duration_ms = int(event.get("duration_ms") or 0)
+        metrics = _metrics_from_cli_result_event(event)
+        duration_ms = int(metrics.get("duration_ms") or 0)
+        tokens_used = int(metrics.get("tokens_used") or 0)
         dur_hint = f" · {duration_ms // 1000}s" if duration_ms > 0 else ""
+        token_hint = f" · {tokens_used} tk" if tokens_used > 0 else ""
+        session_id = str(metrics.get("session_id") or "").strip()
         if subtype == "success":
-            return {
+            entry: dict[str, Any] = {
                 "kind": "result",
                 "time": time_hms,
-                "text": f"本轮 Agent 完成{dur_hint}",
+                "text": f"本轮 Agent 完成{dur_hint}{token_hint}",
                 "status": "ok",
             }
-        return {
-            "kind": "result",
-            "time": time_hms,
-            "text": f"本轮结束：{subtype}{dur_hint}",
-            "status": "fail",
-        }
+        else:
+            entry = {
+                "kind": "result",
+                "time": time_hms,
+                "text": f"本轮结束：{subtype}{dur_hint}{token_hint}",
+                "status": "fail",
+            }
+        if duration_ms > 0:
+            entry["duration_ms"] = duration_ms
+        if tokens_used > 0:
+            entry["tokens_used"] = tokens_used
+            entry["total_tokens"] = tokens_used
+        if session_id:
+            entry["session_id"] = session_id
+        usage = metrics.get("usage")
+        if isinstance(usage, dict) and usage:
+            entry["usage"] = usage
+        return entry
     if etype == "system":
         model = str(event.get("model") or "").strip()
         label = f"会话初始化 · {model}" if model else "会话初始化"
@@ -1509,7 +1655,23 @@ def render_task_exec_report_markdown(data: dict[str, Any]) -> str:
         cov = task.get("coverage") if isinstance(task.get("coverage"), list) else []
         if cov:
             lines.append(f"- 功能覆盖：{', '.join(str(x) for x in cov)}")
-        lines.append(f"- Token：{task.get('tokens_used', 0)} · 耗时：{task.get('duration_seconds', 0)}s")
+        duration_ms = int(task.get("duration_ms") or 0)
+        duration_label = (
+            f"{duration_ms // 1000}s ({duration_ms}ms)"
+            if duration_ms > 0
+            else f"{task.get('duration_seconds', 0)}s"
+        )
+        lines.append(f"- Token：{task.get('tokens_used', 0)} · 耗时：{duration_label}")
+        if task.get("session_id"):
+            lines.append(f"- CLI session：{task.get('session_id')}")
+        usage = task.get("usage") if isinstance(task.get("usage"), dict) else {}
+        if usage:
+            lines.append(
+                "- Token 明细："
+                f" input={usage.get('input_tokens', 0)}"
+                f" output={usage.get('output_tokens', 0)}"
+                f" cache_read={usage.get('cache_read_tokens', 0)}"
+            )
         if task.get("error"):
             lines.append(f"- 错误：{task['error']}")
         lines.append("")

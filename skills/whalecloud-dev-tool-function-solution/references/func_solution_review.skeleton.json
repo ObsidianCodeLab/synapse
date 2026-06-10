@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "demand_no": "[待补充]",
+  "requirement_name": "[待补充]",
+  "reviewed_at": null,
+  "overview": {
+    "architecture_summary": "[待补充：改造在系统中的位置与主链路]",
+    "diagrams": [
+      {
+        "id": "diagram-flow",
+        "title": "改造主流程",
+        "kind": "flowchart",
+        "mermaid": "flowchart TD\n  A[需求入口] --> B[模块改造]\n  B --> C[验收]"
+      },
+      {
+        "id": "diagram-seq",
+        "title": "关键时序",
+        "kind": "sequenceDiagram",
+        "mermaid": "sequenceDiagram\n  participant U as 调用方\n  participant S as Service\n  U->>S: 请求\n  S-->>U: 响应"
+      }
+    ]
+  },
+  "consistency_analysis": {
+    "summary": "[待补充：整体合理性与兼容性结论]",
+    "compatibility_notes": [],
+    "contradiction_checks": []
+  },
+  "transformation_plans": [
+    {
+      "id": "plan-1",
+      "requirement_ref": "[需求澄清/模块功能条目]",
+      "requirement_summary": "[满足的需求摘要]",
+      "module_name": "[FUNCTIONAL_ARCH 模块名]",
+      "title": "[改造方案标题]",
+      "design_rationale": "[为什么这样设计]",
+      "design_evidence": ["[代码或文档引用]"],
+      "expected_effect": "[预期效果]",
+      "content_markdown": "[方案细节 Markdown，文字为主]",
+      "human_review": {
+        "status": "pending",
+        "comment": ""
+      }
+    }
+  ],
+  "human_review": {
+    "status": "pending",
+    "comment": "",
+    "decided_at": null
+  }
+}

@@ -800,6 +800,12 @@ def _append_host_duties_shared(
                 "`solution_review.json` 与 `方案评审结论.md`；**禁止** interactive HITL。"
                 "人工在「方案评审」面板裁决。"
             )
+        elif nid == "func_solution":
+            lines.append(
+                "- **函数级方案（协同门控）**：产出 `函数级方案.md` + `func_solution_review.json`；"
+                "JSON 须含 Mermaid 总览图与逐条 `transformation_plans`（需求-模块-改造方案关联）；"
+                "**禁止** interactive HITL；人工在「函数级方案评审」面板逐条确认。"
+            )
         elif nid == "leader_review":
             lines.append(
                 "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
