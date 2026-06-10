@@ -366,6 +366,39 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
     if et == "node_init":
         return _expand_node_init(ev, index, host_id)
 
+    if et in ("task_exec_develop_started", "task_exec_verify_started"):
+        display = ev.get("display") if isinstance(ev.get("display"), dict) else {}
+        phase = str(display.get("phase") or ("develop" if et.endswith("develop_started") else "verify"))
+        card_title = "任务执行 · 开发轮 Agent 命令" if phase == "develop" else "任务执行 · 完成检测 Agent 命令"
+        out: list[dict[str, Any]] = []
+        summary = format_event_chat_display(ev)
+        if summary:
+            out.append(
+                _row(
+                    ev,
+                    index,
+                    text=summary,
+                    agent_id=SPEAKER_SYSTEM,
+                    speaker_role=SPEAKER_SYSTEM,
+                    display_kind="pipeline",
+                    suffix="-pipe",
+                )
+            )
+        if display:
+            out.append(
+                _row(
+                    ev,
+                    index,
+                    text=card_title,
+                    agent_id=SPEAKER_SYSTEM,
+                    speaker_role=SPEAKER_SYSTEM,
+                    display_kind="system_task_exec",
+                    payload={**display, "phase": phase, "node_id": "task_exec"},
+                    suffix="-cmd",
+                )
+            )
+        return out
+
     if et == "system_node_executed":
         from synapse.rd_meeting.system_node_display import (
             STRUCTURED_SYSTEM_NODES,

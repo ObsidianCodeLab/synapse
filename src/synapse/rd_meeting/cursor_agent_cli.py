@@ -109,6 +109,22 @@ def _version_dir_sort_key(name: str) -> tuple[int, ...]:
         return (0, 0, 0)
 
 
+def format_argv_as_shell(argv: list[str]) -> str:
+    """将 argv 格式化为可在终端粘贴的单行命令（含引号转义）。"""
+    parts: list[str] = []
+    for arg in argv:
+        text = str(arg)
+        if not text:
+            parts.append('""')
+            continue
+        if any(c in text for c in ' \t"&|<>^%\n\r'):
+            escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+            parts.append(f'"{escaped}"')
+        else:
+            parts.append(text)
+    return " ".join(parts)
+
+
 def resolve_agent_launch_argv(agent_path: str = "agent") -> list[str]:
     """解析 agent 启动 argv；Windows 上优先 node.exe + index.js，避免 .cmd 丢参。"""
     resolved = resolve_agent_executable(agent_path)

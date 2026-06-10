@@ -28,6 +28,7 @@ import {
   SystemEnvPregenCard,
   SystemExecCard,
   SystemSandboxBuildCard,
+  SystemTaskExecCard,
 } from './SystemNodeCards';
 
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
@@ -469,6 +470,8 @@ export function StructuredChatBody({
       return <SystemCodeCommitCard payload={payload} />;
     case 'system_task_check':
       return <SystemTaskCheckCard payload={payload} />;
+    case 'system_task_exec':
+      return <SystemTaskExecCard payload={payload} />;
     case 'work_plan':
       return <WorkPlanCard text={log.text} />;
     case 'delegation_start':

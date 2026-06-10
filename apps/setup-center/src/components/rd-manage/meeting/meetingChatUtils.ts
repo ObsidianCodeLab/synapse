@@ -12,6 +12,7 @@ export type ChatDisplayKind =
   | 'system_env_pregen'
   | 'system_code_commit'
   | 'system_task_check'
+  | 'system_task_exec'
   | 'work_plan'
   | 'delegation_start'
   | 'delegation_done'
@@ -64,6 +65,7 @@ const STRUCTURED_KINDS: ChatDisplayKind[] = [
   'system_env_pregen',
   'system_code_commit',
   'system_task_check',
+  'system_task_exec',
   'work_plan',
   'delegation_start',
   'delegation_done',

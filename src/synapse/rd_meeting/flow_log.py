@@ -37,6 +37,14 @@ EVENT_FLOW_STAGE: dict[str, str] = {
     "user_context": "用户上下文",
     "system": "系统",
     "chat_message": "对话",
+    "task_exec_develop_started": "任务执行 · 开发轮",
+    "task_exec_verify_started": "任务执行 · 完成检测",
+    "task_exec_develop_finished": "任务执行 · 开发轮结束",
+    "task_exec_verify_finished": "任务执行 · 检测结束",
+    "task_exec_task_finished": "任务执行 · 子单完成",
+    "task_exec_cli_started": "任务执行 CLI 开始",
+    "task_exec_cli_finished": "任务执行 CLI 结束",
+    "task_exec_gate": "任务执行评审门控",
 }
 
 CHAT_VISIBLE_EVENTS = frozenset(
@@ -69,6 +77,8 @@ CHAT_VISIBLE_EVENTS = frozenset(
         "node_completed",
         "node_skipped",
         "run_node_scheduled",
+        "task_exec_develop_started",
+        "task_exec_verify_started",
     }
 )
 

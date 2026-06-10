@@ -15,6 +15,7 @@ import {
   Server,
   Sparkles,
   Tag,
+  Terminal,
 } from 'lucide-react';
 
 import { EnvPregenDocsPanel } from './EnvPregenDocsPanel';
@@ -917,6 +918,109 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function CommandScriptBlock({ label, value }: { label: string; value?: string }) {
+  const text = String(value || '').trim();
+  const [copied, setCopied] = useState(false);
+  if (!text) {
+    return (
+      <div className="mt-2">
+        <div className="text-[10px] font-medium text-muted-foreground mb-1">{label}</div>
+        <span className="text-muted-foreground text-[11px]">—</span>
+      </div>
+    );
+  }
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="text-[10px] font-medium text-muted-foreground">{label}</div>
+        <button
+          type="button"
+          className={`rd-system-path-row__btn${copied ? ' is-copied' : ''}`}
+          onClick={() => void onCopy()}
+          title="复制命令"
+        >
+          {copied ? (
+            <>
+              <CheckCircle2 className="h-3 w-3" />
+              已复制
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3" />
+              复制
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="rd-task-exec-prompt__body custom-scrollbar max-h-48 text-[10px] leading-relaxed whitespace-pre-wrap break-all">
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+const TASK_EXEC_PHASE_LABEL: Record<string, string> = {
+  develop: '开发轮',
+  verify: '完成检测轮',
+};
+
+export function SystemTaskExecCard({ payload }: { payload: Record<string, unknown> }) {
+  const phase = String(payload.phase || 'develop');
+  const phaseLabel = TASK_EXEC_PHASE_LABEL[phase] || phase;
+  const taskNo = String(payload.task_no || '—');
+  const taskTitle = String(payload.task_title || '').trim();
+  const taskIndex = Number(payload.task_index || 0);
+  const taskTotal = Number(payload.task_total || 0);
+  const progress =
+    taskIndex > 0 && taskTotal > 0 ? `${taskIndex}/${taskTotal}` : '—';
+
+  return (
+    <div className="rd-chat-card rd-chat-card--meta">
+      <HeroBanner
+        gradient="rd-system-hero--split"
+        icon={<Terminal className="h-6 w-6" />}
+        title={`Cursor Agent · ${phaseLabel}`}
+        subtitle="Synapse 任务执行节点实际调用的 agent 命令（含完整 prompt）。"
+        stats={[
+          { label: '工单', value: taskNo },
+          { label: '进度', value: progress },
+          { label: '模型', value: String(payload.cli_model || '—') },
+        ]}
+      />
+      {taskTitle ? (
+        <p className="text-[11px] text-muted-foreground mt-2 mb-0 truncate" title={taskTitle}>
+          {taskTitle}
+        </p>
+      ) : null}
+      <div className="mt-3 space-y-1">
+        <CopyPath label="工作区" value={String(payload.sandbox_path || '')} />
+        {payload.func_doc ? <CopyPath label="函数级方案" value={String(payload.func_doc)} /> : null}
+        {payload.acceptance_doc ? (
+          <CopyPath label="验收标准" value={String(payload.acceptance_doc)} />
+        ) : null}
+      </div>
+      <CommandScriptBlock label="agent 命令（完整）" value={String(payload.agent_command || '')} />
+      <details className="mt-2 rounded-lg border border-slate-700/50 bg-slate-950/40 px-3 py-2">
+        <summary className="cursor-pointer text-[10px] text-muted-foreground select-none list-none">
+          Synapse 包装命令（python cursor-operation.py）
+        </summary>
+        <CommandScriptBlock label="" value={String(payload.python_command || '')} />
+      </details>
     </div>
   );
 }
