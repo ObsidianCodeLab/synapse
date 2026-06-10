@@ -280,7 +280,36 @@ def parse_func_solution_impact_assessment(md: str) -> dict[str, Any]:
 
 
 def parse_module_func_md(md: str) -> list[dict[str, str]]:
-    """从模块功能.md「需求功能拆分」表解析功能点清单。"""
+    """从模块功能.md 解析模块级改造清单。
+
+    优先读取「模块改造清单」下修改/新增模块表（模块名称 + 模块目标）；
+    兼容旧版「需求功能拆分」功能点表。
+    """
+    section = _extract_section(md, "模块改造清单")
+    if section.strip():
+        rows_out: list[dict[str, str]] = []
+        for sub_title in ("修改模块", "新增模块"):
+            sub = _extract_section(section, sub_title)
+            if not sub.strip():
+                continue
+            for row in _parse_md_table_rows(sub):
+                point = str(row.get("功能模块名称") or row.get("模块名称") or "").strip()
+                if not point:
+                    continue
+                desc = str(
+                    row.get("模块目标") or row.get("说明") or row.get("功能描述") or ""
+                ).strip()
+                rows_out.append({"functionPoint": point, "functionDesc": desc})
+        if rows_out:
+            return [
+                {
+                    "id": f"fp-{i + 1}",
+                    "functionPoint": row["functionPoint"],
+                    "functionDesc": row["functionDesc"],
+                }
+                for i, row in enumerate(rows_out)
+            ]
+
     section = _extract_section(md, "需求功能拆分")
     rows = _parse_md_table_rows(section)
     out: list[dict[str, str]] = []

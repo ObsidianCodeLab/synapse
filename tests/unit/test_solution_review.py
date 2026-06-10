@@ -178,6 +178,33 @@ def test_enrich_payload_from_archive_reparses_impact(tmp_path, monkeypatch):
 
 SAMPLE_MODULE_FUNC = """# 模块功能
 
+## 模块改造清单
+
+### 修改模块
+
+| # | 功能模块名称 | 模块目标 | 满足的需求 | 验证方式 | 核心类 | 澄清文档依据 | 确认依据 |
+|---|-------------|---------|-----------|---------|--------|-------------|---------|
+| 1 | 任务调度模块 | 支持运营在线调整任务优先级 | 功能要点-优先级调整 | 联调：调整优先级后任务队列顺序变更 | TaskService | 功能要点 §4 | code/TaskService.java |
+
+### 新增模块
+
+| # | 模块名称 | 模块目标 | 满足的需求 | 验证方式 | 核心类 | 新增原因 | 澄清文档依据 | 确认依据 |
+|---|---------|---------|-----------|---------|--------|---------|-------------|---------|
+| 1 | 账单导出模块 | 支持导出 PDF/Excel 账单 | 功能要点-账单导出 | 导出文件格式与内容校验 | ExportService | 架构无对应模块 | 功能要点 §5 | [待确认] |
+"""
+
+
+def test_parse_module_func_md():
+    rows = parse_module_func_md(SAMPLE_MODULE_FUNC)
+    assert len(rows) == 2
+    assert rows[0]["functionPoint"] == "任务调度模块"
+    assert rows[0]["functionDesc"] == "支持运营在线调整任务优先级"
+    assert rows[1]["functionPoint"] == "账单导出模块"
+    assert rows[1]["functionDesc"] == "支持导出 PDF/Excel 账单"
+
+
+LEGACY_MODULE_FUNC = """# 模块功能
+
 ## 需求功能拆分
 
 | # | 功能点 | 说明 |
@@ -187,8 +214,8 @@ SAMPLE_MODULE_FUNC = """# 模块功能
 """
 
 
-def test_parse_module_func_md():
-    rows = parse_module_func_md(SAMPLE_MODULE_FUNC)
+def test_parse_module_func_md_legacy():
+    rows = parse_module_func_md(LEGACY_MODULE_FUNC)
     assert len(rows) == 2
     assert rows[0]["functionPoint"] == "在线调优先级"
     assert rows[1]["functionDesc"] == "导出 PDF/Excel 账单"
@@ -208,14 +235,14 @@ def test_resolve_demand_functions_merges_split_tasks(tmp_path, monkeypatch):
     payload = {
         "demand_function": [],
         "split_tasks_draft": [
-            {"taskTitle": "子单A", "functionPoints": ["账单导出"]},
+            {"taskTitle": "子单A", "functionPoints": ["账单导出模块"]},
             {"taskTitle": "子单B", "functionPoints": ["仅存在于拆单"]},
         ],
     }
     out = resolve_demand_functions(payload, scope_id)
     points = [row["functionPoint"] for row in out]
-    assert "在线调优先级" in points
-    assert "账单导出" in points
+    assert "任务调度模块" in points
+    assert "账单导出模块" in points
     assert "仅存在于拆单" in points
 
 
