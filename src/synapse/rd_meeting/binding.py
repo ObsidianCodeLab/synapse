@@ -15,6 +15,7 @@ from synapse.rd_meeting.intents import resolve_node_intent
 from synapse.rd_sop.manifest import (
     DEFAULT_HOST_PROFILE_ID,
     default_human_confirm,
+    fixed_worker_profile_ids,
     get_node_manifest_entry,
     is_collaborative_node,
     is_system_node,
@@ -159,7 +160,7 @@ def resolve_node_binding(
 
     node_type = str(entry.get("type") or SOP_NODE_TYPES.get(node_id, "ai"))
     if node_type == "ai_human":
-        merged["worker_profile_ids"] = []
+        merged["worker_profile_ids"] = fixed_worker_profile_ids(node_id)
     human_confirm = _coerce_human_confirm(
         merged.get("human_confirm") if "human_confirm" in merged else None,
         node_id=node_id,

@@ -7,7 +7,7 @@ export type InterventionPanelKind =
   | 'node_review'
   | 'hitl';
 
-/** 协同型节点（ai_human）禁止配置协作智能体阵容。 */
+/** 协同型节点（ai_human）禁止配置协作智能体阵容；``func_solution`` 见 ``meetingRoomFixedWorkers``。 */
 export function collaborationWorkersConfigurable(
   nodeType: NodeType | string | undefined,
 ): boolean {

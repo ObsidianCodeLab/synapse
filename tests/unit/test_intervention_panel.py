@@ -69,11 +69,23 @@ def test_binding_ai_human_strips_worker_overrides(
                 "leader_review": {
                     "worker_profile_ids": ["code-explorer"],
                 },
+                "func_solution": {
+                    "worker_profile_ids": ["whalecloud-rd-expert"],
+                },
             }
         }
     )
     assert resolve_node_binding("solution_review")["worker_profile_ids"] == []
     assert resolve_node_binding("leader_review")["worker_profile_ids"] == []
+    assert resolve_node_binding("func_solution")["worker_profile_ids"] == [
+        "whalecloud-design-expert",
+    ]
+
+
+def test_binding_func_solution_fixed_design_expert() -> None:
+    b = resolve_node_binding("func_solution")
+    assert b.get("type") == "ai_human"
+    assert b.get("worker_profile_ids") == ["whalecloud-design-expert"]
 
 
 def test_binding_ai_forces_human_confirm_off() -> None:

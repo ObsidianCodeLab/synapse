@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer, Button, Tag, Spin, Input } from 'antd';
 import {
   Settings2,
@@ -38,6 +38,10 @@ import {
   effectiveHumanConfirmByType,
   humanConfirmSwitchVisible,
 } from './meetingInterventionPanel';
+import {
+  fixedWorkerProfileIds,
+  hasFixedWorkerRoster,
+} from './meetingRoomFixedWorkers';
 import {
   fetchLlmEndpointsCatalog,
   type LlmEndpointCatalogItem,
@@ -235,12 +239,16 @@ function hydrateConfigWithDefaults(config: MeetingRoomConfigPayload): MeetingRoo
     const ov = { ...(overrides[nodeId] ?? {}) };
     const binding = bindingFor(config.bindings, nodeId);
     const collabNode = binding?.type === 'ai_human';
+    const fixedWorkers = fixedWorkerProfileIds(nodeId);
     const workersSource = ov.worker_profile_ids ?? binding?.worker_profile_ids;
-    const worker_profile_ids = collabNode
-      ? []
-      : Array.isArray(workersSource)
-        ? workersSource.filter((id) => id !== HOST_PROFILE_ID)
-        : undefined;
+    const worker_profile_ids =
+      fixedWorkers.length > 0
+        ? fixedWorkers
+        : collabNode
+          ? []
+          : Array.isArray(workersSource)
+            ? workersSource.filter((id) => id !== HOST_PROFILE_ID)
+            : undefined;
     overrides[nodeId] = {
       ...ov,
       host_profile_id: HOST_PROFILE_ID,
@@ -278,12 +286,15 @@ function normalizeOverridesForSave(
     const ov = nodeOverrides[nodeId] ?? {};
     const b = bindingFor(bindings, nodeId);
     const workers = ov.worker_profile_ids ?? b?.worker_profile_ids;
+    const fixedWorkers = fixedWorkerProfileIds(nodeId);
     const entry: MeetingRoomNodeOverride = {
       ...ov,
       host_profile_id: HOST_PROFILE_ID,
     };
     delete entry.node_intent;
-    if (b?.type === 'ai_human') {
+    if (fixedWorkers.length > 0) {
+      entry.worker_profile_ids = fixedWorkers;
+    } else if (b?.type === 'ai_human') {
       entry.worker_profile_ids = [];
     } else if (Array.isArray(workers)) {
       entry.worker_profile_ids = workers.filter((id) => id !== HOST_PROFILE_ID);
@@ -316,6 +327,7 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const [expandedStages, setExpandedStages] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(PIPELINE_STAGES.map((s) => [String(s.id), true])),
   );
+  const stageSectionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const workerAgents = useMemo(
     () => agents.filter((a) => a.id !== HOST_PROFILE_ID),
@@ -409,11 +421,13 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const nodeType = (binding?.type ?? 'ai') as NodeType;
 
   const workerProfileIds = useMemo(() => {
+    const fixed = fixedWorkerProfileIds(selectedNodeId);
+    if (fixed.length > 0) return fixed;
     if (!collaborationWorkersConfigurable(nodeType)) return [];
     const raw = override.worker_profile_ids ?? binding?.worker_profile_ids;
     if (!Array.isArray(raw)) return [];
     return raw.filter((id) => id !== HOST_PROFILE_ID);
-  }, [nodeType, override.worker_profile_ids, binding?.worker_profile_ids]);
+  }, [selectedNodeId, nodeType, override.worker_profile_ids, binding?.worker_profile_ids]);
 
   const patchOverride = (patch: MeetingRoomNodeOverride) => {
     if (!config) return;
@@ -619,6 +633,25 @@ export const MeetingRoomConfigDrawer: React.FC<{
     setExpandedStages((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const scrollStageIntoView = useCallback((stageId: number) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        stageSectionRefs.current
+          .get(stageId)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }, []);
+
+  const focusStageInNav = useCallback(
+    (stageId: number, firstNodeId?: string) => {
+      if (firstNodeId) setSelectedNodeId(firstNodeId);
+      setExpandedStages((prev) => ({ ...prev, [String(stageId)]: true }));
+      scrollStageIntoView(stageId);
+    },
+    [scrollStageIntoView],
+  );
+
   const renderSopNodeNavItem = (node: SOPNode, index: number, total: number) => {
     const enabled = isNodeEnabled(config?.node_overrides ?? {}, node.id);
     const selected = selectedNodeId === node.id;
@@ -780,9 +813,8 @@ export const MeetingRoomConfigDrawer: React.FC<{
                       aria-selected={active}
                       title={`${stage.name} · ${stats?.enabled ?? 0}/${stats?.total ?? 0} 启用`}
                       onClick={() => {
-                        setExpandedStages((prev) => ({ ...prev, [String(stage.id)]: true }));
                         const first = stage.nodes[0];
-                        if (first) setSelectedNodeId(first.id);
+                        focusStageInNav(stage.id, first?.id);
                       }}
                       className={`group relative flex-1 min-w-0 rounded-lg border px-1 py-1.5 transition-all duration-300 ${
                         active
@@ -827,7 +859,12 @@ export const MeetingRoomConfigDrawer: React.FC<{
                 return (
                   <div
                     key={stage.id}
-                    className={`rd-meeting-sop-stage rounded-xl border overflow-hidden transition-all duration-300 ${theme.panel} ${
+                    id={`rd-meeting-stage-${stage.id}`}
+                    ref={(el) => {
+                      if (el) stageSectionRefs.current.set(stage.id, el);
+                      else stageSectionRefs.current.delete(stage.id);
+                    }}
+                    className={`rd-meeting-sop-stage scroll-mt-3 rounded-xl border overflow-hidden transition-all duration-300 ${theme.panel} ${
                       hasSelected
                         ? 'rd-meeting-sop-stage--focus shadow-[0_0_22px_rgba(16,185,129,0.12)] ring-1 ring-emerald-500/20'
                         : ''
@@ -1207,6 +1244,38 @@ export const MeetingRoomConfigDrawer: React.FC<{
                           </p>
                         )}
                       </div>
+                    </ConfigFieldBox>
+                  </div>
+                  ) : hasFixedWorkerRoster(selectedNodeId) ? (
+                  <div>
+                    <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                      <Users className="w-3.5 h-3.5 text-emerald-400" />
+                      协作智能体
+                    </label>
+                    <ConfigFieldBox className="!p-0 !bg-transparent !border-none !shadow-none">
+                      {workerProfileIds.map((pid) => {
+                        const agent = agentById.get(pid);
+                        if (!agent) return null;
+                        const profile = toMeetingProfile(agent);
+                        const rules = workerRulesForProfile(pid);
+                        const validation = rules
+                          ? validateRequiredSkills(profile, rules)
+                          : null;
+                        const cards = resolveProfileSkillCards(profile, rules);
+                        return (
+                          <MeetingAgentSkillCards
+                            key={pid}
+                            agent={profile}
+                            skills={cards}
+                            validation={validation}
+                            variant="worker"
+                            skillsModeAll={(agent.skills_mode || '').toLowerCase() === 'all'}
+                          />
+                        );
+                      })}
+                      <p className="text-[10px] text-muted-foreground mt-2 mb-0 px-0.5">
+                        固定设计专家 · 必备：函数级方案技能、文档生成、研发工具共享脚本、C++代码阅读
+                      </p>
                     </ConfigFieldBox>
                   </div>
                   ) : nodeType === 'ai_human' ? (

@@ -12,7 +12,7 @@ from synapse.rd_meeting.agent_context_probe import (
     dump_meeting_agent_contexts,
 )
 from synapse.rd_meeting.binding import list_resolved_bindings, resolve_node_binding
-from synapse.rd_sop.manifest import is_collaborative_node
+from synapse.rd_sop.manifest import fixed_worker_profile_ids, is_collaborative_node
 from synapse.rd_meeting.config_store import (
     load_meeting_room_config,
     save_meeting_room_config,
@@ -129,7 +129,8 @@ class MeetingRoomService:
                 if entry:
                     nid = str(node_id)
                     if is_collaborative_node(nid):
-                        entry["worker_profile_ids"] = []
+                        fixed = fixed_worker_profile_ids(nid)
+                        entry["worker_profile_ids"] = fixed if fixed else []
                     cleaned[nid] = entry
             allowed["node_overrides"] = cleaned
         if allowed:

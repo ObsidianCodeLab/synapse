@@ -5,6 +5,7 @@ import type {
   MeetingRoomNodeBinding,
 } from '../../../api/meetingRoomService';
 import { HOST_PROFILE_ID, workerColor } from './MeetingAgentAvatar';
+import { fixedWorkerProfileIds } from './meetingRoomFixedWorkers';
 import type { RoomAgent } from './meetingChatTypes';
 
 export interface MeetingAgentProfileWire {
@@ -30,6 +31,8 @@ export function workerProfileIdsForNode(
   const ov = config.node_overrides?.[nodeId];
   const binding = bindingFor(config.bindings, nodeId);
   const nodeType = binding?.type ?? '';
+  const fixed = fixedWorkerProfileIds(nodeId);
+  if (fixed.length > 0) return fixed;
   if (nodeType === 'ai_human') return [];
   const raw = ov?.worker_profile_ids ?? binding?.worker_profile_ids;
   if (!Array.isArray(raw)) return [];

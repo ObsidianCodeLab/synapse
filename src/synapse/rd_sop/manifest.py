@@ -10,6 +10,13 @@ PriorOutputUseMode = Literal["skill_required", "flow_required", "llm_judge"]
 
 DEFAULT_HOST_PROFILE_ID = "default"
 DEFAULT_LLM_ENDPOINT_KEY = "default"
+FUNC_SOLUTION_NODE_ID = "func_solution"
+FUNC_SOLUTION_FIXED_WORKER_PROFILE_ID = "whalecloud-design-expert"
+
+# 协同型节点中须固定参与的协作智能体（配置 UI 不可增减，运行时 binding 强制注入）
+FIXED_WORKER_PROFILE_IDS: dict[str, list[str]] = {
+    FUNC_SOLUTION_NODE_ID: [FUNC_SOLUTION_FIXED_WORKER_PROFILE_ID],
+}
 
 # 与 setup-center rd-sop/constants 对齐的节点类型
 # human/human_start=人工主导；ai=AI主导；ai_human=协同；system=系统独立
@@ -126,8 +133,16 @@ def is_system_node(node_id: str) -> bool:
     return NODE_TYPES.get((node_id or "").strip(), "") == "system"
 
 
+def fixed_worker_profile_ids(node_id: str) -> list[str]:
+    """节点固定协作智能体 profile id 列表（空表示无固定阵容）。"""
+    raw = FIXED_WORKER_PROFILE_IDS.get((node_id or "").strip())
+    if not raw:
+        return []
+    return [str(x).strip() for x in raw if str(x).strip()]
+
+
 def is_collaborative_node(node_id: str) -> bool:
-    """协同型 SOP 节点（ai_human）：仅小鲸主持，不可配置协作智能体。"""
+    """协同型 SOP 节点（ai_human）：默认仅小鲸主持；``func_solution`` 等节点见 ``fixed_worker_profile_ids``。"""
     return NODE_TYPES.get((node_id or "").strip(), "") == "ai_human"
 
 
