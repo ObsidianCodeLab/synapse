@@ -974,7 +974,13 @@ async def submit_func_solution_review_decision(
         )
     except ValueError as exc:
         code = str(exc)
-        if code in ("not_all_plans_approved", "comment_too_short", "no_pending_delivery"):
+        if code in (
+            "not_all_plans_approved",
+            "comment_too_short",
+            "no_pending_delivery",
+            "no_plans_need_change",
+            "plan_comment_required",
+        ):
             return error_response(422, code)
         return error_response(400, code)
     except Exception as exc:

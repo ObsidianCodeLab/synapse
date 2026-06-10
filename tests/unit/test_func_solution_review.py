@@ -9,10 +9,12 @@ import pytest
 from synapse.rd_meeting.func_solution_review import (
     apply_human_decision,
     enrich_payload_from_archive,
+    format_revision_brief,
     load_func_solution_review_payload,
     normalize_payload,
     save_plan_reviews,
     validate_func_solution_review_json,
+    _parse_plans_from_markdown,
 )
 
 SAMPLE_REVIEW = {
@@ -103,7 +105,16 @@ def test_enrich_from_markdown(tmp_path, monkeypatch):
 
 **模块概要**
 
+- 涉及功能点：在线调账与账单核对
 - 改造类型：修改
+- 职责：账单生命周期管理
+- 关键文件：BillService.java, BillDao.java
+
+**函数设计清单**
+
+| 函数签名 | 入参 | 出参 |
+|----------|------|------|
+| adjustBill | id | bool |
 """
     (archive / "函数级方案.md").write_text(md, encoding="utf-8")
     (archive / "func_solution_review.json").write_text(
@@ -125,4 +136,69 @@ def test_enrich_from_markdown(tmp_path, monkeypatch):
     payload = load_func_solution_review_payload(scope_id)
     assert payload is not None
     enriched = enrich_payload_from_archive(scope_id, payload)
-    assert len(enriched.get("transformation_plans") or []) >= 1
+    plans = enriched.get("transformation_plans") or []
+    assert len(plans) >= 1
+    plan = plans[0]
+    assert plan["module_name"] == "账单模块"
+    assert "在线调账" in plan["requirement_summary"]
+    assert plan["design_rationale"]
+    assert "BillService.java" in plan["design_evidence"][0]
+
+
+def test_parse_markdown_extracts_rationale():
+    md = """## 1.7 模块改造方案
+
+#### 1.7.2 索引模块
+
+- **涉及功能点**：优先级在线变更
+- **改造类型**：修改
+- **职责**：索引维护
+"""
+    plans = _parse_plans_from_markdown(md)
+    assert len(plans) == 1
+    assert plans[0]["module_name"] == "索引模块"
+    assert "优先级" in plans[0]["requirement_summary"]
+    assert "改造类型" in plans[0]["design_rationale"]
+
+
+def test_format_revision_brief_and_revise_validation(tmp_path, monkeypatch):
+    scope_id = "fs-revise"
+    archive = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
+    archive.mkdir(parents=True)
+    review = dict(SAMPLE_REVIEW)
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(review, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.archive_dir",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.json_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "func_solution_review.json",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.md_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "函数级方案.md",
+    )
+
+    payload = load_func_solution_review_payload(scope_id)
+    review["transformation_plans"][0]["human_review"] = {
+        "status": "needs_change",
+        "comment": "应复用 TaskService 而非新增入口",
+    }
+    brief = format_revision_brief(review, "总体需收紧边界")
+    assert "TaskService" in brief
+    assert "总体" in brief
+
+    with pytest.raises(ValueError, match="no_plans_need_change"):
+        apply_human_decision(scope_id, decision="revise", comment="无具体条目")
+
+    save_plan_reviews(
+        scope_id,
+        [{"id": "plan-1", "status": "needs_change", "comment": "应复用 TaskService 而非新增入口"}],
+    )
+    out = apply_human_decision(scope_id, decision="revise", comment="请按意见调整")
+    assert out["human_review"]["status"] == "needs_revision"

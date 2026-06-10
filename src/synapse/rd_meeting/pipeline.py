@@ -642,6 +642,18 @@ def _step_node_init(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
 
             rs = clear_hitl_gate_residual_state(rs)
             reset_human_confirm_lifecycle(sid)
+        rs["current_node_id"] = run_node
+        rs["current_node_binding"] = {
+            "node_id": run_node,
+            "node_name": str(run_binding.get("node_name") or run_node),
+            "host_profile_id": run_binding.get("host_profile_id"),
+            "worker_profile_ids": run_binding.get("worker_profile_ids"),
+            "node_intent": run_binding.get("node_intent"),
+            "human_confirm": run_binding.get("human_confirm"),
+        }
+        plan = rs.get("current_work_plan")
+        if isinstance(plan, dict) and str(plan.get("node_id") or "") != run_node:
+            rs.pop("current_work_plan", None)
         rs["participants"] = build_meeting_participants(run_binding)
         save_room_state(sid, rs)
         ctx.room_state = rs
@@ -1114,6 +1126,7 @@ def clear_room_state_for_node_reprocess(
         "stopped_at",
         "stopped_reason",
         "solution_review_blocked",
+        "func_solution_blocked",
         "escalate_reason",
     ):
         rs.pop(key, None)
@@ -1705,8 +1718,18 @@ def schedule_node_finish(
             logger.exception("schedule_node_finish failed scope=%s: %s", sid, exc)
 
     if loop is not None:
+        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+
+        _remember_scheduler_loop(loop)
         try:
-            loop.create_task(_run_node_finish_coro(_do_advance))
+            loop.create_task(
+                _run_node_finish_coro(
+                    _do_advance,
+                    scope_id=sid,
+                    scope_type=scope_type,
+                    agent_pool=agent_pool,
+                )
+            )
         except Exception as exc:  # pragma: no cover
             logger.debug("schedule_node_finish create_task failed: %s", exc)
             _do_advance()
@@ -1715,8 +1738,19 @@ def schedule_node_finish(
         _do_advance()
 
 
-async def _run_node_finish_coro(fn: Callable[[], None]) -> None:
+async def _run_node_finish_coro(
+    fn: Callable[[], None],
+    *,
+    scope_id: str = "",
+    scope_type: ScopeType = "demand",
+    agent_pool: Any | None = None,
+) -> None:
     await asyncio.to_thread(fn)
+    sid = (scope_id or "").strip()
+    if sid:
+        from synapse.rd_meeting.orchestrator import retry_pending_run_node_if_needed
+
+        retry_pending_run_node_if_needed(sid, scope_type=scope_type, agent_pool=agent_pool)
 
 
 def get_flow_step(scope_id: str) -> str:
