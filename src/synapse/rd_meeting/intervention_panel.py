@@ -34,6 +34,23 @@ def collab_dedicated_panel(node_id: str) -> InterventionPanel | None:
     return _COLLAB_DEDICATED_PANEL.get((node_id or "").strip())
 
 
+def is_clarify_gate_active(
+    intervention_kind: str | None,
+    hitl_form_schema: dict[str, Any] | None,
+    *,
+    phase: str | None = None,
+) -> bool:
+    """会中澄清/异常门控进行中：须展示 HITL 问卷，不得被 node_review 抢占。"""
+    kind = (intervention_kind or "").strip().lower()
+    if not isinstance(hitl_form_schema, dict):
+        return False
+    if not (hitl_form_schema.get("questions") or []):
+        return False
+    if (phase or "").strip() == "clarify_gate":
+        return True
+    return kind in ("interactive", "exception")
+
+
 def resolve_intervention_panel(
     *,
     node_id: str,
@@ -56,6 +73,10 @@ def resolve_intervention_panel(
     if kind == "task_exec" or pending.get("task_exec_payload"):
         return "task_exec"
 
+    # 会中问卷优先于 pending 内预取的 review_payload（避免详情页拉取 node-review 盖掉表单）
+    if is_clarify_gate_active(kind, hitl_form_schema):
+        return "hitl"
+
     if kind == "result_confirm" or pending.get("review_payload"):
         return "node_review"
 
@@ -71,9 +92,6 @@ def resolve_intervention_panel(
             return "func_solution_review"
         if dedicated == "node_review" and (kind == "result_confirm" or pending.get("review_payload")):
             return "node_review"
-
-    if kind in ("interactive", "exception") and isinstance(hitl_form_schema, dict):
-        return "hitl"
 
     if isinstance(hitl_form_schema, dict) and is_human_sop_type(sop):
         return "hitl"

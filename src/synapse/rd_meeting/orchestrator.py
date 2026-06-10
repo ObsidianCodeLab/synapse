@@ -224,6 +224,21 @@ def _write_simulated_agent_deliverables(
         (dest_dir / name).write_text(body, encoding="utf-8")
 
 
+def _strip_review_payload_from_pending(scope_id: str) -> None:
+    """会中问卷门控：移除 pending 内预取的 node_review，避免中栏误显确认总结。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    rs = dict(load_room_state(sid) or {})
+    pending = rs.get("pending_delivery")
+    if not isinstance(pending, dict) or "review_payload" not in pending:
+        return
+    pending = dict(pending)
+    pending.pop("review_payload", None)
+    rs["pending_delivery"] = pending
+    save_room_state(sid, rs)
+
+
 class MeetingRoomOrchestrator:
     """节点执行与状态推进（可 dry-run，不依赖 LLM）。"""
 
@@ -733,6 +748,9 @@ class MeetingRoomOrchestrator:
             pending_delivery=pending,
             intervention_kind=kind,
         )
+        if kind == "interactive":
+            _strip_review_payload_from_pending(scope_id)
+            gate_state = load_room_state(scope_id) or gate_state
         append_history_event(
             scope_id,
             {
@@ -1669,7 +1687,17 @@ class MeetingRoomOrchestrator:
             plan_pending = plan_awaiting_hitl(sid)
         except Exception:
             plan_pending = False
-        if should_enter_node_review_after_hitl_locked(sid, node_id, rs_locked) and not plan_pending:
+        from synapse.rd_meeting.hitl_closure_guard import (
+            closure_guard_correction_prompt,
+            load_closure_intent,
+        )
+
+        closure_intent = load_closure_intent(sid, node_id)
+        if (
+            closure_intent != "further"
+            and should_enter_node_review_after_hitl_locked(sid, node_id, rs_locked)
+            and not plan_pending
+        ):
             return await self.enter_node_review_gate(
                 scope_type=scope_type,
                 scope_id=sid,
@@ -1743,7 +1771,11 @@ class MeetingRoomOrchestrator:
                 "agent_id": host_profile_id,
             },
         )
-        retry_prompt = f"{prompt}\n\n{prompt_require_interactive_questionnaire()}"
+        guard_extra = closure_guard_correction_prompt(sid, node_id)
+        base_retry = prompt_require_interactive_questionnaire()
+        retry_prompt = f"{prompt}\n\n{guard_extra or base_retry}"
+        if guard_extra and base_retry not in retry_prompt:
+            retry_prompt = f"{retry_prompt}\n\n{base_retry}"
         retry_result = await run_host(retry_prompt)
         retry_questionnaire = consume_pending_questionnaire(sid)
         if retry_result.success:
@@ -1751,7 +1783,25 @@ class MeetingRoomOrchestrator:
 
         if retry_questionnaire and retry_questionnaire.get("schema"):
             kind = (retry_questionnaire.get("kind") or "interactive").strip().lower()
-            if kind == "interactive":
+            from synapse.rd_meeting.hitl_closure_guard import evaluate_host_run_guard
+
+            retry_guard = evaluate_host_run_guard(
+                sid, node_id, tool_questionnaire=retry_questionnaire, ready_for_review=False
+            )
+            if retry_guard.discard_tool_questionnaire:
+                append_history_event(
+                    sid,
+                    {
+                        "event": "hitl_closure_guard_reject_questionnaire",
+                        "room_id": room_id,
+                        "node_id": node_id,
+                        "intent": retry_guard.intent,
+                        "log_type": "warning",
+                        "agent_id": host_profile_id,
+                    },
+                )
+                retry_questionnaire = None
+            elif kind == "interactive":
                 return self._gate_from_tool_questionnaire(
                     scope_type=scope_type,
                     scope_id=sid,
@@ -2454,6 +2504,27 @@ class MeetingRoomOrchestrator:
             )
             tool_questionnaire = None
 
+        if need_human_confirm:
+            from synapse.rd_meeting.hitl_closure_guard import evaluate_host_run_guard
+
+            pre_guard = evaluate_host_run_guard(
+                sid, node_id, tool_questionnaire=tool_questionnaire, ready_for_review=False
+            )
+            if pre_guard.discard_tool_questionnaire and tool_questionnaire:
+                append_history_event(
+                    sid,
+                    {
+                        "event": "hitl_closure_guard_reject_questionnaire",
+                        "room_id": room_id,
+                        "node_id": node_id,
+                        "intent": pre_guard.intent,
+                        "detail": "用户末题选否，丢弃主控 interactive 问卷",
+                        "log_type": "warning",
+                        "agent_id": host_id,
+                    },
+                )
+                tool_questionnaire = None
+
         # 本轮回主控 submit_hitl_questionnaire 优先于历史 hitl_locked / ready 标记，
         # 避免「用户已填过一轮 + 归档已就绪」时跳过新一轮 interactive 问卷直达 NodeReview。
         if need_human_confirm and tool_questionnaire and tool_questionnaire.get("schema"):
@@ -2499,6 +2570,25 @@ class MeetingRoomOrchestrator:
         except Exception:
             pass
 
+        if need_human_confirm:
+            from synapse.rd_meeting.hitl_closure_guard import (
+                apply_ready_for_review_guard,
+                evaluate_host_run_guard,
+                load_closure_intent,
+            )
+
+            ready_for_review = apply_ready_for_review_guard(sid, node_id, ready_for_review)
+            post_guard = evaluate_host_run_guard(
+                sid,
+                node_id,
+                tool_questionnaire=tool_questionnaire,
+                ready_for_review=ready_for_review,
+            )
+            if post_guard.required == "enter_node_review":
+                ready_for_review = True
+            if post_guard.block_node_review:
+                ready_for_review = False
+
         if (
             need_human_confirm
             and not tool_questionnaire
@@ -2533,34 +2623,56 @@ class MeetingRoomOrchestrator:
             hitl_gate = extract_hitl_from_agent_output(report_body)
             report_body = hitl_gate.clean_body
             if hitl_gate.explicit and hitl_gate.intervention_kind in ("interactive", "exception"):
-                append_history_event(
-                    sid,
-                    {
-                        "event": "hitl_dynamic",
-                        "room_id": room_id,
-                        "node_id": node_id,
-                        "detail": (
-                            f"主控输出动态问卷 kind={hitl_gate.intervention_kind} "
-                            f"questions={len((hitl_gate.schema or {}).get('questions') or [])}"
-                        ),
-                        "log_type": "info",
-                        "agent_id": host_id,
-                    },
-                )
-                return self._gate_from_agent_hitl(
-                    scope_type=scope_type,
-                    scope_id=sid,
-                    room_id=room_id,
-                    node_id=node_id,
-                    binding=binding,
-                    gate=hitl_gate,
-                    report_body=report_body,
-                    tokens_used=tokens_used,
-                    duration_seconds=duration,
-                    stage_id=stage_id,
-                    ticket_title=ticket_title,
-                    skipped_nodes=skipped_nodes or None,
-                )
+                from synapse.rd_meeting.hitl_closure_guard import load_closure_intent
+                from synapse.rd_meeting.hitl_lifecycle import node_archive_ready_for_review
+
+                agent_closure_intent = load_closure_intent(sid, node_id)
+                if (
+                    agent_closure_intent == "done"
+                    and hitl_gate.intervention_kind == "interactive"
+                ):
+                    append_history_event(
+                        sid,
+                        {
+                            "event": "hitl_closure_guard_reject_agent_hitl",
+                            "room_id": room_id,
+                            "node_id": node_id,
+                            "detail": "用户末题选否，忽略主控 Markdown 问卷块",
+                            "log_type": "warning",
+                            "agent_id": host_id,
+                        },
+                    )
+                    if node_archive_ready_for_review(sid, node_id):
+                        ready_for_review = True
+                else:
+                    append_history_event(
+                        sid,
+                        {
+                            "event": "hitl_dynamic",
+                            "room_id": room_id,
+                            "node_id": node_id,
+                            "detail": (
+                                f"主控输出动态问卷 kind={hitl_gate.intervention_kind} "
+                                f"questions={len((hitl_gate.schema or {}).get('questions') or [])}"
+                            ),
+                            "log_type": "info",
+                            "agent_id": host_id,
+                        },
+                    )
+                    return self._gate_from_agent_hitl(
+                        scope_type=scope_type,
+                        scope_id=sid,
+                        room_id=room_id,
+                        node_id=node_id,
+                        binding=binding,
+                        gate=hitl_gate,
+                        report_body=report_body,
+                        tokens_used=tokens_used,
+                        duration_seconds=duration,
+                        stage_id=stage_id,
+                        ticket_title=ticket_title,
+                        skipped_nodes=skipped_nodes or None,
+                    )
         else:
             hitl_gate = extract_hitl_from_agent_output(report_body)
             report_body = hitl_gate.clean_body

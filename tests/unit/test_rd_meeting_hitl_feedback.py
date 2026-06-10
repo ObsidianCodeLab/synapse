@@ -7,8 +7,14 @@ from synapse.rd_meeting.hitl_feedback import (
     format_hitl_feedback_structured,
     split_question_answer,
     user_has_free_text_input,
+    user_selected_no_further_processing,
+    user_wants_further_processing,
 )
-from synapse.rd_meeting.hitl_form import HUMAN_SUPPLEMENT_QUESTION_ID
+from synapse.rd_meeting.hitl_form import (
+    HUMAN_CLOSURE_DETAIL_ID,
+    HUMAN_CLOSURE_QUESTION_ID,
+    HUMAN_SUPPLEMENT_QUESTION_ID,
+)
 from synapse.rd_meeting.hitl_lifecycle import user_has_supplement_input
 
 _SCHEMA = {
@@ -82,3 +88,15 @@ def test_format_hitl_feedback_options_only_mode_label():
     text = format_hitl_feedback_structured(vals, _SCHEMA)
     assert "仅选项" in text
     assert "用户输入**：（无）" in text
+
+
+def test_closure_no_allows_node_review_gate():
+    vals = {HUMAN_CLOSURE_QUESTION_ID: "false"}
+    assert user_selected_no_further_processing(vals)
+    assert not user_wants_further_processing(vals)
+
+
+def test_closure_yes_blocks_node_review_gate():
+    vals = {HUMAN_CLOSURE_QUESTION_ID: "true", HUMAN_CLOSURE_DETAIL_ID: "还要改备份范围"}
+    assert user_wants_further_processing(vals)
+    assert not user_selected_no_further_processing(vals)

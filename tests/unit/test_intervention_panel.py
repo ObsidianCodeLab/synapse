@@ -22,7 +22,17 @@ def test_resolve_hitl_for_human_node() -> None:
     panel = resolve_intervention_panel(
         node_id="req_clarify",
         intervention_kind="interactive",
-        hitl_form_schema={"title": "澄清", "questions": []},
+        hitl_form_schema={"title": "澄清", "questions": [{"id": "q1", "title": "Q"}]},
+    )
+    assert panel == "hitl"
+
+
+def test_interactive_hitl_wins_over_stale_review_payload() -> None:
+    panel = resolve_intervention_panel(
+        node_id="req_clarify",
+        intervention_kind="interactive",
+        hitl_form_schema={"title": "澄清", "questions": [{"id": "q1", "title": "Q"}]},
+        pending_delivery={"review_payload": {"node_id": "req_clarify", "summaries": []}},
     )
     assert panel == "hitl"
 

@@ -35,6 +35,19 @@ def is_ready_for_node_review(room_state: dict[str, Any] | None) -> bool:
     return bool(room_state.get(READY_FOR_NODE_REVIEW_KEY))
 
 
+def _submission_values_for_closure_check(room_state: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    if not isinstance(room_state, dict):
+        return {}, None
+    submission = room_state.get("hitl_submission")
+    if not isinstance(submission, dict):
+        return {}, None
+    values = submission.get("values")
+    schema = submission.get("schema_snapshot")
+    vals = dict(values) if isinstance(values, dict) else {}
+    sch = schema if isinstance(schema, dict) else None
+    return vals, sch
+
+
 def should_enter_node_review_after_hitl_locked(
     scope_id: str,
     node_id: str,
@@ -77,6 +90,11 @@ def should_enter_node_review_after_hitl_locked(
     if not kind:
         kind = str(room_state.get("intervention_kind") or "").strip().lower()
     if kind and kind not in ("interactive", ""):
+        return False
+    from synapse.rd_meeting.hitl_feedback import user_selected_no_further_processing
+
+    sub_vals, sub_schema = _submission_values_for_closure_check(room_state)
+    if not user_selected_no_further_processing(sub_vals, sub_schema):
         return False
     return node_archive_ready_for_review(sid, nid)
 
@@ -126,16 +144,22 @@ def resolve_ready_for_node_review_after_hitl(
     scope_id: str,
     node_id: str,
     feedback_mode: HitlFeedbackMode,
+    *,
+    values: dict[str, Any] | None = None,
+    schema: dict[str, Any] | None = None,
 ) -> bool:
-    """会中问卷提交后：仅「仅选项」且归档文件已存在时才标记 NodeReview 就绪。"""
+    """会中问卷提交后：末题选「否」且归档已就绪时才标记 NodeReview 就绪。"""
     from synapse.rd_meeting.func_solution_review import uses_func_solution_gate
+    from synapse.rd_meeting.hitl_feedback import user_selected_no_further_processing
     from synapse.rd_meeting.solution_review import uses_solution_review_gate
+
+    del feedback_mode  # 收口题「否」为唯一门控，不再依赖 options_only
 
     if uses_solution_review_gate(node_id):
         return False
     if uses_func_solution_gate(node_id):
         return False
-    if feedback_mode != "options_only":
+    if not user_selected_no_further_processing(values or {}, schema):
         return False
     return node_archive_ready_for_review(scope_id, node_id)
 
@@ -157,11 +181,42 @@ def reset_human_confirm_lifecycle(scope_id: str) -> None:
     sid = (scope_id or "").strip()
     if not sid:
         return
+    from synapse.rd_meeting.hitl_closure_guard import HITL_CLOSURE_INTENT_KEY
+
     rs = dict(load_room_state(sid) or {})
     rs.pop(READY_FOR_NODE_REVIEW_KEY, None)
     rs.pop(HITL_CLARIFY_ROUND_KEY, None)
     rs.pop(HITL_FEEDBACK_MODE_KEY, None)
+    rs.pop(HITL_CLOSURE_INTENT_KEY, None)
     save_room_state(sid, rs)
+
+
+def clear_hitl_gate_residual_state(room_state: dict[str, Any]) -> dict[str, Any]:
+    """清理会中门控残留（重处理/节点初始化用；不触碰 reprocess_reason）。"""
+    from synapse.rd_meeting.hitl_closure_guard import HITL_CLOSURE_INTENT_KEY
+
+    rs = dict(room_state)
+    for key in (
+        "hitl_locked",
+        "hitl_submission",
+        "hitl_form_schema",
+        "intervention_kind",
+        "pending_questionnaire",
+        HITL_CLOSURE_INTENT_KEY,
+    ):
+        rs.pop(key, None)
+    pending = rs.get("pending_delivery")
+    if isinstance(pending, dict):
+        pending = dict(pending)
+        pending.pop("review_payload", None)
+        if pending:
+            rs["pending_delivery"] = pending
+        else:
+            rs.pop("pending_delivery", None)
+    rs.pop(READY_FOR_NODE_REVIEW_KEY, None)
+    rs.pop(HITL_CLARIFY_ROUND_KEY, None)
+    rs.pop(HITL_FEEDBACK_MODE_KEY, None)
+    return rs
 
 
 def get_clarify_round(scope_id: str) -> int:

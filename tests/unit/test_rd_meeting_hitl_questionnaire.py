@@ -7,6 +7,7 @@ import json
 import pytest
 
 from synapse.rd_meeting.hitl_form import (
+    HUMAN_CLOSURE_QUESTION_ID,
     HUMAN_SUPPLEMENT_QUESTION_ID,
     coerce_questionnaire_schema,
     default_exception_hitl_schema,
@@ -98,8 +99,8 @@ def test_coerce_schema_validates_questions():
     assert schema["intervention_kind"] == "result_confirm"
     assert schema["summary_markdown"] == "待确认要点"
     assert schema["render"]["accent"] == "blue"
-    assert schema["questions"][-1]["id"] == HUMAN_SUPPLEMENT_QUESTION_ID
-    assert schema["questions"][-1]["type"] == "textarea"
+    assert schema["questions"][-1]["id"] == HUMAN_CLOSURE_QUESTION_ID
+    assert schema["questions"][-1]["type"] == "single"
     assert schema["questions"][0]["render"]["progress"]["total"] == 2
 
 
@@ -119,9 +120,8 @@ def test_normalize_appends_human_supplement_question():
         }
     )
     assert schema is not None
-    assert schema["questions"][-1]["id"] == HUMAN_SUPPLEMENT_QUESTION_ID
-    assert schema["questions"][-1]["required"] is False
-    assert schema["questions"][-1]["type"] == "textarea"
+    assert schema["questions"][-1]["id"] == HUMAN_CLOSURE_QUESTION_ID
+    assert schema["questions"][-1]["required"] is True
 
 
 def test_submit_questionnaire_writes_room_state(meeting_scope):
@@ -267,7 +267,7 @@ def test_coerce_allows_sufficient_granularity():
         summary=summary,
     )
     assert len(schema["questions"]) == 4
-    assert schema["questions"][-1]["id"] == HUMAN_SUPPLEMENT_QUESTION_ID
+    assert schema["questions"][-1]["id"] == HUMAN_CLOSURE_QUESTION_ID
 
 
 def test_coerce_granularity_skipped_for_exception():
@@ -544,3 +544,70 @@ def test_default_exception_schema_shape():
     assert schema["render"]["accent"] == "violet"
     ids = {q["id"] for q in schema["questions"]}
     assert {"exception_ack", "decision", "comment"} <= ids
+
+
+def test_coerce_promotes_desc_to_label_when_label_is_letter():
+    """Worker hitl_context 常见 {label:A, desc:正文} → label 展示正文，value 保留字母。"""
+    schema = coerce_questionnaire_schema(
+        kind="interactive",
+        questions=[
+            {
+                "id": "Q1",
+                "type": "multiple",
+                "title": "备份粒度与范围",
+                "context": "请确认备份粒度",
+                "options": [
+                    {"label": "A", "desc": "全量备份：备份所有数据"},
+                    {"label": "B", "desc": "增量备份：只备份变更数据"},
+                ],
+            }
+        ],
+        summary="待确认 2 项",
+        enforce_granularity=False,
+    )
+    q1 = schema["questions"][0]
+    assert q1["options"][0]["value"] == "A"
+    assert q1["options"][0]["label"] == "全量备份：备份所有数据"
+    assert q1["options"][1]["label"] == "增量备份：只备份变更数据"
+
+
+def test_coerce_rejects_letter_only_options_without_desc():
+    with pytest.raises(ValueError) as excinfo:
+        coerce_questionnaire_schema(
+            kind="interactive",
+            questions=[
+                {
+                    "id": "Q1",
+                    "type": "single",
+                    "title": "触发方式",
+                    "context": "请选择",
+                    "options": [
+                        {"label": "A", "value": "A"},
+                        {"label": "B", "value": "B"},
+                    ],
+                }
+            ],
+            enforce_granularity=False,
+        )
+    assert "占位符" in str(excinfo.value)
+
+
+def test_submit_questionnaire_rejects_letter_only_options(meeting_scope):
+    scope_id, _work = meeting_scope
+    with pytest.raises(ValueError, match="占位符"):
+        submit_questionnaire(
+            session_id="rd_meeting:room-hitl:host",
+            kind="interactive",
+            questions=[
+                {
+                    "id": "q1",
+                    "type": "single",
+                    "title": "请选择",
+                    "context": "场景说明",
+                    "options": [
+                        {"label": "A"},
+                        {"label": "B"},
+                    ],
+                }
+            ],
+        )

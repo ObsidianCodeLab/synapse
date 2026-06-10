@@ -476,12 +476,21 @@ async def get_node_review(
         else:
             payload = await build_node_review_payload(**common, use_llm_summary=True)
 
-        save_node_review(
-            sid,
-            target_node,
-            payload,
-            sync_pending=pending_matches and target_node == current_node and not is_historical,
+        from synapse.rd_meeting.intervention_panel import is_clarify_gate_active
+
+        may_sync_pending = (
+            pending_matches
+            and target_node == current_node
+            and not is_historical
+            and not is_clarify_gate_active(
+                str(room_state.get("intervention_kind") or ""),
+                room_state.get("hitl_form_schema")
+                if isinstance(room_state.get("hitl_form_schema"), dict)
+                else None,
+                phase=str(room_state.get("phase") or ""),
+            )
         )
+        save_node_review(sid, target_node, payload, sync_pending=may_sync_pending)
         return success_response(payload)
     except Exception as exc:
         logger.exception("refresh node_review failed: %s", exc)

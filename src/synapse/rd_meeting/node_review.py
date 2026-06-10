@@ -960,6 +960,14 @@ def save_node_review(
         return
 
     room_state = dict(load_room_state(sid) or {})
+    from synapse.rd_meeting.intervention_panel import is_clarify_gate_active
+
+    if is_clarify_gate_active(
+        str(room_state.get("intervention_kind") or ""),
+        room_state.get("hitl_form_schema") if isinstance(room_state.get("hitl_form_schema"), dict) else None,
+        phase=str(room_state.get("phase") or ""),
+    ):
+        return
     pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
     pending = dict(pending)
     pending["review_payload"] = payload

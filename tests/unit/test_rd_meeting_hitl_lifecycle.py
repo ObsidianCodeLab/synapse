@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from synapse.rd_meeting.hitl_form import HUMAN_SUPPLEMENT_QUESTION_ID
+from synapse.rd_meeting.hitl_form import (
+    HUMAN_CLOSURE_QUESTION_ID,
+    HUMAN_SUPPLEMENT_QUESTION_ID,
+)
 from synapse.rd_meeting.hitl_lifecycle import (
     READY_FOR_NODE_REVIEW_KEY,
     clear_ready_for_node_review,
@@ -68,8 +71,14 @@ def test_resolve_ready_only_when_archive_exists(monkeypatch, tmp_path):
             "synapse.rd_meeting.validation", fromlist=["NodeOutputValidation"]
         ).NodeOutputValidation(ok=False, errors=["missing"]),
     )
-    assert not resolve_ready_for_node_review_after_hitl(scope, node_id, "options_only")
-    assert resolve_ready_for_node_review_after_hitl(scope, node_id, "with_free_text") is False
+    closure_no = {HUMAN_CLOSURE_QUESTION_ID: "false"}
+    closure_yes = {HUMAN_CLOSURE_QUESTION_ID: "true", "human_closure_detail": "还要改接口"}
+    assert not resolve_ready_for_node_review_after_hitl(
+        scope, node_id, "options_only", values=closure_no
+    )
+    assert not resolve_ready_for_node_review_after_hitl(
+        scope, node_id, "with_free_text", values=closure_yes
+    )
 
     monkeypatch.setattr(
         "synapse.rd_meeting.validation.validate_node_archive_files",
@@ -77,7 +86,12 @@ def test_resolve_ready_only_when_archive_exists(monkeypatch, tmp_path):
             "synapse.rd_meeting.validation", fromlist=["NodeOutputValidation"]
         ).NodeOutputValidation(ok=True, errors=[]),
     )
-    assert resolve_ready_for_node_review_after_hitl(scope, node_id, "options_only")
+    assert resolve_ready_for_node_review_after_hitl(
+        scope, node_id, "options_only", values=closure_no
+    )
+    assert not resolve_ready_for_node_review_after_hitl(
+        scope, node_id, "options_only", values=closure_yes
+    )
 
 
 def test_clear_ready_for_node_review(monkeypatch):
@@ -110,7 +124,11 @@ def test_should_enter_node_review_after_hitl_locked(monkeypatch, tmp_path):
     )
     rs = {
         "hitl_locked": True,
-        "hitl_submission": {"kind": "interactive", "locked": True},
+        "hitl_submission": {
+            "kind": "interactive",
+            "locked": True,
+            "values": {HUMAN_CLOSURE_QUESTION_ID: "false"},
+        },
         "intervention_kind": "interactive",
     }
     assert not should_enter_node_review_after_hitl_locked(scope, node_id, rs)
@@ -124,6 +142,16 @@ def test_should_enter_node_review_after_hitl_locked(monkeypatch, tmp_path):
     )
     assert should_enter_node_review_after_hitl_locked(scope, node_id, rs)
     assert should_enter_node_review_gate(scope, node_id, rs)
+
+    rs_yes = {
+        **rs,
+        "hitl_submission": {
+            "kind": "interactive",
+            "locked": True,
+            "values": {HUMAN_CLOSURE_QUESTION_ID: "true", "human_closure_detail": "还要补充"},
+        },
+    }
+    assert not should_enter_node_review_after_hitl_locked(scope, node_id, rs_yes)
 
     rs_pending_form = {**rs, "hitl_form_schema": {"questions": [{"id": "q1"}]}}
     assert not should_enter_node_review_after_hitl_locked(scope, node_id, rs_pending_form)

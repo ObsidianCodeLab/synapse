@@ -92,6 +92,14 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
     return pendingNid || current || 'func_solution';
   }
 
+  if (
+    kind === 'interactive' ||
+    kind === 'exception' ||
+    room.hitlFormSchema
+  ) {
+    return pendingNid || current;
+  }
+
   if (panel === 'node_review' || kind === 'result_confirm') {
     const fromReview = (room.reviewPayload?.node_id || '').trim();
     return fromReview || pendingNid || current;
@@ -140,6 +148,14 @@ export function resolveMeetingInterventionPanel(
   if (kind === 'func_solution_review' || room.funcSolutionReviewPayload) {
     return 'func_solution_review';
   }
+
+  if (
+    (kind === 'interactive' || kind === 'exception' || room.hitlFormSchema) &&
+    humanConfirmSwitchVisible(nodeType)
+  ) {
+    return 'hitl';
+  }
+
   if (kind === 'result_confirm' || room.reviewPayload) {
     return 'node_review';
   }
@@ -149,13 +165,6 @@ export function resolveMeetingInterventionPanel(
     if (nid === 'solution_review' && room.solutionReviewPayload) return 'solution_review';
     if (nid === 'func_solution' && room.funcSolutionReviewPayload) return 'func_solution_review';
     if (room.reviewPayload) return 'node_review';
-  }
-
-  if (
-    (kind === 'interactive' || kind === 'exception' || room.hitlFormSchema) &&
-    humanConfirmSwitchVisible(nodeType)
-  ) {
-    return 'hitl';
   }
 
   if (room.hitlFormSchema && nodeType !== 'ai_human' && nodeType !== 'ai') {

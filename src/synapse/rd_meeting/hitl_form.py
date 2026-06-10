@@ -21,7 +21,12 @@ OptionStyle = Literal["radio", "checkbox", "boolean"]
 QUESTIONNAIRE_TYPE = "questionnaire"
 QUESTIONNAIRE_VERSION = "1.0"
 
-# 所有人机问卷末尾追加的自由补充题（不覆盖上方选项/填空答案）
+# 会中问卷末题：是否需进一步处理（选「是」时须填写 human_closure_detail）
+HUMAN_CLOSURE_QUESTION_ID = "human_closure"
+HUMAN_CLOSURE_DETAIL_ID = "human_closure_detail"
+HUMAN_CLOSURE_TITLE = "是否还存在问题需要进一步处理？"
+
+# 遗留补充题 id（旧问卷解析兼容）
 HUMAN_SUPPLEMENT_QUESTION_ID = "human_supplement"
 HUMAN_SUPPLEMENT_TITLE = "请问您还有什么需要补充的吗？"
 
@@ -352,7 +357,10 @@ def _validate_question_context_substance(
     context = str(question.get("context") or "").strip()
     qtype = str(question.get("type") or "").strip().lower()
 
-    if qid == HUMAN_SUPPLEMENT_QUESTION_ID or qtype in ("text", "textarea"):
+    if qid in (HUMAN_SUPPLEMENT_QUESTION_ID, HUMAN_CLOSURE_QUESTION_ID) or qtype in (
+        "text",
+        "textarea",
+    ):
         return
 
     expected_n = _extract_count_from_title(title)
@@ -421,6 +429,85 @@ def _infer_expected_question_count(summary: str) -> int:
     return best
 
 
+_OPTION_LETTER_ONLY_RE = re.compile(r"^[A-Za-z]$")
+_OPTION_SHORT_INDEX_RE = re.compile(r"^\d{1,2}$")
+
+
+def _option_auxiliary_text(opt: dict[str, Any]) -> str:
+    """LLM/Worker 常把可读文案放在 desc/description，而非 label。"""
+    for key in ("desc", "description", "text"):
+        val = str(opt.get(key) or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def _is_placeholder_option_label(label: str, value: str) -> bool:
+    """label 仅为 A/B/1 等占位符，不能作为前端展示文案。"""
+    lab = (label or "").strip()
+    val = (value or "").strip()
+    if not lab:
+        return True
+    if _OPTION_LETTER_ONLY_RE.fullmatch(lab):
+        return True
+    if _OPTION_SHORT_INDEX_RE.fullmatch(lab) and lab == val:
+        return True
+    return lab == val and len(lab) <= 2
+
+
+def _resolve_option_display_label(opt: dict[str, Any], *, value: str) -> str:
+    label = str(opt.get("label") or "").strip()
+    aux = _option_auxiliary_text(opt)
+    if aux and (not label or _is_placeholder_option_label(label, value)):
+        return aux
+    return label or aux or value
+
+
+def _normalize_option_dict(opt: dict[str, Any], opt_idx: int) -> dict[str, Any]:
+    """单条 option 归一化：value 稳定、label 为用户可读文案。"""
+    raw_val = opt.get("value")
+    if raw_val is not None and raw_val is not False and str(raw_val).strip() != "":
+        value = _normalize_option_value(raw_val)
+    else:
+        value = (
+            str(opt.get("id") or "").strip()
+            or str(opt.get("label") or "").strip()
+            or f"opt_{opt_idx}"
+        )
+        value = _normalize_option_value(value) or value
+    display = _resolve_option_display_label(opt, value=value)
+    return {
+        "value": value,
+        "label": display,
+        **{k: v for k, v in opt.items() if k not in ("value", "label", "id")},
+    }
+
+
+def validate_choice_option_labels(question: dict[str, Any], *, idx: int) -> None:
+    """护栏：单选/多选题 options[].label 不得仍为字母/编号占位符。"""
+    qtype = str(question.get("type") or "single").strip().lower()
+    if qtype not in ("single", "multiple"):
+        return
+    qid = str(question.get("id") or "").strip() or f"q{idx + 1}"
+    opts = question.get("options")
+    if not isinstance(opts, list) or len(opts) < 2:
+        return
+    placeholders: list[str] = []
+    for opt in opts:
+        if not isinstance(opt, dict):
+            continue
+        val = str(opt.get("value") or "").strip()
+        lab = str(opt.get("label") or "").strip()
+        if not lab or _is_placeholder_option_label(lab, val):
+            placeholders.append(lab or val or "?")
+    if placeholders:
+        raise ValueError(
+            f"questions[{idx}]（id={qid}）options 须使用用户可读的完整 label，"
+            f"当前仍为占位符：{', '.join(placeholders)}。"
+            "请把选项正文写入 options[].label（不要仅用 A/B/C 字母配合 desc）。"
+        )
+
+
 def coerce_questionnaire_schema(
     *,
     kind: str,
@@ -464,35 +551,15 @@ def coerce_questionnaire_schema(
         entry["id"] = qid
         entry["type"] = qtype
         entry["title"] = qtitle
-        # 兼容 LLM 输出 ``{"id": "...", "label": "..."}``（无 value）的题型选项；
-        # 统一为 ``{"value": "...", "label": "..."}``，避免前端用 undefined 主键。
+        # 兼容 LLM 输出 ``{"label":"A","desc":"…"}`` 或 ``{"id","label"}``（无 value）；
+        # 统一为 ``{"value","label"}``，label 须为用户可读文案。
         raw_opts = entry.get("options")
         if isinstance(raw_opts, list):
             normalized_opts: list[dict[str, Any]] = []
             for opt_idx, opt in enumerate(raw_opts):
                 if not isinstance(opt, dict):
                     continue
-                raw_val = opt.get("value")
-                if raw_val is not None and raw_val is not False and str(raw_val).strip() != "":
-                    value = _normalize_option_value(raw_val)
-                else:
-                    value = (
-                        str(opt.get("id") or "").strip()
-                        or str(opt.get("label") or "").strip()
-                        or f"opt_{opt_idx}"
-                    )
-                    value = _normalize_option_value(value) or value
-                normalized_opts.append(
-                    {
-                        "value": value,
-                        "label": str(opt.get("label") or value),
-                        **{
-                            k: v
-                            for k, v in opt.items()
-                            if k not in ("value", "label", "id")
-                        },
-                    }
-                )
+                normalized_opts.append(_normalize_option_dict(opt, opt_idx))
             entry["options"] = normalized_opts
         _maybe_normalize_boolean_question(entry)
         if kind_norm == "interactive":
@@ -500,6 +567,8 @@ def coerce_questionnaire_schema(
 
             entry = repair_embedded_options(entry, idx=idx)
             qtype = str(entry.get("type") or qtype).strip().lower()
+        if kind_norm in ("interactive", "result_confirm", "exception"):
+            validate_choice_option_labels(entry, idx=idx)
         # 选项题由前端/归一化自动附加人工输入框，不再要求 LLM 显式 inputEnabled
         if qtype in ("single", "multiple") and qid != HUMAN_SUPPLEMENT_QUESTION_ID:
             entry["inputEnabled"] = True
@@ -667,8 +736,25 @@ def build_question(
     }
 
 
+def build_human_closure_question() -> dict[str, Any]:
+    """会中问卷末题：是否仍需进一步处理（选「是」时由前端展示 detail 输入框）。"""
+    return build_question(
+        qid=HUMAN_CLOSURE_QUESTION_ID,
+        qtype="boolean",
+        title=HUMAN_CLOSURE_TITLE,
+        context=(
+            "选择「是」请说明仍需处理的要求，系统将继续本节点会中问卷；"
+            "选择「否」表示本节点已无待决问题，将进入节点确认总结。"
+        ),
+        options=_boolean_options(),
+        input_enabled=False,
+        required=True,
+        show_progress=False,
+    )
+
+
 def build_human_supplement_question() -> dict[str, Any]:
-    """所有人机场景末尾的选填补充题（长文本输入，独立于上方各题答案）。"""
+    """遗留：旧版选填补充题（仅兼容历史解析）。"""
     return build_question(
         qid=HUMAN_SUPPLEMENT_QUESTION_ID,
         qtype="textarea",
@@ -680,13 +766,17 @@ def build_human_supplement_question() -> dict[str, Any]:
 
 
 def append_human_supplement_question(questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """在题目列表末尾追加统一补充题（已存在同 id/标题则跳过）。"""
+    """在题目列表末尾追加统一收口题（closure；已存在同 id/标题则跳过）。"""
     out = [dict(q) for q in questions if isinstance(q, dict)]
+    if any(str(q.get("id") or "").strip() == HUMAN_CLOSURE_QUESTION_ID for q in out):
+        return out
+    if any(HUMAN_CLOSURE_TITLE in str(q.get("title") or "") for q in out):
+        return out
     if any(str(q.get("id") or "").strip() == HUMAN_SUPPLEMENT_QUESTION_ID for q in out):
         return out
     if any(HUMAN_SUPPLEMENT_TITLE in str(q.get("title") or "") for q in out):
         return out
-    out.append(build_human_supplement_question())
+    out.append(build_human_closure_question())
     return out
 
 
@@ -888,7 +978,12 @@ def ensure_question_input_guardrails(questions: list[dict[str, Any]]) -> list[di
         item = dict(q)
         qid = str(item.get("id") or "").strip()
         qtype = str(item.get("type") or "single").strip().lower()
-        if qid == HUMAN_SUPPLEMENT_QUESTION_ID or qtype in ("text", "textarea"):
+        if qid in (HUMAN_SUPPLEMENT_QUESTION_ID, HUMAN_CLOSURE_QUESTION_ID) or qtype in (
+            "text",
+            "textarea",
+        ):
+            if qid == HUMAN_CLOSURE_QUESTION_ID:
+                item["inputEnabled"] = False
             out.append(item)
             continue
         opts = item.get("options")
@@ -933,6 +1028,9 @@ def normalize_hitl_schema(schema: dict[str, Any] | None) -> dict[str, Any] | Non
         summary_text = str(out.get("summary_markdown") or "")
         question_list = apply_interactive_question_repairs(question_list, summary=summary_text)
     guarded = ensure_question_input_guardrails(question_list)
+    for q_idx, q in enumerate(guarded):
+        if isinstance(q, dict):
+            validate_choice_option_labels(q, idx=q_idx)
     merged = append_human_supplement_question(guarded)
     out["questions"] = attach_question_progress(merged)
     return out

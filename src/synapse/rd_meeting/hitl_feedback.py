@@ -6,7 +6,11 @@ import json
 from datetime import datetime
 from typing import Any, Literal
 
-from synapse.rd_meeting.hitl_form import HUMAN_SUPPLEMENT_QUESTION_ID
+from synapse.rd_meeting.hitl_form import (
+    HUMAN_CLOSURE_DETAIL_ID,
+    HUMAN_CLOSURE_QUESTION_ID,
+    HUMAN_SUPPLEMENT_QUESTION_ID,
+)
 
 HitlFeedbackMode = Literal["options_only", "with_free_text"]
 
@@ -21,8 +25,8 @@ _PROMPT_OPTIONS_ONLY = """
 1. **逐条阅读**上方「本轮人工确认反馈（结构化）」JSON：以用户选项为约束，结合工单、产品、代码仓库等**真实上下文**，更新或落盘本节点约定产出物（NODE_OUTPUTS 中的 Markdown）。
 2. 不得无视或弱化用户选项；选项即用户决策，写入产出物时必须体现。
 3. 若选项与现有产物/分析冲突，以用户选项为准并简要说明调整点。
-4. 无需再次提交 interactive 问卷，除非出现新的未决决策点。
-5. 完成产出物更新后停止；系统将进入节点完成确认（NodeReview）。
+4. 用户已在末题选择「否，本节点已无待决问题」；完成产出物更新后停止，系统将进入节点确认总结（NodeReview）。
+5. 除非出现新的未决决策点，无需再次提交 interactive 问卷。
 """.strip()
 
 _PROMPT_WITH_FREE_TEXT = """
@@ -58,8 +62,23 @@ def prompt_for_followup_interactive_round(round_n: int) -> str:
     return _PROMPT_FOLLOWUP_INTERACTIVE_ROUND.format(round_n=n)
 
 
-def prompt_after_hitl_feedback(mode: HitlFeedbackMode, *, followup_round: int = 0) -> str:
-    base = _PROMPT_WITH_FREE_TEXT if mode == "with_free_text" else _PROMPT_OPTIONS_ONLY
+def prompt_after_hitl_feedback(
+    mode: HitlFeedbackMode,
+    *,
+    followup_round: int = 0,
+    values: dict[str, Any] | None = None,
+    schema: dict[str, Any] | None = None,
+) -> str:
+    if user_wants_further_processing(values or {}, schema):
+        base = (
+            _PROMPT_WITH_FREE_TEXT
+            + "\n\n## 续跑提示（用户选择仍需进一步处理）\n"
+            "用户已在末题选择「是」并说明待处理要求；**必须**据此更新产出/分析后，"
+            "再次 ``submit_hitl_questionnaire(kind=\"interactive\")`` 发起新一轮会中问卷，"
+            "**禁止**在未获用户末题选「否」前进入节点确认总结。"
+        )
+    else:
+        base = _PROMPT_WITH_FREE_TEXT if mode == "with_free_text" else _PROMPT_OPTIONS_ONLY
     if followup_round >= 2:
         return f"{base}\n\n{prompt_for_followup_interactive_round(followup_round)}"
     if followup_round == 1 and mode == "with_free_text":
@@ -70,6 +89,13 @@ def prompt_after_hitl_feedback(mode: HitlFeedbackMode, *, followup_round: int = 
             "让用户对收敛后的章节/清单签收（每题 context 须含完整待审阅正文）。"
         )
     return base
+
+
+def _is_affirmative_key(key: str) -> bool:
+    k = (key or "").strip().lower()
+    if k in ("true", "yes", "y", "1"):
+        return True
+    return key.strip() == "是"
 
 
 def _normalize_option_key(raw: Any, idx: int = 0) -> str:
@@ -122,7 +148,10 @@ def split_question_answer(
     qid = str(q.get("id") or "").strip()
     qtype = str(q.get("type") or "").strip().lower()
 
-    if qtype in ("text", "textarea") or qid == HUMAN_SUPPLEMENT_QUESTION_ID:
+    if qtype in ("text", "textarea") or qid in (
+        HUMAN_SUPPLEMENT_QUESTION_ID,
+        HUMAN_CLOSURE_DETAIL_ID,
+    ):
         text = str(raw or "").strip() if raw is not None else ""
         return [], text
 
@@ -166,13 +195,54 @@ def _format_option_labels(question: dict[str, Any], option_keys: list[str]) -> s
     return "；".join(labels)
 
 
+def user_wants_further_processing(
+    values: dict[str, Any],
+    schema: dict[str, Any] | None = None,
+) -> bool:
+    """末题选「是」或填写进一步处理说明 → 须继续会中问卷，不进 NodeReview。"""
+    if HUMAN_CLOSURE_QUESTION_ID in values:
+        qmap = _question_by_id(schema)
+        q = qmap.get(
+            HUMAN_CLOSURE_QUESTION_ID,
+            {"id": HUMAN_CLOSURE_QUESTION_ID, "type": "boolean"},
+        )
+        selected, _ = split_question_answer(q, values.get(HUMAN_CLOSURE_QUESTION_ID))
+        if selected:
+            return _is_affirmative_key(selected[0])
+        raw = values.get(HUMAN_CLOSURE_QUESTION_ID)
+        if isinstance(raw, bool):
+            return raw
+        if raw is not None and str(raw).strip():
+            return _is_affirmative_key(_normalize_option_key(raw))
+        return False
+    detail = str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip()
+    if detail:
+        return True
+    supplement = str(values.get(HUMAN_SUPPLEMENT_QUESTION_ID) or "").strip()
+    return bool(supplement)
+
+
+def user_selected_no_further_processing(
+    values: dict[str, Any],
+    schema: dict[str, Any] | None = None,
+) -> bool:
+    """末题选「否」→ 唯一允许进入 NodeReview 的会中收口条件。"""
+    if HUMAN_CLOSURE_QUESTION_ID in values:
+        return not user_wants_further_processing(values, schema)
+    if HUMAN_SUPPLEMENT_QUESTION_ID in values:
+        return not str(values.get(HUMAN_SUPPLEMENT_QUESTION_ID) or "").strip()
+    return False
+
+
 def classify_hitl_feedback_mode(
     values: dict[str, Any],
     schema: dict[str, Any] | None,
     *,
     comment: str = "",
 ) -> HitlFeedbackMode:
-    """区分「仅选项」与「含自由输入（题目输入框 / 末尾补充 / 文本题）」。"""
+    """区分「仅选项」与「含自由输入（题目输入框 / 收口说明 / 文本题）」。"""
+    if user_wants_further_processing(values, schema):
+        return "with_free_text"
     if user_has_free_text_input(values, schema, comment=comment):
         return "with_free_text"
     return "options_only"
@@ -188,11 +258,13 @@ def user_has_free_text_input(
 
     覆盖：
     - 各题选项旁的自定义输入（``OTHER:…`` 或解析后无法匹配选项的文本）
-    - 末尾 ``human_supplement`` 补充题
+    - 收口题 ``human_closure_detail`` / 遗留 ``human_supplement``
     - ``text`` / ``textarea`` 题型答案
     - 表单 ``补充说明`` / comment 行
     """
     if (comment or "").strip():
+        return True
+    if str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip():
         return True
 
     qmap = _question_by_id(schema)
@@ -240,10 +312,16 @@ def format_hitl_feedback_structured(
     for q in (schema or {}).get("questions") or []:
         if isinstance(q, dict):
             qid = str(q.get("id") or "").strip()
-            if qid and qid != HUMAN_SUPPLEMENT_QUESTION_ID:
+            if qid and qid not in (
+                HUMAN_SUPPLEMENT_QUESTION_ID,
+                HUMAN_CLOSURE_DETAIL_ID,
+            ):
                 ordered_ids.append(qid)
     for qid in values:
-        if qid not in ordered_ids and qid != HUMAN_SUPPLEMENT_QUESTION_ID:
+        if qid not in ordered_ids and qid not in (
+            HUMAN_SUPPLEMENT_QUESTION_ID,
+            HUMAN_CLOSURE_DETAIL_ID,
+        ):
             ordered_ids.append(qid)
 
     for qid in ordered_ids:
@@ -258,12 +336,22 @@ def format_hitl_feedback_structured(
         lines.append(f"- **用户输入**：{custom if custom else '（无）'}")
         lines.append("")
 
+    detail_text = str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip()
+    if detail_text:
+        lines.append("### 进一步处理要求")
+        lines.append("- **用户选项**：（无）")
+        lines.append(f"- **用户输入**：{detail_text}")
+        lines.append("")
+
     supplement_q = qmap.get(HUMAN_SUPPLEMENT_QUESTION_ID, {})
     supplement_title = str(supplement_q.get("title") or "请问您还有什么需要补充的吗？").strip()
     supplement_raw = values.get(HUMAN_SUPPLEMENT_QUESTION_ID)
     supplement_text = ""
     if supplement_raw is not None:
-        _, supplement_text = split_question_answer(supplement_q or {"id": HUMAN_SUPPLEMENT_QUESTION_ID, "type": "textarea"}, supplement_raw)
+        _, supplement_text = split_question_answer(
+            supplement_q or {"id": HUMAN_SUPPLEMENT_QUESTION_ID, "type": "textarea"},
+            supplement_raw,
+        )
     if supplement_text:
         lines.append(f"### {supplement_title}")
         lines.append("- **用户选项**：（无）")
@@ -298,10 +386,16 @@ def build_hitl_round_record(
     for q in (schema or {}).get("questions") or []:
         if isinstance(q, dict):
             qid = str(q.get("id") or "").strip()
-            if qid and qid != HUMAN_SUPPLEMENT_QUESTION_ID:
+            if qid and qid not in (
+                HUMAN_SUPPLEMENT_QUESTION_ID,
+                HUMAN_CLOSURE_DETAIL_ID,
+            ):
                 ordered_ids.append(qid)
     for qid in values:
-        if qid not in ordered_ids and qid != HUMAN_SUPPLEMENT_QUESTION_ID:
+        if qid not in ordered_ids and qid not in (
+            HUMAN_SUPPLEMENT_QUESTION_ID,
+            HUMAN_CLOSURE_DETAIL_ID,
+        ):
             ordered_ids.append(qid)
 
     questions: list[dict[str, Any]] = []
@@ -320,6 +414,18 @@ def build_hitl_round_record(
                 "selected_options": opts,
                 "option_labels": [opt_index.get(k, k) for k in opts],
                 "user_input": custom,
+            }
+        )
+
+    detail_text = str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip()
+    if detail_text:
+        questions.append(
+            {
+                "id": HUMAN_CLOSURE_DETAIL_ID,
+                "title": "进一步处理要求",
+                "selected_options": [],
+                "option_labels": [],
+                "user_input": detail_text,
             }
         )
 

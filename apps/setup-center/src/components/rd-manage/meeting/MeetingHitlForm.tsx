@@ -12,30 +12,52 @@ const { TextArea } = Input;
 
 const OPTION_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+const HUMAN_CLOSURE_QUESTION_ID = 'human_closure';
+const HUMAN_CLOSURE_DETAIL_ID = 'human_closure_detail';
+const HUMAN_CLOSURE_TITLE = '是否还存在问题需要进一步处理？';
+/** 遗留补充题（旧问卷兼容） */
 const HUMAN_SUPPLEMENT_QUESTION_ID = 'human_supplement';
-const HUMAN_SUPPLEMENT_TITLE = '请问您还有什么需要补充的吗？';
 const DEFAULT_CUSTOM_PLACEHOLDER = '或者你的答案：';
 
 function isFreeTextQuestion(q: HitlQuestion): boolean {
   return q.type === 'textarea' || q.type === 'text';
 }
 
-function buildSupplementQuestion(): HitlQuestion {
+function isClosureQuestion(q: HitlQuestion): boolean {
+  return (
+    q.id === HUMAN_CLOSURE_QUESTION_ID ||
+    (q.title || '').includes(HUMAN_CLOSURE_TITLE)
+  );
+}
+
+function buildClosureQuestion(): HitlQuestion {
   return {
-    id: HUMAN_SUPPLEMENT_QUESTION_ID,
-    type: 'textarea',
-    title: HUMAN_SUPPLEMENT_TITLE,
-    context: '选填。此处为自由补充说明，不会覆盖您在上方各题中的选择；无补充可留空直接提交。',
-    required: false,
-    render: { showProgress: true },
+    id: HUMAN_CLOSURE_QUESTION_ID,
+    type: 'boolean',
+    title: HUMAN_CLOSURE_TITLE,
+    context:
+      '选择「是」请说明仍需处理的要求，系统将继续本节点会中问卷；选择「否」表示本节点已无待决问题，将进入节点确认总结。',
+    required: true,
+    options: [
+      { value: 'true', label: '是，仍有问题需进一步处理' },
+      { value: 'false', label: '否，本节点已无待决问题' },
+    ],
+    render: { optionStyle: 'boolean', showProgress: true },
   };
+}
+
+function closureWantsFurther(selections: Record<string, Set<string>>): boolean {
+  const sel = selections[HUMAN_CLOSURE_QUESTION_ID];
+  if (!sel || sel.size === 0) return false;
+  const key = Array.from(sel)[0];
+  return isAffirmativeOption(key);
 }
 
 /** 渲染前护栏：每题可输入；末尾追加统一补充题（与后端 normalize 对齐）。 */
 function normalizeQuestionsForRender(raw: HitlQuestion[]): HitlQuestion[] {
   const mapped = raw.map((q) => {
     const item: HitlQuestion = { ...q };
-    if (item.id === HUMAN_SUPPLEMENT_QUESTION_ID) return item;
+    if (item.id === HUMAN_SUPPLEMENT_QUESTION_ID || isClosureQuestion(item)) return item;
     if (isFreeTextQuestion(item)) return item;
     const opts = item.options || [];
     if ((item.type === 'single' || item.type === 'multiple') && opts.length === 0) {
@@ -52,12 +74,10 @@ function normalizeQuestionsForRender(raw: HitlQuestion[]): HitlQuestion[] {
       inputPlaceholder: item.inputPlaceholder || DEFAULT_CUSTOM_PLACEHOLDER,
     };
   });
-  const hasSupplement = mapped.some(
-    (q) =>
-      q.id === HUMAN_SUPPLEMENT_QUESTION_ID ||
-      (q.title || '').includes(HUMAN_SUPPLEMENT_TITLE),
+  const hasClosure = mapped.some(
+    (q) => isClosureQuestion(q) || q.id === HUMAN_SUPPLEMENT_QUESTION_ID,
   );
-  const withSupplement = hasSupplement ? mapped : [...mapped, buildSupplementQuestion()];
+  const withSupplement = hasClosure ? mapped : [...mapped, buildClosureQuestion()];
   return withSupplement.map((q, idx, arr) => ({
     ...q,
     render: {
@@ -84,7 +104,28 @@ export interface HitlQuestionOption {
   /** 兼容字段：当 LLM 输出 ``{"id": "...", "label": "..."}`` 时使用 */
   id?: string;
   label: string;
+  /** 兼容 Worker/LLM 把正文放在 desc 而 label 仅写字母 */
+  desc?: string;
+  description?: string;
   selected?: boolean;
+}
+
+function isPlaceholderOptionLabel(label: string, value: string): boolean {
+  const lab = (label || '').trim();
+  const val = (value || '').trim();
+  if (!lab) return true;
+  if (/^[A-Za-z]$/.test(lab)) return true;
+  if (/^\d{1,2}$/.test(lab) && lab === val) return true;
+  return lab === val && lab.length <= 2;
+}
+
+/** 展示文案：优先 label；label 为 A/B 占位时回退 desc/description。 */
+function optionDisplayLabel(o: HitlQuestionOption, idx: number): string {
+  const label = (o.label || '').trim();
+  const aux = (o.desc || o.description || '').trim();
+  const value = String(o.value ?? '').trim();
+  if (aux && isPlaceholderOptionLabel(label, value)) return aux;
+  return label || aux || value || `选项 ${idx + 1}`;
 }
 
 /** 归一化选项主键：是/否、bool、True/False 统一为 true/false，保证选中态一致。 */
@@ -284,6 +325,10 @@ const HitlQuestionnaireForm: React.FC<{
       customInit[q.id] = '';
       const raw = vals?.[q.id];
       if (raw === undefined || raw === null) return;
+      if (q.id === HUMAN_CLOSURE_DETAIL_ID) {
+        customInit[HUMAN_CLOSURE_DETAIL_ID] = String(raw);
+        return;
+      }
       if (q.type === 'textarea' || q.type === 'text') {
         customInit[q.id] = String(raw);
         return;
@@ -353,6 +398,13 @@ const HitlQuestionnaireForm: React.FC<{
   const questionAnswered = (q: HitlQuestion): boolean => {
     const sel = selections[q.id];
     const custom = customTexts[q.id]?.trim();
+    if (isClosureQuestion(q)) {
+      if ((sel?.size ?? 0) === 0) return false;
+      if (closureWantsFurther(selections)) {
+        return !!(customTexts[HUMAN_CLOSURE_DETAIL_ID] || '').trim();
+      }
+      return true;
+    }
     if (isFreeTextQuestion(q)) return !!custom || !q.required;
     if (q.required) return (sel?.size ?? 0) > 0 || !!custom;
     return true;
@@ -366,6 +418,17 @@ const HitlQuestionnaireForm: React.FC<{
     questions.forEach((q) => {
       const sel = selections[q.id];
       const custom = customTexts[q.id]?.trim();
+      if (isClosureQuestion(q)) {
+        const arr = sel ? Array.from(sel) : [];
+        if (arr.length > 0) {
+          values[q.id] = arr[0];
+        }
+        const detail = (customTexts[HUMAN_CLOSURE_DETAIL_ID] || '').trim();
+        if (closureWantsFurther(selections) && detail) {
+          values[HUMAN_CLOSURE_DETAIL_ID] = detail;
+        }
+        return;
+      }
       if (q.type === 'textarea' || q.type === 'text') {
         if (custom) values[q.id] = custom;
         return;
@@ -416,7 +479,7 @@ const HitlQuestionnaireForm: React.FC<{
                     : 'border-border/50 bg-background/40 text-muted-foreground hover:border-border'
                 }`}
               >
-                {o.label}
+                {optionDisplayLabel(o, idx)}
               </motion.button>
             );
           })}
@@ -430,6 +493,7 @@ const HitlQuestionnaireForm: React.FC<{
           const key = optionKey(o, idx);
           const active = sel.has(key);
           const letter = OPTION_LETTERS[idx] || String(idx + 1);
+          const display = optionDisplayLabel(o, idx);
           const isDecision = q.id === 'decision';
           const approve = key === 'approve';
           const reject = key === 'reject';
@@ -464,7 +528,7 @@ const HitlQuestionnaireForm: React.FC<{
                 {multi ? (active ? '✓' : '') : letter}
               </span>
               <span className={`text-xs leading-relaxed pt-0.5 ${active ? 'text-foreground' : 'text-foreground/80'}`}>
-                {o.label}
+                {display}
               </span>
             </motion.button>
           );
@@ -540,7 +604,24 @@ const HitlQuestionnaireForm: React.FC<{
         />
       )}
       {optsLength(q) > 0 ? renderOptions(q) : null}
-      {renderPerQuestionInput(q)}
+      {isClosureQuestion(q) && closureWantsFurther(selections) ? (
+        <div className="mt-3 space-y-1.5">
+          <div className="text-[10px] font-medium text-amber-300/90">
+            请说明仍需进一步处理的要求 <span className="text-rose-400">*</span>
+          </div>
+          <TextArea
+            rows={4}
+            disabled={preview}
+            value={customTexts[HUMAN_CLOSURE_DETAIL_ID] || ''}
+            onChange={(e) =>
+              setCustomTexts((p) => ({ ...p, [HUMAN_CLOSURE_DETAIL_ID]: e.target.value }))
+            }
+            placeholder="请描述待澄清/待处理的具体要求…"
+            className="bg-background/50 border-border/50 text-foreground text-xs resize-none"
+          />
+        </div>
+      ) : null}
+      {!isClosureQuestion(q) ? renderPerQuestionInput(q) : null}
     </div>
     );
   };

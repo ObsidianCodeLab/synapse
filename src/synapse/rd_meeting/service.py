@@ -1070,10 +1070,28 @@ class MeetingRoomService:
         effective_values = dict(parsed_values)
         if isinstance(form_values, dict) and form_values:
             effective_values.update(form_values)
+        schema_snapshot = room_state.get("hitl_form_schema")
+        schema_for_validation = schema_snapshot if isinstance(schema_snapshot, dict) else None
+        kind_pre = str(room_state.get("intervention_kind") or "interactive").strip().lower()
+        if kind_pre == "interactive" and schema_for_validation:
+            from synapse.rd_meeting.hitl_closure_guard import validate_user_closure_submission
+
+            validate_user_closure_submission(effective_values, schema_for_validation)
         submission = record_hitl_submission_locked(
             sid, raw_text=text, values=effective_values
         )
         schema = submission.get("schema_snapshot") if isinstance(submission.get("schema_snapshot"), dict) else None
+        if kind_pre == "interactive":
+            from synapse.rd_meeting.hitl_closure_guard import set_closure_intent
+            from synapse.rd_meeting.hitl_feedback import (
+                user_selected_no_further_processing,
+                user_wants_further_processing,
+            )
+
+            if user_wants_further_processing(effective_values, schema):
+                set_closure_intent(sid, "further")
+            elif user_selected_no_further_processing(effective_values, schema):
+                set_closure_intent(sid, "done")
 
         from synapse.rd_meeting.hitl_feedback import (
             build_hitl_round_record,
@@ -1267,13 +1285,22 @@ class MeetingRoomService:
 
         set_ready_for_node_review(
             sid,
-            resolve_ready_for_node_review_after_hitl(sid, node_id, feedback_mode),
+            resolve_ready_for_node_review_after_hitl(
+                sid,
+                node_id,
+                feedback_mode,
+                values=effective_values,
+                schema=schema,
+            ),
         )
         set_hitl_feedback_mode(sid, feedback_mode)
         rs2 = dict(load_room_state(sid) or {})
         rs2["status"] = "processing"
         rs2["rework_instruction"] = prompt_after_hitl_feedback(
-            feedback_mode, followup_round=followup_round
+            feedback_mode,
+            followup_round=followup_round,
+            values=effective_values,
+            schema=schema,
         )
         save_room_state(sid, rs2)
         schedule_run_node(

@@ -633,6 +633,14 @@ def _step_node_init(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     rs = load_room_state(sid) or {}
     if isinstance(rs, dict):
         rs = dict(rs)
+        if str(rs.get("status") or "") != "human_intervention":
+            from synapse.rd_meeting.hitl_lifecycle import (
+                clear_hitl_gate_residual_state,
+                reset_human_confirm_lifecycle,
+            )
+
+            rs = clear_hitl_gate_residual_state(rs)
+            reset_human_confirm_lifecycle(sid)
         rs["participants"] = build_meeting_participants(run_binding)
         save_room_state(sid, rs)
         ctx.room_state = rs
@@ -1089,15 +1097,14 @@ def clear_room_state_for_node_reprocess(
         if xs and xs not in metric_ids:
             metric_ids.append(xs)
 
+    from synapse.rd_meeting.hitl_lifecycle import clear_hitl_gate_residual_state
+
     rs = dict(load_room_state(sid) or {})
     rs["status"] = "processing"
     rs["phase"] = "running"
+    rs = clear_hitl_gate_residual_state(rs)
     for key in (
-        "hitl_form_schema",
-        "hitl_locked",
-        "hitl_submission",
         "pending_delivery",
-        "intervention_kind",
         "agents_active",
         "rework_instruction",
         "user_context_pending",

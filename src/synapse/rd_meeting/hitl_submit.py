@@ -72,6 +72,9 @@ def submit_questionnaire(
 
     rs = dict(load_room_state(scope_id) or {})
     node_id = str(rs.get("current_node_id") or "").strip() or "pending"
+    from synapse.rd_meeting.hitl_closure_guard import assert_tool_questionnaire_kind_allowed
+
+    assert_tool_questionnaire_kind_allowed(scope_id, node_id, kind_norm)
     from synapse.rd_meeting.func_solution_review import (
         FUNC_SOLUTION_HITL_FORBIDDEN,
         uses_func_solution_gate,
