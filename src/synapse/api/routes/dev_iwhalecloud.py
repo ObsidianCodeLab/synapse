@@ -1703,7 +1703,7 @@ async def get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
     功能：根据 ciFlowInstId 获取本次构建各环节结果。
     用法：传入构建实例ID，获取本次构建各环节结果。
     接口类型：研发云界面抓取请求（研发平台 --> 事务管理 --> 任务详情 --> 代码分支 --> 双击试飞构建历史）
-    返回数据格式：[
+    返回数据格式（仅 runResult 为 F 的失败节点）：[
         {
             "nodeName": "节点名称",
             "stepId": "步骤ID",
@@ -1725,6 +1725,27 @@ async def get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
     转调：GET /portal/zcm-cicd/ci/flow/history/qryFlowNodeInstanceDetail/{{ciFlowInstId}}，返回码code为null
     """
     return await _get_ci_flow_build_result(body)
+
+
+def _simplify_ci_flow_build_nodes(raw_items: list) -> list[dict]:
+    """抽取构建节点，仅保留 runResult 为 F（失败）的节点。"""
+    nodes: list[dict] = []
+    for it in raw_items:
+        if not isinstance(it, dict):
+            continue
+        if str(it.get("runResult") or "").strip() != "F":
+            continue
+        nodes.append(
+            {
+                "nodeName": it.get("nodeName"),
+                "stepId": it.get("stepId"),
+                "runResult": it.get("runResult"),
+                "url": it.get("url"),
+                "attachments": it.get("attachments") or [],
+            }
+        )
+    return nodes
+
 
 async def _get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
     """
@@ -1753,8 +1774,8 @@ async def _get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
     # 检查数据格式
     try:
         raw = resp.json()
-        # 检查返回码
-        if raw.get("code") != "9999":
+        # qryFlowNodeInstanceDetail 成功时 code 常为 null，而非 9999
+        if not _is_portal_success_code(raw.get("code")):
             msg = raw.get("finalMessage") or raw.get("msg") or raw.get("message") or "研发云获取构建结果失败"
             return error_response(502, msg, error=str(raw))
 
@@ -1763,17 +1784,8 @@ async def _get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
     except ValueError:
         return error_response(502, f"研发云获取构建结果返回非 JSON：{resp.text}")
 
-    # 提取数据
-    simplified = [
-        {
-            "nodeName": it.get("nodeName"),
-            "stepId": it.get("stepId"),
-            "runResult": it.get("runResult"),
-            "url": it.get("url"),
-            "attachments": it.get("attachments") or [],
-        }
-        for it in raw.get("data")
-    ]
+    # 提取数据（仅失败节点 runResult=F）
+    simplified = _simplify_ci_flow_build_nodes(raw.get("data") or [])
     return success_response(simplified)
 
 
@@ -1794,6 +1806,11 @@ def _parse_dt_for_sort(v: object) -> datetime:
     except ValueError:
         return datetime.min
 
+def _is_portal_success_code(code: object) -> bool:
+    """研发云门户部分接口成功时 code 为 None，部分为 '9999'。"""
+    return code in (None, "9999")
+
+
 def _build_state_desc(v: object) -> str:
     s = "" if v is None else str(v).strip()
     if s == "0":
@@ -1802,41 +1819,121 @@ def _build_state_desc(v: object) -> str:
         return "构建失败"
     return "构建中"
 
+
+def _is_build_success_state(state: object) -> bool:
+    return str(state or "").strip() == "0"
+
+
+def _is_build_failed_state(state: object) -> bool:
+    return str(state or "").strip() == "1"
+
+
+def _is_build_running_state(state: object) -> bool:
+    return not _is_build_success_state(state) and not _is_build_failed_state(state)
+
+
+def _merge_run_states(states: list[object]) -> str:
+    if any(_is_build_failed_state(s) for s in states):
+        return "1"
+    if any(_is_build_running_state(s) for s in states):
+        for s in states:
+            if _is_build_running_state(s):
+                return str(s or "").strip()
+        return ""
+    return "0"
+
+
+def _pick_date_extreme(values: list[object], *, earliest: bool) -> str | None:
+    candidates: list[tuple[str, datetime]] = []
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            continue
+        text = value.strip()
+        candidates.append((text, _parse_dt_for_sort(text)))
+    if not candidates:
+        return None
+    if earliest:
+        return min(candidates, key=lambda item: item[1])[0]
+    return max(candidates, key=lambda item: item[1])[0]
+
+
+def _merge_build_results(results: list[list[dict]]) -> list[dict]:
+    merged: list[dict] = []
+    seen: set[tuple[object, object]] = set()
+    for result in results:
+        for node in result:
+            if not isinstance(node, dict):
+                continue
+            key = (node.get("nodeName"), node.get("stepId"))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(node)
+    return merged
+
+
+def _merge_flow_build_status(flow_items: list[dict]) -> dict:
+    if not flow_items:
+        return {
+            "ciFlowInstBeginDate": None,
+            "ciFlowInstEndDate": None,
+            "ciFlowInstRunState": "",
+            "ciFlowInstRunStateDesc": _build_state_desc(""),
+            "buildResult": [],
+        }
+
+    states = [item.get("ciFlowInstRunState") for item in flow_items]
+    merged_state = _merge_run_states(states)
+    failed_results = [
+        item.get("buildResult") or []
+        for item in flow_items
+        if _is_build_failed_state(item.get("ciFlowInstRunState"))
+    ]
+    return {
+        "ciFlowInstBeginDate": _pick_date_extreme(
+            [item.get("ciFlowInstBeginDate") for item in flow_items],
+            earliest=True,
+        ),
+        "ciFlowInstEndDate": _pick_date_extreme(
+            [item.get("ciFlowInstEndDate") for item in flow_items],
+            earliest=False,
+        ),
+        "ciFlowInstRunState": merged_state,
+        "ciFlowInstRunStateDesc": _build_state_desc(merged_state),
+        "buildResult": _merge_build_results(failed_results) if failed_results else [],
+    }
+
+
 @router.post("/api/dev/iwhalecloud/get_ci_flow_build_status")
 async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
     """
-    根据任务构建历史聚合每个 flowId 的最新状态，并补充本次构建各环节结果。
+    根据任务构建历史合并各 flowId 的最新状态，并补充构建各环节结果。
     1) 调 _get_task_build_history 取 featureBuildHisList
     2) 按 ciFlowId 分组，按 ciFlowInstBeginDate 取最新一条
     3) 每条都调用 _get_ci_flow_build_result(ciFlowInstId)
-    4) 返回数据格式：
+    4) 合并多个 flow 的状态为单一结果（失败优先；有构建中则构建中；否则成功）
+    5) 返回数据格式：
     {
         "taskId": "任务ID",
-        "flowBuildStatusList": [
+        "ciFlowInstBeginDate": "各流程最早开始时间",
+        "ciFlowInstEndDate": "各流程最晚结束时间",
+        "ciFlowInstRunState": "合并后的构建状态",
+        "ciFlowInstRunStateDesc": "构建状态中文描述",
+        "buildResult": [
             {
-                "ciFlowId": "CI流程ID",
-                "ciFlowInstId": "构建实例ID",
-                "ciFlowInstBeginDate": "构建开始时间",
-                "ciFlowInstEndDate": "构建结束时间",
-                "ciFlowInstRunState": "构建状态",
-                "ciFlowInstRunStateDesc": "构建状态描述",
-                "buildResult": [
+                "nodeName": "节点名称",
+                "stepId": "步骤ID",
+                "runResult": "运行结果",
+                "url": "URL",
+                "attachments": [
                     {
-                        "nodeName": "节点名称",
-                        "stepId": "步骤ID",
-                        "runResult": "运行结果",
-                        "url": "URL",
-                        "attachments": [
-                            {
-                                "fullPath": "附件全路径",
-                                "path": "附件路径",
-                                "nodeInstanceId": "节点实例ID",
-                                "attachmentDesc": "附件描述",
-                                "fileSize": "附件大小",
-                                "resultType": "附件类型",
-                                "createDate": "创建时间",
-                            }
-                        ]
+                        "fullPath": "附件全路径",
+                        "path": "附件路径",
+                        "nodeInstanceId": "节点实例ID",
+                        "attachmentDesc": "附件描述",
+                        "fileSize": "附件大小",
+                        "resultType": "附件类型",
+                        "createDate": "创建时间",
                     }
                 ]
             }
@@ -1876,7 +1973,7 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
         #    同一个 ciFlowInstId 可能重复出现，做缓存避免重复请求
         build_result_cache: dict[str, list[dict]] = {}
 
-        result_list: list[dict] = []
+        per_flow_items: list[dict] = []
         for _, latest in latest_by_flow.items():
             ci_flow_inst_id = latest.get("ciFlowInstId")
             run_state = latest.get("ciFlowInstRunState")
@@ -1897,36 +1994,20 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
                     if isinstance(build_result_resp, dict) and build_result_resp.get("errorcode") == 0:
                         br_data = build_result_resp.get("data") or []
                         if isinstance(br_data, list):
-                            for n in br_data:
-                                if not isinstance(n, dict):
-                                    continue
-                                node_results.append(
-                                    {
-                                        "nodeName": n.get("nodeName"),
-                                        "stepId": n.get("stepId"),
-                                        "runResult": n.get("runResult"),
-                                        "url": n.get("url"),
-                                        "attachments": n.get("attachments") or [],
-                                    }
-                                )
+                            node_results.extend(br_data)
                     build_result_cache[inst_id_str] = node_results
 
-            # 6) 拼装每个 flowId 的最终输出：最新构建 + 状态 + 节点结果数组
-            result_list.append(
+            per_flow_items.append(
                 {
-                    "ciFlowId": latest.get("ciFlowId"),
-                    "ciFlowInstId": ci_flow_inst_id,
                     "ciFlowInstBeginDate": latest.get("ciFlowInstBeginDate"),
                     "ciFlowInstEndDate": latest.get("ciFlowInstEndDate"),
                     "ciFlowInstRunState": run_state,
-                    "ciFlowInstRunStateDesc": _build_state_desc(run_state),
                     "buildResult": node_results,
                 }
             )
 
-        # 7) 最终按开始时间倒序，方便前端直接展示“最近的构建”
-        result_list.sort(key=lambda x: _parse_dt_for_sort(x.get("ciFlowInstBeginDate")), reverse=True)
-        return success_response({"taskId": body.taskId, "flowBuildStatusList": result_list})
+        merged = _merge_flow_build_status(per_flow_items)
+        return success_response({"taskId": body.taskId, **merged})
     except Exception as e:
         logger.exception("获取构建状态失败: %s", e)
         return error_response(502, f"获取构建状态失败: {e}")
