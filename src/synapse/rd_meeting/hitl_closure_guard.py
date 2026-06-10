@@ -26,9 +26,10 @@ _PROMPT_USER_SAID_YES_NEED_QUESTIONNAIRE = """
 - 仅输出正文总结而不调用 ``submit_hitl_questionnaire``。
 
 **本次必须**：
-1. 根据用户进一步处理要求更新分析/产出；
-2. 直接调用 ``submit_hitl_questionnaire(kind="interactive", ...)`` 提交新一轮会中问卷；
-3. 调用工具后立即停止。
+1. 读 ``hitl_context.json``，用 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON 重生成 ``需求澄清.md``（保留已确认项）；
+2. 委派 ``whalecloud-requirement-expert`` 执行技能 **Phase R**，调研用户补充项（不得把用户原文做成确认题）；
+3. 仅对 Phase R 后的新未决点调用 ``submit_hitl_questionnaire(kind="interactive", ...)``；
+4. 调用工具后立即停止。
 """.strip()
 
 _PROMPT_USER_SAID_NO_FORBID_QUESTIONNAIRE = """

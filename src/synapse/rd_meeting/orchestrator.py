@@ -2278,6 +2278,10 @@ class MeetingRoomOrchestrator:
                 if user_ctx:
                     prompt = f"{prompt}\n\n{user_ctx}"
                 try:
+                    from synapse.rd_meeting.clarify_followup import (
+                        build_clarify_followup_brief,
+                        prompt_clarify_followup_workflow,
+                    )
                     from synapse.rd_meeting.hitl_context import read_hitl_context
                     from synapse.rd_meeting.hitl_feedback import (
                         prompt_for_followup_interactive_round,
@@ -2286,10 +2290,20 @@ class MeetingRoomOrchestrator:
                     prior_ctx = read_hitl_context(sid, node_id, binding=binding)
                     prior_rounds = len(prior_ctx.get("rounds") or [])
                     if prior_rounds >= 1:
-                        prompt = (
-                            f"{prompt}\n\n"
-                            f"{prompt_for_followup_interactive_round(prior_rounds + 1)}"
-                        )
+                        if node_id == "req_clarify":
+                            brief = build_clarify_followup_brief(sid, node_id, binding=binding)
+                            if brief:
+                                prompt = f"{prompt}\n\n{brief}"
+                            else:
+                                prompt = (
+                                    f"{prompt}\n\n"
+                                    f"{prompt_clarify_followup_workflow(prior_rounds + 1)}"
+                                )
+                        else:
+                            prompt = (
+                                f"{prompt}\n\n"
+                                f"{prompt_for_followup_interactive_round(prior_rounds + 1)}"
+                            )
                 except Exception:
                     pass
                 if rework:

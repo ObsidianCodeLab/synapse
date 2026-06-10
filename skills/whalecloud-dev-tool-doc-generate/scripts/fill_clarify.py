@@ -1,6 +1,29 @@
 # -*- coding: utf-8 -*-
 """需求澄清.md 模板填充脚本 v3（修复repl_unclear accum）"""
-import json, re, datetime
+import json, re, datetime, sys
+
+_LIST_KEYS = ("unclear", "dialogue", "conclusions", "scenarios", "acceptance_criteria", "feature_points")
+
+
+def validate_context(ctx):
+    """校验 CONTEXT_JSON 契约；返回问题列表（空=通过）。"""
+    issues = []
+    if not isinstance(ctx, dict):
+        return ["CONTEXT_JSON 根节点须为 JSON 对象"]
+    for key in _LIST_KEYS:
+        val = ctx.get(key)
+        if val is not None and not isinstance(val, list):
+            issues.append(f"{key} 须为数组")
+    unclear = ctx.get("unclear")
+    if isinstance(unclear, list):
+        for idx, item in enumerate(unclear):
+            if not isinstance(item, dict):
+                issues.append(f"unclear[{idx}] 须为对象")
+                continue
+            if not str(item.get("question") or item.get("title") or "").strip():
+                issues.append(f"unclear[{idx}] 缺少 question/title")
+    return issues
+
 
 def fill(template_path, ctx_path, out_path):
     with open(template_path, encoding="utf-8") as f:
@@ -112,5 +135,15 @@ def fill(template_path, ctx_path, out_path):
     print(f"[OK] Written: {out_path}")
 
 if __name__ == "__main__":
-    import sys
+    if len(sys.argv) >= 3 and sys.argv[1] == "--validate-only":
+        with open(sys.argv[2], encoding="utf-8") as f:
+            ctx = json.load(f)
+        issues = validate_context(ctx)
+        if issues:
+            print("CONTEXT_JSON 契约校验失败:")
+            for x in issues:
+                print(f"  - {x}")
+            sys.exit(1)
+        print("[OK] CONTEXT_JSON 契约校验通过")
+        sys.exit(0)
     fill(sys.argv[1], sys.argv[2], sys.argv[3])

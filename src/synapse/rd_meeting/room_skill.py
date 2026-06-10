@@ -703,12 +703,24 @@ def _format_hitl_artifact_lines(
         return []
 
     ctx_abs = str(hitl_context_path(sid, stg, nid).resolve())
-    return [
+    fill_ctx_abs = str((hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_fill_ctx.json").resolve())
+    lines = [
         f"- **人工确认产物（机器台账）**：`{ctx_abs}`（`{HITL_CONTEXT_FILENAME}`）",
         "  - 仅 **interactive** 问卷提交时由系统自动维护；含各轮结构化确认与 ``confirmed_by_id`` 汇总。",
-        "  - 生成上方「会议产出」Markdown **之前**必须 ``read_file`` 该路径并综合全量确认项；"
-        f"``whalecloud-dev-tool-doc-generate`` 的 ``CONTEXT_JSON`` 应指向该文件；**禁止**自写 ``clarify_context.json`` 等替代台账。",
     ]
+    if nid == "req_clarify":
+        lines.extend(
+            [
+                f"  - **doc-generate 上下文（系统生成）**：`{fill_ctx_abs}`（`clarify_fill_ctx.json`）",
+                "  - 多轮续澄清：生成 ``需求澄清.md`` 时 **优先** 以 ``clarify_fill_ctx.json`` 为 ``CONTEXT_JSON``；",
+                "    用户末题补充须先 Phase R 调研，**禁止**原样做成确认题。",
+            ]
+        )
+    lines.append(
+        "  - 生成上方「会议产出」Markdown **之前**必须 ``read_file`` 台账并综合全量确认项；"
+        "**禁止**自写 ``clarify_context.json`` 等替代台账。"
+    )
+    return lines
 
 def load_reprocess_reason(scope_id: str) -> str:
     """读取一次性重处理原因（room_state.reprocess_reason）。"""
@@ -788,6 +800,11 @@ def _append_host_duties_shared(
         lines.append(
             "- **多轮会中问卷**：已确认项视为既成事实，只推进未决点；详见下方规范 §3.1。"
         )
+        if (context.node_id or "").strip() == "req_clarify":
+            lines.append(
+                "- **需求澄清多轮续跑**：用户末题补充 = 调研任务；须 doc-generate 重生成 ``需求澄清.md`` "
+                "→ 委派 Phase R → 仅对新未决点出题；禁止回声确认题。"
+            )
         lines.append(
             "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
             "提交后立即停止；用户无新指正时收敛归档。"

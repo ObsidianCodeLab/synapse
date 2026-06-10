@@ -19,45 +19,60 @@ _HITL_FORM_PREFIX = "[人工确认表单]"
 _PROMPT_OPTIONS_ONLY = """
 ## 系统提示：用户已完成问卷（仅选项反馈，无额外自由输入）
 
-用户已通过会中问卷做出选择，**未**在题目自定义输入框或末尾补充栏填写额外说明。
+用户已通过会中问卷做出选择，**未**在题目自定义输入框或末题进一步处理栏填写额外说明。
 
 **本次要求**：
-1. **逐条阅读**上方「本轮人工确认反馈（结构化）」JSON：以用户选项为约束，结合工单、产品、代码仓库等**真实上下文**，更新或落盘本节点约定产出物（NODE_OUTPUTS 中的 Markdown）。
+1. **逐条阅读**「本轮人工确认反馈（结构化）」与「需求澄清续跑工序」：以用户选项为约束，结合工单、产品、代码仓库等**真实上下文**更新产出物。
 2. 不得无视或弱化用户选项；选项即用户决策，写入产出物时必须体现。
-3. 若选项与现有产物/分析冲突，以用户选项为准并简要说明调整点。
+3. **必须**用 `clarify_fill_ctx.json`（或系统生成的 CONTEXT_JSON）调用 `whalecloud-dev-tool-doc-generate` 重生成 `需求澄清.md`，保留已确认项。
 4. 用户已在末题选择「否，本节点已无待决问题」；完成产出物更新后停止，系统将进入节点确认总结（NodeReview）。
-5. 除非出现新的未决决策点，无需再次提交 interactive 问卷。
+5. 除非 Phase R 调研后出现新的未决点，无需再次提交 interactive 问卷。
 """.strip()
 
 _PROMPT_WITH_FREE_TEXT = """
-## 系统提示：用户已完成问卷（含自由输入，需认真总结并多轮推进）
+## 系统提示：用户已完成问卷（含自由输入，须调研后推进）
 
-用户在题目自定义输入框和/或末尾「还有什么需要补充的吗」中提供了**自由文本**。
+用户在题目自定义输入框和/或末题「进一步处理要求」中提供了**自由文本**。
 
 **本次要求**：
-1. **先总结**：逐条整理「本轮人工确认反馈（结构化）」JSON——每题的用户选项与用户输入，形成「用户意图与约束摘要」（不得省略任何输入细节）。
-2. **再推进**：基于该摘要，结合工单、产品、代码真实信息，继续分析、委派协作智能体、更新产出物；凡用户输入中的新要求、例外、约束必须显式响应。
-3. **多轮问卷（允许且常见）**：收敛后**应**再次 ``submit_hitl_questionnaire(kind="interactive")`` 让用户对更新后的章节/清单签收；若无新未决点则推进产出物直至可验收。
-4. 禁止用泛泛复述代替对用户输入的针对性回应。
+1. **先归纳**「本轮人工确认反馈（结构化）」——每题选项与自由输入，形成约束摘要（不得省略细节）。
+2. **用户自由文本 = 调研任务**，不是让你原样做成「请确认您是否指…」类问卷题。
+3. **强制工序**：读 `hitl_context.json` → 用 `clarify_fill_ctx.json` 作 CONTEXT_JSON → doc-generate 重生成 `需求澄清.md` → 委派 `whalecloud-requirement-expert` **Phase R** 调研待决项 → 仅对调研后的新 unclear 出题。
+4. 禁止用泛泛复述代替对用户输入的针对性回应；禁止跳过调研直接交问卷。
+""".strip()
+
+_PROMPT_FURTHER_PROCESSING = """
+## 续跑提示（用户选择仍需进一步处理）
+
+用户已在末题选择「是」并说明待处理要求。该说明是**系统继续分析/调研的输入**，不是确认题素材。
+
+**禁止**：
+- 把 `human_closure_detail` 或用户补充原文改写成「您是否同意/是否指…」类题目；
+- 在未完成 doc-generate 重生成与 Phase R 委派前提交 interactive 问卷；
+- 在未获用户末题选「否」前进入节点确认总结。
+
+**必须**：
+1. 按上方「需求澄清续跑工序」逐步执行；
+2. 已确认题 id 不得再次出现在 `questions[]`；
+3. 调研完成后再 `submit_hitl_questionnaire(kind=interactive)`，题目须基于代码/文档证据。
 """.strip()
 
 _PROMPT_FOLLOWUP_INTERACTIVE_ROUND = """
-## 系统提示：第 {round_n} 轮会中问卷（内容签收 / 续澄清）
+## 系统提示：第 {round_n} 轮会中问卷（调研后续澄清）
 
-用户已在前面轮次完成澄清；本轮问卷用于**呈现已收敛内容供人工签收**，或继续未决决策点。
+第 2+ 轮：**不是**让用户确认自己写过的补充说明，而是对 Phase R 调研后的**新未决点**澄清。
 
 **硬约束（工具会校验，不达标将拒绝提交）**：
-1. **summary**：表单顶部会渲染给用户——写本节点核心变化、产出文件、与 ``questions`` 对齐的待确认简表（可含表格）；**禁止** SOP 下一节点 / Phase 路线图预告。
-2. **每题 context 必须可独立审阅**：
-   - 题目标题含「（N项）」「共 N 条」→ context **逐条列出 N 条完整内容**（Markdown 列表或表格），禁止只用「含 A/B/C 维度」。
-   - 题为「XX 是否满足/完整/覆盖」类签收 → context 必须嵌入**该章节/清单的全文或逐条列表**（从已写归档 Markdown ``read_file`` 摘录），让用户不离开表单即可核对。
-3. **禁止空壳 meta 题**：不得只问「7 项验收标准是否 OK」却在 context 里只写「含配置/触发/日志…」关键词。
-4. 调用 ``submit_hitl_questionnaire`` 后立即停止；正文摘要由 ``summary`` + 各题 ``context`` 承担，勿依赖 tool 返回后的聊天输出。
+1. **summary**：写本轮文档更新要点 + 仅**新**待确认决策点简表；已确认项只列在「已收敛」区，不得再次入题。
+2. **每题须有新证据**：`context` 须引用代码路径/文档章节/调研结论，不得只有用户原文复述。
+3. **禁止回声题**：题面不得与用户 `OPEN_RESEARCH_ITEMS` 高度相似且为确认口吻（系统会拒绝）。
+4. **禁止复核**：`questions[].id` 不得出现在 `confirmed_by_id` 中。
+5. 调用 ``submit_hitl_questionnaire`` 后立即停止。
 """.strip()
 
 
 def prompt_for_followup_interactive_round(round_n: int) -> str:
-    """第 2 轮及以后会中问卷：注入内容签收约束。"""
+    """第 2 轮及以后会中问卷：调研后续澄清约束。"""
     n = max(2, int(round_n or 2))
     return _PROMPT_FOLLOWUP_INTERACTIVE_ROUND.format(round_n=n)
 
@@ -69,24 +84,20 @@ def prompt_after_hitl_feedback(
     values: dict[str, Any] | None = None,
     schema: dict[str, Any] | None = None,
 ) -> str:
-    if user_wants_further_processing(values or {}, schema):
-        base = (
-            _PROMPT_WITH_FREE_TEXT
-            + "\n\n## 续跑提示（用户选择仍需进一步处理）\n"
-            "用户已在末题选择「是」并说明待处理要求；**必须**据此更新产出/分析后，"
-            "再次 ``submit_hitl_questionnaire(kind=\"interactive\")`` 发起新一轮会中问卷，"
-            "**禁止**在未获用户末题选「否」前进入节点确认总结。"
-        )
+    wants_further = user_wants_further_processing(values or {}, schema)
+    if wants_further:
+        base = f"{_PROMPT_WITH_FREE_TEXT}\n\n{_PROMPT_FURTHER_PROCESSING}"
     else:
         base = _PROMPT_WITH_FREE_TEXT if mode == "with_free_text" else _PROMPT_OPTIONS_ONLY
+
     if followup_round >= 2:
         return f"{base}\n\n{prompt_for_followup_interactive_round(followup_round)}"
-    if followup_round == 1 and mode == "with_free_text":
+    if followup_round >= 1 and (mode == "with_free_text" or wants_further):
         return (
             f"{base}\n\n"
             "## 续跑提示\n"
-            "用户已提供自由文本纠偏；更新产出物后，**建议**再交一轮 ``interactive`` 问卷"
-            "让用户对收敛后的章节/清单签收（每题 context 须含完整待审阅正文）。"
+            "本轮须先重生成 `需求澄清.md` 并完成 Phase R 调研，再交问卷；"
+            "详见上方「需求澄清续跑工序」。"
         )
     return base
 
@@ -181,7 +192,6 @@ def split_question_answer(
         elif s in known:
             selected.append(s)
         else:
-            # parse_hitl_form_text 可能已剥掉 OTHER: 前缀
             custom = custom if custom else s
 
     return selected, custom
@@ -254,14 +264,7 @@ def user_has_free_text_input(
     *,
     comment: str = "",
 ) -> bool:
-    """是否含用户自由输入（非纯选项反馈）。
-
-    覆盖：
-    - 各题选项旁的自定义输入（``OTHER:…`` 或解析后无法匹配选项的文本）
-    - 收口题 ``human_closure_detail`` / 遗留 ``human_supplement``
-    - ``text`` / ``textarea`` 题型答案
-    - 表单 ``补充说明`` / comment 行
-    """
+    """是否含用户自由输入（非纯选项反馈）。"""
     if (comment or "").strip():
         return True
     if str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip():
@@ -338,7 +341,7 @@ def format_hitl_feedback_structured(
 
     detail_text = str(values.get(HUMAN_CLOSURE_DETAIL_ID) or "").strip()
     if detail_text:
-        lines.append("### 进一步处理要求")
+        lines.append("### 进一步处理要求（系统须调研，不得原样做成确认题）")
         lines.append("- **用户选项**：（无）")
         lines.append(f"- **用户输入**：{detail_text}")
         lines.append("")

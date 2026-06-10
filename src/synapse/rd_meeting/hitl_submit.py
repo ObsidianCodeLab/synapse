@@ -72,6 +72,13 @@ def submit_questionnaire(
 
     rs = dict(load_room_state(scope_id) or {})
     node_id = str(rs.get("current_node_id") or "").strip() or "pending"
+    if kind_norm == "interactive":
+        from synapse.rd_meeting.clarify_followup import validate_clarify_followup_questionnaire
+        from synapse.rd_meeting.hitl_context import read_hitl_context
+
+        hitl_doc = read_hitl_context(scope_id, node_id)
+        q_list = schema.get("questions") if isinstance(schema.get("questions"), list) else []
+        validate_clarify_followup_questionnaire(q_list, hitl_doc, node_id=node_id)
     from synapse.rd_meeting.hitl_closure_guard import assert_tool_questionnaire_kind_allowed
 
     assert_tool_questionnaire_kind_allowed(scope_id, node_id, kind_norm)

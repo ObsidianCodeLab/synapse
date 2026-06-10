@@ -31,7 +31,8 @@
 - 本批 Worker **全部返回后**再交 `interactive` 问卷（批次内可多次 delegate，不必每条响应都弹表单）
 - plan 未全部返回或尚未交问卷时，系统阻止归档/doc-generate
 - **提交问卷后立即停止**本轮正文/工具，等用户答复
-- **多轮**：已确认项不再复核；指正/补充纳入推演；`questions[]` 只覆盖未决项；用户无新指正即收敛
+- **多轮**：已确认项不再复核；指正/补充纳入推演；`questions[]` 只覆盖未决项；末题选「否」即收敛
+- **`req_clarify` 续跑**：用户补充须 Phase R 调研后出题；`clarify_fill_ctx.json` → doc-generate 重生成 `需求澄清.md`；禁止回声确认题
 - 终稿由 **NodeReview** 确认；**禁止** host `result_confirm` 覆盖产出全文
 - 异常/模板缺失：`kind=exception`（提交即停）
 

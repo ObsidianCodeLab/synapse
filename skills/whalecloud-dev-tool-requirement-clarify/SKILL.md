@@ -47,6 +47,9 @@ label: 需求澄清技能
 | `PRODUCT_CODE_ROOT` | 否 | 产品代码根目录，默认 `{WORK_ORDER_DIR}/code` |
 | `PRODUCT_DOC_ROOT` | 否 | 产品文档根目录，默认 `{WORK_ORDER_DIR}/doc` |
 | `SIMILAR_DEMAND_DOC` | 否 | 相似历史工单方案文档正文。若已提供则直接使用；未提供则通过历史相似工单搜索能力获取 |
+| `OPEN_RESEARCH_ITEMS` | 否 | Phase R：Host 注入的待调研补充项 JSON 数组 |
+| `CONFIRMED_SNAPSHOT` | 否 | Phase R：已确认问卷项（`hitl_context.confirmed_by_id`） |
+| `ROUND_N` | 否 | Phase R：会中澄清轮次（≥2） |
 
 > **注意**：用户回复内容存放在系统提示词上下文中，智能体需自行从上下文中提取。
 
@@ -361,6 +364,47 @@ Phase 4 — 深度澄清：三视角问题澄清（最终交付）
 - 对外输出：问题（等待用户回答）
 
 **后续动作**：输出问题 → 等待用户回答 → 智能体从上下文提取用户回答 → 循环 Phase 4 直到无新问题 → 进入完成阶段
+
+---
+
+### Phase R — 会中续澄清（研发会议室第 2+ 轮，Host 委派）
+
+**触发条件**：研发会议室 `req_clarify` 节点，用户已提交会中问卷且末题选择「仍需进一步处理」，或提供了纠偏/补充文本（见 Host 注入的 `OPEN_RESEARCH_ITEMS`）。
+
+**输入（由 Host 注入，禁止臆造）**：
+
+| 参数 | 说明 |
+|------|------|
+| `CONFIRMED_SNAPSHOT` | `hitl_context.json` 的 `confirmed_by_id`（已确认题，既成事实） |
+| `OPEN_RESEARCH_ITEMS` | 用户补充/末题说明，**待调研假设**列表 |
+| `PRIOR_CLARIFY_MD` | 已生成的 `需求澄清.md` 路径（可选） |
+| `CLARIFY_FILL_CTX` | 系统生成的 `clarify_fill_ctx.json` 路径（doc-generate 用） |
+| `ROUND_N` | 当前会中轮次（≥2） |
+
+**强制约束**：
+
+1. **已确认项**：写入 `conclusions` / `unclear[state=confirmed]`，**禁止**再生成对应澄清问题。
+2. **OPEN_RESEARCH_ITEMS**：每条须在 `{PRODUCT_CODE_ROOT}` / `{PRODUCT_DOC_ROOT}` 检索证据后，产出**新** `unclear[]` 条目（含 `ref` 代码或文档路径）。
+3. **禁止回声题**：不得把用户补充原文改写成「请确认您是否指…」「是否同意…」类题目。
+4. **禁止覆盖台账**：**不得** `write_file` 覆盖归档目录下的系统 `hitl_context.json`；产出分析片段供 Host 合并。
+
+**执行步骤**：
+
+  Ra. 读取 `CONFIRMED_SNAPSHOT`，锁定已确认结论。
+
+  Rb. 逐条处理 `OPEN_RESEARCH_ITEMS`：检索代码/文档 → 形成调研结论或新红卡（不确定处标 `[待确认]`）。
+
+  Rc. 按约束 D1/D2 为**新未决点**生成示例驱动问题（输出 JSON 片段：`new_unclear[]`，供 Host 下一问卷使用）。
+
+  Rd. 输出结构化 JSON（非对用户喊话），包含 `conclusions_delta`、`new_unclear`、`research_notes`。
+
+**产出**：`requirement_clarify_round.json` 或等效 JSON 片段（由 Host 消费，不直接对用户输出问卷）。
+
+**后续动作**：交还 Host → doc-generate 更新 `需求澄清.md` → Host 仅对 `new_unclear` 提交 interactive 问卷。
+
+| 禁止 | 正确 |
+|------|------|
+| 用户写「还要确认备份到对象存储」→ 题：「是否需要对象存储备份？」 | 先查现有备份路径/配置类 → 题：「对象存储备份需新增接口 X，REST 还是 MQ？」 |
 
 ---
 

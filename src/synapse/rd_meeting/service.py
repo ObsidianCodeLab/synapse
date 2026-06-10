@@ -1151,6 +1151,16 @@ class MeetingRoomService:
                     round_record,
                     binding=hitl_binding,
                 )
+            if kind == "interactive" and node_id not in ("", "pending"):
+                from synapse.rd_meeting.clarify_followup import (
+                    build_clarify_followup_brief,
+                    write_clarify_fill_ctx,
+                )
+
+                write_clarify_fill_ctx(sid, node_id, binding=hitl_binding)
+                followup_brief = build_clarify_followup_brief(sid, node_id, binding=hitl_binding)
+                if followup_brief:
+                    append_user_context_pending(sid, followup_brief)
         except Exception as exc:
             logger.debug("append hitl artifacts failed scope=%s: %s", sid, exc)
         pending = room_state.get("pending_delivery")
