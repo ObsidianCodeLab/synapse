@@ -227,6 +227,24 @@ def _plan_match_key(plan: dict[str, Any]) -> str:
     return mod or title
 
 
+_CONTENT_SECTION_MARKERS = (
+    "**模块概要**",
+    "**函数设计清单**",
+    "**函数伪代码**",
+    "**模块内部调用关系**",
+)
+
+
+def _content_markdown_is_structured(text: str) -> bool:
+    """评审面板 PlanTransformationContent 依赖 **小节** 或 1.7.x 标题切分四类卡片。"""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if any(marker in t for marker in _CONTENT_SECTION_MARKERS):
+        return True
+    return bool(_PLAN_HEADING_RE.search(t))
+
+
 def _merge_plan_fields(target: dict[str, Any], source: dict[str, Any]) -> None:
     """用 Markdown 解析结果补全 JSON 改造方案的空字段。"""
     for key in (
@@ -236,10 +254,13 @@ def _merge_plan_fields(target: dict[str, Any], source: dict[str, Any]) -> None:
         "title",
         "design_rationale",
         "expected_effect",
-        "content_markdown",
     ):
         if not str(target.get(key) or "").strip() and str(source.get(key) or "").strip():
             target[key] = source[key]
+    src_body = str(source.get("content_markdown") or "").strip()
+    tgt_body = str(target.get("content_markdown") or "").strip()
+    if src_body and (not tgt_body or not _content_markdown_is_structured(tgt_body)):
+        target["content_markdown"] = source["content_markdown"]
     if not target.get("design_evidence") and source.get("design_evidence"):
         target["design_evidence"] = list(source.get("design_evidence") or [])
 

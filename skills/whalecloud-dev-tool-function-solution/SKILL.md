@@ -385,7 +385,7 @@ Step 11 — 结构化评审 JSON（func_solution_review.json）
       - `overview.diagrams[]`：至少 2 条 Mermaid（flowchart + graph/sequenceDiagram）
       - `overview.architecture_summary`
       - `consistency_analysis`：summary + compatibility_notes + contradiction_checks
-      - `transformation_plans[]`：每条含 requirement_ref、module_name、title、design_rationale、design_evidence、expected_effect、content_markdown；`human_review.status` 初始为 `pending`
+      - `transformation_plans[]`：每条含 requirement_ref、module_name、title、design_rationale、design_evidence、expected_effect；`content_markdown` **可留空**（系统会从 `函数级方案.md` §1.7 同名模块小节补全四类评审卡片），若填写须含 `**模块概要**` / `**函数设计清单**` / `**函数伪代码**` / `**模块内部调用关系**` 小节，**禁止**仅写一段 prose 摘要；`human_review.status` 初始为 `pending`
   11b. 使用 `write_file` UTF-8 写入 `{ARCHIVE_DIR}/func_solution_review.json`
   11c. 若存在人工评审意见（修订重跑）：**须优先理解** `human_review.comment` 与各 plan 的 `human_review.comment`，合理则调整方案后重新落盘双文件
   11d. 自检：plans 覆盖 MODULE_DOC 全部改造模块；无 consistency 悖论；JSON 可被前端评审面板解析

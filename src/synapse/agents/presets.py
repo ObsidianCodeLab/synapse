@@ -24,7 +24,9 @@ SYSTEM_PRESETS: list[AgentProfile] = [
         skills=[
             "whalecloud-dev-tool-ask-user",
             "whalecloud-dev-tool-base-scripts",
+            "whalecloud-dev-tool-c-code-access",
             "whalecloud-dev-tool-doc-generate",
+            "whalecloud-dev-tool-function-solution",
             "whalecloud-dev-tool-solution-review",
         ],
         skills_mode=SkillsMode.INCLUSIVE,

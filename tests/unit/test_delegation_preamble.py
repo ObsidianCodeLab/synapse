@@ -123,7 +123,9 @@ class TestPresetSkillFixes:
         assert default.skills == [
             "whalecloud-dev-tool-ask-user",
             "whalecloud-dev-tool-base-scripts",
+            "whalecloud-dev-tool-c-code-access",
             "whalecloud-dev-tool-doc-generate",
+            "whalecloud-dev-tool-function-solution",
             "whalecloud-dev-tool-solution-review",
         ]
         assert default.skills_mode == SkillsMode.INCLUSIVE

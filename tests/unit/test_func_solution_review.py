@@ -93,6 +93,80 @@ def test_validate_and_apply(tmp_path, monkeypatch):
     assert out["human_review"]["status"] == "approved"
 
 
+def test_enrich_prefers_structured_markdown_over_json_prose(tmp_path, monkeypatch):
+    """JSON 中短 prose content_markdown 不应挡住 函数级方案.md 的四类小节。"""
+    scope_id = "fs-md-over-json"
+    archive = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
+    archive.mkdir(parents=True)
+    md = """# 函数级方案
+
+### 1.7 模块改造方案
+
+#### 1.7.1 账单模块
+
+**模块概要**
+
+- 涉及功能点：在线调账与账单核对
+- 改造类型：修改
+
+**函数设计清单**
+
+| 函数签名 | 入参 | 出参 |
+|----------|------|------|
+| adjustBill | id | bool |
+
+**函数伪代码**
+
+##### adjustBill()
+
+```
+if valid(id): update()
+```
+
+**模块内部调用关系**
+
+BillService -> BillDao
+"""
+    review = {
+        "schema_version": 1,
+        "transformation_plans": [
+            {
+                "id": "plan-1",
+                "module_name": "账单模块",
+                "title": "优先级接口改造",
+                "design_rationale": "扩展 BillService",
+                "expected_effect": "可在线调账",
+                "content_markdown": "改造 BillService.adjustBill 方法实现调账逻辑。",
+                "human_review": {"status": "pending", "comment": ""},
+            }
+        ],
+    }
+    (archive / "函数级方案.md").write_text(md, encoding="utf-8")
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(review, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.archive_dir",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.json_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "func_solution_review.json",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.md_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "函数级方案.md",
+    )
+    payload = load_func_solution_review_payload(scope_id)
+    cm = payload["transformation_plans"][0]["content_markdown"]
+    assert "**模块概要**" in cm
+    assert "**函数设计清单**" in cm
+    assert "**函数伪代码**" in cm
+    assert "**模块内部调用关系**" in cm
+    assert "改造 BillService.adjustBill" not in cm
+
+
 def test_enrich_from_markdown(tmp_path, monkeypatch):
     scope_id = "fs-md-fallback"
     archive = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
