@@ -1,0 +1,13 @@
+/**
+ * rd-view 样式变量壳层。
+ * 所有色值唯一来源：同目录 palette.ts（由 RdViewThemeProvider 注入到 .rdViewRoot）。
+ */
+.rdViewRoot {
+  color-scheme: light;
+}
+
+[data-theme='dark'] .rdViewRoot,
+[data-theme='daltonized-dark'] .rdViewRoot,
+[data-theme='high-contrast'] .rdViewRoot {
+  color-scheme: dark;
+}

@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Tag } from 'antd';
+import { Card } from 'antd';
 import { UnorderedListOutlined } from '@ant-design/icons';
 import { workOrderTicketData } from '@rd-view/data/mockData';
 import { getActiveSopNode } from '@rd-view/data/buildWorkOrderTickets';
-import type { RequirementStatus, WorkOrderTicket } from '@rd-view/types';
-import { CURRENT_USER_NAME, PERSON_COLORS } from '@rd-view/types';
+import type { RequirementStatus, WorkOrderTicket, SopNodeRunStatus } from '@rd-view/types';
+import { CURRENT_USER_NAME } from '@rd-view/types';
 import { formatElapsedSince } from '@rd-view/utils/workOrder';
 import { WorkOrderDetailDrawer } from './WorkOrderDetailDrawer';
 import { RUN_STATUS_CONFIG } from './WorkOrderSopTimeline';
 import { WorkOrderEmojiPicker, type EmojiReaction } from './WorkOrderEmojiPicker';
 import { chartCardTitleIconStyle, chartCardTitleStyle, chartCardTitleTextStyle, dashboardCardStyle } from '@rd-view/constants/dashboardTheme';
 
-const ORDER_STATUS_TAG: Record<RequirementStatus, { label: string; color: string }> = {
-  pending: { label: '待处理', color: 'orange' },
-  inProgress: { label: '在途', color: 'blue' },
-  completed: { label: '完成', color: 'green' },
+const ORDER_STATUS_TAG: Record<RequirementStatus, { label: string }> = {
+  pending: { label: '待处理' },
+  inProgress: { label: '在途' },
+  completed: { label: '完成' },
 };
 
 const PRIORITY_COLOR: Record<WorkOrderTicket['priority'], string> = {
@@ -27,13 +27,28 @@ const ITEM_HEIGHT = 156;
 const SCROLL_SECONDS_PER_ITEM = 3.6;
 const PAUSE_HOVER_DELAY_MS = 120;
 
-type WorkOrderCardTone = 'success' | 'error' | 'default';
+type WorkOrderCardTone = RequirementStatus | 'error';
 
 function getWorkOrderCardTone(item: WorkOrderTicket): WorkOrderCardTone {
   const activeNode = getActiveSopNode(item);
   if (activeNode?.runStatus === 'abnormal') return 'error';
-  if (item.status === 'completed') return 'success';
-  return 'default';
+  return item.status;
+}
+
+function StatusTag({ variant, label }: { variant: RequirementStatus | 'error'; label: string }) {
+  return <span className={`work-order-status-tag work-order-status-tag--${variant}`}>{label}</span>;
+}
+
+function getStatusTagVariant(item: WorkOrderTicket): RequirementStatus | 'error' {
+  const activeNode = getActiveSopNode(item);
+  if (item.status === 'inProgress' && activeNode?.runStatus === 'abnormal') return 'error';
+  return item.status;
+}
+
+function SopInlineTag({ runStatus, label }: { runStatus: SopNodeRunStatus; label: string }) {
+  return (
+    <span className={`work-order-sop-inline-tag work-order-sop-inline-tag--${runStatus}`}>{label}</span>
+  );
 }
 
 function readTrackOffset(track: HTMLDivElement | null): number {
@@ -58,8 +73,8 @@ function WorkOrderRow({
   onEmojiSelect: (orderId: string, emoji: string) => void;
   onEmojiPickerOpenChange: (open: boolean) => void;
 }) {
-  const avatarColor = PERSON_COLORS[item.assignee] ?? '#165DFF';
   const statusTag = ORDER_STATUS_TAG[item.status];
+  const statusTagVariant = getStatusTagVariant(item);
   const activeNode = getActiveSopNode(item);
   const cardTone = getWorkOrderCardTone(item);
   const elapsedLabel = item.status === 'completed' ? '总耗时' : '至今';
@@ -68,54 +83,48 @@ function WorkOrderRow({
   return (
     <div className="work-scroll-item work-order-card-wrap" style={{ height: ITEM_HEIGHT }}>
       <div className={`work-order-card work-order-card--${cardTone}`}>
-        <button type="button" className="work-order-card-main" onClick={() => onOpen(item)}>
-          <div
-            className="work-scroll-avatar"
-            style={{ background: `${avatarColor}18`, color: avatarColor, borderColor: `${avatarColor}40` }}
-          >
-            {item.assignee.slice(-1)}
-          </div>
-          <div className="work-scroll-body">
-            <div className="work-scroll-header">
-              <span className="work-scroll-name">{item.assignee}</span>
-              <Tag bordered={false} color={statusTag.color} style={{ margin: 0, fontSize: 10, lineHeight: '18px' }}>
-                {statusTag.label}
-              </Tag>
+        <div className="work-order-card-inner">
+          <button type="button" className="work-order-card-main" onClick={() => onOpen(item)}>
+            <div className="work-scroll-avatar">
+              {item.assignee.slice(-1)}
             </div>
+            <div className="work-scroll-body">
+              <div className="work-scroll-header">
+                <span className="work-scroll-name">{item.assignee}</span>
+                <StatusTag variant={statusTagVariant} label={statusTag.label} />
+              </div>
 
-            <div className="work-order-row-title">
-              <span className="work-order-row-id">{item.id}</span>
-              <span className="work-order-row-name">{item.title}</span>
+              <div className="work-order-row-title">
+                <span className="work-order-row-id">{item.id}</span>
+                <span className="work-order-row-name">{item.title}</span>
+              </div>
+
+              <div className="work-order-row-meta">
+                <span>{elapsedLabel} {elapsedValue}</span>
+                <span className="work-scroll-dot">·</span>
+                <span style={{ color: PRIORITY_COLOR[item.priority] }}>{item.priority}优先级</span>
+              </div>
+
+              <div className="work-order-row-summary">{item.summary}</div>
             </div>
+          </button>
 
-            <div className="work-order-row-meta">
-              <span>{elapsedLabel} {elapsedValue}</span>
-              <span className="work-scroll-dot">·</span>
-              <span style={{ color: PRIORITY_COLOR[item.priority] }}>{item.priority}优先级</span>
-            </div>
-
-            <div className="work-order-row-summary">{item.summary}</div>
-
+          <div className="work-order-emoji-bar">
             <div className="work-order-row-status-line">
-              {(item.status === 'inProgress' || item.status === 'completed') && activeNode ? (
-                <>
-                  <Tag bordered={false} color={statusTag.color} style={{ margin: 0, fontSize: 10 }}>
-                    工单{statusTag.label}
-                  </Tag>
-                  <Tag bordered={false} color={RUN_STATUS_CONFIG[activeNode.runStatus].color} style={{ margin: 0, fontSize: 10 }}>
-                    {RUN_STATUS_CONFIG[activeNode.runStatus].label} · {activeNode.name}
-                  </Tag>
-                </>
+              {activeNode?.runStatus === 'abnormal' ? (
+                <SopInlineTag
+                  runStatus={activeNode.runStatus}
+                  label={`${RUN_STATUS_CONFIG[activeNode.runStatus].label} · ${activeNode.name}`}
+                />
               ) : null}
             </div>
+            <WorkOrderEmojiPicker
+              value={emojiReaction}
+              onSelect={(emoji) => onEmojiSelect(item.id, emoji)}
+              onOpenChange={onEmojiPickerOpenChange}
+            />
           </div>
-        </button>
-
-        <WorkOrderEmojiPicker
-          value={emojiReaction}
-          onSelect={(emoji) => onEmojiSelect(item.id, emoji)}
-          onOpenChange={onEmojiPickerOpenChange}
-        />
+        </div>
       </div>
     </div>
   );

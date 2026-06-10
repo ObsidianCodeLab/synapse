@@ -16,14 +16,7 @@ import {
   chartCardTitleTextStyle,
   dashboardCardStyle,
 } from '@rd-view/constants/dashboardTheme';
-
-const barColors = { completed: '#165DFF', inProgress: '#00B42A', pending: '#FF7D00' };
-
-const LEGEND_ITEMS = [
-  { label: '已完成', color: barColors.completed },
-  { label: '进行中', color: barColors.inProgress },
-  { label: '待开始', color: barColors.pending },
-];
+import { useRdViewColors } from '@rd-view/theme';
 
 const cardStyle = dashboardCardStyle;
 
@@ -36,9 +29,16 @@ const cardBodyStyle = {
 };
 
 function WorkloadLegend() {
+  const { chart } = useRdViewColors();
+  const legendItems = [
+    { label: '已完成', color: chart.series.completed },
+    { label: '进行中', color: chart.series.inProgress },
+    { label: '待开始', color: chart.series.pending },
+  ];
+
   return (
     <div className="chart-pair-legend chart-pair-legend--inline">
-      {LEGEND_ITEMS.map((item) => (
+      {legendItems.map((item) => (
         <div key={item.label} className="chart-pair-legend-item">
           <span className="chart-pair-legend-bar" style={{ background: item.color }} />
           {item.label}
@@ -54,9 +54,13 @@ interface PersonWorkloadChartProps {
 }
 
 function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
+  const { chart, isDark } = useRdViewColors();
   const rowCount = data.length;
   const barSize = getPersonWorkloadBarSize(rowCount);
   const barGap = getPersonWorkloadBarGap(rowCount);
+  const tooltipCursor = isDark
+    ? { fill: chart.hoverRow, opacity: 1 }
+    : { fill: chart.hoverRow };
 
   const xMax = useMemo(() => {
     const max = Math.max(...data.map((p) => p.completed + p.inProgress + p.pending), 1);
@@ -64,7 +68,7 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
   }, [data]);
 
   return (
-    <div className="chart-pair-chart-block" style={{ height }}>
+    <div className="chart-pair-chart-block person-workload-chart" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"
@@ -73,11 +77,11 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
           barCategoryGap={barGap}
           margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} horizontal={false} />
           <XAxis
             type="number"
             domain={[0, xMax]}
-            tick={{ fontSize: rowCount > 8 ? 8 : 10, fill: 'var(--text-muted)' }}
+            tick={{ fontSize: rowCount > 8 ? 8 : 10, fill: chart.axisTick }}
             axisLine={false}
             tickLine={false}
             allowDecimals={false}
@@ -86,16 +90,25 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fontSize: rowCount > 8 ? 9 : 11, fill: 'var(--text-muted)' }}
+            tick={{ fontSize: rowCount > 8 ? 9 : 11, fill: chart.axisTick }}
             axisLine={false}
             tickLine={false}
             width={42}
             interval={0}
           />
-          <Tooltip contentStyle={{ borderRadius: 6, border: '1px solid var(--border)', fontSize: 10, background: 'var(--overlay-bg)', color: 'var(--text-primary)' }} />
-          <Bar dataKey="completed" name="已完成" stackId="stack" fill={barColors.completed} />
-          <Bar dataKey="inProgress" name="进行中" stackId="stack" fill={barColors.inProgress} />
-          <Bar dataKey="pending" name="待开始" stackId="stack" fill={barColors.pending} radius={[0, 3, 3, 0]} />
+          <Tooltip
+            cursor={tooltipCursor}
+            contentStyle={{
+              borderRadius: 6,
+              border: `1px solid ${chart.tooltip.border}`,
+              fontSize: 10,
+              background: chart.tooltip.background,
+              color: chart.tooltip.color,
+            }}
+          />
+          <Bar dataKey="completed" name="已完成" stackId="stack" fill={chart.series.completed} />
+          <Bar dataKey="inProgress" name="进行中" stackId="stack" fill={chart.series.inProgress} />
+          <Bar dataKey="pending" name="待开始" stackId="stack" fill={chart.series.pending} radius={[0, 3, 3, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -149,6 +162,7 @@ export function PersonWorkloadCard() {
         width={480}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        rootClassName="person-workload-drawer"
         styles={{ body: { padding: '12px 16px' } }}
       >
         <div className="person-workload-drawer-scroll">
