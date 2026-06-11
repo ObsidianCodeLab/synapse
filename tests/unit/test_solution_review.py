@@ -34,9 +34,9 @@ SAMPLE_FUNC_SOLUTION = """# 函数级方案
 ## 1. 方案内容
 
 ### 1.3 涉及仓库
-| 产品分支ID | 仓库地址 | 改造内容 |
-|-----------|---------|---------|
-| 4531 | https://git.example.com/repo.git | 改造计费模块 |
+| 产品分支ID | 应用模块 | 仓库地址 | 改造内容 |
+|-----------|---------|---------|---------|
+| 4531 | ZMDB | https://git.example.com/repo.git | 改造计费模块 |
 
 ### 影响评估
 
@@ -69,6 +69,7 @@ def test_parse_func_solution_md_repos_and_security():
     parsed = parse_func_solution_md(SAMPLE_FUNC_SOLUTION)
     assert len(parsed["repos"]) == 1
     assert parsed["repos"][0]["branch_version_id"] == "4531"
+    assert parsed["repos"][0]["product_module_name"] == "ZMDB"
     impact = parsed["impact_assessment"]
     sections = impact["sections"]
     assert len(sections) == 2

@@ -794,185 +794,252 @@ def _format_meeting_outputs(binding: dict[str, Any] | None) -> str:
     return "、".join(f"`{n}`" for n in outs)
 
 
+# ─── 主持职责文案表（表驱动：文案集中定义一份，分支只决定取哪几条） ──────
+#
+# 设计：每条职责文案只在此定义一次，`_append_host_duties_shared` 按
+# (rules_kind, node_id) 选取对应 key 序列拼装，避免同一文案散落多个 if 分支
+# 被复制。新增/修改职责文案只需改这张表。
+
+_HOST_DUTY_TEXTS: dict[str, str] = {
+    # 所有 host 共有
+    "know_product": (
+        "- 必须熟悉本工单对应的产品信息（产品文档 / 仓库代码 / 历史工单），"
+        "所有决策都要基于产品事实；缺少产品事实时可以拒绝或报错，**不得臆造**。"
+    ),
+    "focus_goal": (
+        "- 基于产品事实，**专注于上方「会议目标」中要做的具体事情**，不进行超出本节点目标的决策。"
+    ),
+    "archive_after_pass": (
+        "- 节点目标完成且通过自检后，按下方规范「输出物与归档」写入「本节点归档目录」"
+        "（系统信息段已展示完整路径）并报告结论。"
+    ),
+    "output_eq_filename": (
+        "- **会议产出 = 归档文件名（硬约束）**：上方「会议产出」列出的就是本节点必须落盘的文件，"
+        "归档文件名必须与之**逐字一致**（如 `需求澄清.md`、`模块功能.md`），"
+        "**禁止**改名 / 加前后缀 / 用 `result.md` 替代；多文件时每一项都要落盘，且不能多出清单之外的文件。"
+    ),
+    # 迭代语义（按 kind / node_id 分流）
+    "iter_human_multipoll": (
+        "- **多轮会中问卷**：已确认项视为既成事实，只推进未决点；详见下方规范 §3.1。"
+    ),
+    "iter_human_confirm": (
+        "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
+        "提交后立即停止；用户无新指正时收敛归档。"
+    ),
+    "iter_collab_solution_review": (
+        "- **方案评审（协同门控）**：执行 `whalecloud-dev-tool-solution-review` 生成 "
+        "`solution_review.json` 与 `方案评审结论.md`；**禁止** interactive HITL。"
+        "人工在「方案评审」面板裁决。"
+    ),
+    "iter_collab_func_solution": (
+        "- **函数级方案（协同门控）**：产出 `函数级方案.md` + `func_solution_review.json`；"
+        "JSON 须含 Mermaid 总览图与逐条 `transformation_plans`（需求-模块-改造方案关联）；"
+        "**禁止** interactive HITL；人工在「函数级方案评审」面板逐条确认。"
+    ),
+    "iter_collab_leader_review": (
+        "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
+        "**禁止** interactive HITL；人工在 NodeReview 面板确认。"
+    ),
+    "iter_collab_default": (
+        "- **协同评审节点**：结构化报告落盘后走专用前端面板；**禁止** interactive HITL。"
+    ),
+    "iter_ai_autonomous": (
+        "- **自主迭代**：上一轮已通过自检的结论视为既成事实，只补未决项；详见下方规范 §2.1。"
+    ),
+    "iter_ai_no_hitl": (
+        "- **AI 节点无人机交互**：`human_confirm` 固定关闭；三项校验全过且产出覆盖「会议产出」清单方可归档；"
+        "自主迭代 ≤3 轮，仍未收敛则在正文说明阻塞并停止，**禁止**调用 `submit_hitl_questionnaire`。"
+    ),
+    # doc-generate 归档铁律（按 kind / node_id 分流）
+    "doc_collab_solution_review": (
+        "- **方案评审产出**：须通过 `whalecloud-dev-tool-solution-review` 生成 "
+        "`solution_review.json` 与 `方案评审结论.md`；JSON schema 校验失败或模板缺失时 exception HITL。"
+    ),
+    "doc_human": (
+        '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
+        "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板；"
+        "若运行时头已给出 `hitl_context.json` 路径且文件存在，**必须先** `read_file` 该路径，"
+        "再以之为 `CONTEXT_JSON` 调用 doc-generate 落盘；"
+        '若模板缺失或与本节点产出物不匹配，**立即** '
+        '`submit_hitl_questionnaire(kind="exception", summary="doc-generate 缺少 <文件名> 模板，需人工补齐模板或调整产出物清单")` '
+        "请求人工介入，**禁止**自行手写 Markdown 兜底。"
+    ),
+    "doc_ai": (
+        '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
+        "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板，再落盘；"
+        "模板缺失时在正文说明阻塞原因并停止落盘，**禁止**手写 Markdown 兜底，**禁止**调用 `submit_hitl_questionnaire`。"
+    ),
+    "doc_collab_default": (
+        "- **协同节点产出**：按节点专用 SKILL 生成结构化报告与结论文档；"
+        "schema / 模板缺失时 exception HITL，禁止手写绕过。"
+    ),
+    # 问卷收尾约束（按 kind 分流）
+    "confirm_human_result_confirm": (
+        "- **`result_confirm` 不得整篇覆盖会议产出**：节点验收问卷仅用于确认/返工指令，"
+        "禁止用验收轮反馈直接重写已归档的「会议产出」全文。"
+    ),
+    "confirm_human_no_fake": (
+        "- `human_confirm` 开启或出现异常时，必须调用 `submit_hitl_questionnaire`，"
+        "**禁止伪造用户答复**，**禁止只口头宣称问卷已提交**。"
+    ),
+    "confirm_collab_only_exception": (
+        "- 协同节点**禁止** `submit_hitl_questionnaire(kind=\"interactive\")`；"
+        "仅异常场景使用 `kind=\"exception\"`。"
+    ),
+    "confirm_ai_no_questionnaire": (
+        "- **禁止** `submit_hitl_questionnaire` 及一切问卷 / 表单流程；"
+        "不得口头宣称已提交表单或等待人工确认。"
+    ),
+    # 有协作智能体（with collaborators）
+    "collab_must_delegate": (
+        "- **有 Worker 必须先委派（强制）**：参会能力卡片上 Worker 具备的技能，"
+        "**禁止** Host 在本会话抢先执行；须 `submit_meeting_work_plan` → `delegate_*` 后再综合校验。"
+        "Host 只做主持编排与 Worker 不具备能力时的补缺。"
+    ),
+    "collab_fact_first": (
+        "- **事实先于分析（强约束）**：委派分析型 SKILL 前，须先完成或并行完成代码/文档/相似工单事实收集；"
+        "除非用户反馈了明确的分析方向, 否则禁止在指派任务时圈定范围或维度。"
+    ),
+    "collab_message_whitelist": (
+        "- **委派 message 白名单（强约束）**：`delegate_to_agent(message=...)` **禁止**写入「方案原文」"
+        "「拆解要求/维度」「待澄清问题清单」及任何未经核验的技术细节；"
+        "只允许 skill/Phase、任务边界、工单字段原文引用、指向前序 Worker 已核验产出。详见下方规范 §3.0。"
+    ),
+    "collab_fact_prefer_delegate": (
+        "- 产品事实收集**优先委派**给协作智能体，且须在分析型 SKILL 派单之前完成或并行启动；"
+        "当且仅当现有 worker 不具备某项能力时，才自行调用工具/技能收集。"
+    ),
+    "collab_plan_then_delegate": (
+        "- 必须通过 `submit_meeting_work_plan` 提交结构化计划后，再调用 `delegate_to_agent` 或 "
+        "`delegate_parallel` 派单；委派后等待 worker 返回再继续。"
+    ),
+    "collab_three_checks": (
+        "- 收到 worker 产出后，按「契合度 / 真实性 / 准确性」三项逐条校验；"
+        "不通过则**重新派单**给同一 worker 并指出缺项。"
+    ),
+    "collab_card_reference": (
+        "- 可用 worker 名单与能力边界见下方「参会能力卡片」（已排除你自己）；"
+        "派单时 task 描述应指向卡片上的具体 skill / 能力，便于 Worker 加载对应 SKILL。"
+    ),
+    "collab_message_orchestration_only": (
+        "- 派单时 `message` 只写编排指令（skill/Phase/边界/原文引用），"
+        "**禁止**替 Worker 撰写方案描述或需求拆解框架；违规示例见规范 §3.0。"
+    ),
+    "collab_host_self_skill": (
+        "- 若你（Host）自身 Profile 也配置了技能且必须自行执行（Worker 不具备时），"
+        "同样须先 `get_skill_info(skill_id)` 读取 SKILL.md，再按 SKILL 指引用 shell / 读写工具执行，"
+        "需要调用技能的脚本时再执行`run_skill_script`, **禁止**跳过 SKILL 硬猜流程。"
+    ),
+    # 无协作智能体（solo）
+    "solo_intro": (
+        "- **本场无协作智能体（小鲸独立处理）**：本节点由你一人完成；"
+        "**无需** `submit_meeting_work_plan`，**禁止** `delegate_to_agent` / `delegate_parallel`。"
+        "完整流程见规范 §3.2。"
+    ),
+    "solo_fact_first": (
+        "- **事实先于分析（强约束）**：跑分析型 SKILL 前，须先用 `read_file` / `run_shell` / "
+        "`get_skill_info` + 技能脚本自行完成代码 / 文档 / 相似工单事实收集；"
+        "除非用户反馈了明确分析方向，否则禁止在未取证前圈定范围或维度。"
+    ),
+    "solo_direct_execute": (
+        "- 直接按「你的能力档案」与会议目标执行 SKILL / 工具；"
+        "勿调用 `submit_meeting_work_plan`（无 Worker 时系统会拒绝）。"
+    ),
+    "solo_self_check": (
+        "- 每轮产出（含 SKILL 落盘文件）后，对你自己的结果按「契合度 / 真实性 / 准确性」三项自检；"
+        "不通过则在本会话内补证据 / 重跑 SKILL / 修正归档，**禁止**调用 delegate（无对象可派）。"
+    ),
+    "solo_skill_boundary": (
+        "- 执行边界以「你的能力档案」为准；须先 `get_skill_info(skill_id)` 再按 SKILL 用 shell / 读写 / "
+        "`run_skill_script` 执行，**禁止**跳过 SKILL 硬猜流程。"
+    ),
+}
+
+# 有/无协作智能体两种模式下，主持职责附加文案的 key 序列（顺序即输出顺序）
+_HOST_DUTY_KEYS_WITH_COLLABORATORS: list[str] = [
+    "collab_must_delegate",
+    "collab_fact_first",
+    "collab_message_whitelist",
+    "collab_fact_prefer_delegate",
+    "collab_plan_then_delegate",
+    "collab_three_checks",
+    "collab_card_reference",
+    "collab_message_orchestration_only",
+    "collab_host_self_skill",
+]
+_HOST_DUTY_KEYS_SOLO: list[str] = [
+    "solo_intro",
+    "solo_fact_first",
+    "solo_direct_execute",
+    "solo_self_check",
+    "solo_skill_boundary",
+]
+
+
+def _collab_node_suffix(node_id: str) -> str:
+    """协同节点按 node_id 选取迭代语义文案的后缀 key。"""
+    nid = (node_id or "").strip()
+    if nid in ("solution_review", "func_solution", "leader_review"):
+        return nid
+    return "default"
+
+
+def _host_duty_keys_shared(rules_kind: MeetingRulesKind, node_id: str) -> list[str]:
+    """按节点类型返回共性主持职责的文案 key 序列（顺序即输出顺序）。"""
+    keys: list[str] = ["know_product", "focus_goal"]
+
+    # 迭代语义
+    if rules_kind == "human":
+        keys += ["iter_human_multipoll", "iter_human_confirm"]
+    elif rules_kind == "collab":
+        keys.append(f"iter_collab_{_collab_node_suffix(node_id)}")
+    else:  # ai
+        keys += ["iter_ai_autonomous", "iter_ai_no_hitl"]
+
+    keys += ["archive_after_pass", "output_eq_filename"]
+
+    # doc-generate 归档铁律
+    if rules_kind == "collab" and (node_id or "").strip() == "solution_review":
+        keys.append("doc_collab_solution_review")
+    elif rules_kind == "human":
+        keys.append("doc_human")
+    elif rules_kind == "ai":
+        keys.append("doc_ai")
+    else:  # collab 非 solution_review
+        keys.append("doc_collab_default")
+
+    # 问卷收尾约束
+    if rules_kind == "human":
+        keys += ["confirm_human_result_confirm", "confirm_human_no_fake"]
+    elif rules_kind == "collab":
+        keys.append("confirm_collab_only_exception")
+    else:  # ai
+        keys.append("confirm_ai_no_questionnaire")
+
+    return keys
+
+
 def _append_host_duties_shared(
     lines: list[str],
     context: MeetingRoomContext,
     *,
     rules_kind: MeetingRulesKind = "ai",
 ) -> None:
-    """主持职责：按节点规则模板裁剪共性说明。"""
-    lines.append(
-        "- 必须熟悉本工单对应的产品信息（产品文档 / 仓库代码 / 历史工单），"
-        "所有决策都要基于产品事实；缺少产品事实时可以拒绝或报错，**不得臆造**。"
-    )
-    lines.append(
-        "- 基于产品事实，**专注于上方「会议目标」中要做的具体事情**，不进行超出本节点目标的决策。"
-    )
-    if rules_kind == "human":
-        lines.append(
-            "- **多轮会中问卷**：已确认项视为既成事实，只推进未决点；详见下方规范 §3.1。"
-        )
-        lines.append(
-            "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
-            "提交后立即停止；用户无新指正时收敛归档。"
-        )
-    elif rules_kind == "collab":
-        nid = (context.node_id or "").strip()
-        if nid == "solution_review":
-            lines.append(
-                "- **方案评审（协同门控）**：执行 `whalecloud-dev-tool-solution-review` 生成 "
-                "`solution_review.json` 与 `方案评审结论.md`；**禁止** interactive HITL。"
-                "人工在「方案评审」面板裁决。"
-            )
-        elif nid == "func_solution":
-            lines.append(
-                "- **函数级方案（协同门控）**：产出 `函数级方案.md` + `func_solution_review.json`；"
-                "JSON 须含 Mermaid 总览图与逐条 `transformation_plans`（需求-模块-改造方案关联）；"
-                "**禁止** interactive HITL；人工在「函数级方案评审」面板逐条确认。"
-            )
-        elif nid == "leader_review":
-            lines.append(
-                "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
-                "**禁止** interactive HITL；人工在 NodeReview 面板确认。"
-            )
-        else:
-            lines.append(
-                "- **协同评审节点**：结构化报告落盘后走专用前端面板；**禁止** interactive HITL。"
-            )
-    else:
-        lines.append(
-            "- **自主迭代**：上一轮已通过自检的结论视为既成事实，只补未决项；详见下方规范 §2.1。"
-        )
-        lines.append(
-            "- **AI 节点无人机交互**：`human_confirm` 固定关闭；三项校验全过且产出覆盖「会议产出」清单方可归档；"
-            "自主迭代 ≤3 轮，仍未收敛则在正文说明阻塞并停止，**禁止**调用 `submit_hitl_questionnaire`。"
-        )
-    lines.append(
-        "- 节点目标完成且通过自检后，按下方规范「输出物与归档」写入「本节点归档目录」"
-        "（系统信息段已展示完整路径）并报告结论。"
-    )
-    lines.append(
-        "- **会议产出 = 归档文件名（硬约束）**：上方「会议产出」列出的就是本节点必须落盘的文件，"
-        "归档文件名必须与之**逐字一致**（如 `需求澄清.md`、`模块功能.md`），"
-        "**禁止**改名 / 加前后缀 / 用 `result.md` 替代；多文件时每一项都要落盘，且不能多出清单之外的文件。"
-    )
-    if rules_kind == "collab" and (context.node_id or "").strip() == "solution_review":
-        lines.append(
-            "- **方案评审产出**：须通过 `whalecloud-dev-tool-solution-review` 生成 "
-            "`solution_review.json` 与 `方案评审结论.md`；JSON schema 校验失败或模板缺失时 exception HITL。"
-        )
-    elif rules_kind == "human":
-        doc_ctx = (
-            "若运行时头已给出 `hitl_context.json` 路径且文件存在，**必须先** `read_file` 该路径，"
-            "再以之为 `CONTEXT_JSON` 调用 doc-generate 落盘；"
-        )
-        lines.append(
-            '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
-            "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板；"
-            f"{doc_ctx}"
-            '若模板缺失或与本节点产出物不匹配，**立即** '
-            '`submit_hitl_questionnaire(kind="exception", summary="doc-generate 缺少 <文件名> 模板，需人工补齐模板或调整产出物清单")` '
-            "请求人工介入，**禁止**自行手写 Markdown 兜底。"
-        )
-    elif rules_kind == "ai":
-        lines.append(
-            '- **必须走 `whalecloud-dev-tool-doc-generate` 生成产出物**：先 `get_skill_info(whalecloud-dev-tool-doc-generate)` '
-            "读 SKILL.md、确认 `templates/` 下存在与预期产出物**同名**的模板，再落盘；"
-            "模板缺失时在正文说明阻塞原因并停止落盘，**禁止**手写 Markdown 兜底，**禁止**调用 `submit_hitl_questionnaire`。"
-        )
-    else:
-        lines.append(
-            "- **协同节点产出**：按节点专用 SKILL 生成结构化报告与结论文档；"
-            "schema / 模板缺失时 exception HITL，禁止手写绕过。"
-        )
-    if rules_kind == "human":
-        lines.append(
-            "- **`result_confirm` 不得整篇覆盖会议产出**：节点验收问卷仅用于确认/返工指令，"
-            "禁止用验收轮反馈直接重写已归档的「会议产出」全文。"
-        )
-        lines.append(
-            "- `human_confirm` 开启或出现异常时，必须调用 `submit_hitl_questionnaire`，"
-            "**禁止伪造用户答复**，**禁止只口头宣称问卷已提交**。"
-        )
-    elif rules_kind == "collab":
-        lines.append(
-            "- 协同节点**禁止** `submit_hitl_questionnaire(kind=\"interactive\")`；"
-            "仅异常场景使用 `kind=\"exception\"`。"
-        )
-    else:
-        lines.append(
-            "- **禁止** `submit_hitl_questionnaire` 及一切问卷 / 表单流程；"
-            "不得口头宣称已提交表单或等待人工确认。"
-        )
+    """主持职责：按节点规则模板裁剪共性说明（表驱动，文案见 ``_HOST_DUTY_TEXTS``）。"""
+    for key in _host_duty_keys_shared(rules_kind, context.node_id):
+        lines.append(_HOST_DUTY_TEXTS[key])
 
 
 def _append_host_duties_with_collaborators(lines: list[str]) -> None:
-    """主持职责：本场有协作智能体。"""
-    lines.append(
-        "- **有 Worker 必须先委派（强制）**：参会能力卡片上 Worker 具备的技能，"
-        "**禁止** Host 在本会话抢先执行；须 `submit_meeting_work_plan` → `delegate_*` 后再综合校验。"
-        "Host 只做主持编排与 Worker 不具备能力时的补缺。"
-    )
-    lines.append(
-        "- **事实先于分析（强约束）**：委派分析型 SKILL 前，须先完成或并行完成代码/文档/相似工单事实收集；"
-        "除非用户反馈了明确的分析方向, 否则禁止在指派任务时圈定范围或维度。"
-    )
-    lines.append(
-        "- **委派 message 白名单（强约束）**：`delegate_to_agent(message=...)` **禁止**写入「方案原文」"
-        "「拆解要求/维度」「待澄清问题清单」及任何未经核验的技术细节；"
-        "只允许 skill/Phase、任务边界、工单字段原文引用、指向前序 Worker 已核验产出。详见下方规范 §3.0。"
-    )
-    lines.append(
-        "- 产品事实收集**优先委派**给协作智能体，且须在分析型 SKILL 派单之前完成或并行启动；"
-        "当且仅当现有 worker 不具备某项能力时，才自行调用工具/技能收集。"
-    )
-    lines.append(
-        "- 必须通过 `submit_meeting_work_plan` 提交结构化计划后，再调用 `delegate_to_agent` 或 "
-        "`delegate_parallel` 派单；委派后等待 worker 返回再继续。"
-    )
-    lines.append(
-        "- 收到 worker 产出后，按「契合度 / 真实性 / 准确性」三项逐条校验；"
-        "不通过则**重新派单**给同一 worker 并指出缺项。"
-    )
-    lines.append(
-        "- 可用 worker 名单与能力边界见下方「参会能力卡片」（已排除你自己）；"
-        "派单时 task 描述应指向卡片上的具体 skill / 能力，便于 Worker 加载对应 SKILL。"
-    )
-    lines.append(
-        "- 派单时 `message` 只写编排指令（skill/Phase/边界/原文引用），"
-        "**禁止**替 Worker 撰写方案描述或需求拆解框架；违规示例见规范 §3.0。"
-    )
-    lines.append(
-        "- 若你（Host）自身 Profile 也配置了技能且必须自行执行（Worker 不具备时），"
-        "同样须先 `get_skill_info(skill_id)` 读取 SKILL.md，再按 SKILL 指引用 shell / 读写工具执行，"
-        "需要调用技能的脚本时再执行`run_skill_script`, **禁止**跳过 SKILL 硬猜流程。"
-    )
+    """主持职责：本场有协作智能体（表驱动，文案见 ``_HOST_DUTY_TEXTS``）。"""
+    for key in _HOST_DUTY_KEYS_WITH_COLLABORATORS:
+        lines.append(_HOST_DUTY_TEXTS[key])
 
 
 def _append_host_duties_solo(lines: list[str]) -> None:
-    """主持职责：本场无协作智能体，小鲸独立处理。"""
-    lines.append(
-        "- **本场无协作智能体（小鲸独立处理）**：本节点由你一人完成；"
-        "**无需** `submit_meeting_work_plan`，**禁止** `delegate_to_agent` / `delegate_parallel`。"
-        "完整流程见规范 §3.2。"
-    )
-    lines.append(
-        "- **事实先于分析（强约束）**：跑分析型 SKILL 前，须先用 `read_file` / `run_shell` / "
-        "`get_skill_info` + 技能脚本自行完成代码 / 文档 / 相似工单事实收集；"
-        "除非用户反馈了明确分析方向，否则禁止在未取证前圈定范围或维度。"
-    )
-    lines.append(
-        "- 直接按「你的能力档案」与会议目标执行 SKILL / 工具；"
-        "勿调用 `submit_meeting_work_plan`（无 Worker 时系统会拒绝）。"
-    )
-    lines.append(
-        "- 每轮产出（含 SKILL 落盘文件）后，对你自己的结果按「契合度 / 真实性 / 准确性」三项自检；"
-        "不通过则在本会话内补证据 / 重跑 SKILL / 修正归档，**禁止**调用 delegate（无对象可派）。"
-    )
-    lines.append(
-        "- 执行边界以「你的能力档案」为准；须先 `get_skill_info(skill_id)` 再按 SKILL 用 shell / 读写 / "
-        "`run_skill_script` 执行，**禁止**跳过 SKILL 硬猜流程。"
-    )
+    """主持职责：本场无协作智能体，小鲸独立处理（表驱动，文案见 ``_HOST_DUTY_TEXTS``）。"""
+    for key in _HOST_DUTY_KEYS_SOLO:
+        lines.append(_HOST_DUTY_TEXTS[key])
 
 
 def _append_host_capability_cards_with_collaborators(lines: list[str], cards: str) -> None:

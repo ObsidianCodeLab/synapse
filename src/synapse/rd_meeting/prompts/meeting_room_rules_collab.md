@@ -28,7 +28,3 @@
 | `func_solution` | `函数级方案.md`、`func_solution_review.json` |
 | `solution_review` | `方案评审结论.md`、`solution_review.json` |
 | `leader_review` | `研发组长评审结论.md` |
-
-### 4. 硬约束（摘要）
-
-报告先于门控 · 禁 interactive HITL · 结论可追溯方案/工单/代码证据 · 禁跳过门控自行归档或推进下一节点 · 异常时 exception HITL

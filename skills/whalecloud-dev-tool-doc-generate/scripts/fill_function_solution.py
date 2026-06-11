@@ -153,7 +153,7 @@ FORBIDDEN_TOP_LEVEL_KEYS: dict[str, str] = {
 }
 
 LIST_ROW_KEYS: dict[str, tuple[str, ...]] = {
-    "repos": ("branch_id", "repo_url", "change_desc"),
+    "repos": ("branch_id", "app_module", "repo_url", "change_desc"),
     "terms": ("term", "meaning"),
     "data_structures": ("name", "change_type", "module", "description"),
     "db_changes": ("table_name", "change_type", "field_changes", "description"),
@@ -202,7 +202,9 @@ LIST_ROW_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 LIST_ROW_FORBIDDEN_KEYS: dict[str, frozenset[str]] = {
-    "repos": frozenset({"repo_name", "repo_path", "files"}),
+    "repos": frozenset(
+        {"repo_name", "repo_path", "files", "product_module_name", "repo_module", "module_name"}
+    ),
     "data_structures": frozenset({"file", "definition"}),
 }
 
@@ -262,7 +264,11 @@ def _validate_list_rows(
             continue
         missing = [k for k in expected if k not in item]
         if missing and list_name == "repos":
-            issues.append(f"{list_name}[{i}] 缺少键 {missing}（勿用 repo_name/repo_path/files）")
+            issues.append(
+                f"{list_name}[{i}] 缺少键 {missing}"
+                "（应使用 branch_id/app_module/repo_url/change_desc；"
+                "勿用 repo_name/repo_path/files/product_module_name/repo_module）"
+            )
 
 
 def _validate_modules(issues: list[str], modules: list[Any]) -> None:

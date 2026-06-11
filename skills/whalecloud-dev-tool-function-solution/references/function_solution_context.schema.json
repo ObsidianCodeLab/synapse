@@ -52,9 +52,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["branch_id", "repo_url", "change_desc"],
+        "required": ["branch_id", "app_module", "repo_url", "change_desc"],
         "properties": {
           "branch_id": { "type": "string" },
+          "app_module": { "type": "string" },
           "repo_url": { "type": "string" },
           "change_desc": { "type": "string" }
         }

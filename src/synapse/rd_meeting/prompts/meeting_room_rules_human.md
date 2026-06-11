@@ -50,7 +50,3 @@
 - 文件名与「会议产出」逐字一致；**必须** doc-generate
 - 有 `hitl_context.json` 路径时，生成前 **必须先** `read_file` 作 `CONTEXT_JSON`
 - 模板缺失 → `exception`
-
-### 6. 硬约束（摘要）
-
-有 Worker 必先委派 · Host 不抢 Worker 技能 · 用户选项即约束 · HITL 先于拍板 · 问卷即停 · 台账以 `hitl_context.json` 为准

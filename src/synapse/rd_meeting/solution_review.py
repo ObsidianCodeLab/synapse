@@ -507,7 +507,12 @@ def parse_func_solution_md(md: str) -> dict[str, Any]:
                 "change_summary": str(
                     row.get("改造内容") or row.get("change_summary") or ""
                 ).strip(),
-                "product_module_name": str(row.get("应用模块") or row.get("product_module_name") or "").strip(),
+                "product_module_name": str(
+                    row.get("应用模块")
+                    or row.get("app_module")
+                    or row.get("product_module_name")
+                    or ""
+                ).strip(),
                 "branch_version_name": str(
                     row.get("产品分支") or row.get("branch_version_name") or ""
                 ).strip(),
