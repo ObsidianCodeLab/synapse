@@ -239,6 +239,7 @@ def _archive_doc_paths(engineering_root: str) -> tuple[str, str]:
 
 def build_task_develop_prompt(
     *,
+    scope_id: str = "",
     order: dict[str, Any],
     func_doc: str,
     accept_doc: str,
@@ -275,7 +276,7 @@ def build_task_develop_prompt(
         lines.append(f"人工建议与补充：{human_suggestions.strip()}")
     from synapse.rd_meeting.soul_instruction import format_soul_instruction_cli_lines
 
-    lines.extend(format_soul_instruction_cli_lines())
+    lines.extend(format_soul_instruction_cli_lines(scope_id))
     lines.extend(
         [
             "",
@@ -288,6 +289,7 @@ def build_task_develop_prompt(
 
 def build_task_verify_prompt(
     *,
+    scope_id: str = "",
     order: dict[str, Any],
     func_doc: str,
     human_suggestions: str,
@@ -322,7 +324,7 @@ def build_task_verify_prompt(
         lines.append(f"人工建议：{human_suggestions.strip()}")
     from synapse.rd_meeting.soul_instruction import format_soul_instruction_cli_lines
 
-    lines.extend(format_soul_instruction_cli_lines())
+    lines.extend(format_soul_instruction_cli_lines(scope_id))
     if develop_log_hint:
         lines.append(f"开发轮日志：{develop_log_hint}")
     lines.extend(
@@ -1041,6 +1043,7 @@ def bootstrap_task_exec(
             "product_module": order.get("product_module"),
         }
         develop_prompt = build_task_develop_prompt(
+            scope_id=sid,
             order=order,
             func_doc=func_doc,
             accept_doc=accept_doc,
@@ -1048,6 +1051,7 @@ def bootstrap_task_exec(
             reprocess_reason=reprocess_text,
         )
         verify_prompt = build_task_verify_prompt(
+            scope_id=sid,
             order=order,
             func_doc=func_doc,
             human_suggestions=human_suggestions,

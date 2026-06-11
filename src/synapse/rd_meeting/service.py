@@ -469,38 +469,42 @@ class MeetingRoomService:
         pending.sort(key=lambda x: (x.get("updated_at") or ""), reverse=True)
         return pending
 
-    def get_soul_instruction(self) -> dict[str, Any]:
+    def get_soul_instruction(self, scope_id: str) -> dict[str, Any]:
         from synapse.rd_meeting.soul_instruction import (
             load_soul_instruction,
             load_soul_instruction_payload,
             soul_instruction_path,
         )
 
-        payload = load_soul_instruction_payload()
+        sid = (scope_id or "").strip()
+        if not sid:
+            raise ValueError("scope_id required")
+        payload = load_soul_instruction_payload(sid)
         return {
-            "instruction": load_soul_instruction(),
+            "scope_id": sid,
+            "instruction": load_soul_instruction(sid),
             "updated_at": payload.get("updated_at"),
-            "path": str(soul_instruction_path()),
+            "path": str(soul_instruction_path(sid)),
         }
 
     def put_soul_instruction(
         self,
+        scope_id: str,
         instruction: str,
-        *,
-        scope_id: str | None = None,
     ) -> dict[str, Any]:
         from synapse.rd_meeting.host_prompt_cache import clear_host_prompt_cache
         from synapse.rd_meeting.soul_instruction import save_soul_instruction, soul_instruction_path
 
-        payload = save_soul_instruction(instruction)
         sid = (scope_id or "").strip()
-        if sid:
-            clear_host_prompt_cache(sid)
+        if not sid:
+            raise ValueError("scope_id required")
+        payload = save_soul_instruction(sid, instruction)
+        clear_host_prompt_cache(sid)
         return {
+            "scope_id": sid,
             "instruction": str(payload.get("instruction") or ""),
             "updated_at": payload.get("updated_at"),
-            "path": str(soul_instruction_path()),
-            "cache_cleared_scope_id": sid or None,
+            "path": str(soul_instruction_path(sid)),
         }
 
     def open_meeting(
@@ -531,7 +535,7 @@ class MeetingRoomService:
 
         from synapse.rd_meeting.soul_instruction import save_soul_instruction_if_provided
 
-        save_soul_instruction_if_provided(soul_instruction)
+        save_soul_instruction_if_provided(sid, soul_instruction)
 
         existing_dev = load_dev_status(sid)
         if existing_dev is not None:

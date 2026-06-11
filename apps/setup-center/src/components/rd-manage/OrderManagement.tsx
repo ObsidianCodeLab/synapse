@@ -1392,7 +1392,7 @@ export const OrderManagement: React.FC<{
       setSelectedProdKey(preProd);
       setOpenMeetingPending({ ticket, scopeId });
       setOpenMeetingPickerOpen(true);
-      void fetchSoulInstruction(synapseApiBase)
+      void fetchSoulInstruction(synapseApiBase, scopeId)
         .then((payload) => {
           setSoulInstructionDraft(String(payload.instruction || '').trim());
         })
@@ -2885,7 +2885,7 @@ export const OrderManagement: React.FC<{
             value={soulInstructionDraft}
             onChange={(e) => setSoulInstructionDraft(e.target.value)}
             placeholder={t('rdManageOrder.soulInstructionPlaceholder', {
-              defaultValue: '辅助工单处理：指明关键流程、模块与注意事项（写入 SOUL_INSTRUCTION.json，全局共用）',
+              defaultValue: '辅助工单处理：指明关键流程、模块与注意事项（写入本工单 work/<单号>/SOUL_INSTRUCTION.json）',
             })}
             autoSize={{ minRows: 3, maxRows: 8 }}
             className="text-sm"

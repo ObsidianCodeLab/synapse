@@ -1046,9 +1046,10 @@ const MeetingRoomTitleBar = ({
 
   useEffect(() => {
     const base = (synapseApiBase || '').trim();
-    if (!base) return;
+    const scopeId = (room.ticketId || '').trim();
+    if (!base || !scopeId) return;
     let cancelled = false;
-    void fetchSoulInstruction(base)
+    void fetchSoulInstruction(base, scopeId)
       .then((payload) => {
         if (cancelled) return;
         setSoulDraft(String(payload.instruction || ''));
@@ -1059,17 +1060,18 @@ const MeetingRoomTitleBar = ({
     return () => {
       cancelled = true;
     };
-  }, [synapseApiBase]);
+  }, [room.ticketId, synapseApiBase]);
 
   const openSoulModal = useCallback(() => {
     const base = (synapseApiBase || '').trim();
+    const scopeId = (room.ticketId || '').trim();
     setSoulModalOpen(true);
-    if (!base) {
+    if (!base || !scopeId) {
       setSoulDraft('');
       return;
     }
     setSoulLoading(true);
-    void fetchSoulInstruction(base)
+    void fetchSoulInstruction(base, scopeId)
       .then((payload) => {
         setSoulDraft(String(payload.instruction || ''));
       })
@@ -1080,17 +1082,18 @@ const MeetingRoomTitleBar = ({
       .finally(() => {
         setSoulLoading(false);
       });
-  }, [synapseApiBase]);
+  }, [room.ticketId, synapseApiBase]);
 
   const saveSoulInstruction = useCallback(async () => {
     const base = (synapseApiBase || '').trim();
-    if (!base) {
+    const scopeId = (room.ticketId || '').trim();
+    if (!base || !scopeId) {
       toast.message('当前环境无法保存灵魂建议');
       return;
     }
     setSoulSaving(true);
     try {
-      await putSoulInstruction(base, soulDraft.trim(), { scopeId: room.ticketId });
+      await putSoulInstruction(base, scopeId, soulDraft.trim());
       toast.success('灵魂建议已保存');
       setSoulModalOpen(false);
     } catch (err) {
@@ -1155,17 +1158,20 @@ const MeetingRoomTitleBar = ({
         </div>
 
         <div className="flex items-center justify-end gap-2 min-w-0 shrink-0 flex-wrap">
-          <Tooltip title="编辑全局灵魂建议（SOUL_INSTRUCTION.json），辅助工单处理的关键流程与模块">
-            <Button
-              size="small"
-              type={soulHasContent ? 'primary' : 'default'}
-              ghost={soulHasContent}
-              icon={<Flame className="w-3.5 h-3.5" />}
+          <Tooltip title={`编辑本工单灵魂建议（work/${room.ticketId}/SOUL_INSTRUCTION.json）`}>
+            <button
+              type="button"
+              className={`rd-meeting-soul-btn${soulHasContent ? ' rd-meeting-soul-btn--filled' : ''}`}
               onClick={openSoulModal}
-              className={`shrink-0 border-border/60 ${soulHasContent ? 'border-violet-500/40 text-violet-300' : ''}`}
+              aria-label="编辑灵魂建议"
             >
-              灵魂建议
-            </Button>
+              <span className="rd-meeting-soul-btn__aura" aria-hidden />
+              <span className="rd-meeting-soul-btn__icon-wrap" aria-hidden>
+                <Flame className="rd-meeting-soul-btn__flame w-3.5 h-3.5" />
+              </span>
+              <span className="rd-meeting-soul-btn__label">灵魂建议</span>
+              {soulHasContent ? <span className="rd-meeting-soul-btn__dot" aria-hidden /> : null}
+            </button>
           </Tooltip>
           <Tooltip title={`会议开始于 ${formatMeetingStartedAt(room.meetingStartedAt)} · 累计处理 ${room.stageDuration}`}>
             <div className="inline-flex items-center gap-2 rounded-lg border border-border/50 bg-muted/25 px-3 py-1.5 text-[11px] text-muted-foreground">
@@ -1215,7 +1221,9 @@ const MeetingRoomTitleBar = ({
         destroyOnClose
       >
         <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
-          辅助工单处理，指明关键流程与模块；保存至工作目录 <code className="text-[10px]">SOUL_INSTRUCTION.json</code>，全局共用，并注入 Host/Worker 系统提示词与 CLI 开发/检测指令。
+          辅助工单处理，指明关键流程与模块；保存至本工单目录{' '}
+          <code className="text-[10px]">work/{room.ticketId}/SOUL_INSTRUCTION.json</code>
+          ，并注入 Host/Worker 系统提示词与 CLI 开发/检测指令。
         </p>
         <Input.TextArea
           value={soulDraft}

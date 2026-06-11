@@ -41,16 +41,13 @@ class OpenMeetingBody(BaseModel):
     )
     soul_instruction: str | None = Field(
         None,
-        description="可选灵魂建议；非空时写入 work/SOUL_INSTRUCTION.json（全局共用）",
+        description="可选灵魂建议；非空时写入 work/<scope_id>/SOUL_INSTRUCTION.json",
     )
 
 
 class PutSoulInstructionBody(BaseModel):
+    scope_id: str = Field(..., min_length=1, description="工单 scope_id（需求单号/研发单号）")
     instruction: str = Field("", description="灵魂建议正文，空字符串表示清除")
-    scope_id: str | None = Field(
-        None,
-        description="可选：清除该工单主控提示词缓存，便于后续节点复跑时生效",
-    )
 
 
 class InterveneBody(BaseModel):
@@ -247,11 +244,13 @@ async def stop_meeting_room(room_id: str) -> dict:
 
 
 @router.get("/api/dev/soul-instruction")
-async def get_soul_instruction() -> dict:
-    """读取全局灵魂建议（work/SOUL_INSTRUCTION.json）。"""
+async def get_soul_instruction(scope_id: str) -> dict:
+    """读取工单灵魂建议（work/<scope_id>/SOUL_INSTRUCTION.json）。"""
     try:
-        item = _service.get_soul_instruction()
+        item = _service.get_soul_instruction(scope_id)
         return success_response(item)
+    except ValueError as exc:
+        return error_response(400, str(exc))
     except Exception as exc:
         logger.exception("get_soul_instruction failed: %s", exc)
         return error_response(500, "get_soul_instruction_failed", str(exc))
@@ -259,13 +258,15 @@ async def get_soul_instruction() -> dict:
 
 @router.put("/api/dev/soul-instruction")
 async def put_soul_instruction(body: PutSoulInstructionBody) -> dict:
-    """更新全局灵魂建议；可选清除指定工单的主控提示词缓存。"""
+    """更新工单灵魂建议，并清除该工单主控提示词缓存。"""
     try:
         item = _service.put_soul_instruction(
+            body.scope_id.strip(),
             body.instruction,
-            scope_id=body.scope_id,
         )
         return success_response(item)
+    except ValueError as exc:
+        return error_response(400, str(exc))
     except Exception as exc:
         logger.exception("put_soul_instruction failed: %s", exc)
         return error_response(500, "put_soul_instruction_failed", str(exc))

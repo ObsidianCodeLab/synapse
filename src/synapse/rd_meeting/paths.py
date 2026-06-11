@@ -17,9 +17,9 @@ def work_root() -> Path:
     return settings.synapse_home / "work"
 
 
-def soul_instruction_path() -> Path:
-    """全局灵魂建议：``work/SOUL_INSTRUCTION.json``（全工单共用）。"""
-    return work_root() / "SOUL_INSTRUCTION.json"
+def soul_instruction_path(scope_id: str) -> Path:
+    """工单灵魂建议：``work/<scope_id>/SOUL_INSTRUCTION.json``。"""
+    return scope_dir(scope_id) / "SOUL_INSTRUCTION.json"
 
 
 def sanitize_work_order_segment(raw: str) -> str:

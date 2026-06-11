@@ -2765,6 +2765,6 @@
     "openMeetingFailed": "Failed to open meeting: {{message}}",
     "productUnspecified": "Product not specified",
     "soulInstructionLabel": "Soul instruction",
-    "soulInstructionPlaceholder": "Guide ticket handling: key flows, modules, and notes (saved to SOUL_INSTRUCTION.json, shared globally)"
+    "soulInstructionPlaceholder": "Guide ticket handling: key flows, modules, and notes (saved to work/<ticket>/SOUL_INSTRUCTION.json)"
   }
 }

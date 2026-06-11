@@ -944,21 +944,32 @@ export interface SoulInstructionPayload {
   path?: string;
 }
 
-export async function fetchSoulInstruction(synapseApiBase: string): Promise<SoulInstructionPayload> {
+export async function fetchSoulInstruction(
+  synapseApiBase: string,
+  scopeId: string,
+): Promise<SoulInstructionPayload> {
   const base = synapseApiBase.replace(/\/$/, '');
-  return apiGet<SoulInstructionPayload>(base, '/api/dev/soul-instruction');
+  const sid = (scopeId || '').trim();
+  if (!sid) {
+    throw new Error('missing_scope_id');
+  }
+  const params = new URLSearchParams({ scope_id: sid });
+  return apiGet<SoulInstructionPayload>(base, `/api/dev/soul-instruction?${params.toString()}`);
 }
 
 export async function putSoulInstruction(
   synapseApiBase: string,
+  scopeId: string,
   instruction: string,
-  options?: { scopeId?: string },
 ): Promise<SoulInstructionPayload> {
   const base = synapseApiBase.replace(/\/$/, '');
-  const scopeId = (options?.scopeId || '').trim();
+  const sid = (scopeId || '').trim();
+  if (!sid) {
+    throw new Error('missing_scope_id');
+  }
   return apiPut<SoulInstructionPayload>(base, '/api/dev/soul-instruction', {
+    scope_id: sid,
     instruction,
-    scope_id: scopeId || undefined,
   });
 }
 

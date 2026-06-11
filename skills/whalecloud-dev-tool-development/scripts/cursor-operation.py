@@ -67,10 +67,14 @@ def find_repo_root_with_synapse_archive(start: Path) -> Optional[Path]:
 
 
 SOUL_INSTRUCTION_FILENAME = "SOUL_INSTRUCTION.json"
+SOUL_INSTRUCTION_USAGE_HINT = (
+    "本条用于辅助工单处理，指明关键流程与模块；"
+    "使用技能、编写方案、执行开发与完成检测时须**充分参考**，不得忽略"
+)
 
 
 def resolve_soul_instruction_from_code_path(code_path: str) -> str:
-    """从 code_path 向上查找 work/SOUL_INSTRUCTION.json 并读取 instruction 字段。"""
+    """从 code_path 向上查找工单目录 work/<scope_id>/SOUL_INSTRUCTION.json。"""
     code = Path(code_path).resolve()
     if not code.exists():
         start = code.parent
@@ -79,6 +83,11 @@ def resolve_soul_instruction_from_code_path(code_path: str) -> str:
     for candidate in [start, *start.parents]:
         soul_file = candidate / SOUL_INSTRUCTION_FILENAME
         if not soul_file.is_file():
+            continue
+        # 工单根目录特征：同目录含 dev.status 或 meeting_pipeline.json
+        if not (candidate / "dev.status").is_file() and not (
+            candidate / "meeting_pipeline.json"
+        ).is_file():
             continue
         try:
             data = json.loads(soul_file.read_text(encoding="utf-8"))
@@ -95,9 +104,8 @@ def format_soul_instruction_cli_lines(code_path: str) -> list[str]:
     if not text:
         return []
     return [
-        "【灵魂建议 · SOUL_INSTRUCTION】",
+        f"【灵魂建议（{SOUL_INSTRUCTION_USAGE_HINT}）】",
         text,
-        "使用技能、改码与验收时须充分参考上述关键流程与模块指引。",
         "",
     ]
 

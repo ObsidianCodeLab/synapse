@@ -1030,7 +1030,7 @@ def build_meeting_runtime_header(
         lines.append(reprocess_block)
     from synapse.rd_meeting.soul_instruction import format_soul_instruction_block
 
-    soul_block = format_soul_instruction_block()
+    soul_block = format_soul_instruction_block(context.scope_id)
     if soul_block:
         lines.append("")
         lines.append(soul_block)
