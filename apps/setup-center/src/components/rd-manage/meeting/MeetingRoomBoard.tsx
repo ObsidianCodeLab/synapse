@@ -1963,6 +1963,9 @@ const InterventionDialog = ({
               const isSelected = resolvedSelectedNodeId === node.id;
               const isCurrentNode = node.id === room.currentNode;
               const isSkipped = state === 'skipped';
+              const hasCornerAction =
+                (canStopNodeRun && isCurrentNode) ||
+                canReprocessHistoricalNode(node.id, node.type);
 
               return (
                 <motion.div
@@ -1972,7 +1975,9 @@ const InterventionDialog = ({
                     selectSopNode(node.id);
                     if (node.id !== hitlTargetNodeId) setCenterTab('detail');
                   }}
-                  className={`relative cursor-pointer rounded-xl p-3 border transition-all duration-200 ${
+                  className={`relative cursor-pointer rounded-xl px-3 pt-3 ${
+                    hasCornerAction ? 'pb-8' : 'pb-3'
+                  } border transition-all duration-200 ${
                     isSkipped
                       ? `rd-meeting-node-card--skipped${isSelected ? ' rd-meeting-node-card--skipped-selected' : ''}`
                       : isSelected
@@ -2068,7 +2073,11 @@ const InterventionDialog = ({
                   </div>
 
                   {/* 会议目标 */}
-                  <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2 pr-8">
+                  <p
+                    className={`text-[10px] text-muted-foreground leading-relaxed line-clamp-2 ${
+                      hasCornerAction ? 'pr-8' : ''
+                    }`}
+                  >
                     {node.desc}
                   </p>
                 </motion.div>
