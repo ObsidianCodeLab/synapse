@@ -12,25 +12,35 @@ import {
   message,
 } from 'antd';
 import {
+  Bot,
   Check,
   CheckCircle2,
   ChevronDown,
+  Crown,
   GitBranch,
+  Hash,
   Layers,
   Loader2,
   MessageSquareWarning,
   Sparkles,
   Target,
+  Timer,
+  Users,
+  Wrench,
   XCircle,
+  Zap,
 } from 'lucide-react';
 
 import {
   fetchFuncSolutionReview,
+  fetchNodeReview,
   reprocessMeetingRoom,
   saveFuncSolutionPlanReviews,
   submitFuncSolutionReviewDecision,
   type FuncSolutionReviewPayload,
   type FuncSolutionTransformationPlan,
+  type NodeReviewAgentRow,
+  type NodeReviewMetrics,
 } from '../../../api/meetingRoomService';
 import { MermaidPreviewBlock } from '@/components/product/MermaidPreviewBlock';
 import { PlanTransformationContent } from './PlanTransformationContent';
@@ -46,9 +56,128 @@ interface Props {
   synapseApiBase: string;
   roomId: string;
   scopeId?: string;
+  nodeId?: string;
   initialPayload?: FuncSolutionReviewPayload | null;
   blocked?: boolean;
+  /** 历史只读：展示评审结论与节点处理指标，隐藏裁决操作 */
+  readOnly?: boolean;
   onDecided?: () => void;
+}
+
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return `${m}m${rem ? ` ${rem}s` : ''}`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+const MetricStat: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  accent: string;
+}> = ({ icon, label, value, accent }) => (
+  <div
+    className={`min-w-[140px] flex-1 rounded-xl border ${accent} px-4 py-3
+      bg-gradient-to-br from-white/[0.02] to-white/[0.06]
+      shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]`}
+  >
+    <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider opacity-80">
+      {icon}
+      <span>{label}</span>
+    </div>
+    <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value}</div>
+  </div>
+);
+
+const AgentMetricsCard: React.FC<{ row: NodeReviewAgentRow }> = ({ row }) => {
+  const isHost = row.role === 'host';
+  const badge = isHost
+    ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+    : 'bg-violet-500/15 text-violet-300 border-violet-500/40';
+  const icon = isHost ? <Crown className="h-4 w-4" /> : <Bot className="h-4 w-4" />;
+  const label = isHost ? '主持人' : '协作智能体';
+  return (
+    <div className="rounded-xl border border-border/60 bg-[color:var(--panel)]/60 p-4">
+      <div className="mb-3 flex min-w-0 items-center gap-2">
+        <span className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] ${badge}`}>
+          {icon}
+          {label}
+        </span>
+        <span className="min-w-0 truncate font-semibold text-foreground">{row.display_name}</span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 text-center">
+        <div>
+          <div className="text-[10px] text-muted-foreground">委派</div>
+          <div className="font-mono text-base tabular-nums">{row.delegations}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground">工具</div>
+          <div className="font-mono text-base tabular-nums">{row.tool_calls}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground">技能</div>
+          <div className="font-mono text-base tabular-nums">{row.skill_calls}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground">Token</div>
+          <div className="font-mono text-base tabular-nums">{row.tokens.toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function NodeProcessingMetricsSection({ metrics }: { metrics: NodeReviewMetrics | null }) {
+  if (!metrics) return null;
+  const host = metrics.host;
+  const workers = metrics.workers ?? [];
+  const hasAgentRows = Boolean(host) || workers.length > 0;
+  return (
+    <section className="mb-6 rounded-2xl border border-border/50 bg-gradient-to-br from-blue-500/[0.04] to-transparent p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Zap className="h-4 w-4 text-blue-300" />
+        <Text strong>节点处理详情 · 整体指标</Text>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <MetricStat
+          icon={<Hash className="h-3.5 w-3.5" />}
+          label="本节点 Token"
+          value={(metrics.node_token_total ?? 0).toLocaleString()}
+          accent="border-blue-500/40 text-blue-300"
+        />
+        <MetricStat
+          icon={<Timer className="h-3.5 w-3.5" />}
+          label="节点耗时"
+          value={formatDuration(metrics.node_duration_seconds ?? 0)}
+          accent="border-emerald-500/40 text-emerald-300"
+        />
+        <MetricStat
+          icon={<Users className="h-3.5 w-3.5" />}
+          label="委派次数"
+          value={metrics.delegation_total ?? 0}
+          accent="border-amber-500/40 text-amber-300"
+        />
+        <MetricStat
+          icon={<Wrench className="h-3.5 w-3.5" />}
+          label="工具/技能调用"
+          value={(metrics.tool_call_total ?? 0) + (metrics.skill_call_total ?? 0)}
+          accent="border-violet-500/40 text-violet-300"
+        />
+      </div>
+      {hasAgentRows ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          {host ? <AgentMetricsCard row={host} /> : null}
+          {workers.map((w) => (
+            <AgentMetricsCard key={w.profile_id} row={w} />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 type PlanDraft = {
@@ -164,7 +293,8 @@ const PlanReviewCard: React.FC<{
   draft: PlanDraft;
   onChange: (next: PlanDraft) => void;
   isDark: boolean;
-}> = ({ plan, draft, onChange, isDark }) => {
+  readOnly?: boolean;
+}> = ({ plan, draft, onChange, isDark, readOnly = false }) => {
   const approved = draft.status === 'approved';
   const needsChange = draft.status === 'needs_change';
   const reqLabel = (plan.requirement_summary || plan.requirement_ref || '').trim();
@@ -236,7 +366,7 @@ const PlanReviewCard: React.FC<{
             collapsed={draft.collapsed}
             onToggle={() => onChange({ ...draft, collapsed: !draft.collapsed })}
           />
-          <ApproveToggle approved={approved} onToggle={toggleApprove} />
+          {readOnly ? null : <ApproveToggle approved={approved} onToggle={toggleApprove} />}
         </div>
       </div>
 
@@ -276,7 +406,7 @@ const PlanReviewCard: React.FC<{
             <PlanTransformationContent markdown={plan.content_markdown} />
           ) : null}
 
-          {!approved ? (
+          {!readOnly && !approved ? (
             <div className="flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
               <Button
                 size="small"
@@ -290,7 +420,14 @@ const PlanReviewCard: React.FC<{
             </div>
           ) : null}
 
-          {draft.showRejectForm || needsChange ? (
+          {readOnly && needsChange && draft.comment.trim() ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
+              <Text className="!mb-1 block text-[10px] font-medium text-amber-200/90">评审意见</Text>
+              <p className="text-[12px] leading-relaxed text-foreground/90">{draft.comment.trim()}</p>
+            </div>
+          ) : null}
+
+          {!readOnly && (draft.showRejectForm || needsChange) ? (
             <div className="flex flex-col gap-4 rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
               <Text className="!mb-0 block text-[10px] leading-relaxed text-amber-200/90">
                 评审意见（必填，说明不合理之处或改进方向，≥{MIN_PLAN_COMMENT_LEN} 字）
@@ -320,12 +457,15 @@ const PlanReviewCard: React.FC<{
 export function FuncSolutionReviewPanel({
   synapseApiBase,
   roomId,
+  nodeId = 'func_solution',
   initialPayload,
   blocked,
+  readOnly = false,
   onDecided,
 }: Props) {
   const [payload, setPayload] = useState<FuncSolutionReviewPayload | null>(initialPayload ?? null);
   const [loading, setLoading] = useState(!initialPayload);
+  const [nodeMetrics, setNodeMetrics] = useState<NodeReviewMetrics | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [overallComment, setOverallComment] = useState('');
   const [planDrafts, setPlanDrafts] = useState<Record<string, PlanDraft>>(() =>
@@ -363,6 +503,10 @@ export function FuncSolutionReviewPanel({
   }, [roomId]);
 
   useEffect(() => {
+    if (readOnly) {
+      void reload();
+      return;
+    }
     if (initialPayload) {
       setPayload(initialPayload);
       if (!draftsDirtyRef.current) {
@@ -375,7 +519,26 @@ export function FuncSolutionReviewPanel({
       return;
     }
     void reload();
-  }, [initialPayload, reload]);
+  }, [initialPayload, readOnly, reload]);
+
+  useEffect(() => {
+    if (!readOnly || !synapseApiBase || !roomId) {
+      setNodeMetrics(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh: true });
+        if (!cancelled) setNodeMetrics(data.metrics ?? null);
+      } catch {
+        if (!cancelled) setNodeMetrics(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [readOnly, synapseApiBase, roomId, nodeId]);
 
   const plans = payload?.transformation_plans || [];
   const approvedCount = plans.filter((p) => planDrafts[p.id]?.status === 'approved').length;
@@ -546,6 +709,8 @@ export function FuncSolutionReviewPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-6 py-5">
+        {readOnly ? <NodeProcessingMetricsSection metrics={nodeMetrics} /> : null}
+
         {blocked ? (
           <Alert
             type="error"
@@ -604,11 +769,13 @@ export function FuncSolutionReviewPanel({
           <div className="mb-4 flex items-center gap-2">
             <Layers className="h-4 w-4 text-violet-400" />
             <Text strong>改造方案清单</Text>
-            <Tooltip title="保存当前逐条评审状态">
-              <Button size="small" type="link" onClick={() => void persistPlans()}>
-                保存进度
-              </Button>
-            </Tooltip>
+            {readOnly ? null : (
+              <Tooltip title="保存当前逐条评审状态">
+                <Button size="small" type="link" onClick={() => void persistPlans()}>
+                  保存进度
+                </Button>
+              </Tooltip>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -618,13 +785,22 @@ export function FuncSolutionReviewPanel({
                 plan={plan}
                 draft={planDrafts[plan.id] || planDraftFromPayload(plan)}
                 isDark={isDark}
+                readOnly={readOnly}
                 onChange={(next) => updatePlanDraft(plan.id, next)}
               />
             ))}
           </div>
         </section>
+
+        {readOnly && overallComment.trim() ? (
+          <section className="mt-6 rounded-2xl border border-border/50 bg-black/15 p-5">
+            <Text className="!mb-2 block text-[11px] font-medium text-muted-foreground">总体评审意见</Text>
+            <p className="text-[12px] leading-relaxed text-foreground/90">{overallComment.trim()}</p>
+          </section>
+        ) : null}
       </div>
 
+      {readOnly ? null : (
       <div className="shrink-0 border-t border-border/50 bg-black/20 px-6 py-4">
         <div className="flex flex-col gap-4">
           <Text className="!mb-0 block text-[11px] text-muted-foreground">
@@ -662,6 +838,7 @@ export function FuncSolutionReviewPanel({
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,25 @@ _ECHO_CONFIRM_RE = re.compile(
 )
 
 CLARIFY_FILL_CTX_FILENAME = "clarify_fill_ctx.json"
+CLARIFY_SECTIONS_FILENAME = "clarify_sections.json"
+_UNDERSTANDING_PENDING = "（待归纳）"
+
+_CLARIFY_SECTION_SCALAR_MAP: dict[str, str] = {
+    "motivation_trigger": "trigger_scenario",
+    "trigger_scenario": "trigger_scenario",
+    "motivation_pain": "pain_point",
+    "pain_point": "pain_point",
+    "motivation_benefit": "expected_benefit",
+    "expected_benefit": "expected_benefit",
+    "scope_in": "scope_in",
+    "scope_out": "scope_out",
+    "background": "BACKGROUND",
+    "tech_constraint": "tech_constraint",
+    "module_dependency": "module_dependency",
+    "data_dependency": "data_dependency",
+}
+
+_CLARIFY_SECTION_LIST_KEYS = ("feature_points", "scenarios", "acceptance_criteria")
 
 
 def _normalize_text(text: str) -> str:
@@ -117,16 +136,175 @@ def parse_open_research_items(
 
 
 def _confirmed_answer_text(rec: dict[str, Any]) -> str:
+    """用户确认内容（选项 + 自定义输入），供摘要/台账表格使用。"""
+    return _format_user_answer(rec)
+
+
+def _format_all_options(rec: dict[str, Any]) -> str:
+    snapshot = rec.get("options_snapshot")
+    if isinstance(snapshot, list) and snapshot:
+        labels: list[str] = []
+        for idx, opt in enumerate(snapshot, 1):
+            if not isinstance(opt, dict):
+                continue
+            label = str(opt.get("label") or opt.get("value") or "").strip()
+            if label:
+                labels.append(f"{idx}. {label}")
+        if labels:
+            return "；".join(labels)
+    labels_raw = rec.get("option_labels")
+    if isinstance(labels_raw, list) and labels_raw:
+        return "；".join(str(x).strip() for x in labels_raw if str(x).strip())
+    return "（无选项）"
+
+
+def _format_user_answer(rec: dict[str, Any]) -> str:
+    parts: list[str] = []
     labels = rec.get("option_labels")
     if isinstance(labels, list) and labels:
-        return "；".join(str(x).strip() for x in labels if str(x).strip())
-    return str(rec.get("user_input") or "").strip()
+        parts.extend(str(x).strip() for x in labels if str(x).strip())
+    user_input = str(rec.get("user_input") or "").strip()
+    if user_input:
+        parts.append(user_input)
+    return "；".join(parts) if parts else ""
+
+
+def _format_understanding(
+    rec: dict[str, Any],
+    understanding_by_qid: dict[str, str] | None = None,
+) -> str:
+    qid = str(rec.get("id") or "").strip()
+    if understanding_by_qid and qid:
+        summary = str(understanding_by_qid.get(qid) or "").strip()
+        if summary:
+            return summary
+    summary = str(rec.get("understanding_summary") or "").strip()
+    if summary:
+        return summary
+    return _UNDERSTANDING_PENDING
+
+
+def _question_context(rec: dict[str, Any]) -> str:
+    for key in ("context_snapshot", "context"):
+        text = str(rec.get(key) or "").strip()
+        if text:
+            return text
+    return str(rec.get("title") or "").strip()
+
+
+def seed_clarify_base_ctx(scope_type: str, scope_id: str) -> dict[str, Any]:
+    """从工单快照注入模板标量默认值。"""
+    from synapse.rd_meeting.userwork_sync import load_scope_work_order_context
+
+    sid = (scope_id or "").strip()
+    if not sid:
+        return {}
+    wo = load_scope_work_order_context(scope_type, sid)  # type: ignore[arg-type]
+    title = str(wo.get("demand_title") or wo.get("task_title") or "").strip()
+    return {
+        "REQUIREMENT_NAME": title or "[待补充]",
+        "DEMAND_DESC": str(wo.get("demand_desc") or "").strip() or "[待补充]",
+        "BACKGROUND": str(wo.get("demand_impact") or "").strip() or "[待补充]",
+        "trigger_scenario": "[待补充]",
+        "pain_point": "[待补充]",
+        "expected_benefit": "[待补充]",
+        "scope_in": "[待补充]",
+        "scope_out": "[待补充]",
+        "tech_constraint": "[待补充]",
+        "module_dependency": "[待补充]",
+        "data_dependency": "[待补充]",
+    }
+
+
+def _is_placeholder(value: Any) -> bool:
+    text = str(value or "").strip()
+    return not text or text in ("[待补充]", "（无）", _UNDERSTANDING_PENDING)
+
+
+def load_clarify_sections(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def clarify_sections_path(scope_id: str, stage_name: str, node_id: str) -> Path:
+    return clarify_fill_ctx_path(scope_id, stage_name, node_id).parent / CLARIFY_SECTIONS_FILENAME
+
+
+def _merge_scalar_sections(ctx: dict[str, Any], sections: dict[str, Any]) -> None:
+    scalar_keys = (
+        "BACKGROUND",
+        "trigger_scenario",
+        "pain_point",
+        "expected_benefit",
+        "scope_in",
+        "scope_out",
+        "tech_constraint",
+        "module_dependency",
+        "data_dependency",
+    )
+    for key in scalar_keys:
+        val = sections.get(key)
+        if val is not None and not _is_placeholder(val):
+            ctx[key] = str(val).strip()
+
+
+def _merge_list_sections(ctx: dict[str, Any], sections: dict[str, Any]) -> None:
+    for key in _CLARIFY_SECTION_LIST_KEYS:
+        val = sections.get(key)
+        if isinstance(val, list) and val:
+            ctx[key] = val
+
+
+def _apply_confirmed_section_tags(ctx: dict[str, Any], confirmed: dict[str, Any]) -> None:
+    """有 clarify_section 标签的已确认题 → 写入对应章节（用户原始回答）。"""
+    for rec in confirmed.values():
+        if not isinstance(rec, dict):
+            continue
+        tag = str(rec.get("clarify_section") or "").strip()
+        if not tag:
+            continue
+        answer = _format_user_answer(rec)
+        if not answer:
+            continue
+        scalar_key = _CLARIFY_SECTION_SCALAR_MAP.get(tag)
+        if scalar_key and _is_placeholder(ctx.get(scalar_key)):
+            ctx[scalar_key] = answer
+        elif tag == "feature":
+            fp = ctx.setdefault("feature_points", [])
+            if isinstance(fp, list):
+                fp.append({"point": answer})
+        elif tag == "scenario" and isinstance(rec.get("scenario"), dict):
+            scenarios = ctx.setdefault("scenarios", [])
+            if isinstance(scenarios, list):
+                scenarios.append(dict(rec["scenario"]))
+        elif tag == "acceptance":
+            ac = ctx.setdefault("acceptance_criteria", [])
+            if isinstance(ac, list):
+                ac.append({"criterion": answer})
+
+
+def merge_sections_into_ctx(ctx: dict[str, Any], sections: dict[str, Any] | None) -> dict[str, str]:
+    """合并 Host/专家写入的 clarify_sections.json。"""
+    if not isinstance(sections, dict) or not sections:
+        return {}
+    _merge_scalar_sections(ctx, sections)
+    _merge_list_sections(ctx, sections)
+    raw_map = sections.get("understanding_by_qid")
+    if isinstance(raw_map, dict):
+        return {str(k): str(v).strip() for k, v in raw_map.items() if str(v or "").strip()}
+    return {}
 
 
 def merge_confirmed_into_clarify_ctx(
     hitl_doc: dict[str, Any] | None,
     *,
     base: dict[str, Any] | None = None,
+    sections: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """hitl_context → ``fill_clarify.py`` / ``需求澄清.md`` 模板 CONTEXT_JSON。"""
     ctx: dict[str, Any] = dict(base or {})
@@ -138,6 +316,8 @@ def merge_confirmed_into_clarify_ctx(
     ctx.setdefault("acceptance_criteria", [])
     ctx.setdefault("feature_points", [])
 
+    understanding_by_qid = merge_sections_into_ctx(ctx, sections)
+
     if not isinstance(hitl_doc, dict):
         ctx["open_research_items"] = []
         ctx["confirmed_snapshot"] = {}
@@ -146,6 +326,8 @@ def merge_confirmed_into_clarify_ctx(
     confirmed = hitl_doc.get("confirmed_by_id")
     if not isinstance(confirmed, dict):
         confirmed = {}
+
+    _apply_confirmed_section_tags(ctx, confirmed)
 
     dialogue: list[dict[str, Any]] = []
     conclusions: list[dict[str, Any]] = []
@@ -158,26 +340,30 @@ def merge_confirmed_into_clarify_ctx(
         if not qid_s or qid_s in _SKIP_QIDS:
             continue
         title = str(rec.get("title") or qid_s).strip()
-        answer = _confirmed_answer_text(rec)
-        user_input = str(rec.get("user_input") or "").strip()
-        conclusions.append({"title": title, "summary": answer or user_input})
+        user_answer = _format_user_answer(rec)
+        all_options = _format_all_options(rec)
+        understanding = _format_understanding(rec, understanding_by_qid)
+        qtype = str(rec.get("question_type") or "confirmed").strip() or "confirmed"
+        context = _question_context(rec)
+        conclusions.append({"title": title, "summary": user_answer or understanding})
         dialogue.append(
             {
                 "question_title": title,
-                "type": "confirmed",
-                "options": answer,
-                "user_answer": answer or user_input,
+                "type": qtype,
+                "options": all_options,
+                "user_answer": user_answer or "（无）",
             }
         )
         unclear.append(
             {
                 "question": title,
                 "title": title,
-                "context": user_input or answer,
+                "context": context,
+                "options_all": all_options,
                 "ref": f"hitl_context.confirmed_by_id.{qid_s}",
                 "state": "confirmed",
-                "answer_org": user_input or answer,
-                "answer": answer or user_input,
+                "answer_org": user_answer or "（无）",
+                "answer": understanding,
             }
         )
 
@@ -189,6 +375,7 @@ def merge_confirmed_into_clarify_ctx(
                 "question": f"[待调研] {text[:120]}",
                 "title": str(item.get("source") or "open_research"),
                 "context": text,
+                "options_all": "（无选项）",
                 "ref": str(item.get("source") or ""),
                 "state": "researching",
                 "answer_org": text,
@@ -207,17 +394,105 @@ def merge_confirmed_into_clarify_ctx(
     return ctx
 
 
+def enrich_clarify_ctx_from_disk(ctx: dict[str, Any], ctx_path: Path | str) -> dict[str, Any]:
+    """渲染前合并同目录 ``clarify_sections.json``（Host 可能在系统写入 ctx 之后更新）。"""
+    path = Path(ctx_path)
+    sections = load_clarify_sections(path.parent / CLARIFY_SECTIONS_FILENAME)
+    understanding_by_qid = merge_sections_into_ctx(ctx, sections)
+    if not understanding_by_qid:
+        return ctx
+    for item in ctx.get("unclear") or []:
+        if not isinstance(item, dict):
+            continue
+        ref = str(item.get("ref") or "")
+        match = re.search(r"confirmed_by_id\.([^.]+)$", ref)
+        if not match:
+            continue
+        qid = match.group(1)
+        summary = understanding_by_qid.get(qid)
+        if summary:
+            item["answer"] = summary
+    return ctx
+
+
+def rewrite_clarify_fill_ctx_at_path(ctx_path: Path | str) -> Path:
+    """doc-generate 前回写：合并 ``clarify_sections.json`` 并更新 ``clarify_fill_ctx.json``。"""
+    path = Path(ctx_path)
+    ctx = json.loads(path.read_text(encoding="utf-8"))
+    ctx = enrich_clarify_ctx_from_disk(ctx, path)
+    path.write_text(json.dumps(ctx, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+_CLARIFY_REQUIRED_SCALARS_WHEN_CONFIRMED = (
+    "scope_in",
+    "scope_out",
+    "trigger_scenario",
+    "pain_point",
+    "expected_benefit",
+)
+
+
+def validate_clarify_context_completeness(
+    ctx: dict[str, Any],
+    *,
+    strict: bool = False,
+) -> list[str]:
+    """已有问卷确认时，检查范围/动机/理解总结是否仍为空。"""
+    issues: list[str] = []
+    confirmed = ctx.get("confirmed_snapshot")
+    has_confirmed = isinstance(confirmed, dict) and any(
+        str(k).strip() not in _SKIP_QIDS for k in confirmed
+    )
+    if not has_confirmed:
+        return issues
+
+    for key in _CLARIFY_REQUIRED_SCALARS_WHEN_CONFIRMED:
+        if _is_placeholder(ctx.get(key)):
+            issues.append(f"已有用户确认项但 {key} 仍为待补充（须写入 clarify_sections.json）")
+
+    for item in ctx.get("unclear") or []:
+        if not isinstance(item, dict) or item.get("state") != "confirmed":
+            continue
+        title = str(item.get("title") or item.get("question") or "").strip() or "未命名题"
+        if str(item.get("answer") or "").strip() == _UNDERSTANDING_PENDING:
+            issues.append(f"题「{title}」理解总结仍为待归纳（须写入 understanding_by_qid）")
+
+    if strict:
+        if not ctx.get("feature_points"):
+            issues.append("已有确认项但 feature_points 为空")
+        if not ctx.get("scenarios"):
+            issues.append("已有确认项但 scenarios 为空")
+        if not ctx.get("acceptance_criteria"):
+            issues.append("已有确认项但 acceptance_criteria 为空")
+    return issues
+
+
 def build_doc_generate_context_json(
     scope_id: str,
     node_id: str,
     *,
     binding: dict[str, Any] | None = None,
     base: dict[str, Any] | None = None,
+    scope_type: str = "demand",
 ) -> dict[str, Any]:
+    from synapse.rd_meeting.hitl_confirmed import resolve_stage_name_for_node
     from synapse.rd_meeting.hitl_context import read_hitl_context
 
-    doc = read_hitl_context(scope_id, node_id, binding=binding)
-    return merge_confirmed_into_clarify_ctx(doc, base=base)
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    doc = read_hitl_context(sid, nid, binding=binding)
+    seed = seed_clarify_base_ctx(scope_type, sid)
+    merged_base = {**seed, **(base or {})}
+    stg = resolve_stage_name_for_node(nid, binding)
+    sections: dict[str, Any] = {}
+    if stg:
+        sections = load_clarify_sections(clarify_sections_path(sid, stg, nid))
+    return merge_confirmed_into_clarify_ctx(
+        doc,
+        base=merged_base,
+        sections=sections,
+    )
 
 
 def clarify_fill_ctx_path(scope_id: str, stage_name: str, node_id: str) -> Path:
@@ -232,6 +507,7 @@ def write_clarify_fill_ctx(
     *,
     binding: dict[str, Any] | None = None,
     base: dict[str, Any] | None = None,
+    scope_type: str = "demand",
 ) -> Path | None:
     """落盘 doc-generate 用的 clarify CONTEXT_JSON（相对归档目录 .tmp/）。"""
     from synapse.rd_meeting.hitl_confirmed import resolve_stage_name_for_node
@@ -243,7 +519,13 @@ def write_clarify_fill_ctx(
     stg = resolve_stage_name_for_node(nid, binding)
     if not stg:
         return None
-    ctx = build_doc_generate_context_json(sid, nid, binding=binding, base=base)
+    ctx = build_doc_generate_context_json(
+        sid,
+        nid,
+        binding=binding,
+        base=base,
+        scope_type=scope_type,
+    )
     path = clarify_fill_ctx_path(sid, stg, nid)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(ctx, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -307,7 +589,10 @@ def build_clarify_followup_brief(
     clarify_md = ""
     if stg:
         fill_path = str(clarify_fill_ctx_path(sid, stg, nid).resolve())
+        sections_path = str(clarify_sections_path(sid, stg, nid).resolve())
         clarify_md = str((archive_node_dir(sid, stg, nid) / "需求澄清.md").resolve())
+    else:
+        sections_path = ""
 
     rounds = len(doc.get("rounds") or []) if isinstance(doc, dict) else 0
     round_n = max(2, rounds + 1)
@@ -327,17 +612,21 @@ def build_clarify_followup_brief(
             "",
             "### 强制工序（按序，不可跳步）",
             "1. `read_file` 人机台账：`" + ctx_path + "`，综合 `confirmed_by_id` 全量历史。",
-            "2. 使用系统已生成的 doc-generate 上下文：`" + fill_path + "` 作为 `CONTEXT_JSON`（若不存在须先由系统写入）。",
-            "3. **必须** `whalecloud-dev-tool-doc-generate` 重生成 `需求澄清.md`（保留已确认结论，待调研项标记为 researching）。",
+            "2. 综合 Phase 1–4 / Phase R 分析，**write_file** 更新结构化章节：`"
+            + sections_path
+            + "`（含 `understanding_by_qid`、scope_in/out、scenarios 等；见 skeleton）。",
+            "3. 系统已生成 doc-generate 上下文：`" + fill_path + "`（含工单种子 + 台账 + sections）；"
+            "doc-generate 时 **必须** 以其为 `CONTEXT_JSON`。",
+            "4. **必须** `whalecloud-dev-tool-doc-generate` 重生成 `需求澄清.md`（保留已确认结论，待调研项标记为 researching）。",
             "   - 产出路径：`" + clarify_md + "`",
-            "4. **必须**委派 `whalecloud-requirement-expert` 执行技能 **Phase R（会中续澄清）**：",
+            "5. **必须**委派 `whalecloud-requirement-expert` 执行技能 **Phase R（会中续澄清）**：",
             "   - 注入 `OPEN_RESEARCH_ITEMS`（上方待调研列表）与 `CONFIRMED_SNAPSHOT`；",
             "   - 在代码/文档中检索证据后产出**新** `unclear[]` 条目；",
             "   - **禁止**把用户补充原文改写成「请确认您是否指…」。",
-            "5. 仅对 Phase R 调研后的**新未决点**调用 `submit_hitl_questionnaire(kind=interactive)`；",
+            "6. 仅对 Phase R 调研后的**新未决点**调用 `submit_hitl_questionnaire(kind=interactive)`；",
             "   - `questions[]` 不得包含已确认题 id；",
             "   - 不得出现对用户补充原文的回声确认题（工具会拒绝）。",
-            "6. 提交问卷后立即停止。",
+            "7. 提交问卷后立即停止。",
             "",
             "### OPEN_RESEARCH_ITEMS（JSON，委派时附带）",
             "```json",

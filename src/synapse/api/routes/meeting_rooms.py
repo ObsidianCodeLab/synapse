@@ -39,6 +39,20 @@ class OpenMeetingBody(BaseModel):
     promote_to_processing: bool = Field(
         True, description="待处理工单开会时推进为处理中并定位首节点"
     )
+    soul_instruction: str | None = Field(
+        None,
+        description="可选灵魂建议；非空时写入 work/SOUL_INSTRUCTION.json（全局共用）",
+    )
+
+
+class PutSoulInstructionBody(BaseModel):
+    instruction: str = Field("", description="灵魂建议正文，空字符串表示清除")
+    scope_id: str | None = Field(
+        None,
+        description="可选：清除该工单主控提示词缓存，便于后续节点复跑时生效",
+    )
+
+
 class InterveneBody(BaseModel):
     text: str = Field(..., description="人工指令或聊天内容")
     message_type: str = Field("instruction", description="instruction 或 chat")
@@ -232,6 +246,31 @@ async def stop_meeting_room(room_id: str) -> dict:
         return error_response(500, "stop_meeting_room_failed", str(exc))
 
 
+@router.get("/api/dev/soul-instruction")
+async def get_soul_instruction() -> dict:
+    """读取全局灵魂建议（work/SOUL_INSTRUCTION.json）。"""
+    try:
+        item = _service.get_soul_instruction()
+        return success_response(item)
+    except Exception as exc:
+        logger.exception("get_soul_instruction failed: %s", exc)
+        return error_response(500, "get_soul_instruction_failed", str(exc))
+
+
+@router.put("/api/dev/soul-instruction")
+async def put_soul_instruction(body: PutSoulInstructionBody) -> dict:
+    """更新全局灵魂建议；可选清除指定工单的主控提示词缓存。"""
+    try:
+        item = _service.put_soul_instruction(
+            body.instruction,
+            scope_id=body.scope_id,
+        )
+        return success_response(item)
+    except Exception as exc:
+        logger.exception("put_soul_instruction failed: %s", exc)
+        return error_response(500, "put_soul_instruction_failed", str(exc))
+
+
 @router.post("/api/dev/meeting-rooms/open")
 async def open_meeting(body: OpenMeetingBody, request: Request) -> dict:
     pool = getattr(request.app.state, "agent_pool", None)
@@ -242,6 +281,7 @@ async def open_meeting(body: OpenMeetingBody, request: Request) -> dict:
             prod=body.prod.strip(),
             sync_userwork=body.sync_userwork,
             promote_to_processing=body.promote_to_processing,
+            soul_instruction=body.soul_instruction,
             agent_pool=pool,
         )
         return success_response(item)

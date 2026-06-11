@@ -20,7 +20,8 @@
       "ref": "hitl_context.confirmed_by_id.Q1 或 代码路径",
       "state": "confirmed | researching | open",
       "answer_org": "用户原始回答或补充",
-      "answer": "理解总结或 [待系统调研后形成澄清问题]",
+      "answer": "理解总结或（待归纳）",
+      "options_all": "1. 选项A；2. 选项B",
       "sub_questions": []
     }
   ],

@@ -469,6 +469,40 @@ class MeetingRoomService:
         pending.sort(key=lambda x: (x.get("updated_at") or ""), reverse=True)
         return pending
 
+    def get_soul_instruction(self) -> dict[str, Any]:
+        from synapse.rd_meeting.soul_instruction import (
+            load_soul_instruction,
+            load_soul_instruction_payload,
+            soul_instruction_path,
+        )
+
+        payload = load_soul_instruction_payload()
+        return {
+            "instruction": load_soul_instruction(),
+            "updated_at": payload.get("updated_at"),
+            "path": str(soul_instruction_path()),
+        }
+
+    def put_soul_instruction(
+        self,
+        instruction: str,
+        *,
+        scope_id: str | None = None,
+    ) -> dict[str, Any]:
+        from synapse.rd_meeting.host_prompt_cache import clear_host_prompt_cache
+        from synapse.rd_meeting.soul_instruction import save_soul_instruction, soul_instruction_path
+
+        payload = save_soul_instruction(instruction)
+        sid = (scope_id or "").strip()
+        if sid:
+            clear_host_prompt_cache(sid)
+        return {
+            "instruction": str(payload.get("instruction") or ""),
+            "updated_at": payload.get("updated_at"),
+            "path": str(soul_instruction_path()),
+            "cache_cleared_scope_id": sid or None,
+        }
+
     def open_meeting(
         self,
         scope_type: ScopeType,
@@ -477,6 +511,7 @@ class MeetingRoomService:
         prod: str = "",
         sync_userwork: bool = True,
         promote_to_processing: bool = True,
+        soul_instruction: str | None = None,
         agent_pool: Any | None = None,
     ) -> dict[str, Any]:
         """一键开会：
@@ -493,6 +528,10 @@ class MeetingRoomService:
         prod_key = (prod or "").strip()
         if not prod_key:
             raise ValueError("请选择产品（prod）")
+
+        from synapse.rd_meeting.soul_instruction import save_soul_instruction_if_provided
+
+        save_soul_instruction_if_provided(soul_instruction)
 
         existing_dev = load_dev_status(sid)
         if existing_dev is not None:
@@ -1157,7 +1196,7 @@ class MeetingRoomService:
                     write_clarify_fill_ctx,
                 )
 
-                write_clarify_fill_ctx(sid, node_id, binding=hitl_binding)
+                write_clarify_fill_ctx(sid, node_id, binding=hitl_binding, scope_type=scope_type)
                 followup_brief = build_clarify_followup_brief(sid, node_id, binding=hitl_binding)
                 if followup_brief:
                     append_user_context_pending(sid, followup_brief)

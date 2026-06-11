@@ -66,6 +66,42 @@ def find_repo_root_with_synapse_archive(start: Path) -> Optional[Path]:
     return None
 
 
+SOUL_INSTRUCTION_FILENAME = "SOUL_INSTRUCTION.json"
+
+
+def resolve_soul_instruction_from_code_path(code_path: str) -> str:
+    """从 code_path 向上查找 work/SOUL_INSTRUCTION.json 并读取 instruction 字段。"""
+    code = Path(code_path).resolve()
+    if not code.exists():
+        start = code.parent
+    else:
+        start = code if code.is_dir() else code.parent
+    for candidate in [start, *start.parents]:
+        soul_file = candidate / SOUL_INSTRUCTION_FILENAME
+        if not soul_file.is_file():
+            continue
+        try:
+            data = json.loads(soul_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return ""
+        if isinstance(data, dict):
+            return str(data.get("instruction") or "").strip()
+        return ""
+    return ""
+
+
+def format_soul_instruction_cli_lines(code_path: str) -> list[str]:
+    text = resolve_soul_instruction_from_code_path(code_path)
+    if not text:
+        return []
+    return [
+        "【灵魂建议 · SOUL_INSTRUCTION】",
+        text,
+        "使用技能、改码与验收时须充分参考上述关键流程与模块指引。",
+        "",
+    ]
+
+
 def resolve_agents_md_path(code_path: str) -> Optional[Path]:
     """解析工作区 AGENTS.md（与 synapse_archive 同级的代码根目录）。"""
     code = Path(code_path).resolve()
@@ -527,6 +563,7 @@ def build_develop_prompt(
             parts.append(f"请继续参照函数级方案文档：{doc_path}")
         if acceptance_doc:
             parts.append(f"请继续满足验收标准文档：{acceptance_doc}")
+        parts.extend(format_soul_instruction_cli_lines(code_path))
         parts.extend(
             [
                 f"代码工作目录：{code_path}",
@@ -561,6 +598,7 @@ def build_develop_prompt(
         parts.append(f"请在代码工作目录 {code_path} 中完成下列开发任务。")
     if acceptance_doc:
         parts.append(f"同时阅读并对照验收标准文档：{acceptance_doc}")
+    parts.extend(format_soul_instruction_cli_lines(code_path))
     parts.extend(["", f"任务目标：{target}", "", base_rules])
     return continue_prefix + "\n".join(parts)
 

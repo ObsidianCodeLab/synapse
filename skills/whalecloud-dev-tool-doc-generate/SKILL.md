@@ -87,11 +87,14 @@ run_skill_script(
   script_name="fill_clarify.py",
   args=[
     "skills/whalecloud-dev-tool-doc-generate/templates/需求澄清.md",
-    "{OUTPUT_DIR}/.tmp/_clarify_fill_ctx.json",
-    "{OUTPUT_DIR}/.tmp/_clarify_fill_out.md"
+    "{OUTPUT_DIR}/.tmp/clarify_fill_ctx.json",
+    "{OUTPUT_DIR}/.tmp/_clarify_fill_out.md",
+    "true"
   ]
 )
 ```
+
+`args` 第 4 项为 `STRICT`（`true` 时校验 scope/动机/理解总结非空；已有 `confirmed_snapshot` 时 **必须** `true`）。渲染前脚本会自动 merge 同目录 `clarify_sections.json` 并回写 `clarify_fill_ctx.json`。
 
 ---
 
@@ -152,11 +155,11 @@ run_skill_script(
 
 当 Host 运行时头给出节点归档下的 **`hitl_context.json` 绝对路径**且文件存在时：
 
-1. **需求澄清（`需求澄清.md`）**：若同目录 `.tmp/clarify_fill_ctx.json` 存在，**优先**以其为 `CONTEXT_JSON`（系统已从 `hitl_context` 合并已确认项与待调研项）；否则读 `hitl_context.json` 并按 [references/clarify_context.skeleton.json](references/clarify_context.skeleton.json) 手工映射。
+1. **需求澄清（`需求澄清.md`）**：若同目录 `.tmp/clarify_fill_ctx.json` 存在，**优先**以其为 `CONTEXT_JSON`（系统已从工单、`hitl_context`、`clarify_sections.json` 合并）；**doc-generate 前**须先 `write_file` 更新 `.tmp/clarify_sections.json`（骨架见 [references/clarify_sections.skeleton.json](references/clarify_sections.skeleton.json)）；`fill_clarify.py` 渲染时会再次合并 sections。
 2. 综合 `rounds[]` 与 `confirmed_by_id` 填充模板；**禁止**仅凭本轮对话摘要或 `人机交互清单.md` 落盘。
 3. **禁止**自写 `clarify_context.json` 等替代文件名。
 4. `result_confirm` 验收问卷**不得**触发整篇覆盖已生成的会议产出。
-5. `需求澄清.md` 可选用 `scripts/fill_clarify.py`；可先 `--validate-only` 校验 CONTEXT_JSON 契约。
+5. `需求澄清.md` 可选用 `scripts/fill_clarify.py`；可先 `--validate-only [--strict]` 校验 CONTEXT_JSON 契约与章节完整性；**已有问卷确认时 STRICT 必须为 true**。
 
 ---
 
@@ -189,7 +192,7 @@ Step 3 — 填充模板
       - **必须** `run_skill_script`（见上文「共享脚本」）：`fill_function_solution.py` + 模板路径 + ctx.json + `_function_solution_fill_out.md` 三个参数
       - 脚本非零退出或校验失败 → **中止**；**禁止**手填 `{{VAR}}` / `{{#each}}` 或跳过脚本
       - `read_file` 读取 `_function_solution_fill_out.md`，**必须**以 `write_file` 写入 `{OUTPUT_DIR}/{OUTPUT}`（交付物不得仅依赖脚本 `open` 写盘）；可删除 `.tmp` 下临时文件
-  3b. 其他模板：读取 `templates/{TEMPLATE}`，按 [references/template-filling.md](references/template-filling.md) 手填（替换 `{{VAR}}`、展开 `{{#each}}`、处理 `{{#if}}`）；`需求澄清.md` 可选用 `scripts/fill_clarify.py`（`run_skill_script`，ctx/out 先写入 `.tmp/`）
+  3b. 其他模板：读取 `templates/{TEMPLATE}`，按 [references/template-filling.md](references/template-filling.md) 手填；`需求澄清.md` **必须** `scripts/fill_clarify.py`（第 4 参数 `true`=STRICT；先 merge `clarify_sections.json`）
   3c. 空列表按规范写「（无）」或保留调用方提供的占位说明（`函数级方案.md` 由脚本处理）。
   3d. 自检：无未解析 `{{` 占位符、无 `{{#each` 残留；`函数级方案.md` 须含模板固定章节与表头（见 template-filling.md）。
 
@@ -255,6 +258,7 @@ OUTPUT_MODE: file
 | 未使用 `write_file` 写盘 | **中止**，改用 `write_file` 重写 |
 | `OUTPUT=函数级方案.md` 未执行 `scripts/fill_function_solution.py` 或手填模板 | **中止**，按 Step 3a 重试 |
 | `scripts/fill_function_solution.py` 执行失败或 `CONTEXT_JSON 契约校验失败` | **中止**，对照 skeleton.json 修正键名后重试 |
+| `需求澄清.md` + 已有确认项但 `fill_clarify.py` 完整性校验失败 | **中止**，补写 `clarify_sections.json`（含 `understanding_by_qid`、scope_in/out、scenarios）后重试 |
 
 ---
 

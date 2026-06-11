@@ -27,7 +27,9 @@ label: 需求澄清技能
 > 
 > **本技能执行过程中，大模型只能输出以下内容：**
 > - **提问阶段**：直接输出问题（格式不限制，可根据需要选择）
-> - **完成阶段**：直接输出澄清后的内容总结
+> - **完成阶段（研发会议室 Host 委派）**：输出 **`clarify_sections` JSON 片段**（见完成阶段 §5b）
+> - **完成阶段（非会议室）**：直接输出澄清后的内容总结
+> - **Phase R（会中续澄清）**：输出结构化 JSON 片段（含 `clarify_sections_delta`）
 > 
 > **严格禁止输出任何其他内容**（解释、说明、提示、调试信息、日志等）
 > 
@@ -49,6 +51,7 @@ label: 需求澄清技能
 | `SIMILAR_DEMAND_DOC` | 否 | 相似历史工单方案文档正文。若已提供则直接使用；未提供则通过历史相似工单搜索能力获取 |
 | `OPEN_RESEARCH_ITEMS` | 否 | Phase R：Host 注入的待调研补充项 JSON 数组 |
 | `CONFIRMED_SNAPSHOT` | 否 | Phase R：已确认问卷项（`hitl_context.confirmed_by_id`） |
+| `CLARIFY_SECTIONS` | 否 | `.tmp/clarify_sections.json` 路径；完成阶段 / Phase R 须 merge 写入 |
 | `ROUND_N` | 否 | Phase R：会中澄清轮次（≥2） |
 
 > **注意**：用户回复内容存放在系统提示词上下文中，智能体需自行从上下文中提取。
@@ -64,7 +67,9 @@ label: 需求澄清技能
 **整个技能执行过程中，大模型只能输出以下内容：**
 
 1. **提问阶段**：直接输出问题（格式不限制，可根据需要选择）
-2. **完成阶段**：直接输出澄清后的内容总结
+2. **完成阶段（会议室）**：输出 `clarify_sections` JSON 片段
+3. **完成阶段（非会议室）**：直接输出澄清后的内容总结
+4. **Phase R**：输出结构化 JSON 片段
 
 **禁止输出任何其他内容**：
 - 不得输出任何解释、说明、上下文等信息
@@ -151,6 +156,26 @@ label: 需求澄清技能
 3. 为每条蓝色卡片推导绿色卡片（具体示例），推导方向由动机确认结果引导
 4. 识别红色卡片（无法从代码、文档或需求单上下文确认的问题）
 5. 绿色卡片转化为示例驱动的问题选项，红色卡片转化为判断题或开放题
+
+#### D4. 会中问卷题目标签 `clarify_section`（研发会议室 Host 出题时强制）
+
+Host 调用 `submit_hitl_questionnaire` 时，每题除 `id/title/type/options/context` 外，**必须**携带 `clarify_section`，供系统写入 `需求澄清.md` 对应章节：
+
+| `clarify_section` | 写入字段 |
+|-------------------|----------|
+| `scope_in` | `scope_in` |
+| `scope_out` | `scope_out` |
+| `motivation_trigger` / `trigger_scenario` | `trigger_scenario` |
+| `motivation_pain` / `pain_point` | `pain_point` |
+| `motivation_benefit` / `expected_benefit` | `expected_benefit` |
+| `background` | `BACKGROUND` |
+| `tech_constraint` | `tech_constraint` |
+| `module_dependency` | `module_dependency` |
+| `data_dependency` | `data_dependency` |
+| `feature` | `feature_points[]` |
+| `acceptance` | `acceptance_criteria[]` |
+
+Phase 1 范围题须标 `scope_in` / `scope_out`；Phase 2 动机三题须标对应 `motivation_*`；Phase 3–4 功能/验收题标 `feature` / `acceptance` / `scenario`（BDD 场景写入 `scenarios[]` 由 Host 汇总到 `clarify_sections.json`）。
 
 ---
 
@@ -379,6 +404,7 @@ Phase 4 — 深度澄清：三视角问题澄清（最终交付）
 | `OPEN_RESEARCH_ITEMS` | 用户补充/末题说明，**待调研假设**列表 |
 | `PRIOR_CLARIFY_MD` | 已生成的 `需求澄清.md` 路径（可选） |
 | `CLARIFY_FILL_CTX` | 系统生成的 `clarify_fill_ctx.json` 路径（doc-generate 用） |
+| `CLARIFY_SECTIONS` | Host 维护的 `clarify_sections.json` 路径（Phase R / 完成阶段 merge 写入） |
 | `ROUND_N` | 当前会中轮次（≥2） |
 
 **强制约束**：
@@ -396,11 +422,13 @@ Phase 4 — 深度澄清：三视角问题澄清（最终交付）
 
   Rc. 按约束 D1/D2 为**新未决点**生成示例驱动问题（输出 JSON 片段：`new_unclear[]`，供 Host 下一问卷使用）。
 
-  Rd. 输出结构化 JSON（非对用户喊话），包含 `conclusions_delta`、`new_unclear`、`research_notes`。
+  Rd. 输出结构化 JSON（非对用户喊话），包含 `conclusions_delta`、`new_unclear`、`research_notes`、**`clarify_sections_delta`**（与 [whalecloud-dev-tool-doc-generate/references/clarify_sections.skeleton.json](../whalecloud-dev-tool-doc-generate/references/clarify_sections.skeleton.json) 同构；**必须**含 `understanding_by_qid`，每条须引用代码/文档路径，不得与用户 `answer_org` 逐字相同）。
+
+  Re. Host 将 `clarify_sections_delta` **merge** 写入 `CLARIFY_SECTIONS`（或 `.tmp/clarify_sections.json`），再 doc-generate。
 
 **产出**：`requirement_clarify_round.json` 或等效 JSON 片段（由 Host 消费，不直接对用户输出问卷）。
 
-**后续动作**：交还 Host → doc-generate 更新 `需求澄清.md` → Host 仅对 `new_unclear` 提交 interactive 问卷。
+**后续动作**：交还 Host → **write_file** `clarify_sections.json` → doc-generate（**STRICT=true**）更新 `需求澄清.md` → Host 仅对 `new_unclear` 提交 interactive 问卷。
 
 | 禁止 | 正确 |
 |------|------|
@@ -408,17 +436,24 @@ Phase 4 — 深度澄清：三视角问题澄清（最终交付）
 
 ---
 
-### 完成阶段 — 输出澄清内容
+### 完成阶段 — 输出结构化章节（研发会议室）
 
 **触发条件**：没有新的待确认点（用户回答后无新问题产生，或用户明确表示需求已澄清完成）
 
 **执行步骤**：
 
-  5a. 从上下文提取所有已回答的问题和结论
+  5a. 从上下文与 `CONFIRMED_SNAPSHOT` 提取 Phase 1–4 全部已确认结论
 
-  5b. 直接输出澄清后的内容总结
+  5b. 汇总为 **`clarify_sections.json` 片段**（JSON 对象，非 Markdown 说明），字段见 `whalecloud-dev-tool-doc-generate/references/clarify_sections.skeleton.json`：
+        - 标量：`trigger_scenario`、`pain_point`、`expected_benefit`、`scope_in`、`scope_out`、`BACKGROUND`、约束三字段
+        - 列表：`feature_points`、`scenarios`、`acceptance_criteria`
+        - **`understanding_by_qid`**：每题 id → 基于代码/文档的理解总结（≠ 用户选项原文）
 
-**产出**：直接输出的内容总结
+  5c. 交还 Host：**write_file** 合并到 `.tmp/clarify_sections.json`，再 **STRICT=true** doc-generate 生成 `需求澄清.md`
+
+**产出**：`clarify_sections` JSON 片段（Host 落盘）；禁止仅输出自由文本摘要代替 JSON
+
+> **非会议室场景**（无 Host / 无 doc-generate 路径）可降级为 Markdown 内容总结；研发会议室 **必须** JSON 片段。
 
 ---
 

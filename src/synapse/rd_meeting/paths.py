@@ -17,6 +17,11 @@ def work_root() -> Path:
     return settings.synapse_home / "work"
 
 
+def soul_instruction_path() -> Path:
+    """全局灵魂建议：``work/SOUL_INSTRUCTION.json``（全工单共用）。"""
+    return work_root() / "SOUL_INSTRUCTION.json"
+
+
 def sanitize_work_order_segment(raw: str) -> str:
     t = (raw or "").strip() or "default"
     base = t.replace("\\", "/").split("/")[-1] or t

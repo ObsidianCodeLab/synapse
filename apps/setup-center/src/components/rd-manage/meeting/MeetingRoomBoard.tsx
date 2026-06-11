@@ -9,6 +9,8 @@ import {
   fetchMeetingRoomConfig,
   interveneMeetingRoom,
   serializeHitlFormSubmission,
+  fetchSoulInstruction,
+  putSoulInstruction,
   MEETING_NODE_TOKEN_BUDGET,
   MEETING_ROOM_TOKEN_BUDGET,
   reprocessMeetingRoom,
@@ -1026,6 +1028,7 @@ const MeetingRoomTitleBar = ({
   viewNodeName,
   viewNodeToken,
   onBack,
+  synapseApiBase,
 }: {
   room: MeetingRoom;
   /** 当前 SOP 卡片选中的节点（顶栏指标随其切换） */
@@ -1033,7 +1036,71 @@ const MeetingRoomTitleBar = ({
   viewNodeName: string;
   viewNodeToken: number;
   onBack: () => void;
+  synapseApiBase?: string;
 }) => {
+  const [soulModalOpen, setSoulModalOpen] = useState(false);
+  const [soulDraft, setSoulDraft] = useState('');
+  const [soulLoading, setSoulLoading] = useState(false);
+  const [soulSaving, setSoulSaving] = useState(false);
+  const soulHasContent = soulDraft.trim().length > 0;
+
+  useEffect(() => {
+    const base = (synapseApiBase || '').trim();
+    if (!base) return;
+    let cancelled = false;
+    void fetchSoulInstruction(base)
+      .then((payload) => {
+        if (cancelled) return;
+        setSoulDraft(String(payload.instruction || ''));
+      })
+      .catch(() => {
+        if (!cancelled) setSoulDraft('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [synapseApiBase]);
+
+  const openSoulModal = useCallback(() => {
+    const base = (synapseApiBase || '').trim();
+    setSoulModalOpen(true);
+    if (!base) {
+      setSoulDraft('');
+      return;
+    }
+    setSoulLoading(true);
+    void fetchSoulInstruction(base)
+      .then((payload) => {
+        setSoulDraft(String(payload.instruction || ''));
+      })
+      .catch(() => {
+        toast.error('加载灵魂建议失败');
+        setSoulDraft('');
+      })
+      .finally(() => {
+        setSoulLoading(false);
+      });
+  }, [synapseApiBase]);
+
+  const saveSoulInstruction = useCallback(async () => {
+    const base = (synapseApiBase || '').trim();
+    if (!base) {
+      toast.message('当前环境无法保存灵魂建议');
+      return;
+    }
+    setSoulSaving(true);
+    try {
+      await putSoulInstruction(base, soulDraft.trim(), { scopeId: room.ticketId });
+      toast.success('灵魂建议已保存');
+      setSoulModalOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`保存失败：${msg}`);
+    } finally {
+      setSoulSaving(false);
+    }
+  }, [room.ticketId, soulDraft, synapseApiBase]);
+
   const isPipelineCurrent = viewNodeId === room.currentNode;
   const tokenBudget = MEETING_NODE_TOKEN_BUDGET;
   const tokenConsumed = viewNodeToken;
@@ -1088,6 +1155,18 @@ const MeetingRoomTitleBar = ({
         </div>
 
         <div className="flex items-center justify-end gap-2 min-w-0 shrink-0 flex-wrap">
+          <Tooltip title="编辑全局灵魂建议（SOUL_INSTRUCTION.json），辅助工单处理的关键流程与模块">
+            <Button
+              size="small"
+              type={soulHasContent ? 'primary' : 'default'}
+              ghost={soulHasContent}
+              icon={<Flame className="w-3.5 h-3.5" />}
+              onClick={openSoulModal}
+              className={`shrink-0 border-border/60 ${soulHasContent ? 'border-violet-500/40 text-violet-300' : ''}`}
+            >
+              灵魂建议
+            </Button>
+          </Tooltip>
           <Tooltip title={`会议开始于 ${formatMeetingStartedAt(room.meetingStartedAt)} · 累计处理 ${room.stageDuration}`}>
             <div className="inline-flex items-center gap-2 rounded-lg border border-border/50 bg-muted/25 px-3 py-1.5 text-[11px] text-muted-foreground">
               <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
@@ -1125,6 +1204,27 @@ const MeetingRoomTitleBar = ({
           </Tooltip>
         </div>
       </div>
+      <Modal
+        title="灵魂建议（SOUL_INSTRUCTION）"
+        open={soulModalOpen}
+        onCancel={() => setSoulModalOpen(false)}
+        onOk={() => void saveSoulInstruction()}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={soulSaving}
+        destroyOnClose
+      >
+        <p className="mb-3 text-xs text-muted-foreground leading-relaxed">
+          辅助工单处理，指明关键流程与模块；保存至工作目录 <code className="text-[10px]">SOUL_INSTRUCTION.json</code>，全局共用，并注入 Host/Worker 系统提示词与 CLI 开发/检测指令。
+        </p>
+        <Input.TextArea
+          value={soulDraft}
+          onChange={(e) => setSoulDraft(e.target.value)}
+          placeholder="例如：本工单涉及账务中心限流模块，优先查阅 MDB 配置与 REST 接入文档…"
+          autoSize={{ minRows: 4, maxRows: 12 }}
+          disabled={soulLoading}
+        />
+      </Modal>
     </header>
   );
 };
@@ -1812,6 +1912,7 @@ const InterventionDialog = ({
           viewNodeName={selectedNode?.name || resolveSopNodeName(chatNodeId)}
           viewNodeToken={viewNodeToken}
           onBack={onClose}
+          synapseApiBase={synapseApiBase}
         />
 
         <div className="flex min-h-0 flex-1">
@@ -2195,6 +2296,18 @@ const InterventionDialog = ({
                           roomId={room.id}
                           scopeId={room.scopeId}
                           blocked={room.solutionReviewBlocked}
+                        />
+                      </div>
+                    ) : detailViewMode === 'review' && selectedNode.id === 'func_solution' ? (
+                      <div className="min-h-0 flex-1 overflow-hidden">
+                        <FuncSolutionReviewPanel
+                          key={`detail-fs-${room.id}`}
+                          synapseApiBase={synapseApiBase || ''}
+                          roomId={room.id}
+                          scopeId={room.scopeId}
+                          initialPayload={room.funcSolutionReviewPayload ?? null}
+                          blocked={room.funcSolutionBlocked}
+                          readOnly
                         />
                       </div>
                     ) : detailViewMode === 'review' ? (

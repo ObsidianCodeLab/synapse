@@ -25,11 +25,39 @@ def validate_context(ctx):
     return issues
 
 
-def fill(template_path, ctx_path, out_path):
+def fill(template_path, ctx_path, out_path, *, strict=False):
     with open(template_path, encoding="utf-8") as f:
         tmpl = f.read()
     with open(ctx_path, encoding="utf-8") as f:
         ctx = json.load(f)
+
+    try:
+        from pathlib import Path as _Path
+
+        from synapse.rd_meeting.clarify_followup import (
+            enrich_clarify_ctx_from_disk,
+            rewrite_clarify_fill_ctx_at_path,
+            validate_clarify_context_completeness,
+        )
+
+        ctx_path_obj = _Path(ctx_path)
+        ctx = enrich_clarify_ctx_from_disk(ctx, ctx_path_obj)
+        rewrite_clarify_fill_ctx_at_path(ctx_path_obj)
+    except ImportError:
+        pass
+
+    issues = validate_context(ctx)
+    try:
+        from synapse.rd_meeting.clarify_followup import validate_clarify_context_completeness
+
+        issues.extend(validate_clarify_context_completeness(ctx, strict=bool(strict)))
+    except ImportError:
+        pass
+    if issues:
+        msg = "CONTEXT_JSON 契约/完整性校验失败:\n" + "\n".join(f"  - {x}" for x in issues)
+        if strict:
+            raise ValueError(msg)
+        print(msg)
 
     ts = ctx.get("TIMESTAMP", datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
     def g(k, d="[待补充]"): return ctx.get(k, d)
@@ -70,6 +98,7 @@ def fill(template_path, ctx_path, out_path):
             q = d.get("question",""); title = d.get("title","")
             context = d.get("context",""); ref = d.get("ref","")
             state = d.get("state",""); answer_org = d.get("answer_org",""); answer = d.get("answer","")
+            options_all = d.get("options_all","")
             sub_qs = d.get("sub_questions", [])
             sub_block = ""
             if sub_qs and sq_line_tpl:
@@ -83,7 +112,7 @@ def fill(template_path, ctx_path, out_path):
             elif sub_qs:
                 sq_lines = [f"- {sq.get('question','')} → {sq.get('answer','')} [{sq.get('state','')}" for sq in sub_qs]
                 sub_block = "#### 追问\n" + "\n".join(sq_lines) + "\n"
-            rows.append(f"### 问题 {idx}: {q}\n\n| 字段 | 内容 |\n|------|------|\n| 标题 | {title} |\n| 内容 | {context} |\n| 来源 | {ref} |\n| 状态 | {state} |\n| 用户回答 | {answer_org} |\n| 理解总结 | {answer} |\n{sub_block}\n---")
+            rows.append(f"### 问题 {idx}: {q}\n\n| 字段 | 内容 |\n|------|------|\n| 标题 | {title} |\n| 内容 | {context} |\n| 选项列表 | {options_all} |\n| 来源 | {ref} |\n| 状态 | {state} |\n| 用户回答 | {answer_org} |\n| 理解总结 | {answer} |\n{sub_block}\n---")
         return "\n".join(rows)
     result = re.sub(r"\{\{#each unclear\}\}(.*?)\{\{/each\}\}", repl_unclear, result, flags=re.DOTALL)
 
@@ -136,9 +165,16 @@ def fill(template_path, ctx_path, out_path):
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--validate-only":
+        strict = "--strict" in sys.argv[3:]
         with open(sys.argv[2], encoding="utf-8") as f:
             ctx = json.load(f)
         issues = validate_context(ctx)
+        try:
+            from synapse.rd_meeting.clarify_followup import validate_clarify_context_completeness
+
+            issues.extend(validate_clarify_context_completeness(ctx, strict=strict))
+        except ImportError:
+            pass
         if issues:
             print("CONTEXT_JSON 契约校验失败:")
             for x in issues:
@@ -146,4 +182,5 @@ if __name__ == "__main__":
             sys.exit(1)
         print("[OK] CONTEXT_JSON 契约校验通过")
         sys.exit(0)
-    fill(sys.argv[1], sys.argv[2], sys.argv[3])
+    strict = len(sys.argv) >= 5 and str(sys.argv[4]).lower() in ("true", "1", "yes", "strict")
+    fill(sys.argv[1], sys.argv[2], sys.argv[3], strict=strict)

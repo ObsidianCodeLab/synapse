@@ -1,0 +1,30 @@
+{
+  "$comment": "Host/专家在 doc-generate 前写入 archive/.../req_clarify/.tmp/clarify_sections.json",
+  "trigger_scenario": "用户确认的触发场景",
+  "pain_point": "用户确认的痛点",
+  "expected_benefit": "用户确认的期望收益",
+  "scope_in": "范围内模块/能力",
+  "scope_out": "明确排除项",
+  "BACKGROUND": "需求背景分析（可选，覆盖工单默认）",
+  "tech_constraint": "技术约束",
+  "module_dependency": "模块依赖",
+  "data_dependency": "数据依赖",
+  "feature_points": [{ "point": "功能要点" }],
+  "scenarios": [
+    {
+      "title": "场景标题",
+      "feature": "Feature 名",
+      "given": "前置条件",
+      "when": "操作",
+      "then": "期望结果",
+      "rule": "业务规则",
+      "perspective": "视角",
+      "ref": "代码或文档路径",
+      "edge_cases": "边缘情况"
+    }
+  ],
+  "acceptance_criteria": [{ "criterion": "可验证验收项" }],
+  "understanding_by_qid": {
+    "Q1": "基于代码/文档证据对该题的理解总结（不得与用户回答逐字相同）"
+  }
+}

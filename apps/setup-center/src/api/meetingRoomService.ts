@@ -938,6 +938,30 @@ export async function fetchMeetingAgentContexts(
   return apiGet<MeetingAgentContextsPayload>(base, path);
 }
 
+export interface SoulInstructionPayload {
+  instruction?: string;
+  updated_at?: string | null;
+  path?: string;
+}
+
+export async function fetchSoulInstruction(synapseApiBase: string): Promise<SoulInstructionPayload> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<SoulInstructionPayload>(base, '/api/dev/soul-instruction');
+}
+
+export async function putSoulInstruction(
+  synapseApiBase: string,
+  instruction: string,
+  options?: { scopeId?: string },
+): Promise<SoulInstructionPayload> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const scopeId = (options?.scopeId || '').trim();
+  return apiPut<SoulInstructionPayload>(base, '/api/dev/soul-instruction', {
+    instruction,
+    scope_id: scopeId || undefined,
+  });
+}
+
 export async function openMeetingRoom(
   synapseApiBase: string,
   scopeType: MeetingRoomScopeType,
@@ -946,6 +970,7 @@ export async function openMeetingRoom(
     prod: string;
     promoteToProcessing?: boolean;
     syncUserwork?: boolean;
+    soulInstruction?: string;
   },
 ): Promise<MeetingRoomDetail> {
   const base = synapseApiBase.replace(/\/$/, '');
@@ -953,12 +978,14 @@ export async function openMeetingRoom(
   if (!prod) {
     throw new Error('missing_prod');
   }
+  const soulInstruction = (options.soulInstruction || '').trim();
   return apiPost<MeetingRoomDetail>(base, '/api/dev/meeting-rooms/open', {
     scope_type: scopeType,
     scope_id: scopeId,
     prod,
     sync_userwork: options.syncUserwork ?? true,
     promote_to_processing: options.promoteToProcessing ?? true,
+    ...(soulInstruction ? { soul_instruction: soulInstruction } : {}),
   });
 }
 

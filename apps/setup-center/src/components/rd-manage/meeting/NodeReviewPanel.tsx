@@ -362,6 +362,11 @@ export const NodeReviewPanel: React.FC<Props> = ({
         setPayload(null);
         return;
       }
+      if (nodeId === 'func_solution') {
+        setError('函数级方案节点请使用函数级方案评审面板查看');
+        setPayload(null);
+        return;
+      }
       if (refresh) setRefreshing(true);
       else setLoading(true);
       setError(null);

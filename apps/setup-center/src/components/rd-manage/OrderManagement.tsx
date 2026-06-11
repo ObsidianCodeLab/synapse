@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
-import { ConfigProvider, theme, Badge, Avatar, Button, Drawer, Modal, Tag, Progress, Tabs, Popover, Tooltip, Collapse } from 'antd';
+import { ConfigProvider, theme, Badge, Avatar, Button, Drawer, Modal, Tag, Progress, Tabs, Popover, Tooltip, Collapse, Input } from 'antd';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   GitBranch,
@@ -55,6 +55,7 @@ import {
   fetchMeetingRoomConfig,
   fetchMeetingRoomLive,
   openMeetingRoom,
+  fetchSoulInstruction,
   type MeetingRoomArchiveEntry,
   type MeetingRoomConfigPayload,
   type MeetingRoomListItem,
@@ -631,6 +632,7 @@ export const OrderManagement: React.FC<{
     scopeId: string;
   } | null>(null);
   const [selectedProdKey, setSelectedProdKey] = useState('');
+  const [soulInstructionDraft, setSoulInstructionDraft] = useState('');
   const [meetingSummary, setMeetingSummary] = useState<MeetingSummaryPayload | null>(null);
   const [meetingSummaryLoading, setMeetingSummaryLoading] = useState(false);
   const [meetingSummaryErr, setMeetingSummaryErr] = useState<string | null>(null);
@@ -1390,8 +1392,15 @@ export const OrderManagement: React.FC<{
       setSelectedProdKey(preProd);
       setOpenMeetingPending({ ticket, scopeId });
       setOpenMeetingPickerOpen(true);
+      void fetchSoulInstruction(synapseApiBase)
+        .then((payload) => {
+          setSoulInstructionDraft(String(payload.instruction || '').trim());
+        })
+        .catch(() => {
+          setSoulInstructionDraft('');
+        });
     },
-    [demandListRaw, prodCatalog.length, prodCatalogLoading, t],
+    [demandListRaw, prodCatalog.length, prodCatalogLoading, synapseApiBase, t],
   );
 
   const confirmOpenMeetingWithProd = useCallback(async () => {
@@ -1408,6 +1417,7 @@ export const OrderManagement: React.FC<{
       const detail = await openMeetingRoom(synapseApiBase, 'demand', scopeId, {
         prod,
         promoteToProcessing: true,
+        soulInstruction: soulInstructionDraft.trim() || undefined,
       });
       setOpenMeetingPickerOpen(false);
       setOpenMeetingPending(null);
@@ -1429,7 +1439,7 @@ export const OrderManagement: React.FC<{
     } finally {
       setOpeningMeetingKey(null);
     }
-  }, [openMeetingPending, selectedProdKey, synapseApiBase, t, onViewChange]);
+  }, [openMeetingPending, selectedProdKey, soulInstructionDraft, synapseApiBase, t, onViewChange]);
 
   const renderMeetingArchiveOutput = (nodeId: string) => {
     const files = meetingArchiveByNodeId.get(nodeId);
@@ -2833,6 +2843,7 @@ export const OrderManagement: React.FC<{
         onCancel={() => {
           setOpenMeetingPickerOpen(false);
           setOpenMeetingPending(null);
+          setSoulInstructionDraft('');
         }}
         onOk={() => void confirmOpenMeetingWithProd()}
         okText={t('rdManageOrder.oneClickOpenMeeting')}
@@ -2861,6 +2872,23 @@ export const OrderManagement: React.FC<{
             }
             disabled={prodCatalogLoading || prodSelectOptions.length === 0}
             isLoading={prodCatalogLoading}
+          />
+        </div>
+        <div className="space-y-2 mt-4">
+          <Label className="text-foreground">
+            {t('rdManageOrder.soulInstructionLabel', { defaultValue: '灵魂建议' })}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">
+              ({t('common.optional', { defaultValue: '可选' })})
+            </span>
+          </Label>
+          <Input.TextArea
+            value={soulInstructionDraft}
+            onChange={(e) => setSoulInstructionDraft(e.target.value)}
+            placeholder={t('rdManageOrder.soulInstructionPlaceholder', {
+              defaultValue: '辅助工单处理：指明关键流程、模块与注意事项（写入 SOUL_INSTRUCTION.json，全局共用）',
+            })}
+            autoSize={{ minRows: 3, maxRows: 8 }}
+            className="text-sm"
           />
         </div>
       </Modal>

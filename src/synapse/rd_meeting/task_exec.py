@@ -273,6 +273,9 @@ def build_task_develop_prompt(
         lines.append(f"验收标准文档：{accept_doc}")
     if human_suggestions.strip():
         lines.append(f"人工建议与补充：{human_suggestions.strip()}")
+    from synapse.rd_meeting.soul_instruction import format_soul_instruction_cli_lines
+
+    lines.extend(format_soul_instruction_cli_lines())
     lines.extend(
         [
             "",
@@ -317,6 +320,9 @@ def build_task_verify_prompt(
         lines.append(f"函数级方案：{func_doc}")
     if human_suggestions.strip():
         lines.append(f"人工建议：{human_suggestions.strip()}")
+    from synapse.rd_meeting.soul_instruction import format_soul_instruction_cli_lines
+
+    lines.extend(format_soul_instruction_cli_lines())
     if develop_log_hint:
         lines.append(f"开发轮日志：{develop_log_hint}")
     lines.extend(

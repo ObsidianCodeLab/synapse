@@ -24,7 +24,7 @@ _PROMPT_OPTIONS_ONLY = """
 **本次要求**：
 1. **逐条阅读**「本轮人工确认反馈（结构化）」与「需求澄清续跑工序」：以用户选项为约束，结合工单、产品、代码仓库等**真实上下文**更新产出物。
 2. 不得无视或弱化用户选项；选项即用户决策，写入产出物时必须体现。
-3. **必须**用 `clarify_fill_ctx.json`（或系统生成的 CONTEXT_JSON）调用 `whalecloud-dev-tool-doc-generate` 重生成 `需求澄清.md`，保留已确认项。
+3. **必须**先 `write_file` 更新 ``clarify_sections.json``（含 `understanding_by_qid`、scope_in/out、scenarios 等），再以 ``clarify_fill_ctx.json`` 为 `CONTEXT_JSON`、**STRICT=true** 调用 `whalecloud-dev-tool-doc-generate` 重生成 `需求澄清.md`，保留已确认项。
 4. 用户已在末题选择「否，本节点已无待决问题」；完成产出物更新后停止，系统将进入节点确认总结（NodeReview）。
 5. 除非 Phase R 调研后出现新的未决点，无需再次提交 interactive 问卷。
 """.strip()
@@ -37,7 +37,7 @@ _PROMPT_WITH_FREE_TEXT = """
 **本次要求**：
 1. **先归纳**「本轮人工确认反馈（结构化）」——每题选项与自由输入，形成约束摘要（不得省略细节）。
 2. **用户自由文本 = 调研任务**，不是让你原样做成「请确认您是否指…」类问卷题。
-3. **强制工序**：读 `hitl_context.json` → 用 `clarify_fill_ctx.json` 作 CONTEXT_JSON → doc-generate 重生成 `需求澄清.md` → 委派 `whalecloud-requirement-expert` **Phase R** 调研待决项 → 仅对调研后的新 unclear 出题。
+3. **强制工序**：读 `hitl_context.json` → **write_file** ``clarify_sections.json``（Phase 1–4 结构化章节 + `understanding_by_qid`）→ 用 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON → **STRICT=true** doc-generate 重生成 `需求澄清.md` → 委派 `whalecloud-requirement-expert` **Phase R** 调研待决项 → 仅对调研后的新 unclear 出题。
 4. 禁止用泛泛复述代替对用户输入的针对性回应；禁止跳过调研直接交问卷。
 """.strip()
 
@@ -148,6 +148,39 @@ def _question_by_id(schema: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
             if qid:
                 out[qid] = q
     return out
+
+
+def _snapshot_question_options(question: dict[str, Any]) -> list[dict[str, str]]:
+    """问卷 schema 选项快照（供 clarify 文档还原完整选项列表）。"""
+    out: list[dict[str, str]] = []
+    for idx, opt in enumerate(question.get("options") or []):
+        if not isinstance(opt, dict):
+            continue
+        value = str(opt.get("value") or opt.get("id") or opt.get("label") or "").strip()
+        label = str(opt.get("label") or opt.get("value") or opt.get("id") or "").strip()
+        if not value and not label:
+            value = f"opt_{idx}"
+            label = value
+        out.append({"value": value or label, "label": label or value})
+    return out
+
+
+def _question_record_fields(question: dict[str, Any]) -> dict[str, Any]:
+    """从 schema 题面提取需持久化到 hitl_context 的元数据。"""
+    extra: dict[str, Any] = {}
+    qtype = str(question.get("type") or "").strip().lower()
+    if qtype:
+        extra["question_type"] = qtype
+    snapshot = _snapshot_question_options(question)
+    if snapshot:
+        extra["options_snapshot"] = snapshot
+    context = str(question.get("context") or "").strip()
+    if context:
+        extra["context_snapshot"] = context
+    clarify_section = str(question.get("clarify_section") or question.get("section") or "").strip()
+    if clarify_section:
+        extra["clarify_section"] = clarify_section
+    return extra
 
 
 def split_question_answer(
@@ -417,6 +450,7 @@ def build_hitl_round_record(
                 "selected_options": opts,
                 "option_labels": [opt_index.get(k, k) for k in opts],
                 "user_input": custom,
+                **_question_record_fields(q),
             }
         )
 

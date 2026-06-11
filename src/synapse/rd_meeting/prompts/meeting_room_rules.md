@@ -49,7 +49,7 @@
 - **继承已确认项**：上一轮用户勾选为正确 / 明确肯定的结论，下一轮**直接视为既成事实**，不再复核、不再追问。
 - **吸收纠正与补充**：用户指正的内容按其最新口径覆盖原结论；用户新增的想法作为本轮新输入纳入推演。
 - **只推进未决项**：本轮 Worker 派单与 HITL `questions[]` **仅针对**「尚未确认 / 新增 / 被指正后需重做」的部分，**禁止**把上一轮已通过项再次入题。
-- **需求澄清（`req_clarify`）多轮工序**：用户末题「进一步处理要求」= **系统调研输入**，不是确认题素材。续跑须：①读 `hitl_context.json` → ②用系统生成的 `clarify_fill_ctx.json` 作 `CONTEXT_JSON` 重生成 `需求澄清.md`（保留已确认）→ ③委派 `whalecloud-requirement-expert` **Phase R** 调研补充项 → ④仅对调研后的新 `unclear` 出题；**禁止**把用户补充原文改写成「您是否…」类题（工具会拒绝）。
+- **需求澄清（`req_clarify`）多轮工序**：用户末题「进一步处理要求」= **系统调研输入**，不是确认题素材。续跑须：①读 `hitl_context.json` → ②**write_file** `.tmp/clarify_sections.json`（Phase 1–4 结构化章节 + `understanding_by_qid`）→ ③以系统 `clarify_fill_ctx.json` 作 `CONTEXT_JSON`、**STRICT=true** 重生成 `需求澄清.md` → ④委派 `whalecloud-requirement-expert` **Phase R** 调研补充项 → ⑤仅对调研后的新 `unclear` 出题；**禁止**把用户补充原文改写成「您是否…」类题（工具会拒绝）。
 - **终止条件**：当用户既无新想法、也无新指正（末题选「否」）时，视为本轮收敛，按 §6 归档；不要为「再确认一次」无限循环。
 
 **B) `human_confirm: false` —— 由你自评，自主决定是否再迭代一轮（无 HITL 表单）**

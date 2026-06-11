@@ -26,10 +26,11 @@ _PROMPT_USER_SAID_YES_NEED_QUESTIONNAIRE = """
 - 仅输出正文总结而不调用 ``submit_hitl_questionnaire``。
 
 **本次必须**：
-1. 读 ``hitl_context.json``，用 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON 重生成 ``需求澄清.md``（保留已确认项）；
-2. 委派 ``whalecloud-requirement-expert`` 执行技能 **Phase R**，调研用户补充项（不得把用户原文做成确认题）；
-3. 仅对 Phase R 后的新未决点调用 ``submit_hitl_questionnaire(kind="interactive", ...)``；
-4. 调用工具后立即停止。
+1. 读 ``hitl_context.json``，**write_file** ``clarify_sections.json``（含 `understanding_by_qid`、scope_in/out、scenarios）；
+2. 以 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON、**STRICT=true** 重生成 ``需求澄清.md``（保留已确认项）；
+3. 委派 ``whalecloud-requirement-expert`` 执行技能 **Phase R**，调研用户补充项（不得把用户原文做成确认题）；
+4. 仅对 Phase R 后的新未决点调用 ``submit_hitl_questionnaire(kind="interactive", ...)``；
+5. 调用工具后立即停止。
 """.strip()
 
 _PROMPT_USER_SAID_NO_FORBID_QUESTIONNAIRE = """
@@ -42,8 +43,9 @@ _PROMPT_USER_SAID_NO_FORBID_QUESTIONNAIRE = """
 - 再次发起交互式问卷。
 
 **本次必须**：
-1. 确保约定归档产出物已落盘并通过校验；
-2. 不要提交 interactive 问卷；系统将自动进入 **节点确认总结（NodeReview）** 门控。
+1. 确保 ``clarify_sections.json`` 已写入（含 scope/动机/场景/``understanding_by_qid``）且 **STRICT=true** doc-generate 已通过；
+2. 确保约定归档产出物已落盘并通过校验；
+3. 不要提交 interactive 问卷；系统将自动进入 **节点确认总结（NodeReview）** 门控。
 """.strip()
 
 _TOOL_REJECT_INTERACTIVE_AFTER_DONE = (

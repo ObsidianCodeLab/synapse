@@ -704,6 +704,7 @@ def _format_hitl_artifact_lines(
 
     ctx_abs = str(hitl_context_path(sid, stg, nid).resolve())
     fill_ctx_abs = str((hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_fill_ctx.json").resolve())
+    sections_abs = str((hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_sections.json").resolve())
     lines = [
         f"- **人工确认产物（机器台账）**：`{ctx_abs}`（`{HITL_CONTEXT_FILENAME}`）",
         "  - 仅 **interactive** 问卷提交时由系统自动维护；含各轮结构化确认与 ``confirmed_by_id`` 汇总。",
@@ -711,8 +712,11 @@ def _format_hitl_artifact_lines(
     if nid == "req_clarify":
         lines.extend(
             [
+                f"  - **结构化章节（Host 写入）**：`{sections_abs}`（`clarify_sections.json`）",
+                "    Phase 1–4 / Phase R 分析后 **write_file** 更新；含 `understanding_by_qid`、scope_in/out、scenarios 等。",
                 f"  - **doc-generate 上下文（系统生成）**：`{fill_ctx_abs}`（`clarify_fill_ctx.json`）",
-                "  - 多轮续澄清：生成 ``需求澄清.md`` 时 **优先** 以 ``clarify_fill_ctx.json`` 为 ``CONTEXT_JSON``；",
+                "  - 生成 ``需求澄清.md`` 工序：①写 ``clarify_sections.json`` → ②以 ``clarify_fill_ctx.json`` 为 CONTEXT_JSON "
+                "→ ③``fill_clarify.py``（STRICT=true 校验）→ ④doc-generate；",
                 "    用户末题补充须先 Phase R 调研，**禁止**原样做成确认题。",
             ]
         )
@@ -802,8 +806,9 @@ def _append_host_duties_shared(
         )
         if (context.node_id or "").strip() == "req_clarify":
             lines.append(
-                "- **需求澄清多轮续跑**：用户末题补充 = 调研任务；须 doc-generate 重生成 ``需求澄清.md`` "
-                "→ 委派 Phase R → 仅对新未决点出题；禁止回声确认题。"
+                "- **需求澄清多轮续跑**：读 ``hitl_context.json`` → **write_file** ``clarify_sections.json`` "
+                "（Phase 1–4 + `understanding_by_qid`）→ 以 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON "
+                "→ doc-generate（STRICT=true）重生成 ``需求澄清.md`` → 委派 Phase R → 仅对新未决点出题；禁止回声确认题。"
             )
         lines.append(
             "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
@@ -1023,6 +1028,12 @@ def build_meeting_runtime_header(
     if reprocess_block:
         lines.append("")
         lines.append(reprocess_block)
+    from synapse.rd_meeting.soul_instruction import format_soul_instruction_block
+
+    soul_block = format_soul_instruction_block()
+    if soul_block:
+        lines.append("")
+        lines.append(soul_block)
     lines.append(f"- **人工确认**：{confirm_label}")
     lines.extend(
         _format_hitl_artifact_lines(

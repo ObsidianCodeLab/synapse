@@ -2765,6 +2765,8 @@
     "actNow": "立即处理",
     "openMeetingSuccess": "已开启研发会议室",
     "openMeetingFailed": "开会失败：{{message}}",
-    "productUnspecified": "未指定产品"
+    "productUnspecified": "未指定产品",
+    "soulInstructionLabel": "灵魂建议",
+    "soulInstructionPlaceholder": "辅助工单处理：指明关键流程、模块与注意事项（写入 SOUL_INSTRUCTION.json，全局共用）"
   }
 }
