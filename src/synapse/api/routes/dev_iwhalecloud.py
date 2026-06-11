@@ -1619,8 +1619,28 @@ async def get_task_build_history(body: GetTaskBuildHistoryRequest) -> dict:
             "ciFlowInstBeginDate": "ciFlowInstBeginDate",
             "ciFlowInstEndDate": "ciFlowInstEndDate",
             "ciFlowInstRunState": "ciFlowInstRunState",
+            "buildResult": [
+                {
+                    "nodeName": "节点名称",
+                    "stepId": "步骤ID",
+                    "runResult": "运行结果",
+                    "url": "URL",
+                    "attachments": [
+                        {
+                            "fullPath": "附件全路径",
+                            "path": "附件路径",
+                            "nodeInstanceId": "节点实例ID",
+                            "attachmentDesc": "附件描述",
+                            "fileSize": "附件大小",
+                            "resultType": "附件类型",
+                            "createDate": "创建时间",
+                        }
+                    ]
+                }
+            ]
         }
     ]
+    buildResult 仅在 ciFlowInstRunState 为 "1"（构建失败）时填充，且只包含 runResult 为 F 的失败节点。
     转调：GET /portal/zcm-devspace/task/{taskId}/build-history，返回码code为“9999”表示成功
     """
     return await _get_task_build_history(body)
@@ -1660,17 +1680,38 @@ async def _get_task_build_history(body: GetTaskBuildHistoryRequest) -> dict:
     except ValueError:
         return error_response(502, f"研发云获取任务构建历史返回非 JSON：{resp.text}")
 
-    # 提取数据
-    simplified = [
-        {
+    # 提取数据；失败构建补充各环节失败详情（buildResult 仅含 runResult=F 的节点）
+    build_result_cache: dict[str, list[dict]] = {}
+    simplified: list[dict] = []
+    for it in raw.get("data").get("featureBuildHisList") or []:
+        run_state = it.get("ciFlowInstRunState")
+        item: dict = {
             "ciFlowId": it.get("ciFlowId"),
             "ciFlowInstId": it.get("ciFlowInstId"),
             "ciFlowInstBeginDate": it.get("ciFlowInstBeginDate"),
             "ciFlowInstEndDate": it.get("ciFlowInstEndDate"),
-            "ciFlowInstRunState": it.get("ciFlowInstRunState"),
+            "ciFlowInstRunState": run_state,
+            "buildResult": [],
         }
-        for it in raw.get("data").get("featureBuildHisList")
-    ]
+        if str(run_state or "").strip() == "1":
+            ci_flow_inst_id = it.get("ciFlowInstId")
+            if ci_flow_inst_id is not None and str(ci_flow_inst_id).strip():
+                inst_id_str = str(ci_flow_inst_id).strip()
+                cached = build_result_cache.get(inst_id_str)
+                if cached is not None:
+                    item["buildResult"] = cached
+                else:
+                    build_result_resp = await _get_ci_flow_build_result(
+                        GetCiFlowBuildResultRequest(ciFlowInstId=inst_id_str),
+                    )
+                    node_results: list[dict] = []
+                    if isinstance(build_result_resp, dict) and build_result_resp.get("errorcode") == 0:
+                        br_data = build_result_resp.get("data") or []
+                        if isinstance(br_data, list):
+                            node_results.extend(br_data)
+                    build_result_cache[inst_id_str] = node_results
+                    item["buildResult"] = node_results
+        simplified.append(item)
     return success_response(simplified)
 
 
@@ -1857,6 +1898,43 @@ def _pick_date_extreme(values: list[object], *, earliest: bool) -> str | None:
     return max(candidates, key=lambda item: item[1])[0]
 
 
+async def _fetch_url_text(url: str, *, timeout: float = 30) -> str:
+    """GET 远程 URL 并返回文本内容；失败时记录 warning 并返回空字符串。"""
+    text = (url or "").strip()
+    if not text:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(text)
+        if resp.status_code >= 400:
+            logger.warning("下载附件失败 status=%s url=%s", resp.status_code, text)
+            return ""
+        return resp.text
+    except httpx.RequestError as exc:
+        logger.warning("下载附件异常 url=%s: %s", text, exc)
+        return ""
+
+
+async def _format_ci_build_result_entries(nodes: list[dict]) -> list[dict]:
+    """将失败节点转为 {resultType, resultMsg}；resultMsg 取自首个 attachment.fullPath 文件内容。"""
+    entries: list[dict] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        attachments = node.get("attachments") or []
+        full_path = ""
+        if attachments and isinstance(attachments[0], dict):
+            full_path = str(attachments[0].get("fullPath") or "").strip()
+        result_msg = await _fetch_url_text(full_path) if full_path else ""
+        entries.append(
+            {
+                "resultType": str(node.get("nodeName") or "").strip(),
+                "resultMsg": result_msg,
+            }
+        )
+    return entries
+
+
 def _merge_build_results(results: list[list[dict]]) -> list[dict]:
     merged: list[dict] = []
     seen: set[tuple[object, object]] = set()
@@ -1864,7 +1942,7 @@ def _merge_build_results(results: list[list[dict]]) -> list[dict]:
         for node in result:
             if not isinstance(node, dict):
                 continue
-            key = (node.get("nodeName"), node.get("stepId"))
+            key = (node.get("resultType"), node.get("resultMsg"))
             if key in seen:
                 continue
             seen.add(key)
@@ -1910,7 +1988,7 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
     根据任务构建历史合并各 flowId 的最新状态，并补充构建各环节结果。
     1) 调 _get_task_build_history 取 featureBuildHisList
     2) 按 ciFlowId 分组，按 ciFlowInstBeginDate 取最新一条
-    3) 每条都调用 _get_ci_flow_build_result(ciFlowInstId)
+    3) 失败 flow 调用 _get_ci_flow_build_result(ciFlowInstId) 并下载首个 attachment 内容
     4) 合并多个 flow 的状态为单一结果（失败优先；有构建中则构建中；否则成功）
     5) 返回数据格式：
     {
@@ -1921,21 +1999,8 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
         "ciFlowInstRunStateDesc": "构建状态中文描述",
         "buildResult": [
             {
-                "nodeName": "节点名称",
-                "stepId": "步骤ID",
-                "runResult": "运行结果",
-                "url": "URL",
-                "attachments": [
-                    {
-                        "fullPath": "附件全路径",
-                        "path": "附件路径",
-                        "nodeInstanceId": "节点实例ID",
-                        "attachmentDesc": "附件描述",
-                        "fileSize": "附件大小",
-                        "resultType": "附件类型",
-                        "createDate": "创建时间",
-                    }
-                ]
+                "resultType": "节点名称（nodeName）",
+                "resultMsg": "首个 attachment.fullPath 文件文本内容"
             }
         ]
     }
@@ -1979,22 +2044,25 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
             run_state = latest.get("ciFlowInstRunState")
 
             node_results: list[dict] = []
-            if ci_flow_inst_id is not None and str(ci_flow_inst_id).strip():
+            if (
+                _is_build_failed_state(run_state)
+                and ci_flow_inst_id is not None
+                and str(ci_flow_inst_id).strip()
+            ):
                 inst_id_str = str(ci_flow_inst_id).strip()
                 cached = build_result_cache.get(inst_id_str)
                 if cached is not None:
-                    # 命中缓存：不重复请求上游
                     node_results = cached
                 else:
-                    # 未命中缓存：调用上游获取该构建实例的“各节点执行结果”
                     build_result_resp = await _get_ci_flow_build_result(
                         GetCiFlowBuildResultRequest(ciFlowInstId=inst_id_str),
                     )
-                    # 上游成功：只抽取前端关心的字段，保持数组结构不变
+                    br_data: list[dict] = []
                     if isinstance(build_result_resp, dict) and build_result_resp.get("errorcode") == 0:
-                        br_data = build_result_resp.get("data") or []
-                        if isinstance(br_data, list):
-                            node_results.extend(br_data)
+                        raw_data = build_result_resp.get("data") or []
+                        if isinstance(raw_data, list):
+                            br_data = [x for x in raw_data if isinstance(x, dict)]
+                    node_results = await _format_ci_build_result_entries(br_data)
                     build_result_cache[inst_id_str] = node_results
 
             per_flow_items.append(
@@ -2011,7 +2079,6 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
     except Exception as e:
         logger.exception("获取构建状态失败: %s", e)
         return error_response(502, f"获取构建状态失败: {e}")
-
 
 
 class CreateTaskRequest(BaseModel):
