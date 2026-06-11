@@ -206,7 +206,7 @@ def plan_awaiting_hitl(scope_id: str, *, human_confirm: bool | None = None) -> b
 
 
 def mark_archive_doc_pending(scope_id: str) -> None:
-    """Host 收到 Worker / 人机 / 节点确认反馈后，要求先 doc-generate 再推进。"""
+    """Host 收到人机问卷或节点打回反馈后，要求先 doc-generate 再推进。"""
     sid = (scope_id or "").strip()
     if not sid:
         return
@@ -582,7 +582,6 @@ def mark_delegation_completed(
     plan["completed_item_ids"] = completed
     rs[ROOM_STATE_KEY] = plan
     save_room_state(scope_id, rs)
-    mark_archive_doc_pending(scope_id)
     return batch_complete_hint(scope_id)
 
 

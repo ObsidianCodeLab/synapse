@@ -221,6 +221,7 @@ def test_batch_complete_awaiting_hitl_gate(meeting_scope: str, monkeypatch: pyte
     assert plan_awaiting_hitl(meeting_scope) is False
     hint = mark_delegation_completed(session, agent_id="worker-b", plan_item_id="t2")
     assert plan_awaiting_hitl(meeting_scope) is True
+    assert is_archive_doc_pending(meeting_scope) is False
     assert "submit_hitl_questionnaire" in hint
     err = check_host_hitl_gate(session, "deliver_artifacts")
     assert err is not None
@@ -234,7 +235,7 @@ def test_batch_complete_awaiting_hitl_gate(meeting_scope: str, monkeypatch: pyte
     )
     mark_plan_hitl_submitted(meeting_scope, kind="interactive")
     assert plan_awaiting_hitl(meeting_scope) is False
-    clear_archive_doc_pending(meeting_scope)
+    assert is_archive_doc_pending(meeting_scope) is False
     assert check_host_hitl_gate(session, "deliver_artifacts") is None
 
 
