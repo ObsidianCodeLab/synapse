@@ -98,6 +98,19 @@ def test_dynamic_context_workers_summary_avoids_capability_card_duplication(host
     assert md.count("worker-default") == 0
 
 
+def test_format_section_system_includes_server_url_for_base_scripts():
+    md = _format_section_system(
+        {
+            "synapse_url": "http://127.0.0.1:10001",
+            "gitnexus_url": "http://127.0.0.1:11011",
+        }
+    )
+    assert "- SYNAPSE_URL：`http://127.0.0.1:10001`" in md
+    assert "- SERVER_URL：`http://127.0.0.1:10001`" in md
+    assert "hybrid_query" in md
+    assert "勿用于 hybrid_query" in md
+
+
 def test_format_section_system_includes_current_os(monkeypatch):
     monkeypatch.setattr(
         "synapse.rd_meeting.dynamic_prompt._detect_current_os_type",

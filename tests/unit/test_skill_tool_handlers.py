@@ -189,6 +189,28 @@ class TestSkillsHandlerRunScriptDiagnostics:
         assert "工作区根目录" in out
         assert str(skill_dir / "news_searcher.py") in out
 
+    def test_base_scripts_hybrid_query_wrong_gitnexus_port_hint(self):
+        from synapse.tools.handlers.skills import SkillsHandler
+
+        hint = SkillsHandler._base_scripts_failure_hint(
+            "whalecloud-dev-tool-base-scripts",
+            "hybrid_query.py",
+            "404 for url: http://10.0.0.1:11011/dev/iwhalecloud/synapse/his_order_search",
+        )
+        assert "GITNEXUS_URL" in hint
+        assert "SERVER_URL" in hint
+
+    def test_base_scripts_gnx_tools_missing_args_hint(self):
+        from synapse.tools.handlers.skills import SkillsHandler
+
+        hint = SkillsHandler._base_scripts_failure_hint(
+            "whalecloud-dev-tool-base-scripts",
+            "gnx-tools.js",
+            "search: need --repo and --query",
+        )
+        assert "REPO_NAME" in hint
+        assert "--query" in hint
+
 
 # ---------------------------------------------------------------------------
 # SkillsHandler._reload_skill

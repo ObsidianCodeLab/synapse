@@ -27,6 +27,50 @@ run_skill_script(
 
 需要脚本列表或参数说明时：`get_skill_info("whalecloud-dev-tool-base-scripts")`。
 
+脚本参数细则在 `references/<脚本名>.md`；**禁止**对默认 `REFERENCE.md` 调用 `get_skill_reference`（本技能无此文件），应指定 `ref_name`，例如：
+
+```text
+get_skill_reference(
+  skill_name="whalecloud-dev-tool-base-scripts",
+  ref_name="hybrid_query.md"
+)
+```
+
+## 研发会议室：系统 URL 对照（执行脚本前必读）
+
+系统提示「四、系统信息」会注入下列变量。**禁止混用**：
+
+| 变量 | 用于哪些脚本 | 参数名 |
+|------|----------------|--------|
+| `SERVER_URL`（同 `SYNAPSE_URL`，研发统一服务 :10001） | `hybrid_query.py` / `relation_query.py` / `cypher_query.py` / `get_repo_info.py` / `get_doc.py` | `--server_url` 或 `--server-url` |
+| `GITNEXUS_URL`（代码图谱服务 :11011） | `gnx-tools.js` / `fetch-arch-data.js` | `--url` |
+| `PROD` | 历史工单检索、get_repo_info | `--prod` |
+| `REPO_NAME` | gnx-tools search/explore/impact 等 | `--repo` |
+
+**常见错误**：把 `GITNEXUS_URL` 传给 `hybrid_query.py` 的 `--server_url`（会 404）。历史工单检索一律用 `SERVER_URL`。
+
+### 复制即用示例（把占位符换成系统提示中的实际值）
+
+历史工单混合检索：
+
+```text
+run_skill_script(
+  skill_name="whalecloud-dev-tool-base-scripts",
+  script_name="hybrid_query.py",
+  args=["--server_url", "<SERVER_URL>", "--prod", "<PROD>", "--query", "<从 DEMAND_DESC 提炼的关键词>", "--limit", "10"]
+)
+```
+
+GitNexus 代码搜索：
+
+```text
+run_skill_script(
+  skill_name="whalecloud-dev-tool-base-scripts",
+  script_name="gnx-tools.js",
+  args=["search", "--url", "<GITNEXUS_URL>", "--repo", "<REPO_NAME>", "--query", "<符号或关键词>"]
+)
+```
+
 ## `scripts/` 清单
 
 | 脚本 | 用途 |

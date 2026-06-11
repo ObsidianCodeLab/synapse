@@ -1215,7 +1215,7 @@ def build_meeting_runtime_header(
         "**必须先** `get_skill_info(skill_id)` 加载完整 SKILL.md。"
     )
     lines.append(
-        "  2. 需要参考文档时用 `get_skill_reference`；有预置脚本时用 `run_skill_script`。"
+        "  2. 需要参考文档时用 `get_skill_reference(skill_name, ref_name=...)`（`whalecloud-dev-tool-base-scripts` 须指定如 `hybrid_query.md`，无 `REFERENCE.md`）；有预置脚本时用 `run_skill_script`。"
     )
     lines.append(
         "  3. instruction-only 技能按 get_skill_info 指引写代码并 `run_shell` / 读写文件；"

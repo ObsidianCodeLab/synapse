@@ -414,8 +414,10 @@ def resolve_product_for_meeting(
     row = _scope_row(scope_type, sid) if sid else None  # type: ignore[arg-type]
     prod_key = str(row.get("prod") or "").strip() if row else ""
 
+    unified_url = unified_service_base_url()
     system = {
-        "synapse_url": unified_service_base_url(),
+        "synapse_url": unified_url,
+        "server_url": unified_url,
         "devservice_host": read_devservice_host() or "",
     }
 

@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 interface ProductCardProps {
   product: Product;
-  /** 与本地 userinfo.encryption 对应的 owner_info 一致时为 true（仅桌面端计算） */
+  /** 本机 userinfo 与产品 owner_info 解密后姓名、工号一致时为 true（仅桌面端计算） */
   isOwnedByCurrentUser?: boolean;
   onEdit: (product: Product) => void | Promise<void>;
   onDelete: (product: Product) => void;

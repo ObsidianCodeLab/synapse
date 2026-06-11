@@ -869,6 +869,7 @@ class TaskExecutor:
         - system:proactive_heartbeat - 活人感心跳
         - system:workspace_backup - 定时工作区备份
         - system:memory_nudge_review - 周期性记忆回顾
+        - system:sync_owner_orders - 每小时从研发云同步工单到 userwork.json
         """
         action = task.action
         logger.info(f"Executing system task: {action}")
@@ -887,6 +888,7 @@ class TaskExecutor:
             "system:daily_memory": 1800,  # 30 分钟（含 LLM review 大量记忆）
             "system:workspace_backup": 300,  # 5 分钟
             "system:memory_nudge_review": 120,  # 2 分钟（轻量 LLM 审视）
+            "system:sync_owner_orders": 600,  # 10 分钟（门户登录 + 串行拉研发单）
         }
         timeout = SYSTEM_TASK_TIMEOUTS.get(action)
         budget_tokens = (
@@ -913,6 +915,8 @@ class TaskExecutor:
                 coro = self._system_workspace_backup()
             elif action == "system:memory_nudge_review":
                 coro = self._system_memory_nudge_review()
+            elif action == "system:sync_owner_orders":
+                coro = self._system_sync_owner_orders()
             else:
                 return False, f"Unknown system action: {action}"
 
@@ -1446,6 +1450,31 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Daily selfcheck failed: {e}")
             return False, str(e)
+
+    async def _system_sync_owner_orders(self) -> tuple[bool, str]:
+        """从研发云拉取负责人工单，与本地 userwork.json 合并落盘。"""
+        try:
+            from ..api.routes.dev_iwhalecloud import OwnerOrderSyncError, sync_owner_orders_from_devcloud
+
+            result = await sync_owner_orders_from_devcloud()
+            summary = (
+                "工单同步完成："
+                f"云端 {result.get('total_from_cloud', 0)} 条，"
+                f"本次拉取 {result.get('fetched', 0)} 条，"
+                f"合并后本地 {result.get('merged_list_size', 0)} 条"
+            )
+            logger.info(summary)
+            return True, summary
+        except OwnerOrderSyncError as exc:
+            if exc.status_code == 404:
+                msg = f"跳过工单同步：{exc.message}"
+                logger.info(msg)
+                return True, msg
+            logger.error("Owner order sync failed: %s", exc.message)
+            return False, exc.message
+        except Exception as exc:
+            logger.error("Owner order sync failed: %s", exc)
+            return False, str(exc)
 
     async def _system_workspace_backup(self) -> tuple[bool, str]:
         """执行定时工作区备份。"""

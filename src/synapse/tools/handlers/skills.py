@@ -592,10 +592,52 @@ class SkillsHandler:
                     f"2. 使用管理员权限运行"
                 )
             else:
+                extra = self._base_scripts_failure_hint(skill_name, script_name, output)
                 return (
                     f"❌ 脚本执行失败:\n{output}\n\n"
                     f"**建议**: 请检查脚本参数是否正确，或使用 `get_skill_info` 查看技能使用说明"
+                    f"{extra}"
                 )
+
+    @staticmethod
+    def _base_scripts_failure_hint(skill_name: str, script_name: str, output: str) -> str:
+        """针对 whalecloud-dev-tool-base-scripts 常见参数/URL 误用给出可执行修正提示。"""
+        if skill_name != "whalecloud-dev-tool-base-scripts":
+            return ""
+
+        text = output.lower()
+        lines: list[str] = []
+
+        if "his_order_search" in text and ("404" in text or "cannot post" in text):
+            if ":11011" in output:
+                lines.append(
+                    "历史工单检索误用了 GITNEXUS_URL（:11011）。"
+                    "hybrid/relation/cypher 脚本的 `--server_url` 须用系统提示中的 SERVER_URL（同 SYNAPSE_URL，:10001）。"
+                )
+            else:
+                lines.append(
+                    "请确认 `--server_url` 使用系统提示中的 SERVER_URL（研发统一服务），"
+                    "不要用 GITNEXUS_URL。"
+                )
+
+        if script_name == "gnx-tools.js":
+            if "missing --url" in text or "gitnexus_url" in text:
+                lines.append(
+                    "gnx-tools 须传 `--url`，取值系统提示 GITNEXUS_URL（:11011）。"
+                )
+            if "need --repo" in text or "need --repo and --query" in text:
+                lines.append(
+                    "gnx-tools search 须同时传 `--repo`（系统提示 REPO_NAME）与 `--query`。"
+                )
+
+        if script_name in {"hybrid_query.py", "relation_query.py", "cypher_query.py"}:
+            if "--server_url" not in output and "required" in text:
+                lines.append("须传 `--server_url`，取值系统提示 SERVER_URL。")
+
+        if not lines:
+            return ""
+
+        return "\n" + "\n".join(f"- {line}" for line in lines)
 
     @staticmethod
     def _diagnose_missing_skill_module(skill_entry: Any, output: str) -> str:
@@ -645,8 +687,22 @@ class SkillsHandler:
         if content:
             output = f"# 参考文档: {ref_name}\n\n{content}"
             return self._truncate_skill_content("get_skill_reference", output)
-        else:
-            return f"❌ 未找到参考文档: {skill_name}/{ref_name}"
+
+        hint = ""
+        if ref_name in {"REFERENCE.md", ""}:
+            skill = self.agent.skill_registry.get(skill_name)
+            if skill:
+                from synapse.skills.exposure import build_skill_exposure
+
+                exposed = build_skill_exposure(skill)
+                if exposed.references:
+                    refs = ", ".join(exposed.references)
+                    hint = (
+                        f"\n\n**可用参考文档**: {refs}\n"
+                        f'请使用 `get_skill_reference(skill_name="{skill_name}", '
+                        f'ref_name="<文件名>")`，例如 ref_name="{exposed.references[0]}"。'
+                    )
+        return f"❌ 未找到参考文档: {skill_name}/{ref_name}{hint}"
 
     async def _install_skill(self, params: dict) -> str:
         """安装技能"""

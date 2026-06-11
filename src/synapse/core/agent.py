@@ -3223,6 +3223,7 @@ class Agent:
         - 记忆整理（凌晨 3:00，适应期内每 N 小时一次）
         - 系统自检（凌晨 4:00）
         - 活人感心跳（每 30 分钟）
+        - 工单同步（每小时整点，研发云 → userwork.json）
         """
         from ..config import settings
         from ..scheduler import ScheduledTask, TriggerType
@@ -3434,6 +3435,40 @@ class Agent:
                         await self.task_scheduler.disable_task(backup_task_id)
         except Exception as e:
             logger.warning(f"Failed to register workspace_backup task: {e}")
+
+        # 任务 6: 工单整点同步（研发云 → userwork.json）
+        try:
+            owner_order_task_id = "system_sync_owner_orders"
+            if owner_order_task_id not in existing_ids:
+                owner_order_task = ScheduledTask(
+                    id=owner_order_task_id,
+                    name="工单同步",
+                    trigger_type=TriggerType.CRON,
+                    trigger_config={"cron": "0 * * * *"},
+                    action="system:sync_owner_orders",
+                    prompt="从研发云同步负责人需求单并合并到 userwork.json",
+                    description="每小时整点从研发云拉取工单并与本地快照合并",
+                    task_type=TaskType.TASK,
+                    enabled=True,
+                    deletable=False,
+                    metadata={"notify_on_start": False, "notify_on_complete": False},
+                )
+                await self.task_scheduler.add_task(owner_order_task)
+                logger.info("Registered system task: sync_owner_orders (hourly at :00)")
+            else:
+                existing_owner_order = self.task_scheduler.get_task(owner_order_task_id)
+                if existing_owner_order:
+                    changed = False
+                    if existing_owner_order.deletable:
+                        existing_owner_order.deletable = False
+                        changed = True
+                    if not getattr(existing_owner_order, "action", None):
+                        existing_owner_order.action = "system:sync_owner_orders"
+                        changed = True
+                    if changed:
+                        await self.task_scheduler.save()
+        except Exception as e:
+            logger.warning(f"Failed to register sync_owner_orders task: {e}")
 
     def _build_system_prompt(
         self,

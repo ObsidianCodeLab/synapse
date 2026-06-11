@@ -132,12 +132,15 @@ def _format_section_system(system: dict[str, Any]) -> str:
     lines.append(f"- CURRENT_OS：`{current_os}` 请使用该操作系统对应的命令, 不要尝试非本操作系统的命令")
 
     synapse_url = str(sys.get("synapse_url") or unified_service_base_url() or "").strip()
+    server_url = str(sys.get("server_url") or synapse_url or "").strip()
     if synapse_url:
         lines.append(f"- SYNAPSE_URL：`{synapse_url}`")
+    if server_url:
+        lines.append(f"- SERVER_URL：`{server_url}`（`whalecloud-dev-tool-base-scripts` 历史工单检索脚本的 `--server_url`）")
 
     gitnexus_url = str(sys.get("gitnexus_url") or gitnexus_service_base_url() or "").strip()
     if gitnexus_url:
-        lines.append(f"- GITNEXUS_URL：`{gitnexus_url}`")
+        lines.append(f"- GITNEXUS_URL：`{gitnexus_url}`（仅 `gnx-tools.js` / `fetch-arch-data.js` 的 `--url`，勿用于 hybrid_query）")
 
     return "\n".join(lines) if lines else "（无系统字段）"
 

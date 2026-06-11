@@ -4099,42 +4099,43 @@ def _get_demand_by_user_portal_cookies_sync(username: str, password: str) -> tup
             browser.close()
 
 
-class GetDemandByUserRequest(BaseModel):
-    owner_info: str = Field(..., description="CryptHelper 密文；解密后为 employee_id、password、token、userId 等 JSON")
+class OwnerOrderSyncError(Exception):
+    """研发云工单同步失败；``status_code`` 供 HTTP 路由映射为 error_response。"""
+
+    def __init__(self, message: str, *, status_code: int = 500) -> None:
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
 
 
-@router.post("/api/dev/iwhalecloud/get_demand_by_user")
-async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
-    """按负责人用户查询需求（全项目 currentProjectId=null）；入参 owner_info 密文解密后取工号/密码/用户ID。
+def load_owner_info_cipher_from_file() -> str | None:
+    """读取 ``data/userinfo.encryption`` 密文原文；不存在或为空时返回 ``None``。"""
+    path = _userinfo_encryption_path()
+    if not path.is_file():
+        return None
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return raw or None
 
-    转调 POST /portal/zcm-devspace/task/page-list。HTTP 响应**仅** ``total``，不返回需求列表；拉全量后的
-    列表（含与 graphiti_pipeline 一致的 Demand 字段、``product_version_id``/``product_version_code``、
-    以及 **owned_work_items**）会落盘到 ``synapse_home/work/userwork.json``，请用
-    ``GET /api/dev/iwhalecloud/owner_order_snapshot`` 读取。
 
-    每条需求在落盘数据中含 **owned_work_items**：该需求下研发单摘要列表（串行拉门户详情后映射），每项为扁平
-    snake_case 字段：``task_no``、``task_title``、``task_desc``（门户 adTask.comments）、``created_date``、
-    ``sccb_work_hours``（由分钟换算，空为 null）、``state``（待处理/开发中/已完成/异常）、
-    ``product_module_id``、``product_module_name``、``repo_url``。
-    各需求单下研发单为**串行**拉取（先需求 A 再需求 B，单需求内 work-items 与详情亦顺序请求）。
-    拉取 work-items 需 ai-gateway **Bearer**：优先 owner_info 解密 JSON 的 ``token``，否则使用
-    ``data/userinfo.encryption`` 中的 Authorization；若皆不可用则 ``owned_work_items`` 为空数组。
-    """
-    raw_cipher = str(body.owner_info).strip()
+def _parse_owner_info_cipher(raw_cipher: str) -> dict[str, Any]:
+    raw_cipher = str(raw_cipher).strip()
     if not raw_cipher:
-        return error_response(400, "owner_info 不能为空")
+        raise OwnerOrderSyncError("owner_info 不能为空", status_code=400)
 
     crypt_helper = _crypt_helper()
     plain = crypt_helper.decrypt(raw_cipher, False)
     if plain is None:
-        return error_response(400, "owner_info 解密失败")
+        raise OwnerOrderSyncError("owner_info 解密失败", status_code=400)
     try:
         user_blob = json.loads(plain)
-    except json.JSONDecodeError:
-        return error_response(400, "owner_info 解密后不是合法 JSON")
+    except json.JSONDecodeError as exc:
+        raise OwnerOrderSyncError("owner_info 解密后不是合法 JSON", status_code=400) from exc
 
     if not isinstance(user_blob, dict):
-        return error_response(400, "owner_info 解密后须为 JSON 对象")
+        raise OwnerOrderSyncError("owner_info 解密后须为 JSON 对象", status_code=400)
 
     employee_id = str(user_blob.get("employee_id"))
     password = str(user_blob.get("password"))
@@ -4143,11 +4144,67 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
         user_id_raw = user_blob.get("user_id")
 
     if not employee_id or not password:
-        return error_response(400, "解密后的 employee_id 或 password 不能为空")
+        raise OwnerOrderSyncError("解密后的 employee_id 或 password 不能为空", status_code=400)
     try:
         login_user_id = int(user_id_raw)
-    except (TypeError, ValueError):
-        return error_response(400, "解密后的 userId 必须为整数")
+    except (TypeError, ValueError) as exc:
+        raise OwnerOrderSyncError("解密后的 userId 必须为整数", status_code=400) from exc
+
+    return {
+        **user_blob,
+        "employee_id": employee_id,
+        "password": password,
+        "login_user_id": login_user_id,
+    }
+
+
+def _owner_identity_from_user_blob(blob: dict[str, Any]) -> tuple[str, str]:
+    """从 owner_info 解密 JSON 提取产品归属比对用的姓名与工号。"""
+    name = str(blob.get("name") or "").strip()
+    employee_id = str(blob.get("employee_id") or blob.get("username") or "").strip()
+    return name, employee_id
+
+
+def _decrypt_owner_info_blob(raw_cipher: str) -> dict[str, Any]:
+    """解密 owner_info 密文为 JSON 对象（轻量场景，不校验 password/userId）。"""
+    raw_cipher = str(raw_cipher).strip()
+    if not raw_cipher:
+        raise ValueError("owner_info 不能为空")
+
+    crypt_helper = _crypt_helper()
+    plain = crypt_helper.decrypt(raw_cipher, False)
+    if plain is None:
+        raise ValueError("owner_info 解密失败")
+    try:
+        user_blob = json.loads(plain)
+    except json.JSONDecodeError as exc:
+        raise ValueError("owner_info 解密后不是合法 JSON") from exc
+
+    if not isinstance(user_blob, dict):
+        raise ValueError("owner_info 解密后须为 JSON 对象")
+    return user_blob
+
+
+def _owner_identities_match(local_blob: dict[str, Any], stored_cipher: str) -> bool:
+    """比对本机 userinfo 与产品 owner_info 密文解密后的姓名、工号是否一致。"""
+    try:
+        stored_blob = _decrypt_owner_info_blob(stored_cipher)
+    except ValueError:
+        return False
+
+    local_name, local_eid = _owner_identity_from_user_blob(local_blob)
+    stored_name, stored_eid = _owner_identity_from_user_blob(stored_blob)
+    if not local_eid or not stored_eid:
+        return False
+    return local_name == stored_name and local_eid == stored_eid
+
+
+async def fetch_owner_orders_from_devcloud(*, owner_info_cipher: str) -> tuple[list[dict[str, Any]], int]:
+    """从研发云拉取负责人需求单及研发单摘要，不落盘。"""
+    user_blob = _parse_owner_info_cipher(owner_info_cipher)
+    employee_id = user_blob["employee_id"]
+    password = user_blob["password"]
+    login_user_id = user_blob["login_user_id"]
 
     try:
         async with _iwhalecloud_session_lock:
@@ -4155,10 +4212,10 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
                 _get_demand_by_user_portal_cookies_sync, employee_id, password
             )
     except ValueError as e:
-        return error_response(502, str(e))
+        raise OwnerOrderSyncError(str(e), status_code=502) from e
     except Exception as exc:
-        logger.exception("get_demand_by_user 获取门户会话失败: %s", exc)
-        return error_response(503, f"获取研发云门户会话失败: {exc}")
+        logger.exception("fetch_owner_orders 获取门户会话失败: %s", exc)
+        raise OwnerOrderSyncError(f"获取研发云门户会话失败: {exc}", status_code=503) from exc
 
     url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-devspace/task/page-list"
     params = {"page": 1, "limit": 100000}
@@ -4199,22 +4256,22 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
         "currentProjectId": None,
         "projectIdList": None,
     }
-    logger.debug("get_demand_by_user url:%s params:%s payload:%s", url, params, payload)
+    logger.debug("fetch_owner_orders url:%s params:%s payload:%s", url, params, payload)
     try:
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(url, headers=headers, params=params, json=payload)
             _log_httpx_response("get_demand_by_user", resp)
     except httpx.RequestError as exc:
         logger.exception("调用研发云按用户查询需求列表异常: %s", exc)
-        return error_response(503, f"调用研发云接口异常: {exc}")
+        raise OwnerOrderSyncError(f"调用研发云接口异常: {exc}", status_code=503) from exc
 
     try:
         raw = resp.json()
         if raw.get("code") != "9999":
             msg = raw.get("finalMessage") or raw.get("msg") or raw.get("message") or "研发云执行失败"
-            return error_response(502, f"{msg}", error=str(raw))
-    except ValueError:
-        return error_response(502, f"研发云返回非 JSON：{resp.text}")
+            raise OwnerOrderSyncError(f"{msg}", status_code=502)
+    except ValueError as exc:
+        raise OwnerOrderSyncError(f"研发云返回非 JSON：{resp.text}", status_code=502) from exc
 
     data_block = raw.get("data")
     lst = data_block.get("list") if isinstance(data_block, dict) else None
@@ -4228,7 +4285,7 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
             total = 0
 
     rows = [item for item in lst if isinstance(item, dict)]
-    out_list = []
+    out_list: list[dict[str, Any]] = []
     for item in rows:
         out_list.append(await _page_list_row_to_demand_attrs(item))
 
@@ -4253,15 +4310,65 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
                         cookies=cookies,
                     )
                 except Exception as exc:
-                    logger.exception("get_demand_by_user 拉取研发单失败 demand_no=%s: %s", dn, exc)
+                    logger.exception("fetch_owner_orders 拉取研发单失败 demand_no=%s: %s", dn, exc)
                     o["owned_work_items"] = []
 
-    try:
-        await asyncio.to_thread(
-            persist_owner_order_snapshot_to_file, out_list=out_list
+    return out_list, total
+
+
+async def sync_owner_orders_from_devcloud(*, owner_info_cipher: str | None = None) -> dict[str, Any]:
+    """从研发云拉取负责人工单，与本地 ``userwork.json`` 合并后落盘。"""
+    cipher = (owner_info_cipher or "").strip() or load_owner_info_cipher_from_file()
+    if not cipher:
+        raise OwnerOrderSyncError(
+            "未找到 userinfo.encryption，请先完成研发云引导登录",
+            status_code=404,
         )
+
+    prev_snap = load_owner_order_snapshot_from_file()
+    prev_count = len(prev_snap.get("list") or []) if isinstance(prev_snap, dict) else 0
+
+    out_list, total = await fetch_owner_orders_from_devcloud(owner_info_cipher=cipher)
+    await asyncio.to_thread(persist_owner_order_snapshot_to_file, out_list=out_list)
+
+    merged_snap = load_owner_order_snapshot_from_file()
+    merged_count = len(merged_snap.get("list") or []) if isinstance(merged_snap, dict) else len(out_list)
+    return {
+        "total_from_cloud": total,
+        "fetched": len(out_list),
+        "previous_list_size": prev_count,
+        "merged_list_size": merged_count,
+    }
+
+
+class GetDemandByUserRequest(BaseModel):
+    owner_info: str = Field(..., description="CryptHelper 密文；解密后为 employee_id、password、token、userId 等 JSON")
+
+
+@router.post("/api/dev/iwhalecloud/get_demand_by_user")
+async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
+    """按负责人用户查询需求（全项目 currentProjectId=null）；入参 owner_info 密文解密后取工号/密码/用户ID。
+
+    转调 POST /portal/zcm-devspace/task/page-list。HTTP 响应**仅** ``total``，不返回需求列表；拉全量后的
+    列表（含与 graphiti_pipeline 一致的 Demand 字段、``product_version_id``/``product_version_code``、
+    以及 **owned_work_items**）会落盘到 ``synapse_home/work/userwork.json``，请用
+    ``GET /api/dev/iwhalecloud/owner_order_snapshot`` 读取。
+
+    每条需求在落盘数据中含 **owned_work_items**：该需求下研发单摘要列表（串行拉门户详情后映射），每项为扁平
+    snake_case 字段：``task_no``、``task_title``、``task_desc``（门户 adTask.comments）、``created_date``、
+    ``sccb_work_hours``（由分钟换算，空为 null）、``state``（待处理/开发中/已完成/异常）、
+    ``product_module_id``、``product_module_name``、``repo_url``。
+    各需求单下研发单为**串行**拉取（先需求 A 再需求 B，单需求内 work-items 与详情亦顺序请求）。
+    拉取 work-items 需 ai-gateway **Bearer**：优先 owner_info 解密 JSON 的 ``token``，否则使用
+    ``data/userinfo.encryption`` 中的 Authorization；若皆不可用则 ``owned_work_items`` 为空数组。
+    """
+    try:
+        await sync_owner_orders_from_devcloud(owner_info_cipher=body.owner_info)
+    except OwnerOrderSyncError as exc:
+        return error_response(exc.status_code, exc.message)
     except Exception as exc:
         logger.exception("get_demand_by_user 落地 userwork.json 失败: %s", exc)
+        return error_response(500, f"同步工单失败: {exc}")
 
     return success_response()
 
@@ -4898,6 +5005,46 @@ def userinfo_for_unified_service():
         return error_response(400, str(e))
     owner_name = (data or {}).get("name") or ""
     return success_response({"owner_info": raw, "owner_name": owner_name})
+
+
+class OwnerInfoMatchProductRequest(BaseModel):
+    stored_owner_info: str = Field(
+        ...,
+        description="产品在研发统一服务中记录的 owner_info 密文；解密后与本地 userinfo 的姓名、工号比对",
+    )
+
+
+@router.post("/api/dev/owner-info-matches-product")
+def owner_info_matches_product(body: OwnerInfoMatchProductRequest):
+    """
+    产品归属校验：解密本机 ``userinfo.encryption`` 与入参 ``stored_owner_info``，
+    比对解密 JSON 中的 ``name`` 与 ``employee_id``（``username`` 别名）是否一致。
+    """
+    stored = body.stored_owner_info.strip()
+    if not stored:
+        return error_response(400, "stored_owner_info 不能为空")
+
+    path = _userinfo_encryption_path()
+    if not path.is_file():
+        return error_response(404, "未找到 userinfo.encryption，请先完成研发云引导登录")
+    try:
+        local_blob = _load_userinfo_plain()
+    except ValueError as e:
+        return error_response(400, str(e))
+    if not local_blob:
+        return error_response(404, "未找到 userinfo.encryption，请先完成研发云引导登录")
+
+    local_name, local_eid = _owner_identity_from_user_blob(local_blob)
+    if not local_eid:
+        return error_response(400, "本机 userinfo 缺少 employee_id")
+
+    match = _owner_identities_match(local_blob, stored)
+    return success_response(
+        {
+            "match": match,
+            "local": {"name": local_name, "employee_id": local_eid},
+        }
+    )
 
 
 class UpdateOrderSopLocalProcessStateRequest(BaseModel):

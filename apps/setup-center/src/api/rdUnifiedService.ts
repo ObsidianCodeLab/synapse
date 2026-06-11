@@ -413,6 +413,23 @@ export async function fetchUserinfoForUnifiedService(synapseApiBase: string): Pr
   return fetchSynapseJson(synapseApiBase, "/api/dev/userinfo-for-unified-service");
 }
 
+/** 解密本机与产品 owner_info 后，按姓名 + 工号判断是否同一负责人 */
+export async function checkOwnerInfoMatchesProduct(
+  synapseApiBase: string,
+  storedOwnerInfo: string,
+): Promise<boolean> {
+  const data = await fetchSynapseJson<{ match?: boolean }>(
+    synapseApiBase,
+    "/api/dev/owner-info-matches-product",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stored_owner_info: storedOwnerInfo }),
+    },
+  );
+  return data.match === true;
+}
+
 export type IwhalecloudUserinfoSummary = {
   exists: boolean;
   name: string;
