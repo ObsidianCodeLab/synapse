@@ -8,10 +8,10 @@ import {
   ListOrdered,
   Loader2,
   Maximize2,
-  Minus,
-  Plus,
   RotateCcw,
   Workflow,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -126,6 +126,13 @@ function diagramKindMeta(kind?: string): { icon: LucideIcon; label: string } {
   return { icon: GitBranch, label: '关系图' };
 }
 
+const TOOLBAR_ICON_CLASS =
+  'size-[16px] shrink-0 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]';
+
+const ToolbarIcon: React.FC<{ icon: LucideIcon }> = ({ icon: Icon }) => (
+  <Icon className={TOOLBAR_ICON_CLASS} strokeWidth={3} absoluteStrokeWidth />
+);
+
 const ToolbarButton: React.FC<{
   title: string;
   disabled?: boolean;
@@ -137,7 +144,7 @@ const ToolbarButton: React.FC<{
       type="button"
       disabled={disabled}
       aria-label={title}
-      className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_1px_4px_rgba(0,0,0,0.25)] transition-colors hover:border-cyan-300/70 hover:bg-cyan-400/25 hover:text-white disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-white/[0.04] disabled:text-white/30"
+      className="inline-flex h-7 w-7 items-center justify-center overflow-visible rounded-md border border-white/35 bg-black/50 text-white shadow-[0_1px_4px_rgba(0,0,0,0.35)] transition-colors hover:border-white/55 hover:bg-black/65 disabled:cursor-not-allowed disabled:border-white/15 disabled:bg-black/20 disabled:text-white/35 [&_svg]:disabled:opacity-40"
       onClick={onClick}
     >
       {children}
@@ -152,20 +159,20 @@ const ZoomToolbar: React.FC<{
 }> = ({ zoom, onZoom, onFullscreen }) => (
   <div className="flex shrink-0 items-center gap-1">
     <ToolbarButton title="缩小" disabled={zoom <= ZOOM_MIN} onClick={() => onZoom(Math.max(ZOOM_MIN, +(zoom - ZOOM_STEP).toFixed(2)))}>
-      <Minus className="h-3.5 w-3.5" />
+      <ToolbarIcon icon={ZoomOut} />
     </ToolbarButton>
-    <span className="w-11 select-none text-center font-mono text-[11px] tabular-nums text-muted-foreground">
+    <span className="w-11 select-none text-center font-mono text-[12px] font-semibold tabular-nums text-foreground">
       {Math.round(zoom * 100)}%
     </span>
     <ToolbarButton title="放大" disabled={zoom >= ZOOM_MAX} onClick={() => onZoom(Math.min(ZOOM_MAX, +(zoom + ZOOM_STEP).toFixed(2)))}>
-      <Plus className="h-3.5 w-3.5" />
+      <ToolbarIcon icon={ZoomIn} />
     </ToolbarButton>
     <ToolbarButton title="重置缩放" disabled={zoom === 1} onClick={() => onZoom(1)}>
-      <RotateCcw className="h-3.5 w-3.5" />
+      <ToolbarIcon icon={RotateCcw} />
     </ToolbarButton>
     {onFullscreen ? (
       <ToolbarButton title="全屏查看" onClick={onFullscreen}>
-        <Maximize2 className="h-3.5 w-3.5" />
+        <ToolbarIcon icon={Maximize2} />
       </ToolbarButton>
     ) : null}
   </div>
@@ -176,20 +183,24 @@ const DiagramCanvas: React.FC<{
   zoom: number;
   maxHeight?: number | string;
 }> = ({ state, zoom, maxHeight = 520 }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setPan({ x: 0, y: 0 });
+  }, [zoom, state.status === 'done' ? state.svg : state.status]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // 仅左键触发拖拽
     if (e.button !== 0) return;
-    const el = scrollRef.current;
+    const el = viewportRef.current;
     if (!el) return;
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      scrollLeft: el.scrollLeft,
-      scrollTop: el.scrollTop,
+      panX: pan.x,
+      panY: pan.y,
     };
     el.setPointerCapture(e.pointerId);
     setDragging(true);
@@ -197,18 +208,18 @@ const DiagramCanvas: React.FC<{
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
-    const el = scrollRef.current;
-    if (!drag || !el) return;
-    // 通过 scrollLeft/scrollTop 平移：天然被滚动范围钳制，不会拖出图形
-    el.scrollLeft = drag.scrollLeft - (e.clientX - drag.startX);
-    el.scrollTop = drag.scrollTop - (e.clientY - drag.startY);
+    if (!drag) return;
+    setPan({
+      x: drag.panX + (e.clientX - drag.startX),
+      y: drag.panY + (e.clientY - drag.startY),
+    });
   };
 
   const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragRef.current) return;
     dragRef.current = null;
     setDragging(false);
-    scrollRef.current?.releasePointerCapture?.(e.pointerId);
+    viewportRef.current?.releasePointerCapture?.(e.pointerId);
   };
 
   if (state.status === 'loading') {
@@ -232,16 +243,18 @@ const DiagramCanvas: React.FC<{
     : undefined;
   return (
     <div
-      ref={scrollRef}
-      className={`flex select-none overflow-auto custom-scrollbar ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      ref={viewportRef}
+      className={`flex select-none overflow-hidden ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{ maxHeight }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
     >
-      {/* m-auto：内容小于容器时水平/垂直居中；大于容器时由滚动条接管，滚动范围 = 图形尺寸 + padding */}
-      <div className="m-auto shrink-0 p-4">
+      <div
+        className="m-auto shrink-0 p-4"
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
+      >
         <div
           className="overflow-hidden [&_svg]:!block [&_svg]:!h-full [&_svg]:!w-full [&_svg]:!max-w-none"
           style={{ width: widthPx, height: heightPx }}
