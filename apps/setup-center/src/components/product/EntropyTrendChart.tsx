@@ -12,8 +12,9 @@ export function EntropyTrendChart({ data, dates, color }: EntropyTrendChartProps
     x: dates,
     y: data,
     type: "scatter" as const,
-    mode: "lines" as "lines",
+    mode: "lines+markers" as "lines+markers",
     line: { color, width: 1.5 },
+    marker: { color, size: 4 },
     hoverinfo: "y" as "y",
   };
 
@@ -46,7 +47,7 @@ export function EntropyTrendChart({ data, dates, color }: EntropyTrendChartProps
       linecolor: "rgba(255,255,255,0.3)",
       linewidth: 1,
       tickmode: "array" as "array",
-      tickvals: dates.filter((_, i) => i % 3 === 0),
+      tickvals: dates,
     },
     yaxis: {
       range: [0, 105],

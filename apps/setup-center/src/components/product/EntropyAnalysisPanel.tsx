@@ -1,11 +1,17 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { GitBranch, Info } from "lucide-react";
+import { GitBranch, Info, Loader2, AlertCircle, RefreshCw, Database } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { EntropyCard } from "./EntropyCard";
 import { EntropyDetailDrawer } from "./EntropyDetailDrawer";
+import {
+  fetchEntropyAnalysis,
+  type EntropyAnalysisData,
+  type EntropyType,
+  type RepoStats,
+} from "@/api/entropyService";
 import type { Product } from "./types";
 
 const CARD_CONFIG = [
@@ -45,60 +51,25 @@ function getDescription(key: EntropyKey, score: number): string {
   return map[key];
 }
 
-const MOCK_RAW_SCORES: Record<string, number> = {
-  structural: 0.175,
-  semantic:   0.93,
-  behavioral: 0.242,
-  cognitive:  0.276,
-};
-
-const MOCK_DATES = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date(Date.now() - (29 - i) * 86400000);
-  return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-});
-
-function mockTrend(baseRaw: number): number[] {
-  const base = 100 - 100 * baseRaw;
-  return Array.from({ length: 30 }, () =>
-    Math.round(Math.max(0, Math.min(100, base + (Math.random() - 0.5) * 20)))
-  );
+function buildRepoStatsRows(stats: RepoStats) {
+  return [
+    { label: "分支", value: stats.branch },
+    { label: "最后提交", value: stats.last_commit },
+    { label: "提交总数", value: (stats.total_commits ?? 0).toLocaleString() },
+    { label: "Java 文件数", value: (stats.java_files_count ?? 0).toLocaleString() },
+    { label: "总方法数", value: (stats.total_methods ?? 0).toLocaleString() },
+    { label: "平均方法行数", value: String(stats.avg_method_lines ?? "-") },
+    { label: "最大方法行数", value: String(stats.max_method_lines ?? "-") },
+    { label: "平均注释比例", value: ((stats.avg_comment_ratio ?? 0) * 100).toFixed(1) + "%" },
+  ];
 }
-
-const MOCK_TRENDS: Record<string, number[]> = {
-  structural: mockTrend(0.175),
-  semantic:   mockTrend(0.93),
-  behavioral: mockTrend(0.242),
-  cognitive:  mockTrend(0.276),
-};
-
-interface RepoStats {
-  branch: string;
-  lastCommit: string;
-  commitCount: number;
-  javaFileCount: number;
-  totalMethodCount: number;
-  avgMethodLines: number;
-  maxMethodLines: number;
-  avgCommentRatio: number; // 0~1
-}
-
-const MOCK_REPO_STATS: RepoStats = {
-  branch: "main",
-  lastCommit: "2026-06-09 14:32:10",
-  commitCount: 1247,
-  javaFileCount: 386,
-  totalMethodCount: 4210,
-  avgMethodLines: 34.6,
-  maxMethodLines: 312,
-  avgCommentRatio: 0.18,
-};
 
 interface EntropyAnalysisPanelProps {
   product: Product;
   synapseApiBase: string;
 }
 
-export function EntropyAnalysisPanel({ product, synapseApiBase: _synapseApiBase }: EntropyAnalysisPanelProps) {
+export function EntropyAnalysisPanel({ product, synapseApiBase }: EntropyAnalysisPanelProps) {
   const { t } = useTranslation();
   const [detailType, setDetailType] = useState<string | null>(null);
 
@@ -109,6 +80,63 @@ export function EntropyAnalysisPanel({ product, synapseApiBase: _synapseApiBase 
 
   const [selectedRepoIndex, setSelectedRepoIndex] = useState<number>(defaultRepoIndex);
   const selectedRepo = product.repositories[selectedRepoIndex];
+
+  // API state
+  const [analysisData, setAnalysisData] = useState<EntropyAnalysisData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
+
+  const fetchData = useCallback(() => {
+    console.log("[entropy] fetchData called, product:", product.name, "repo:", selectedRepo?.branch, "prodBranch:", selectedRepo?.prodBranch);
+    if (!product.name || !selectedRepo) return;
+    let cancelled = false;
+    setLoading(true);
+    setErrorMsg(null);
+    setIsEmpty(false);
+    void (async () => {
+      try {
+        const data = await fetchEntropyAnalysis(synapseApiBase, {
+          prod: product.name,
+          repo_branch: selectedRepo.branch,
+          prod_branch: selectedRepo.prodBranch || undefined,
+        });
+        if (!cancelled) {
+          if (!data || !data.entropy || !data.dates) {
+            setIsEmpty(true);
+          } else {
+            setAnalysisData(data);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e);
+          // 后端返回无数据相关错误时视为空态
+          if (msg.toLowerCase().includes("no data") || msg.toLowerCase().includes("not found") || msg.includes("暂无")) {
+            setIsEmpty(true);
+          } else {
+            setErrorMsg(msg);
+          }
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [product.name, selectedRepo?.branch, selectedRepo?.prodBranch, synapseApiBase]);
+
+  useEffect(() => {
+    const cancel = fetchData();
+    return cancel;
+  }, [fetchData]);
+
+  const requestParams = useMemo(() => ({
+    prod: product.name,
+    repo_branch: selectedRepo?.branch ?? "",
+    prod_branch: selectedRepo?.prodBranch || undefined,
+  }), [product.name, selectedRepo?.branch, selectedRepo?.prodBranch]);
+
+  const hasData = analysisData != null && !isEmpty;
 
   return (
     <div className="relative flex flex-col h-full">
@@ -145,74 +173,109 @@ export function EntropyAnalysisPanel({ product, synapseApiBase: _synapseApiBase 
           </SelectContent>
         </Select>
 
-        {/* 详细信息 */}
-        <div className="ml-auto flex items-center">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-sm text-foreground shadow-sm"
-                >
-                  <Info size={15} className="text-emerald-500/80" />
-                  <span>详细信息</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="left" align="start" sideOffset={6} className="z-[1250] w-[340px] p-5 !rounded-xl !border !border-border !bg-popover !text-popover-foreground !shadow-lg">
-                <div className="flex items-center gap-2 mb-4">
-                  <Info size={16} className="text-primary" />
-                  <span className="text-sm font-bold text-popover-foreground">仓库统计</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: "分支", value: MOCK_REPO_STATS.branch },
-                    { label: "最后提交", value: MOCK_REPO_STATS.lastCommit },
-                    { label: "提交总数", value: MOCK_REPO_STATS.commitCount.toLocaleString() },
-                    { label: "Java 文件数", value: MOCK_REPO_STATS.javaFileCount.toLocaleString() },
-                    { label: "总方法数", value: MOCK_REPO_STATS.totalMethodCount.toLocaleString() },
-                    { label: "平均方法行数", value: String(MOCK_REPO_STATS.avgMethodLines) },
-                    { label: "最大方法行数", value: String(MOCK_REPO_STATS.maxMethodLines) },
-                    { label: "平均注释比例", value: (MOCK_REPO_STATS.avgCommentRatio * 100).toFixed(1) + "%" },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="flex flex-col gap-1 rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5"
-                    >
-                      <span className="text-[11px] text-muted-foreground leading-none">{item.label}</span>
-                      <span className="text-[13px] font-semibold text-foreground leading-tight break-all">
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        {/* 详细信息 — 有数据时才可点击 */}
+        {hasData && (
+          <div className="ml-auto flex items-center">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 transition-all text-sm text-foreground shadow-sm"
+                  >
+                    <Info size={15} className="text-emerald-500/80" />
+                    <span>详细信息</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left" align="start" sideOffset={6} className="z-[1250] w-[340px] p-5 !rounded-xl !border !border-border !bg-popover !text-popover-foreground !shadow-lg">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Info size={16} className="text-primary" />
+                    <span className="text-sm font-bold text-popover-foreground">仓库统计</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {buildRepoStatsRows(analysisData.repo_stats).map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex flex-col gap-1 rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5"
+                      >
+                        <span className="text-[11px] text-muted-foreground leading-none">{item.label}</span>
+                        <span className="text-[13px] font-semibold text-foreground leading-tight break-all">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </div>
 
-      <div className="p-6 grid grid-cols-2 gap-5 overflow-y-auto custom-scrollbar relative">
-        {CARD_CONFIG.map((c) => {
-          const rawScore = MOCK_RAW_SCORES[c.key];
-          const score = Math.max(0, 100 - 100 * rawScore);
-          return (
-            <EntropyCard
-              key={c.key}
-              label={t(c.labelKey, c.label)}
-              rawScore={rawScore}
-              description={getDescription(c.key, score)}
-              trendData={MOCK_TRENDS[c.key]}
-              trendDates={MOCK_DATES}
-              onDetail={() => setDetailType(c.key)}
-            />
-          );
-        })}
+      {/* 内容区 */}
+      <div className="p-6 flex-1 flex flex-col relative">
+        {/* Loading */}
+        {loading && !analysisData && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <Loader2 size={36} className="text-emerald-500/60 animate-spin" />
+            <p className="text-sm text-muted-foreground">加载中...</p>
+          </div>
+        )}
+
+        {/* Error */}
+        {!loading && errorMsg && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <AlertCircle size={36} className="text-red-500/60" />
+            <p className="text-sm text-red-600 dark:text-red-400 max-w-md text-center">{errorMsg}</p>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors"
+              onClick={() => fetchData()}
+            >
+              <RefreshCw size={13} />
+              重试
+            </button>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && !errorMsg && isEmpty && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <Database size={36} className="text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">该产品暂无熵分析数据</p>
+          </div>
+        )}
+
+        {/* 卡片网格 */}
+        {hasData && (
+          <div className="grid grid-cols-2 gap-5 overflow-y-auto custom-scrollbar">
+            {CARD_CONFIG.map((c) => {
+              const entropyItem = analysisData.entropy[c.key];
+              const rawScore = entropyItem.score;
+              const score = Math.max(0, 100 - 100 * rawScore);
+              console.log("[entropy] Card", c.key, "rawScore:", rawScore, "trend length:", entropyItem.trend?.length, "dates length:", analysisData.dates?.length);
+              return (
+                <EntropyCard
+                  key={c.key}
+                  label={t(c.labelKey, c.label)}
+                  rawScore={rawScore}
+                  description={getDescription(c.key, score)}
+                  trendData={entropyItem.trend}
+                  trendDates={analysisData.dates}
+                  onDetail={() => setDetailType(c.key)}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <EntropyDetailDrawer
         open={detailType !== null}
         onClose={() => setDetailType(null)}
-        entropyType={detailType as "structural" | "semantic" | "behavioral" | "cognitive" | null}
+        entropyType={detailType as EntropyType | null}
+        synapseApiBase={synapseApiBase}
+        requestParams={hasData ? requestParams : null}
       />
     </div>
   );
