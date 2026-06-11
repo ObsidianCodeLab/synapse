@@ -349,6 +349,16 @@ class MeetingRoomService:
             "solution_review_blocked": bool(room_state.get("solution_review_blocked")),
             "func_solution_blocked": bool(room_state.get("func_solution_blocked")),
             "skipped_node_ids": extract_skipped_node_ids(all_history),
+            **(
+                {
+                    "node_recovery": self.assess_node_recovery(
+                        room_id,
+                        node_id=str(detail.get("current_node_id") or ""),
+                    )
+                }
+                if scope_id
+                else {}
+            ),
         }
 
     def get_room_detail(self, room_id: str) -> dict[str, Any] | None:
@@ -879,6 +889,83 @@ class MeetingRoomService:
         dev = load_dev_status(sid) or {}
         titles = build_title_index()
         return self._room_detail_payload(dev, sid, titles)
+
+    def assess_node_recovery(
+        self,
+        room_id: str,
+        *,
+        node_id: str | None = None,
+    ) -> dict[str, Any]:
+        """检测当前节点是否可从服务重启停止态恢复人工门控。"""
+        rid = (room_id or "").strip()
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+        from synapse.rd_meeting.room_recovery import RECOVERY_REASON_LABELS, assess_node_recovery
+
+        out = assess_node_recovery(
+            sid,
+            node_id=node_id,
+            run_in_progress=is_room_run_in_progress(rid),
+        )
+        code = out.get("reason_code")
+        if code:
+            out["reason"] = RECOVERY_REASON_LABELS.get(str(code), str(code))
+        return out
+
+    def recover_stopped_node(
+        self,
+        room_id: str,
+        *,
+        node_id: str | None = None,
+    ) -> dict[str, Any]:
+        """恢复 server_restart 停止态到人工门控，不清理节点过程数据。"""
+        rid = (room_id or "").strip()
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        from synapse.rd_meeting.room_recovery import recover_stopped_node as _recover
+
+        _recover(
+            sid,
+            room_id=rid,
+            node_id=node_id,
+            run_in_progress=is_room_run_in_progress(rid),
+        )
+        dev = load_dev_status(sid) or {}
+        titles = build_title_index()
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload["node_recovery"] = self.assess_node_recovery(rid, node_id=node_id)
+        return payload
+
+    @staticmethod
+    def _attach_node_recovery(
+        payload: dict[str, Any],
+        *,
+        room_id: str,
+        scope_id: str,
+        node_id: str | None = None,
+    ) -> dict[str, Any]:
+        from synapse.rd_meeting.room_recovery import RECOVERY_REASON_LABELS, assess_node_recovery
+
+        out = dict(payload)
+        assessment = assess_node_recovery(
+            scope_id,
+            node_id=node_id,
+            run_in_progress=is_room_run_in_progress(room_id),
+        )
+        code = assessment.get("reason_code")
+        if code:
+            assessment["reason"] = RECOVERY_REASON_LABELS.get(str(code), str(code))
+        out["node_recovery"] = assessment
+        return out
 
     async def _open_meeting_async_tail(
         self,
@@ -1513,6 +1600,14 @@ class MeetingRoomService:
         item["participants"] = participants
         if MeetingPipeline.exists(scope_id):
             item["pipeline"] = MeetingPipeline.load(scope_id).snapshot_for_api()
+        room_id = str(item.get("room_id") or "")
+        if room_id and scope_id:
+            item = self._attach_node_recovery(
+                item,
+                room_id=room_id,
+                scope_id=scope_id,
+                node_id=str(item.get("current_node_id") or ""),
+            )
         return item
 
     @staticmethod

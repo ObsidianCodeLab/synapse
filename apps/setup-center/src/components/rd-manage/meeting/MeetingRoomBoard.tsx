@@ -14,7 +14,9 @@ import {
   MEETING_NODE_TOKEN_BUDGET,
   MEETING_ROOM_TOKEN_BUDGET,
   reprocessMeetingRoom,
+  recoverMeetingRoom,
   stopMeetingRoom,
+  type MeetingNodeRecovery,
   type MeetingRoomChatLogWire,
   type MeetingRoomDetail,
   type MeetingRoomListItem,
@@ -95,7 +97,7 @@ import {
   Globe, Clock, Coins, MoreHorizontal, CircleDashed, 
   Terminal, Code2, GitBranch, FileCode2, Play, User, Info, Network, Code, 
   TestTube, CheckSquare, Flame, TrendingUp, Loader2, AlertCircle, MessageSquareText, ClipboardCheck,
-  SkipForward, RotateCw, ArrowLeft, Layers, Square,
+  SkipForward, RotateCw, Undo2, ArrowLeft, Layers, Square,
   Search, PenLine, ShieldCheck, Check, Container,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -184,6 +186,10 @@ interface MeetingRoom {
   skippedNodeIds?: string[];
   /** 正在发起重新处理的节点 ID；仅该节点卡片/按钮显示 loading */
   reprocessingNodeId?: string | null;
+  /** 正在发起处理恢复的节点 ID */
+  recoveringNodeId?: string | null;
+  /** 服务重启后是否可恢复人工门控（后端 node_recovery） */
+  nodeRecovery?: MeetingNodeRecovery | null;
   /** 协作流全量刷新世代（重处理后递增，触发按节点 re-fetch） */
   chatEpoch?: number;
 }
@@ -498,6 +504,9 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       ? live.skipped_node_ids
       : room.skippedNodeIds,
     reprocessingNodeId: room.reprocessingNodeId ?? null,
+    recoveringNodeId: room.recoveringNodeId ?? null,
+    nodeRecovery:
+      (live.node_recovery as MeetingNodeRecovery | undefined) ?? room.nodeRecovery ?? null,
   };
 }
 
@@ -616,6 +625,7 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
     scopeId: item.scope_id,
     chatSopKey: sopScopeKey(item.stage_id ?? 0, item.current_node_id || 'pending'),
     skippedNodeIds: item.skipped_node_ids ?? [],
+    nodeRecovery: item.node_recovery ?? null,
   };
 }
 
@@ -1517,6 +1527,7 @@ const InterventionDialog = ({
   onClose,
   onHitlSubmit,
   onReprocess,
+  onRecover,
   onStopRun,
   onMergeNodeChat,
   synapseApiBase,
@@ -1527,6 +1538,7 @@ const InterventionDialog = ({
   /** 仅中栏人工确认表单提交时使用，协作流只读 */
   onHitlSubmit?: (text: string, values: HitlFormValues) => void;
   onReprocess?: (nodeId: string, reason?: string) => void;
+  onRecover?: (nodeId: string) => void;
   onStopRun?: () => void;
   /** 按 SOP 节点合并协作流（来自 agents/<node_id>/room_history.jsonl） */
   onMergeNodeChat?: (nodeId: string, logs: LogEntry[]) => void;
@@ -1657,6 +1669,16 @@ const InterventionDialog = ({
     !room.runInProgress &&
     (selectedNode.id === room.currentNode ||
       canReprocessHistoricalNode(selectedNode.id, selectedNode.type)),
+  );
+
+  const canRecover = Boolean(
+    room &&
+    selectedNode &&
+    selectedNode.id === room.currentNode &&
+    room.status === 'stopped' &&
+    !room.runInProgress &&
+    !room.reprocessingNodeId &&
+    room.nodeRecovery?.recoverable,
   );
 
   const canStopNodeRun = Boolean(
@@ -2133,11 +2155,32 @@ const InterventionDialog = ({
               </button>
             </div>
             <div className="flex items-center gap-2">
+              {canRecover ? (
+                <Tooltip title="恢复服务重启前的人工门控状态，不清理已产出内容">
+                  <Button
+                    type="primary"
+                    disabled={Boolean(room.recoveringNodeId || room.reprocessingNodeId)}
+                    icon={
+                      <Undo2
+                        className={`w-4 h-4 ${
+                          room.recoveringNodeId === selectedNode?.id
+                            ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin'
+                            : ''
+                        }`}
+                      />
+                    }
+                    onClick={() => onRecover?.(selectedNode!.id)}
+                    className={MEETING_TAB_BAR_ANT_BTN}
+                  >
+                    处理恢复
+                  </Button>
+                </Tooltip>
+              ) : null}
               {canReprocess ? (
                 <Button
                   type="primary"
                   danger={room.status === 'failed'}
-                  disabled={Boolean(room.reprocessingNodeId)}
+                  disabled={Boolean(room.reprocessingNodeId || room.recoveringNodeId)}
                   icon={
                     <RotateCw
                       className={`w-4 h-4 ${
@@ -2754,6 +2797,40 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       });
   };
 
+  const handleRecover = (nodeId: string) => {
+    if (!activeRoom) return;
+    const base = (synapseApiBase || '').trim();
+    if (!base) return;
+
+    setActiveRoom((prev) =>
+      prev ? { ...prev, recoveringNodeId: nodeId, status: 'human_intervention' } : prev,
+    );
+    void recoverMeetingRoom(base, activeRoom.id, nodeId)
+      .then((detail) => {
+        const updatedRoom = mapDetailToRoom(detail);
+        updatedRoom.brief = '已恢复人工门控，可继续处理';
+        updatedRoom.recoveringNodeId = null;
+        setActiveRoom(updatedRoom);
+        setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
+        toast.success('已恢复服务重启前的人工处理状态');
+      })
+      .catch((e) => {
+        setActiveRoom((prev) =>
+          prev ? { ...prev, recoveringNodeId: null, status: 'stopped' } : prev,
+        );
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('agent_still_running')) {
+          toast.error('重启前智能体仍在执行，请使用「重新处理」');
+        } else if (msg.includes('not_server_restart')) {
+          toast.error('仅服务重启导致的停止可恢复处理');
+        } else if (msg.includes('no_gate_state')) {
+          toast.error('缺少可恢复的人工门控状态');
+        } else {
+          toast.error(msg);
+        }
+      });
+  };
+
   const handleStopRun = () => {
     if (!activeRoom) return;
     const base = (synapseApiBase || '').trim();
@@ -2836,6 +2913,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
           onClose={() => setDialogOpen(false)}
           onHitlSubmit={handleHitlSubmit}
           onReprocess={handleReprocess}
+          onRecover={handleRecover}
           onStopRun={handleStopRun}
           onMergeNodeChat={handleMergeNodeChat}
           synapseApiBase={synapseApiBase}

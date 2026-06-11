@@ -1124,6 +1124,7 @@ def clear_room_state_for_node_reprocess(
         "pending_host_llm_begin_kind",
         "stopped_at",
         "stopped_reason",
+        "stopped_prev_status",
         "solution_review_blocked",
         "func_solution_blocked",
         "escalate_reason",

@@ -88,6 +88,7 @@ class ProductKnowledgeRepoRow(BaseModel):
     prod_branch: str = Field(default="", description="产品分支 branchVersionId|branchName")
     repo_module: str = Field(default="", description="应用模块 productModuleId|moduleChName")
     code_path: str = Field(default="", description="仓库代码路径")
+    rel_module_list: str = Field(default="", description="关联应用模块（可选）")
     repo_func: str = Field(default="", description="仓库职责/用途")
     repo_master: str = Field(default="N", description="主仓库 Y/N")
 

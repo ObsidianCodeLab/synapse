@@ -76,6 +76,16 @@ export interface MeetingRoomParticipantWire {
   display_name: string;
 }
 
+export interface MeetingNodeRecovery {
+  recoverable: boolean;
+  reason_code?: string | null;
+  reason?: string;
+  restore_status?: string;
+  intervention_panel?: string;
+  stopped_prev_status?: string;
+  node_id?: string;
+}
+
 export interface MeetingRoomDetail extends MeetingRoomListItem {
   room_state?: Record<string, unknown> | null;
   history?: Record<string, unknown>[];
@@ -84,6 +94,7 @@ export interface MeetingRoomDetail extends MeetingRoomListItem {
   participants?: MeetingRoomParticipantWire[];
   current_node_binding?: Record<string, unknown>;
   skipped_node_ids?: string[];
+  node_recovery?: MeetingNodeRecovery;
 }
 
 export interface MeetingRoomArchiveEntry {
@@ -344,6 +355,7 @@ export interface MeetingRoomLivePayload {
     solution_review_payload?: SolutionReviewPayload;
   };
   solution_review_blocked?: boolean;
+  node_recovery?: MeetingNodeRecovery;
 }
 
 // ─── 方案评审面板 ──────────────────────────────────────
@@ -1076,6 +1088,21 @@ export async function stopMeetingRoom(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/stop`,
     {},
+  );
+}
+
+export async function recoverMeetingRoom(
+  synapseApiBase: string,
+  roomId: string,
+  nodeId?: string,
+): Promise<MeetingRoomDetail> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const body: { node_id?: string } = {};
+  if (nodeId) body.node_id = nodeId;
+  return apiPost<MeetingRoomDetail>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/recover`,
+    body,
   );
 }
 

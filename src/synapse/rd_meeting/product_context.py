@@ -152,6 +152,7 @@ def _normalize_repo_entry(raw: dict[str, Any]) -> dict[str, Any]:
         "prod_branch": str(raw.get("prod_branch") or "").strip(),
         "repo_module": str(raw.get("repo_module") or "").strip(),
         "code_path": str(raw.get("code_path") or "").strip(),
+        "rel_module_list": str(raw.get("rel_module_list") or "").strip(),
         "repo_func": str(raw.get("repo_func") or "").strip(),
         "repo_master": str(raw.get("repo_master") or "").strip(),
     }

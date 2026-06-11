@@ -228,6 +228,32 @@ async def reprocess_meeting_room(
         return error_response(500, "reprocess_meeting_room_failed", str(exc))
 
 
+class RecoverBody(BaseModel):
+    node_id: str | None = Field(
+        None,
+        description="要恢复的 SOP 节点；缺省为流水线当前节点（仅支持当前节点）",
+    )
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/recover")
+async def recover_meeting_room(
+    room_id: str,
+    body: RecoverBody | None = None,
+) -> dict:
+    """服务重启后恢复当前节点人工门控（不清理过程数据、不重跑智能体）。"""
+    node_id = (body.node_id if body else None) or None
+    try:
+        item = _service.recover_stopped_node(room_id, node_id=node_id)
+        return success_response(item)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "not_found" in msg else 400
+        return error_response(code, msg)
+    except Exception as exc:
+        logger.exception("recover_meeting_room failed: %s", exc)
+        return error_response(500, "recover_meeting_room_failed", str(exc))
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/stop")
 async def stop_meeting_room(room_id: str) -> dict:
     """终止当前节点后台运行，会议室标为 stopped（TODO-1：杀尽 Agent 池任务）。"""

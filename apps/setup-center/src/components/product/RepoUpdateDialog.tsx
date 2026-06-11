@@ -267,6 +267,7 @@ export function RepoUpdateDialog({
         purpose: "",
         token: defaultRepoAccessToken || "",
         codePath: "",
+        relModuleList: "",
         isMain: isFirst,
         prodBranch: "",
         clientKey: nextKey("n"),
@@ -551,6 +552,19 @@ export function RepoUpdateDialog({
                     />
                     <p className="text-[11px] text-muted-foreground m-0">
                       {t("workbench.products.modal.codePathHint")}
+                    </p>
+                  </div>
+                  <div className="col-span-12 space-y-1.5">
+                    <Label className="text-xs">{t("workbench.products.modal.relModuleList")}</Label>
+                    <Input
+                      className="h-9 text-xs"
+                      value={repo.relModuleList ?? ""}
+                      onChange={(e) => updateRow(index, { relModuleList: e.target.value })}
+                      placeholder={t("workbench.products.modal.relModuleListPlaceholder")}
+                      disabled={saving}
+                    />
+                    <p className="text-[11px] text-muted-foreground m-0">
+                      {t("workbench.products.modal.relModuleListHint")}
                     </p>
                   </div>
                   <div className="col-span-12 space-y-1.5">

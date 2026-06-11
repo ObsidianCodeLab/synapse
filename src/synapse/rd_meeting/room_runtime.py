@@ -384,6 +384,9 @@ def mark_room_stopped(scope_id: str, *, reason: str = "user_stop") -> dict[str, 
     """将会议室标为 stopped，并记录原因（不清理节点过程数据）。"""
     sid = (scope_id or "").strip()
     rs = dict(load_room_state(sid) or {})
+    prev = str(rs.get("status") or "").strip()
+    if prev in ("processing", "human_intervention"):
+        rs["stopped_prev_status"] = prev
     rs["status"] = "stopped"
     rs["stopped_at"] = _now_iso()
     rs["stopped_reason"] = (reason or "user_stop").strip() or "user_stop"

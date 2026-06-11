@@ -52,5 +52,6 @@ def test_mark_stopped_on_restart_respects_status(
     if expect_stopped:
         assert rs["status"] == "stopped"
         assert rs.get("stopped_reason") == "server_restart"
+        assert rs.get("stopped_prev_status") == status
     else:
         assert rs["status"] == status

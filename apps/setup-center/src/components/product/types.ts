@@ -35,6 +35,8 @@ export interface Repository {
   token: string;
   /** 仓库代码路径（与研发统一服务 `repo_info.code_path` 对应，手动填写） */
   codePath?: string;
+  /** 关联应用模块（与研发统一服务 `repo_info.rel_module_list` 对应，可选） */
+  relModuleList?: string;
   isMain: boolean;
   /** 与研发统一服务 repo_process 对齐后的单仓状态 */
   wireAnalysisState?: UnifiedWireAnalysisState;
@@ -414,6 +416,7 @@ function repoWireToRepository(r: RdRepoInfo): Repository {
     prodBranch: r.prod_branch?.trim() || undefined,
     token: r.repo_token || "",
     codePath: (r.code_path ?? "").trim() || undefined,
+    relModuleList: (r.rel_module_list ?? "").trim() || undefined,
     isMain: r.repo_master === "Y",
   };
 }
@@ -426,6 +429,7 @@ export function repositoriesToRdRepoInfo(repositories: Repository[]): RdRepoInfo
     prod_branch: (r.prodBranch ?? "").trim(),
     repo_module: (r.repoModule ?? "").trim(),
     code_path: (r.codePath ?? "").trim(),
+    rel_module_list: (r.relModuleList ?? "").trim(),
     repo_func: r.purpose,
     repo_token: r.token || "",
     repo_master: r.isMain ? "Y" : "N",

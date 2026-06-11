@@ -485,6 +485,7 @@ export function ProductModal({
         purpose: "",
         token: defaultRepoAccessToken || "",
         codePath: "",
+        relModuleList: "",
         wireAnalysisState: "new" as const,
       },
     ];
@@ -854,6 +855,10 @@ export function ProductModal({
                           <span className="text-foreground/80">{t("workbench.products.modal.codePath")}: </span>
                           {repo.codePath?.trim() || "—"}
                         </div>
+                        <div>
+                          <span className="text-foreground/80">{t("workbench.products.modal.relModuleList")}: </span>
+                          {repo.relModuleList?.trim() || "—"}
+                        </div>
                       </div>
                     </div>
                   ))
@@ -978,6 +983,18 @@ export function ProductModal({
                             />
                             <p className="text-[11px] text-muted-foreground m-0">
                               {t("workbench.products.modal.codePathHint")}
+                            </p>
+                          </div>
+                          <div className="col-span-12 space-y-2">
+                            <Label className="text-xs">{t("workbench.products.modal.relModuleList")}</Label>
+                            <Input
+                              className="h-8 text-xs"
+                              value={repo.relModuleList ?? ""}
+                              onChange={(e) => updateRepo(index, "relModuleList", e.target.value)}
+                              placeholder={t("workbench.products.modal.relModuleListPlaceholder")}
+                            />
+                            <p className="text-[11px] text-muted-foreground m-0">
+                              {t("workbench.products.modal.relModuleListHint")}
                             </p>
                           </div>
                           <div className="col-span-6 space-y-2">
