@@ -616,6 +616,7 @@ class MeetingRoomService:
         from synapse.rd_meeting.pipeline import (
             STEP_REPROCESS_PREP,
             PipelineRunContext,
+            clear_room_state_for_node_reprocess,
             run_pipeline_until_waiting,
         )
         from synapse.rd_meeting.orchestrator import schedule_pipeline_background
@@ -629,11 +630,13 @@ class MeetingRoomService:
         ).strip()
         dev["local_process_state"] = "处理中"
         save_dev_status(sid, dev)
-        if isinstance(rs, dict):
-            rs = dict(rs)
-            rs["status"] = "processing"
-            rs["phase"] = "running"
-            save_room_state(sid, rs)
+        if current and current != "pending":
+            clear_room_state_for_node_reprocess(sid, current)
+        else:
+            rs2 = dict(rs) if isinstance(rs, dict) else {}
+            rs2["status"] = "processing"
+            rs2["phase"] = "running"
+            save_room_state(sid, rs2)
 
         ctx = PipelineRunContext(
             scope_type=scope_type,
@@ -768,6 +771,7 @@ class MeetingRoomService:
         from synapse.rd_meeting.pipeline import (
             STEP_REPROCESS_PREP,
             PipelineRunContext,
+            clear_room_state_for_node_reprocess,
             run_pipeline_until_waiting,
         )
         from synapse.rd_meeting.orchestrator import schedule_pipeline_background
@@ -790,10 +794,10 @@ class MeetingRoomService:
                 current_node_id=target,
                 local_process_state="处理中",
             )
-        rs = dict(load_room_state(scope_id) or {})
-        rs["status"] = "processing"
-        rs["phase"] = "running"
-        save_room_state(scope_id, rs)
+        extra = [n for n in node_range if n != target]
+        clear_room_state_for_node_reprocess(
+            scope_id, target, extra_node_ids=extra or None
+        )
 
         patch_userwork_summary(
             scope_type=scope_type,

@@ -383,7 +383,10 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         report_body?: string;
       }
     | undefined;
-  const interventionKind = live.intervention_kind ?? room.interventionKind ?? null;
+  const interventionKind =
+    'intervention_kind' in live
+      ? (live.intervention_kind ?? null)
+      : (room.interventionKind ?? null);
   const likelySolutionReview =
     interventionKind === 'solution_review' ||
     Boolean(pendingDelivery?.solution_review_payload) ||
@@ -2682,7 +2685,22 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
-    setActiveRoom((prev) => (prev ? { ...prev, reprocessingNodeId: nodeId } : prev));
+    setActiveRoom((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        reprocessingNodeId: nodeId,
+        status: 'processing',
+        runInProgress: true,
+        interventionKind: null,
+        interventionPanel: null,
+        hitlFormSchema: null,
+        hitlLocked: false,
+        hitlSubmission: null,
+        hitlPendingSummary: null,
+        reviewPayload: null,
+      };
+    });
     void reprocessMeetingRoom(base, activeRoom.id, nodeId, reason)
       .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
