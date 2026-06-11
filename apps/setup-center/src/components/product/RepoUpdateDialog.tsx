@@ -6,8 +6,6 @@ import {
   Repository,
   displayIdPipeName,
   defaultProdBranchForAppModuleSelection,
-  filterAppModuleOptionsForRow,
-  filterProdBranchOptionsForRow,
   findRepositoryMissingTokenIndex,
   isValidRepoBranchComposite,
   patchRepositoryRepoBranchFromModuleDetail,
@@ -362,16 +360,6 @@ export function RepoUpdateDialog({
         toast.error(t("workbench.products.repoUpdateDialog.incompleteRepo"));
         return;
       }
-      const rmVals = rows.map((r) => r.repoModule?.trim() ?? "").filter(Boolean);
-      if (new Set(rmVals).size !== rmVals.length) {
-        toast.error(t("workbench.products.modal.repoModuleDuplicate"));
-        return;
-      }
-      // const pbVals = rows.map((r) => r.prodBranch?.trim() ?? "").filter(Boolean);
-      // if (new Set(pbVals).size !== pbVals.length) {
-      //   toast.error(t("workbench.products.modal.prodBranchDuplicate"));
-      //   return;
-      // }
       const missingTokenIdx = findRepositoryMissingTokenIndex(plain);
       if (missingTokenIdx >= 0) {
         toast.error(t("workbench.products.modal.repoTokenRequired"));
@@ -500,12 +488,7 @@ export function RepoUpdateDialog({
                       <SearchableVirtualSelect
                         value={repo.repoModule ?? ""}
                         onValueChange={(v) => handleRepoModuleSelect(index, v)}
-                        options={filterAppModuleOptionsForRow(
-                          appModuleOptions,
-                          rows,
-                          index,
-                          repo.repoModule ?? "",
-                        )}
+                        options={appModuleOptions}
                         placeholder={t("workbench.products.modal.appModulePlaceholder")}
                         searchPlaceholder={t("workbench.products.modal.searchFilterPlaceholder")}
                         emptyText={
@@ -530,12 +513,7 @@ export function RepoUpdateDialog({
                     prodBranchOptions={
                       repo.branchLocked
                         ? undefined
-                        : filterProdBranchOptionsForRow(
-                            prodBranchOptions,
-                            rows,
-                            index,
-                            repo.prodBranch ?? "",
-                          )
+                        : prodBranchOptions
                     }
                     prodBranchLoading={prodBranchLoading}
                     prodBranchDisabled={repoModuleSelectDisabled}

@@ -187,6 +187,18 @@ export function mergeChatLogs(existing: MeetingChatLog[], incoming: MeetingChatL
   return order.map((id) => byId.get(id)!);
 }
 
+/** 重处理 / 按节点全量刷新：先剔除该节点旧日志，再合并服务端快照（避免 merge 残留 hist-N） */
+export function replaceNodeChatLogs(
+  existing: MeetingChatLog[],
+  nodeId: string,
+  incoming: MeetingChatLog[],
+): MeetingChatLog[] {
+  const nid = (nodeId || '').trim();
+  if (!nid) return mergeChatLogs(existing, incoming);
+  const others = existing.filter((l) => (l.nodeId || '').trim() !== nid);
+  return mergeChatLogs(others, incoming);
+}
+
 /** @deprecated 使用 filterLogsForNodeExact；保留兼容旧截断逻辑 */
 export function filterLogsForSopNode(logs: MeetingChatLog[], nodeId: string): MeetingChatLog[] {
   const nid = (nodeId || 'pending').trim();

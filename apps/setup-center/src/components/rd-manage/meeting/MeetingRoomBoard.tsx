@@ -82,6 +82,7 @@ import {
 import {
   filterLogsForNodeExact,
   mergeChatLogs,
+  replaceNodeChatLogs,
   resolveChatSpeakerName,
   shouldShowChatAvatar,
   sopScopeKey,
@@ -183,6 +184,8 @@ interface MeetingRoom {
   skippedNodeIds?: string[];
   /** 正在发起重新处理的节点 ID；仅该节点卡片/按钮显示 loading */
   reprocessingNodeId?: string | null;
+  /** 协作流全量刷新世代（重处理后递增，触发按节点 re-fetch） */
+  chatEpoch?: number;
 }
 
 
@@ -1784,7 +1787,7 @@ const InterventionDialog = ({
     return () => {
       cancelled = true;
     };
-  }, [open, room?.id, chatNodeId, synapseApiBase, onMergeNodeChat]);
+  }, [open, room?.id, room?.chatEpoch, chatNodeId, synapseApiBase, onMergeNodeChat]);
 
   const scrollLogsToBottom = useCallback(() => {
     setTimeout(() => {
@@ -2676,10 +2679,12 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleMergeNodeChat = useCallback((nodeId: string, logs: LogEntry[]) => {
     const apply = (room: MeetingRoom): MeetingRoom => {
-      const others = (room.allChatLogs ?? room.logs).filter(
-        (l) => (l.nodeId || '').trim() && (l.nodeId || '').trim() !== nodeId,
-      );
-      return { ...room, allChatLogs: mergeChatLogs(others, logs) };
+      const merged = replaceNodeChatLogs(room.allChatLogs ?? room.logs, nodeId, logs);
+      return {
+        ...room,
+        allChatLogs: merged,
+        logs: filterLogsForNodeExact(merged, room.currentNode),
+      };
     };
     setActiveRoom((prev) => {
       if (!prev) return prev;
@@ -2694,8 +2699,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
+    const chatEpoch = Date.now();
     setActiveRoom((prev) => {
       if (!prev) return prev;
+      const cleared = replaceNodeChatLogs(prev.allChatLogs ?? prev.logs, nodeId, []);
       return {
         ...prev,
         reprocessingNodeId: nodeId,
@@ -2708,6 +2715,9 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
         hitlSubmission: null,
         hitlPendingSummary: null,
         reviewPayload: null,
+        allChatLogs: cleared,
+        logs: filterLogsForNodeExact(cleared, prev.currentNode),
+        chatEpoch,
       };
     });
     void reprocessMeetingRoom(base, activeRoom.id, nodeId, reason)
@@ -2715,6 +2725,14 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '正在重新处理节点…';
         updatedRoom.reprocessingNodeId = null;
+        updatedRoom.chatEpoch = Date.now();
+        const fresh = (detail.chat_logs || []).map(mapChatWireToLog);
+        updatedRoom.allChatLogs = replaceNodeChatLogs(
+          updatedRoom.allChatLogs ?? updatedRoom.logs,
+          nodeId,
+          fresh.filter((l) => (l.nodeId || '').trim() === nodeId),
+        );
+        updatedRoom.logs = filterLogsForNodeExact(updatedRoom.allChatLogs, updatedRoom.currentNode);
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
         toast.success('已清理过程数据，正在从节点初始化重跑');

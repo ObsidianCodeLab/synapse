@@ -311,38 +311,6 @@ export function ensureProdBranchOptionInList(
   return [{ label: v, value: v }, ...options];
 }
 
-/** 多仓库时产品分支下拉：排除其它行已选的 prodBranch（当前行已选保留可选） */
-export function filterProdBranchOptionsForRow(
-  options: { label: string; value: string }[],
-  repos: { prodBranch?: string }[],
-  rowIndex: number,
-  currentProdBranch: string,
-): { label: string; value: string }[] {
-  const cur = currentProdBranch.trim();
-  const taken = new Set(
-    repos
-      .map((r, j) => (j !== rowIndex && r.prodBranch?.trim() ? r.prodBranch.trim() : null))
-      .filter((x): x is string => !!x),
-  );
-  return options.filter((o) => !taken.has(o.value) || o.value === cur);
-}
-
-/** 多仓库时应用模块下拉：排除其它行已选的 `value`（当前行已选保留可选） */
-export function filterAppModuleOptionsForRow(
-  options: SearchableOption[],
-  repos: { repoModule?: string }[],
-  rowIndex: number,
-  currentRepoModule: string,
-): SearchableOption[] {
-  const cur = currentRepoModule.trim();
-  const taken = new Set(
-    repos
-      .map((r, j) => (j !== rowIndex && r.repoModule?.trim() ? r.repoModule.trim() : null))
-      .filter((x): x is string => !!x),
-  );
-  return options.filter((o) => !taken.has(o.value) || o.value === cur);
-}
-
 /** 展示/入库格式 repositoryId|destBranchName */
 export function repoDetailComposite(row: RdRepoDetailRow): string {
   const rid = String(row.repositoryId ?? "").trim();

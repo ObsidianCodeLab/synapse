@@ -7,8 +7,6 @@ import {
   DEFAULT_ICONS,
   displayIdPipeName,
   defaultProdBranchForAppModuleSelection,
-  filterAppModuleOptionsForRow,
-  filterProdBranchOptionsForRow,
   isValidProductTag,
   isValidRepoBranchComposite,
   findRepositoryMissingTokenIndex,
@@ -567,11 +565,6 @@ export function ProductModal({
           toast.error(t("workbench.products.modal.repoModuleRequired"));
           return;
         }
-        const rmVals = formState.repositories.map((r) => r.repoModule?.trim() ?? "").filter(Boolean);
-        if (new Set(rmVals).size !== rmVals.length) {
-          toast.error(t("workbench.products.modal.repoModuleDuplicate"));
-          return;
-        }
         const badPb = formState.repositories.some((r) => {
           const pb = r.prodBranch?.trim() ?? "";
           return !pb || parseCompositeLeadingId(pb) == null;
@@ -580,11 +573,6 @@ export function ProductModal({
           toast.error(t("workbench.products.modal.prodBranchRequired"));
           return;
         }
-        // const pbVals = formState.repositories.map((r) => r.prodBranch?.trim() ?? "").filter(Boolean);
-        // if (new Set(pbVals).size !== pbVals.length) {
-        //   toast.error(t("workbench.products.modal.prodBranchDuplicate"));
-        //   return;
-        // }
         const badRepoBranch = formState.repositories.some((r) => !isValidRepoBranchComposite(r.branch));
         if (badRepoBranch) {
           toast.error(t("workbench.products.modal.repoBranchCompositeRequired"));
@@ -936,12 +924,7 @@ export function ProductModal({
                             <SearchableVirtualSelect
                               value={repo.repoModule ?? ""}
                               onValueChange={(v) => handleRepoModuleChange(index, v)}
-                              options={filterAppModuleOptionsForRow(
-                                appModuleOptions,
-                                formState.repositories,
-                                index,
-                                repo.repoModule ?? "",
-                              )}
+                              options={appModuleOptions}
                               placeholder={t("workbench.products.modal.appModulePlaceholder")}
                               searchPlaceholder={t("workbench.products.modal.searchFilterPlaceholder")}
                               emptyText={
@@ -960,12 +943,7 @@ export function ProductModal({
                             branch={repo.branch}
                             repoModule={repo.repoModule}
                             loading={repoBranchLoading}
-                            prodBranchOptions={filterProdBranchOptionsForRow(
-                              prodBranchOptions,
-                              formState.repositories,
-                              index,
-                              repo.prodBranch ?? "",
-                            )}
+                            prodBranchOptions={prodBranchOptions}
                             prodBranchLoading={prodBranchLoading}
                             prodBranchDisabled={repoModuleSelectDisabled}
                             onProdBranchChange={(v) => handleProdBranchChange(index, v)}
