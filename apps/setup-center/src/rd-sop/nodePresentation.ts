@@ -66,18 +66,18 @@ export function getSopNodeTypeInfo(type: NodeType): SopNodeTypePresentation {
   const label = NODE_TYPE_LABEL[type] ?? '未知';
   switch (type) {
     case 'ai':
-      return { label, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/30' };
+      return { label, color: 'text-blue-300', bg: 'bg-blue-500/15 border-blue-400/35' };
     case 'human':
     case 'human_start':
-      return { label, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30' };
+      return { label, color: 'text-amber-300', bg: 'bg-amber-500/15 border-amber-400/35' };
     case 'ai_human':
-      return { label, color: 'text-purple-400', bg: 'bg-purple-500/10 border-purple-500/30' };
+      return { label, color: 'text-purple-300', bg: 'bg-purple-500/15 border-purple-400/35' };
     case 'human_multi':
-      return { label, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/30' };
+      return { label, color: 'text-orange-300', bg: 'bg-orange-500/15 border-orange-400/35' };
     case 'system':
-      return { label, color: 'text-muted-foreground', bg: 'bg-muted/10 border-border/30' };
+      return { label, color: 'text-slate-300', bg: 'bg-slate-500/15 border-slate-400/30' };
     case 'ai_exception':
-      return { label, color: 'text-red-400', bg: 'bg-red-500/10 border-red-500/30' };
+      return { label, color: 'text-red-300', bg: 'bg-red-500/15 border-red-400/35' };
     default:
       return { label, color: 'text-muted-foreground', bg: 'bg-muted/30 border-border/30' };
   }

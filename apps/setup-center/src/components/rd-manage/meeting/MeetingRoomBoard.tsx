@@ -709,6 +709,17 @@ const SkippedNodeDetailPanel = ({ nodeName }: { nodeName: string }) => (
 /** 看板卡片用：不含「待处理」的流水线阶段 */
 const MEETING_PIPELINE_STAGES = SOP_STAGES.filter((s) => s.id > 0);
 
+/** 左侧 SOP 节点列表：类型标签图标（按处理方式区分，替代统一的 Zap） */
+const SOP_NODE_TYPE_ICON: Record<NodeType, LucideIcon> = {
+  ai: Bot,
+  human: User,
+  human_start: User,
+  ai_human: Users,
+  human_multi: Users,
+  system: TerminalSquare,
+  ai_exception: ShieldAlert,
+};
+
 /** 主页面会议室列表自动刷新间隔（会中弹窗打开时不启用，由 live 轮询负责） */
 const LIST_AUTO_REFRESH_MS = 60_000;
 
@@ -2079,9 +2090,18 @@ const InterventionDialog = ({
                         }`}>
                           {node.name}
                         </span>
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md border shrink-0 ${typeInfo.bg}`}>
-                          <Zap className={`w-2.5 h-2.5 ${typeInfo.color}`} />
-                          <span className={`text-[10px] font-medium leading-none ${typeInfo.color}`}>{typeInfo.label}</span>
+                        <span
+                          className={`inline-flex items-center gap-[3px] rounded-full border px-1.5 py-[2px] shrink-0 ${typeInfo.bg} ${
+                            isSkipped ? 'opacity-50 saturate-50' : ''
+                          }`}
+                        >
+                          {(() => {
+                            const TypeIcon = SOP_NODE_TYPE_ICON[node.type] ?? Zap;
+                            return <TypeIcon className={`w-2.5 h-2.5 ${typeInfo.color}`} />;
+                          })()}
+                          <span className={`text-[9px] font-semibold leading-none tracking-wide ${typeInfo.color}`}>
+                            {typeInfo.label}
+                          </span>
                         </span>
                       </div>
                     </div>
