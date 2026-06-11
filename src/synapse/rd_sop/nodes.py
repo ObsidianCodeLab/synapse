@@ -113,3 +113,13 @@ def node_display_name(node_id: str) -> str:
         if n["id"] == node_id:
             return str(n["name"])
     return node_id
+
+
+def seq_index_for_node_id(node_id: str) -> int:
+    """节点在其 SOP 阶段内的顺序（从 1 开始）。"""
+    nid = (node_id or "").strip()
+    for s in STAGES:
+        for index, n in enumerate(s["nodes"]):
+            if str(n["id"]) == nid:
+                return index + 1
+    return 1

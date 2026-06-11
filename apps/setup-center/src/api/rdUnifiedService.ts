@@ -31,6 +31,8 @@ export const RD_UNIFIED_PATHS = {
   getDoc: "/dev/iwhalecloud/synapse/get_doc",
   changeRepoInfo: "/dev/iwhalecloud/synapse/change_repo_info",
   destroyProd: "/dev/iwhalecloud/synapse/destroy_prod",
+  /** 引导验证通过后登记处理人（后端 login / devservice-ip 也会调用） */
+  rdViewAssigneeSave: "/dev/iwhalecloud/synapse/rd_view_assignee_save",
 } as const;
 
 export type RdRepoInfo = {

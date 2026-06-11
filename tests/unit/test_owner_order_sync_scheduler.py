@@ -119,8 +119,9 @@ def test_merge_owner_orders_preserves_local_sop_state():
         },
     ]
 
-    merged = _merge_owner_order_lists(old, new)
+    merged, cleanup = _merge_owner_order_lists(old, new)
 
+    assert cleanup == []
     assert len(merged) == 2
     d1 = next(x for x in merged if x["demand_no"] == "D1")
     assert d1["demand_status"] == "需求设计"
@@ -137,6 +138,18 @@ def test_merge_owner_orders_preserves_local_sop_state():
     d2 = next(x for x in merged if x["demand_no"] == "D2")
     assert d2["local_process_state"] == "全人工"
     assert d2["sop_node"] == ""
+
+
+def test_merge_owner_order_keeps_completed_orphan_only():
+    old = [
+        {"demand_no": "D-done", "local_process_state": "已完成", "demand_title": "已完成单"},
+        {"demand_no": "D-stale", "local_process_state": "处理中", "demand_title": "下架单"},
+        {"demand_no": "D-pending", "local_process_state": "待处理", "demand_title": "待处理下架"},
+    ]
+    merged, cleanup = _merge_owner_order_lists(old, [])
+    dns = {x["demand_no"] for x in merged}
+    assert dns == {"D-done"}
+    assert set(cleanup) == {"D-stale", "D-pending"}
 
 
 @pytest.mark.asyncio

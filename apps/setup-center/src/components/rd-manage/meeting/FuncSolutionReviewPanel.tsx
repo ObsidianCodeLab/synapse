@@ -42,7 +42,7 @@ import {
   type NodeReviewAgentRow,
   type NodeReviewMetrics,
 } from '../../../api/meetingRoomService';
-import { MermaidPreviewBlock } from '@/components/product/MermaidPreviewBlock';
+import { MermaidDiagramCard } from './MermaidDiagramCard';
 import { PlanTransformationContent } from './PlanTransformationContent';
 import { ReviewMarkdown } from './ReviewMarkdown';
 
@@ -290,15 +290,17 @@ const CollapseToggle: React.FC<{
 
 const PlanReviewCard: React.FC<{
   plan: FuncSolutionTransformationPlan;
+  index: number;
   draft: PlanDraft;
   onChange: (next: PlanDraft) => void;
   isDark: boolean;
   readOnly?: boolean;
-}> = ({ plan, draft, onChange, isDark, readOnly = false }) => {
+}> = ({ plan, index, draft, onChange, isDark, readOnly = false }) => {
   const approved = draft.status === 'approved';
   const needsChange = draft.status === 'needs_change';
   const reqLabel = (plan.requirement_summary || plan.requirement_ref || '').trim();
   const moduleLabel = (plan.module_name || '').trim();
+  const titleLabel = (plan.title || moduleLabel || `改造方案 ${index + 1}`).trim();
 
   const toggleApprove = () => {
     if (approved) {
@@ -333,33 +335,51 @@ const PlanReviewCard: React.FC<{
             : 'border-border/60 bg-gradient-to-br from-white/[0.03] to-white/[0.01]'
       }`}
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <span
+          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-mono text-[12px] font-semibold ${
+            approved
+              ? 'border-[rgba(0,255,178,0.4)] bg-[rgba(0,217,165,0.15)] text-[#5efecf]'
+              : needsChange
+                ? 'border-amber-500/45 bg-amber-500/12 text-amber-200'
+                : 'border-violet-500/35 bg-violet-500/12 text-violet-200'
+          }`}
+        >
+          {index + 1}
+        </span>
         <div className="min-w-0 flex-1">
-          <div className="flex min-h-8 flex-wrap items-center gap-2">
-            {moduleLabel ? (
-              <Tag color="purple" className="m-0 inline-flex items-center px-2.5 py-1 text-[13px] leading-snug">
-                模块 · {moduleLabel}
-              </Tag>
-            ) : null}
-            {reqLabel ? (
-              <Tag color="blue" className="m-0 inline-flex items-center px-2.5 py-1 text-[13px] leading-snug">
-                需求 · {reqLabel}
-              </Tag>
-            ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 text-[13.5px] font-semibold leading-snug text-foreground">
+              {titleLabel}
+            </span>
             {approved ? (
-              <Tag
-                className="m-0 inline-flex items-center border-[rgba(0,255,178,0.35)] bg-[rgba(0,217,165,0.15)] px-2.5 py-1 text-[13px] leading-snug text-[#5efecf]"
-              >
+              <Tag className="m-0 inline-flex shrink-0 items-center border-[rgba(0,255,178,0.35)] bg-[rgba(0,217,165,0.15)] px-2 py-0.5 text-[11px] leading-snug text-[#5efecf]">
                 已通过
               </Tag>
             ) : needsChange ? (
-              <Tag color="warning" className="m-0 inline-flex items-center px-2.5 py-1 text-[13px] leading-snug">
+              <Tag color="warning" className="m-0 inline-flex shrink-0 items-center px-2 py-0.5 text-[11px] leading-snug">
                 需调整
               </Tag>
             ) : (
-              <Tag className="m-0 inline-flex items-center px-2.5 py-1 text-[13px] leading-snug">待评审</Tag>
+              <Tag className="m-0 inline-flex shrink-0 items-center px-2 py-0.5 text-[11px] leading-snug">待评审</Tag>
             )}
           </div>
+          {(moduleLabel || reqLabel) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              {moduleLabel ? (
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <Layers className="h-3 w-3 shrink-0 text-violet-400" />
+                  <span className="truncate">{moduleLabel}</span>
+                </span>
+              ) : null}
+              {reqLabel ? (
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <Target className="h-3 w-3 shrink-0 text-cyan-400" />
+                  <span className="truncate">{reqLabel}</span>
+                </span>
+              ) : null}
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <CollapseToggle
@@ -722,53 +742,105 @@ export function FuncSolutionReviewPanel({
         ) : null}
 
         {(overview?.architecture_summary || (overview?.diagrams?.length ?? 0) > 0) && (
-          <section className="mb-6 rounded-2xl border border-border/50 bg-gradient-to-br from-slate-500/5 to-transparent p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-cyan-400" />
-              <Text strong>方案总览（总）</Text>
+          <section className="mb-6 overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/[0.05] via-transparent to-violet-500/[0.04]">
+            <div className="flex items-center gap-2.5 border-b border-cyan-500/15 bg-cyan-500/[0.06] px-5 py-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-500/30 bg-cyan-500/15">
+                <GitBranch className="h-4 w-4 text-cyan-300" />
+              </div>
+              <div>
+                <Text strong className="!text-[13px]">方案总览</Text>
+                <div className="text-[10px] text-muted-foreground">改造在系统中的位置与主链路</div>
+              </div>
+              {(overview?.diagrams?.length ?? 0) > 0 ? (
+                <span className="ml-auto rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-[10px] text-cyan-200/90">
+                  {overview?.diagrams?.length} 张架构图
+                </span>
+              ) : null}
             </div>
-            {overview?.architecture_summary ? (
-              <ReviewMarkdown content={overview.architecture_summary} compact className="mb-4 text-[12px]" />
-            ) : null}
-            <div className="grid gap-4 md:grid-cols-2">
-              {(overview?.diagrams || []).map((d) => (
-                <div
-                  key={d.id || d.title}
-                  className="overflow-hidden rounded-xl border border-border/40 bg-black/15 p-3"
-                >
-                  <Text className="mb-2 block text-[11px] font-medium text-muted-foreground">
-                    {d.title || '流程/关系图'}
-                  </Text>
-                  {d.mermaid ? (
-                    <MermaidPreviewBlock source={d.mermaid} isDark={isDark} />
-                  ) : null}
+            <div className="space-y-4 p-5">
+              {overview?.architecture_summary ? (
+                <div className="rounded-xl border border-white/[0.07] bg-black/15 px-4 py-3">
+                  <ReviewMarkdown content={overview.architecture_summary} compact className="text-[12px]" />
                 </div>
-              ))}
+              ) : null}
+              {(overview?.diagrams || []).map((d) =>
+                d.mermaid ? (
+                  <MermaidDiagramCard
+                    key={d.id || d.title}
+                    title={d.title}
+                    kind={d.kind}
+                    source={d.mermaid}
+                    isDark={isDark}
+                  />
+                ) : null,
+              )}
             </div>
           </section>
         )}
 
-        {consistency?.summary || (consistency?.contradiction_checks?.length ?? 0) > 0 ? (
-          <section className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <Target className="h-4 w-4 text-amber-400" />
-              <Text strong>合理性与兼容性分析</Text>
+        {consistency?.summary ||
+        (consistency?.compatibility_notes?.length ?? 0) > 0 ||
+        (consistency?.contradiction_checks?.length ?? 0) > 0 ? (
+          <section className="mb-6 overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.04] to-transparent">
+            <div className="flex items-center gap-2.5 border-b border-amber-500/15 bg-amber-500/[0.05] px-5 py-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/15">
+                <Target className="h-4 w-4 text-amber-300" />
+              </div>
+              <div>
+                <Text strong className="!text-[13px]">合理性与兼容性分析</Text>
+                <div className="text-[10px] text-muted-foreground">改造方案之间的一致性与对现有功能的影响</div>
+              </div>
             </div>
-            {consistency.summary ? (
-              <p className="mb-2 text-[12px] text-foreground/90">{consistency.summary}</p>
-            ) : null}
-            {(consistency.contradiction_checks || []).map((line) => (
-              <p key={line} className="text-[11px] text-muted-foreground">
-                ✓ {line}
-              </p>
-            ))}
+            <div className="space-y-3 p-5">
+              {consistency.summary ? (
+                <p className="m-0 text-[12px] leading-relaxed text-foreground/90">{consistency.summary}</p>
+              ) : null}
+              {(consistency.compatibility_notes?.length ?? 0) > 0 ? (
+                <ul className="m-0 space-y-1.5 p-0">
+                  {(consistency.compatibility_notes || []).map((line) => (
+                    <li key={line} className="flex gap-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00d9a5]" />
+                      <span className="min-w-0">{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {(consistency.contradiction_checks || []).map((line) => (
+                <p key={line} className="m-0 flex gap-2 text-[11.5px] text-muted-foreground">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#00d9a5]" />
+                  <span className="min-w-0">{line}</span>
+                </p>
+              ))}
+            </div>
           </section>
         ) : null}
 
         <section>
-          <div className="mb-4 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-violet-400" />
-            <Text strong>改造方案清单</Text>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-500/30 bg-violet-500/15">
+                <Layers className="h-4 w-4 text-violet-300" />
+              </div>
+              <div>
+                <Text strong className="!text-[13px]">改造方案清单</Text>
+                <div className="text-[10px] text-muted-foreground">
+                  按 需求 → 模块 逐条评审，共 {plans.length} 条
+                </div>
+              </div>
+            </div>
+            {plans.length > 0 ? (
+              <div className="flex min-w-[160px] flex-1 items-center gap-2">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#00d9a5] to-[#00ffb2] transition-all duration-500"
+                    style={{ width: `${Math.round((approvedCount / plans.length) * 100)}%` }}
+                  />
+                </div>
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {approvedCount}/{plans.length}
+                </span>
+              </div>
+            ) : null}
             {readOnly ? null : (
               <Tooltip title="保存当前逐条评审状态">
                 <Button size="small" type="link" onClick={() => void persistPlans()}>
@@ -779,10 +851,11 @@ export function FuncSolutionReviewPanel({
           </div>
 
           <div className="space-y-3">
-            {plans.map((plan) => (
+            {plans.map((plan, i) => (
               <PlanReviewCard
                 key={plan.id}
                 plan={plan}
+                index={i}
                 draft={planDrafts[plan.id] || planDraftFromPayload(plan)}
                 isDark={isDark}
                 readOnly={readOnly}

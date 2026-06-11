@@ -1457,12 +1457,26 @@ class TaskExecutor:
             from ..api.routes.dev_iwhalecloud import OwnerOrderSyncError, sync_owner_orders_from_devcloud
 
             result = await sync_owner_orders_from_devcloud()
+            removed = result.get("removed_demands") or []
+            cleaned = result.get("cleaned_work_dirs") or []
+            view_sync = result.get("view_sync") if isinstance(result.get("view_sync"), dict) else {}
             summary = (
                 "工单同步完成："
                 f"云端 {result.get('total_from_cloud', 0)} 条，"
                 f"本次拉取 {result.get('fetched', 0)} 条，"
                 f"合并后本地 {result.get('merged_list_size', 0)} 条"
             )
+            if removed:
+                summary += f"，剔除门户下架 {len(removed)} 条"
+            if cleaned:
+                summary += f"，回收 work 目录 {len(cleaned)} 个"
+            if view_sync.get("status") == "skipped":
+                summary += "；统一服务 rd_view 未同步（未配置 devservice.ip）"
+            elif view_sync:
+                summary += (
+                    f"；rd_view 同步 {view_sync.get('synced', 0)} 条"
+                    f"（失败 {view_sync.get('failed', 0)}）"
+                )
             logger.info(summary)
             return True, summary
         except OwnerOrderSyncError as exc:

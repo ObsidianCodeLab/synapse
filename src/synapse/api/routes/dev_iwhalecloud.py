@@ -277,8 +277,13 @@ def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[s
 
 def _merge_owner_order_lists(
     old_list: list[Any] | None, new_list: list[Any] | None
-) -> list[dict[str, Any]]:
-    """需求单：新有老无则插入（特定阶段插入时 ``local_process_state``→全人工），老有新无则保留，新老均有则合并（见 ``_merge_demand_record``）。"""
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """需求单合并；返回 ``(merged_list, work_dirs_to_cleanup)``。
+
+    老有新无：``local_process_state=已完成`` 保留待归档，否则从 userwork 剔除并回收 ``work/<id>/``。
+    """
+    from synapse.rd_meeting.owner_order_refresh import should_keep_orphan_demand
+
     old_list = [x for x in (old_list or []) if isinstance(x, dict)]
     new_list = [x for x in (new_list or []) if isinstance(x, dict)]
 
@@ -291,14 +296,17 @@ def _merge_owner_order_lists(
     old_dns_set = {_snapshot_norm_id(d.get("demand_no")) for d in old_list if _snapshot_norm_id(d.get("demand_no"))}
 
     out: list[dict[str, Any]] = []
+    cleanup_dns: list[str] = []
     for d in old_list:
         dn = _snapshot_norm_id(d.get("demand_no"))
         if not dn:
             continue
         if dn in new_by_dn:
             out.append(_merge_demand_record(d, new_by_dn[dn]))
-        else:
+        elif should_keep_orphan_demand(d):
             out.append(dict(d))
+        else:
+            cleanup_dns.append(dn)
 
     for d in new_list:
         dn = _snapshot_norm_id(d.get("demand_no"))
@@ -306,17 +314,19 @@ def _merge_owner_order_lists(
             continue
         out.append(_apply_local_process_state_on_new_demand_insert(dict(d)))
 
-    return out
+    return out, cleanup_dns
 
 
-def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> None:
+def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> dict[str, Any]:
     """将本次拉取的需求列表与已有 ``userwork.json`` 合并后落盘；写文件时使用 FileLock 与原子替换。
 
-    合并规则：需求单与研发单均为「新有老无插入、老有新无保留、新老均有更新」；需求单更新时保留
-    ``sop_node``、``local_process_state``、``prod``；新有老无且 ``demand_status`` 为需求设计/需求开发/需求测试时
-    ``local_process_state`` 置为全人工。研发单更新时门户字段以新为准、本地扩展字段保留。文件 JSON：``list``、``updated_at``。
+    合并规则：需求单与研发单均为「新有老无插入、新老均有更新」；需求单更新时保留
+    ``sop_node``、``local_process_state``、``prod``；门户下架（老有新无）时 ``local_process_state=已完成``
+    保留待归档，否则从 userwork 剔除并回收 ``work/<demand_no>/``。研发单更新时门户字段以新为准、本地扩展字段保留。
     """
     from filelock import FileLock
+
+    from synapse.rd_meeting.owner_order_refresh import cleanup_orphan_work_directories
 
     path = _owner_order_file_name()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -335,12 +345,18 @@ def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> N
                 logger.warning("读取已有 userwork.json 失败，将仅写入本次数据: %s", exc)
                 existing_list = []
 
-        merged_list = _merge_owner_order_lists(existing_list, out_list)
+        merged_list, removed_demands = _merge_owner_order_lists(existing_list, out_list)
         payload = {
             "list": merged_list,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
         }
         _atomic_write_json_file(path, payload)
+
+    cleaned_work_dirs = cleanup_orphan_work_directories(removed_demands)
+    return {
+        "removed_demands": removed_demands,
+        "cleaned_work_dirs": cleaned_work_dirs,
+    }
 
 
 def load_owner_order_snapshot_from_file() -> dict[str, Any] | None:
@@ -5000,7 +5016,13 @@ def devservice_ip_post(body: DevserviceIpBody):
         path.write_text(t + "\n", encoding="utf-8")
     except OSError as e:
         return error_response(500, f"写入失败: {e}")
-    return success_response({"ok": True, "path": str(path.resolve())})
+
+    from synapse.rd_meeting.rd_view_assignee import sync_rd_view_assignee_from_userinfo
+
+    assignee_sync = sync_rd_view_assignee_from_userinfo()
+    return success_response(
+        {"ok": True, "path": str(path.resolve()), "assignee_sync": assignee_sync}
+    )
 
 
 class DevserviceProbeBody(BaseModel):
@@ -5183,7 +5205,8 @@ def login(body: LoginRequest):
     """
     登录研发云（浩鲸研发云验证流程）。
 
-    验证通过后，将姓名、工号、密码、token、access_token 写入 data/userinfo.encryption（foundation.CryptHelper 加密）。
+    验证通过后，将姓名、工号、密码、token、access_token 写入 data/userinfo.encryption（foundation.CryptHelper 加密），
+    并尝试调用统一服务 ``/dev/iwhalecloud/synapse/rd_view_assignee_save`` 登记处理人（未配置 devservice.ip 时跳过，写入 IP 后由 devservice-ip 接口补同步）。
     """
     try:
         username, password, file_user = _resolve_iwhalecloud_login_creds(body)
@@ -5293,8 +5316,22 @@ def login(body: LoginRequest):
             if not ok:
                 return error_response(500, err or "保存用户信息失败")
 
+            from synapse.rd_meeting.rd_view_assignee import sync_rd_view_assignee_to_unified_service
+
+            assignee_sync = sync_rd_view_assignee_to_unified_service(
+                assignee_id=username,
+                assignee=name_out,
+                department=dept_out,
+                team=team_out,
+                position=pos_out,
+            )
+
             return success_response(
-                {"token": token_out, "access_token": access_out},
+                {
+                    "token": token_out,
+                    "access_token": access_out,
+                    "assignee_sync": assignee_sync,
+                },
                 "验证通过",
             )
         except FileNotFoundError as e:
