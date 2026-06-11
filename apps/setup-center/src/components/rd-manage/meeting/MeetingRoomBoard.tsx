@@ -2216,12 +2216,6 @@ const InterventionDialog = ({
                   重新处理
                 </Button>
               ) : null}
-              {selectedNode && centerTab === 'detail' ? (
-                <div className={`${MEETING_TAB_BAR_HEIGHT} border ${getSopNodeTypeInfo(selectedNode.type).bg} ${getSopNodeTypeInfo(selectedNode.type).color}`}>
-                  <Zap className="w-4 h-4" />
-                  {getSopNodeTypeInfo(selectedNode.type).label}
-                </div>
-              ) : null}
             </div>
           </div>
 
