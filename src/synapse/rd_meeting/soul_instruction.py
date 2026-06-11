@@ -73,10 +73,11 @@ def format_soul_instruction_prompt_lines(scope_id: str) -> list[str]:
 
 
 def format_soul_instruction_block(scope_id: str) -> str:
+    """运行时头注入用（无独立章节，与 ``format_soul_instruction_prompt_lines`` 同构）。"""
     lines = format_soul_instruction_prompt_lines(scope_id)
     if not lines:
         return ""
-    return "\n".join(["## 灵魂建议（SOUL_INSTRUCTION）", ""] + lines)
+    return "\n".join(lines)
 
 
 def format_soul_instruction_cli_lines(scope_id: str) -> list[str]:

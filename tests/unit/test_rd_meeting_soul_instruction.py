@@ -44,7 +44,8 @@ def test_format_soul_instruction_block_empty(work_home):
 def test_format_soul_instruction_block_renders(work_home):
     si.save_soul_instruction(SCOPE_ID, "优先查 MDB 配置")
     block = si.format_soul_instruction_block(SCOPE_ID)
-    assert "灵魂建议" in block
+    assert block.startswith("- **灵魂建议")
+    assert "## 灵魂建议" not in block
     assert "优先查 MDB 配置" in block
     assert "充分参考" in block
     assert "参考要求" not in block
@@ -57,18 +58,19 @@ def test_format_soul_instruction_block_renders(work_home):
 
 def test_runtime_header_includes_soul_instruction(work_home, monkeypatch):
     si.save_soul_instruction(SCOPE_ID, "模块 A → 模块 B")
+    binding = {
+        "node_id": "req_clarify",
+        "node_name": "需求澄清",
+        "stage_id": 1,
+        "stage_name": "需求分析",
+        "node_intent": "澄清需求",
+        "host_profile_id": "default",
+        "worker_profile_ids": [],
+        "human_confirm": True,
+    }
     ctx = make_context(
         role="host",
-        binding={
-            "node_id": "req_clarify",
-            "node_name": "需求澄清",
-            "stage_id": 1,
-            "stage_name": "需求分析",
-            "node_intent": "澄清需求",
-            "host_profile_id": "default",
-            "worker_profile_ids": [],
-            "human_confirm": False,
-        },
+        binding=binding,
         scope_type="demand",
         scope_id=SCOPE_ID,
         ticket_title="测试工单",
@@ -78,6 +80,17 @@ def test_runtime_header_includes_soul_instruction(work_home, monkeypatch):
         "synapse.rd_meeting.room_skill.load_reprocess_reason",
         lambda _sid: "",
     )
-    header = build_meeting_runtime_header(ctx, binding=ctx.__dict__)
+    header = build_meeting_runtime_header(ctx, binding=binding)
     assert "灵魂建议" in header
     assert "模块 A → 模块 B" in header
+    role_idx = header.index("- **当前角色**")
+    soul_idx = header.index("灵魂建议")
+    assert soul_idx < role_idx
+    assert "## 灵魂建议" not in header
+    assert "## 需求澄清 SOP 工作指引" in header
+    assert "### 通用人机确认" in header
+    assert "### 需求澄清工序" in header
+    assert "clarify_sections.json" in header
+    assert "clarify_context.json" in header
+    assert "- **人工确认**" in header
+    assert header.index("- **人工确认**") < header.index("## 需求澄清 SOP 工作指引")

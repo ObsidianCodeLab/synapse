@@ -680,51 +680,63 @@ def _human_confirm_label(binding: dict[str, Any] | None) -> str:
     return "关闭（自动处理推进会议, 不需要和人工交互）"
 
 
-def _format_hitl_artifact_lines(
+def _format_work_guidance_section(
     binding: dict[str, Any] | None,
     *,
     scope_id: str,
     stage_name: str,
     node_id: str,
-) -> list[str]:
-    """``human_confirm`` 开启时展示人机台账绝对路径与用途说明。"""
+) -> str:
+    """工作指引：与签名档（会议元数据）分离；``human_confirm`` 时注入路径与工序。"""
     if not isinstance(binding, dict) or not binding.get("human_confirm"):
-        return []
+        return ""
     nid = (node_id or "").strip()
     sid = (scope_id or "").strip()
     if not sid or not nid or nid == "pending":
-        return []
+        return ""
 
     from synapse.rd_meeting.hitl_confirmed import resolve_stage_name_for_node
     from synapse.rd_meeting.hitl_context import HITL_CONTEXT_FILENAME, hitl_context_path
 
     stg = (stage_name or "").strip() or resolve_stage_name_for_node(nid, binding)
     if not stg:
-        return []
+        return ""
 
     ctx_abs = str(hitl_context_path(sid, stg, nid).resolve())
-    fill_ctx_abs = str((hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_fill_ctx.json").resolve())
-    sections_abs = str((hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_sections.json").resolve())
-    lines = [
-        f"- **人工确认产物（机器台账）**：`{ctx_abs}`（`{HITL_CONTEXT_FILENAME}`）",
+    title = "## 需求澄清 SOP 工作指引" if nid == "req_clarify" else "## 工作指引"
+    lines: list[str] = [
+        title,
+        "",
+        "### 通用人机确认",
+        "",
+        f"- **机器台账**：`{ctx_abs}`（`{HITL_CONTEXT_FILENAME}`）",
         "  - 仅 **interactive** 问卷提交时由系统自动维护；含各轮结构化确认与 ``confirmed_by_id`` 汇总。",
+        "- **用户反馈内容持久化**：用户澄清与补充须写入上述台账；**禁止**丢失多行补充。",
+        "  - 生成「会议产出」Markdown **之前**必须 ``read_file`` 台账并综合全量确认项。",
     ]
     if nid == "req_clarify":
+        fill_ctx_abs = str(
+            (hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_fill_ctx.json").resolve()
+        )
+        sections_abs = str(
+            (hitl_context_path(sid, stg, nid).parent / ".tmp" / "clarify_sections.json").resolve()
+        )
         lines.extend(
             [
-                f"  - **结构化章节（Host 写入）**：`{sections_abs}`（`clarify_sections.json`）",
-                "    Phase 1–4 / Phase R 分析后 **write_file** 更新；含 `understanding_by_qid`、scope_in/out、scenarios 等。",
-                f"  - **doc-generate 上下文（系统生成）**：`{fill_ctx_abs}`（`clarify_fill_ctx.json`）",
-                "  - 生成 ``需求澄清.md`` 工序：①写 ``clarify_sections.json`` → ②以 ``clarify_fill_ctx.json`` 为 CONTEXT_JSON "
-                "→ ③``fill_clarify.py``（STRICT=true 校验）→ ④doc-generate；",
-                "    用户末题补充须先 Phase R 调研，**禁止**原样做成确认题。",
+                "",
+                "### 需求澄清工序",
+                "",
+                f"- **结构化章节（Host 写入）**：`{sections_abs}`（`clarify_sections.json`）",
+                "  - Phase 1–4 / Phase R 分析后 **write_file** 更新；含 `understanding_by_qid`、scope_in/out、scenarios 等。",
+                f"- **doc-generate 上下文（系统生成）**：`{fill_ctx_abs}`（`clarify_fill_ctx.json`）",
+                "- **生成 ``需求澄清.md`` 工序**：①写 ``clarify_sections.json`` → ②以 ``clarify_fill_ctx.json`` 为 CONTEXT_JSON "
+                "→ ③``fill_clarify.py``（STRICT=true 校验）→ ④doc-generate。",
+                "  - 用户末题补充须先 Phase R 调研，**禁止**原样做成确认题。",
+                "  - 生成 ``需求澄清.md`` **之前**须 ``read_file`` 台账；"
+                "**禁止**自写 ``clarify_context.json`` 等替代 ``clarify_fill_ctx.json`` / 台账。",
             ]
         )
-    lines.append(
-        "  - 生成上方「会议产出」Markdown **之前**必须 ``read_file`` 台账并综合全量确认项；"
-        "**禁止**自写 ``clarify_context.json`` 等替代台账。"
-    )
-    return lines
+    return "\n".join(lines)
 
 def load_reprocess_reason(scope_id: str) -> str:
     """读取一次性重处理原因（room_state.reprocess_reason）。"""
@@ -798,18 +810,8 @@ def _append_host_duties_shared(
     )
     if rules_kind == "human":
         lines.append(
-            "- **用户反馈内容持久化**：用户澄清与补充须写入 `hitl_context.json` 台账；"
-            "**禁止**丢失多行补充。生成产出前须 read_file 该路径。"
-        )
-        lines.append(
             "- **多轮会中问卷**：已确认项视为既成事实，只推进未决点；详见下方规范 §3.1。"
         )
-        if (context.node_id or "").strip() == "req_clarify":
-            lines.append(
-                "- **需求澄清多轮续跑**：读 ``hitl_context.json`` → **write_file** ``clarify_sections.json`` "
-                "（Phase 1–4 + `understanding_by_qid`）→ 以 ``clarify_fill_ctx.json`` 作 CONTEXT_JSON "
-                "→ doc-generate（STRICT=true）重生成 ``需求澄清.md`` → 委派 Phase R → 仅对新未决点出题；禁止回声确认题。"
-            )
         lines.append(
             "- **`human_confirm: true`**：关键分叉须 `submit_hitl_questionnaire(kind=\"interactive\")`；"
             "提交后立即停止；用户无新指正时收敛归档。"
@@ -1018,6 +1020,12 @@ def build_meeting_runtime_header(
     lines: list[str] = []
     lines.append("# 你是 Synapse 研发会议室参会智能体")
     lines.append("")
+    from synapse.rd_meeting.soul_instruction import format_soul_instruction_prompt_lines
+
+    soul_lines = format_soul_instruction_prompt_lines(context.scope_id)
+    if soul_lines:
+        lines.extend(soul_lines)
+        lines.append("")
     lines.append(f"- **当前角色**：{role_label}（`role={role}`）")
     lines.append(f"- **会议工单**:[`{context.scope_id}`]-{context.ticket_title}")
     lines.append(f"- **涉及产品**：{product_label}")
@@ -1028,21 +1036,7 @@ def build_meeting_runtime_header(
     if reprocess_block:
         lines.append("")
         lines.append(reprocess_block)
-    from synapse.rd_meeting.soul_instruction import format_soul_instruction_block
-
-    soul_block = format_soul_instruction_block(context.scope_id)
-    if soul_block:
-        lines.append("")
-        lines.append(soul_block)
     lines.append(f"- **人工确认**：{confirm_label}")
-    lines.extend(
-        _format_hitl_artifact_lines(
-            binding,
-            scope_id=context.scope_id,
-            stage_name=context.stage_name,
-            node_id=context.node_id,
-        )
-    )
     from synapse.rd_meeting.prior_outputs import (
         format_prior_sop_outputs_section,
         load_skipped_node_ids,
@@ -1071,6 +1065,15 @@ def build_meeting_runtime_header(
     if paths_block:
         lines.append("")
         lines.append(paths_block.rstrip())
+    work_guidance = _format_work_guidance_section(
+        binding,
+        scope_id=context.scope_id,
+        stage_name=context.stage_name,
+        node_id=context.node_id,
+    )
+    if work_guidance:
+        lines.append("")
+        lines.append(work_guidance)
     lines.append("")
 
     solo_host = False
