@@ -23,6 +23,15 @@ export interface Repository {
   repoModule?: string;
   /** 产品分支 branchVersionId|branchName，对应 RdRepoInfo.prod_branch */
   prodBranch?: string;
+  /**
+   * 非关联产品仓库：为 true 时本仓库级联选项使用 repoProjectSpace / repoProductVersion，
+   * 不再依赖产品主属性；仅前端配置用，不入库到研发统一服务。
+   */
+  nonAssociatedProductRepo?: boolean;
+  /** 仓库级项目空间 projectId|projectName（仅 nonAssociatedProductRepo 时使用） */
+  repoProjectSpace?: string;
+  /** 仓库级产品版本 productVersionId|code（仅 nonAssociatedProductRepo 时使用） */
+  repoProductVersion?: string;
   token: string;
   /** 仓库代码路径（与研发统一服务 `repo_info.code_path` 对应，手动填写） */
   codePath?: string;
@@ -309,6 +318,21 @@ export function ensureProdBranchOptionInList(
   const v = currentValue.trim();
   if (!v || options.some((o) => o.value === v)) return options;
   return [{ label: v, value: v }, ...options];
+}
+
+/** 仓库配置时实际使用的项目空间与产品版本（关联主属性 vs 仓库自有） */
+export function getRepoEffectiveSpaceVersion(
+  repo: Pick<Repository, "nonAssociatedProductRepo" | "repoProjectSpace" | "repoProductVersion">,
+  productSpace: string,
+  productVersion: string,
+): { space: string; version: string } {
+  if (repo.nonAssociatedProductRepo) {
+    return {
+      space: (repo.repoProjectSpace ?? "").trim(),
+      version: (repo.repoProductVersion ?? "").trim(),
+    };
+  }
+  return { space: productSpace.trim(), version: productVersion.trim() };
 }
 
 /** 展示/入库格式 repositoryId|destBranchName */

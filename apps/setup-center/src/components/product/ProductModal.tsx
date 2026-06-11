@@ -7,14 +7,16 @@ import {
   DEFAULT_ICONS,
   displayIdPipeName,
   defaultProdBranchForAppModuleSelection,
+  getRepoEffectiveSpaceVersion,
   isValidProductTag,
   isValidRepoBranchComposite,
   findRepositoryMissingTokenIndex,
   patchRepositoryRepoBranchFromModuleDetail,
-  prodBranchRowsToOptions,
   repositoriesToValidateTokenItems,
   sanitizeProductTagInput,
 } from "./types";
+import { RepoStandaloneContextFields } from "./RepoStandaloneContextFields";
+import { isRepoContextReady, useRepoContextCascade, zcmRowsToOptions } from "./repoContextCascade";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,14 +29,11 @@ import { toast } from "sonner";
 import { SearchableVirtualSelect, type SearchableOption } from "./SearchableVirtualSelect";
 import { RepoBranchDerivedDisplay } from "./RepoBranchDerivedDisplay";
 import {
-  fetchModuleNameList,
-  fetchProductBranchList,
   fetchRepoDetailByProdBranch,
   fetchIwhalecloudUserinfoSummary,
   fetchZcmProductList,
   repoDetailFetchCacheKey,
   validateRepoTokens,
-  type RdModuleNameItem,
   type RdRepoDetailRow,
   type RdZcmProductItem,
 } from "@/api/rdUnifiedService";
@@ -55,25 +54,6 @@ export function parseCompositeLeadingId(v: string): number | null {
   if (i <= 0) return null;
   const n = Number(v.slice(0, i).trim());
   return Number.isFinite(n) ? n : null;
-}
-
-function zcmRowToOption(row: RdZcmProductItem): SearchableOption {
-  const id = row.productVersionId ?? "";
-  const code = (row.productVersionCode ?? "").trim() || String(id);
-  const value = `${id}|${code}`;
-  return { label: value, value };
-}
-
-/** 全量 ZCM 产品版本选项（选择项目空间后拉取；启用下拉需先选项目空间，见 versionSelectDisabled） */
-function zcmRowsToOptions(rows: RdZcmProductItem[]): SearchableOption[] {
-  return rows.map(zcmRowToOption);
-}
-
-function moduleRowToOption(row: RdModuleNameItem): SearchableOption {
-  const id = row.productModuleId ?? "";
-  const name = (row.moduleChName ?? "").trim() || String(id);
-  const value = `${id}|${name}`;
-  return { label: value, value };
 }
 
 /** 单行：左侧功能名，右侧描述；存盘格式 name:desc|name:desc（仅竖线分隔多项） */
@@ -194,11 +174,6 @@ export function ProductModal({
   const [projectSpaces, setProjectSpaces] = useState<{ label: string; value: string }[]>([]);
   const [zcmAllRows, setZcmAllRows] = useState<RdZcmProductItem[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
-  const [appModuleOptions, setAppModuleOptions] = useState<SearchableOption[]>([]);
-  const [appModuleRows, setAppModuleRows] = useState<RdModuleNameItem[]>([]);
-  const [modulesLoading, setModulesLoading] = useState(false);
-  const [prodBranchOptions, setProdBranchOptions] = useState<SearchableOption[]>([]);
-  const [prodBranchLoading, setProdBranchLoading] = useState(false);
   const [repoDetailByProdBranchVid, setRepoDetailByProdBranchVid] = useState<
     Record<string, RdRepoDetailRow[]>
   >({});
@@ -207,6 +182,14 @@ export function ProductModal({
   const [expandedRepos, setExpandedRepos] = useState<string[]>([]);
   /** 研发云 userinfo.access_token，新建仓库时预填 repo.token（用户可改） */
   const [defaultRepoAccessToken, setDefaultRepoAccessToken] = useState("");
+
+  const { getCascadeForRepo } = useRepoContextCascade(
+    synapseApiBase,
+    open && !isEdit,
+    formState.repositories,
+    formState.projectSpace,
+    formState.productVersion,
+  );
 
   const isProductInfoFilled = !!(
     formState.name &&
@@ -248,8 +231,6 @@ export function ProductModal({
         repositories: [],
       });
       setIsEdit(false);
-      setAppModuleOptions([]);
-      setAppModuleRows([]);
       setDefaultRepoAccessToken("");
     }
   }, [open, initialValues]);
@@ -305,68 +286,6 @@ export function ProductModal({
   const productVersionOptions = useMemo(() => zcmRowsToOptions(zcmAllRows), [zcmAllRows]);
 
   useEffect(() => {
-    if (!open || isEdit) return;
-    const pid = parseProjectIdFromSpaceValue(formState.projectSpace);
-    const vid = parseCompositeLeadingId(formState.productVersion);
-    if (pid == null || vid == null) {
-      setAppModuleOptions([]);
-      setAppModuleRows([]);
-      setModulesLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setModulesLoading(true);
-    fetchModuleNameList(synapseApiBase, pid, vid)
-      .then((rows) => {
-        if (cancelled) return;
-        setAppModuleRows(rows);
-        setAppModuleOptions(rows.map(moduleRowToOption));
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error(e);
-        setAppModuleOptions([]);
-        setAppModuleRows([]);
-        toast.error(t("workbench.products.modal.moduleLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setModulesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, isEdit, formState.projectSpace, formState.productVersion, synapseApiBase, t]);
-
-  useEffect(() => {
-    if (!open || isEdit) return;
-    const vid = parseCompositeLeadingId(formState.productVersion);
-    if (vid == null) {
-      setProdBranchOptions([]);
-      setProdBranchLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setProdBranchLoading(true);
-    fetchProductBranchList(synapseApiBase, vid)
-      .then((rows) => {
-        if (cancelled) return;
-        setProdBranchOptions(prodBranchRowsToOptions(rows));
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error(e);
-        setProdBranchOptions([]);
-        toast.error(t("workbench.products.modal.prodBranchLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setProdBranchLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, isEdit, formState.productVersion, synapseApiBase, t]);
-
-  useEffect(() => {
     if (!open) {
       setRepoDetailByProdBranchVid({});
       setRepoDetailLoadingVid({});
@@ -377,19 +296,18 @@ export function ProductModal({
   /** 按各仓库所选产品分支版本 ID 拉取仓库分支明细（repositoryId|destBranchName）与 repoUrl */
   useEffect(() => {
     if (!open || isEdit) return;
-    const projectId = parseProjectIdFromSpaceValue(formState.projectSpace);
-    if (projectId == null) return;
 
-    const fetchKeys = [
-      ...new Set(
-        formState.repositories
-          .map((r) => repoDetailFetchCacheKey(r.prodBranch ?? "", r.repoModule ?? ""))
-          .filter((x): x is string => x != null),
-      ),
-    ];
+    for (const repo of formState.repositories) {
+      const { space } = getRepoEffectiveSpaceVersion(
+        repo,
+        formState.projectSpace,
+        formState.productVersion,
+      );
+      const projectId = parseProjectIdFromSpaceValue(space);
+      if (projectId == null) continue;
 
-    for (const key of fetchKeys) {
-      if (repoDetailFetchStartedRef.current.has(key)) continue;
+      const key = repoDetailFetchCacheKey(repo.prodBranch ?? "", repo.repoModule ?? "");
+      if (key == null || repoDetailFetchStartedRef.current.has(key)) continue;
       const sep = key.indexOf("|");
       const vid = Number(key.slice(0, sep));
       const moduleId = Number(key.slice(sep + 1));
@@ -410,7 +328,7 @@ export function ProductModal({
           setRepoDetailLoadingVid((m) => ({ ...m, [key]: false }));
         });
     }
-  }, [open, isEdit, formState.repositories, formState.projectSpace, synapseApiBase, t]);
+  }, [open, isEdit, formState.repositories, formState.projectSpace, formState.productVersion, synapseApiBase, t]);
 
   /** 仓库明细返回后按 moduleName 自动填充仓库分支与 URL */
   useEffect(() => {
@@ -450,13 +368,72 @@ export function ProductModal({
   };
 
   const handleRepoModuleChange = (index: number, v: string) => {
-    const defaultPb = defaultProdBranchForAppModuleSelection(v, appModuleRows);
+    const repo = formState.repositories[index];
+    const cascade = getCascadeForRepo(repo);
+    const defaultPb = defaultProdBranchForAppModuleSelection(v, cascade.moduleRows);
     setFormState((prev) => {
       const newRepos = prev.repositories.map((r, i) =>
         i === index ? { ...r, repoModule: v, prodBranch: defaultPb, branch: "", url: "" } : r,
       );
       return { ...prev, repositories: newRepos };
     });
+  };
+
+  const handleRepoNonAssociatedChange = (index: number, checked: boolean) => {
+    setFormState((prev) => ({
+      ...prev,
+      repositories: prev.repositories.map((r, i) =>
+        i !== index
+          ? r
+          : {
+              ...r,
+              nonAssociatedProductRepo: checked,
+              repoProjectSpace: checked ? "" : undefined,
+              repoProductVersion: checked ? "" : undefined,
+              repoModule: "",
+              prodBranch: "",
+              branch: "",
+              url: "",
+            },
+      ),
+    }));
+  };
+
+  const handleRepoProjectSpaceChange = (index: number, v: string) => {
+    setFormState((prev) => ({
+      ...prev,
+      repositories: prev.repositories.map((r, i) =>
+        i !== index
+          ? r
+          : {
+              ...r,
+              repoProjectSpace: v,
+              repoProductVersion: "",
+              repoModule: "",
+              prodBranch: "",
+              branch: "",
+              url: "",
+            },
+      ),
+    }));
+  };
+
+  const handleRepoProductVersionChange = (index: number, v: string) => {
+    setFormState((prev) => ({
+      ...prev,
+      repositories: prev.repositories.map((r, i) =>
+        i !== index
+          ? r
+          : {
+              ...r,
+              repoProductVersion: v,
+              repoModule: "",
+              prodBranch: "",
+              branch: "",
+              url: "",
+            },
+      ),
+    }));
   };
 
   const handleProdBranchChange = (index: number, v: string) => {
@@ -557,6 +534,16 @@ export function ProductModal({
           toast.error(t("workbench.products.modal.mainRepoErrorMany") || "只能有一个主分支仓库");
           return;
         }
+        const badStandalone = formState.repositories.some((r) => {
+          if (!r.nonAssociatedProductRepo) return false;
+          const space = r.repoProjectSpace?.trim() ?? "";
+          const version = r.repoProductVersion?.trim() ?? "";
+          return !isRepoContextReady(space, version);
+        });
+        if (badStandalone) {
+          toast.error(t("workbench.products.modal.repoStandaloneSpaceVersionRequired"));
+          return;
+        }
         const badRepoModule = formState.repositories.some((r) => {
           const rm = r.repoModule?.trim() ?? "";
           return !rm || parseCompositeLeadingId(rm) == null;
@@ -637,10 +624,6 @@ export function ProductModal({
     isEdit ||
     !formState.projectSpace ||
     parseProjectIdFromSpaceValue(formState.projectSpace) == null;
-  const repoModuleSelectDisabled =
-    isEdit ||
-    parseProjectIdFromSpaceValue(formState.projectSpace) == null ||
-    parseCompositeLeadingId(formState.productVersion) == null;
 
   return (
     <Dialog open={open} onOpenChange={(val) => { if (!val) onCancel(); }}>
@@ -885,6 +868,14 @@ export function ProductModal({
                 {formState.repositories.map((repo, index) => {
                   const idxStr = String(index);
                   const isExpanded = expandedRepos.includes(idxStr);
+                  const cascade = getCascadeForRepo(repo);
+                  const { space: effectiveSpace, version: effectiveVersion } = getRepoEffectiveSpaceVersion(
+                    repo,
+                    formState.projectSpace,
+                    formState.productVersion,
+                  );
+                  const repoModuleSelectDisabled =
+                    !isRepoContextReady(effectiveSpace, effectiveVersion);
                   const pbVidKey =
                     repoDetailFetchCacheKey(repo.prodBranch ?? "", repo.repoModule ?? "") ?? "";
                   const repoBranchLoading =
@@ -892,6 +883,8 @@ export function ProductModal({
                     pbVidKey !== "" &&
                     !!(repo.repoModule?.trim()) &&
                     !!repoDetailLoadingVid[pbVidKey];
+                  const standaloneSpace = repo.repoProjectSpace ?? "";
+                  const standaloneVersion = repo.repoProductVersion ?? "";
 
                   return (
                     <div key={index} className="rounded-lg border border-border/80 bg-muted/10 overflow-hidden transition-all">
@@ -919,23 +912,37 @@ export function ProductModal({
 
                       {isExpanded && (
                         <div className="p-4 pt-1 border-t border-border/50 grid grid-cols-12 gap-4 bg-background/50">
+                          <RepoStandaloneContextFields
+                            switchId={`repo-non-associated-${index}`}
+                            nonAssociated={!!repo.nonAssociatedProductRepo}
+                            onNonAssociatedChange={(checked) => handleRepoNonAssociatedChange(index, checked)}
+                            projectSpace={standaloneSpace}
+                            onProjectSpaceChange={(v) => handleRepoProjectSpaceChange(index, v)}
+                            productVersion={standaloneVersion}
+                            onProductVersionChange={(v) => handleRepoProductVersionChange(index, v)}
+                            projectSpaces={projectSpaces}
+                            versionOptions={cascade.versionOptions}
+                            versionsLoading={cascade.versionsLoading}
+                          />
                           <div className="col-span-12 space-y-2">
                             <Label className="text-xs">{t("workbench.products.modal.appModule")} *</Label>
                             <SearchableVirtualSelect
                               value={repo.repoModule ?? ""}
                               onValueChange={(v) => handleRepoModuleChange(index, v)}
-                              options={appModuleOptions}
+                              options={cascade.moduleOptions}
                               placeholder={t("workbench.products.modal.appModulePlaceholder")}
                               searchPlaceholder={t("workbench.products.modal.searchFilterPlaceholder")}
                               emptyText={
                                 repoModuleSelectDisabled
-                                  ? t("workbench.products.modal.selectVersionFirst")
-                                  : modulesLoading
+                                  ? repo.nonAssociatedProductRepo
+                                    ? t("workbench.products.modal.repoStandaloneSelectSpaceVersionFirst")
+                                    : t("workbench.products.modal.selectVersionFirst")
+                                  : cascade.modulesLoading
                                     ? ""
                                     : t("workbench.products.modal.moduleListEmpty")
                               }
                               disabled={repoModuleSelectDisabled}
-                              isLoading={modulesLoading}
+                              isLoading={cascade.modulesLoading}
                             />
                           </div>
                           <RepoBranchDerivedDisplay
@@ -943,8 +950,8 @@ export function ProductModal({
                             branch={repo.branch}
                             repoModule={repo.repoModule}
                             loading={repoBranchLoading}
-                            prodBranchOptions={prodBranchOptions}
-                            prodBranchLoading={prodBranchLoading}
+                            prodBranchOptions={cascade.prodBranchOptions}
+                            prodBranchLoading={cascade.prodBranchLoading}
                             prodBranchDisabled={repoModuleSelectDisabled}
                             onProdBranchChange={(v) => handleProdBranchChange(index, v)}
                           />

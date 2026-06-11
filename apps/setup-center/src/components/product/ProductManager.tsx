@@ -672,6 +672,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
             if (!o) setRepoDialogProduct(null);
           }}
           product={repoDialogProduct}
+          projectSpaces={projectSpaces ?? []}
           synapseApiBase={synapseApiBase}
           onSuccess={handleRepoUpdateSuccess}
           onBusyChange={(busy) => {

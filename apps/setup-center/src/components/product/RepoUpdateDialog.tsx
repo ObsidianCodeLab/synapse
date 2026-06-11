@@ -7,15 +7,17 @@ import {
   displayIdPipeName,
   defaultProdBranchForAppModuleSelection,
   findRepositoryMissingTokenIndex,
+  getRepoEffectiveSpaceVersion,
   isValidRepoBranchComposite,
   patchRepositoryRepoBranchFromModuleDetail,
   productRepositoriesToRdRepoInfo,
-  prodBranchRowsToOptions,
   repositoriesToValidateTokenItems,
 } from "./types";
 import { SearchableVirtualSelect, type SearchableOption } from "./SearchableVirtualSelect";
 import { RepoBranchDerivedDisplay } from "./RepoBranchDerivedDisplay";
+import { RepoStandaloneContextFields } from "./RepoStandaloneContextFields";
 import { parseCompositeLeadingId, parseProjectIdFromSpaceValue } from "./ProductModal";
+import { isRepoContextReady, useRepoContextCascade } from "./repoContextCascade";
 import {
   Dialog,
   DialogContent,
@@ -33,31 +35,19 @@ import { IS_TAURI } from "@/platform";
 import {
   changeRepoInfo,
   fetchIwhalecloudUserinfoSummary,
-  fetchModuleNameList,
-  fetchProductBranchList,
   fetchRepoDetailByProdBranch,
   getProdProcessInfo,
   repoDetailFetchCacheKey,
   validateRepoTokens,
 } from "@/api/rdUnifiedService";
-import type {
-  ProdProcessDataPayload,
-  RdModuleNameItem,
-  RdRepoDetailRow,
-} from "@/api/rdUnifiedService";
+import type { ProdProcessDataPayload, RdRepoDetailRow } from "@/api/rdUnifiedService";
 import { assertOwnerInfoMatchesProduct, toastOwnerInfoGuardError } from "@/utils/ownerInfoGuard";
-
-function moduleRowToOption(row: RdModuleNameItem): SearchableOption {
-  const id = row.productModuleId ?? "";
-  const name = (row.moduleChName ?? "").trim() || String(id);
-  const value = `${id}|${name}`;
-  return { label: value, value };
-}
 
 export type RepoUpdateDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  projectSpaces: SearchableOption[];
   synapseApiBase: string;
   onSuccess: (productId: string, repositories: Repository[], process?: ProdProcessDataPayload | null) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -96,6 +86,7 @@ export function RepoUpdateDialog({
   open,
   onOpenChange,
   product,
+  projectSpaces,
   synapseApiBase,
   onSuccess,
   onBusyChange,
@@ -108,13 +99,19 @@ export function RepoUpdateDialog({
   >({});
   const [repoDetailLoadingVid, setRepoDetailLoadingVid] = useState<Record<string, boolean>>({});
   const repoDetailFetchStartedRef = useRef<Set<string>>(new Set());
-  const [appModuleOptions, setAppModuleOptions] = useState<SearchableOption[]>([]);
-  const [appModuleRows, setAppModuleRows] = useState<RdModuleNameItem[]>([]);
-  const [modulesLoading, setModulesLoading] = useState(false);
-  const [prodBranchOptions, setProdBranchOptions] = useState<SearchableOption[]>([]);
-  const [prodBranchLoading, setProdBranchLoading] = useState(false);
   /** 研发云 userinfo.access_token，新增仓库行时预填 repo.token（用户可改） */
   const [defaultRepoAccessToken, setDefaultRepoAccessToken] = useState("");
+
+  const productSpace = product?.space ?? "";
+  const productVersion = product?.version ?? "";
+  const plainRepos = rows.map(toRepository);
+  const { getCascadeForRepo } = useRepoContextCascade(
+    synapseApiBase,
+    open && product != null,
+    plainRepos,
+    productSpace,
+    productVersion,
+  );
 
   useEffect(() => {
     if (!open) {
@@ -149,84 +146,17 @@ export function RepoUpdateDialog({
     }
   }, [open, product]);
 
-  useEffect(() => {
-    if (!open || !product) return;
-    const pid = parseProjectIdFromSpaceValue(product.space ?? "");
-    const vid = parseCompositeLeadingId(product.version ?? "");
-    if (pid == null || vid == null) {
-      setAppModuleOptions([]);
-      setAppModuleRows([]);
-      setModulesLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setModulesLoading(true);
-    fetchModuleNameList(synapseApiBase, pid, vid)
-      .then((rows) => {
-        if (!cancelled) {
-          setAppModuleRows(rows);
-          setAppModuleOptions(rows.map(moduleRowToOption));
-        }
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error(e);
-        setAppModuleOptions([]);
-        setAppModuleRows([]);
-        toast.error(t("workbench.products.modal.moduleLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setModulesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, product, product?.space, product?.version, synapseApiBase, t]);
-
-  useEffect(() => {
-    if (!open || !product) return;
-    const vid = parseCompositeLeadingId(product.version ?? "");
-    if (vid == null) {
-      setProdBranchOptions([]);
-      setProdBranchLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setProdBranchLoading(true);
-    fetchProductBranchList(synapseApiBase, vid)
-      .then((rows) => {
-        if (!cancelled) setProdBranchOptions(prodBranchRowsToOptions(rows));
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        console.error(e);
-        setProdBranchOptions([]);
-        toast.error(t("workbench.products.modal.prodBranchLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setProdBranchLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, product, product?.version, synapseApiBase, t]);
-
   /** 各产品分支版本 ID 对应的仓库明细（选仓库分支、填 repoUrl） */
   useEffect(() => {
     if (!open || !product) return;
-    const projectId = parseProjectIdFromSpaceValue(product.space ?? "");
-    if (projectId == null) return;
 
-    const fetchKeys = [
-      ...new Set(
-        rows
-          .map((r) => repoDetailFetchCacheKey(r.prodBranch ?? "", r.repoModule ?? ""))
-          .filter((x): x is string => x != null),
-      ),
-    ];
+    for (const repo of rows) {
+      const { space } = getRepoEffectiveSpaceVersion(repo, productSpace, productVersion);
+      const projectId = parseProjectIdFromSpaceValue(space);
+      if (projectId == null) continue;
 
-    for (const key of fetchKeys) {
-      if (repoDetailFetchStartedRef.current.has(key)) continue;
+      const key = repoDetailFetchCacheKey(repo.prodBranch ?? "", repo.repoModule ?? "");
+      if (key == null || repoDetailFetchStartedRef.current.has(key)) continue;
       const sep = key.indexOf("|");
       const vid = Number(key.slice(0, sep));
       const moduleId = Number(key.slice(sep + 1));
@@ -247,7 +177,7 @@ export function RepoUpdateDialog({
           setRepoDetailLoadingVid((m) => ({ ...m, [key]: false }));
         });
     }
-  }, [open, product, rows, synapseApiBase, t]);
+  }, [open, product, rows, productSpace, productVersion, synapseApiBase, t]);
 
   /** 仓库明细返回后按 moduleName 自动填充新行的仓库分支与 URL */
   useEffect(() => {
@@ -269,10 +199,6 @@ export function RepoUpdateDialog({
     });
   }, [open, product, repoDetailByProdBranchVid, repoDetailLoadingVid, rows]);
 
-  const repoModuleSelectDisabled =
-    parseProjectIdFromSpaceValue(product?.space ?? "") == null ||
-    parseCompositeLeadingId(product?.version ?? "") == null;
-
   const updateRow = (index: number, patch: Partial<Repository>) => {
     setRows((prev) => {
       const next = prev.map((r) => ({ ...r }));
@@ -288,12 +214,47 @@ export function RepoUpdateDialog({
   };
 
   const handleRepoModuleSelect = (index: number, v: string) => {
-    const defaultPb = defaultProdBranchForAppModuleSelection(v, appModuleRows);
+    const repo = rows[index];
+    const cascade = getCascadeForRepo(repo);
+    const defaultPb = defaultProdBranchForAppModuleSelection(v, cascade.moduleRows);
     updateRow(index, { repoModule: v, prodBranch: defaultPb, branch: "", url: "" });
   };
 
   const handleProdBranchSelect = (index: number, v: string) => {
     updateRow(index, { prodBranch: v, branch: "", url: "" });
+  };
+
+  const handleRepoNonAssociatedChange = (index: number, checked: boolean) => {
+    updateRow(index, {
+      nonAssociatedProductRepo: checked,
+      repoProjectSpace: checked ? "" : undefined,
+      repoProductVersion: checked ? "" : undefined,
+      repoModule: "",
+      prodBranch: "",
+      branch: "",
+      url: "",
+    });
+  };
+
+  const handleRepoProjectSpaceChange = (index: number, v: string) => {
+    updateRow(index, {
+      repoProjectSpace: v,
+      repoProductVersion: "",
+      repoModule: "",
+      prodBranch: "",
+      branch: "",
+      url: "",
+    });
+  };
+
+  const handleRepoProductVersionChange = (index: number, v: string) => {
+    updateRow(index, {
+      repoProductVersion: v,
+      repoModule: "",
+      prodBranch: "",
+      branch: "",
+      url: "",
+    });
   };
 
   const addRow = () => {
@@ -348,6 +309,11 @@ export function RepoUpdateDialog({
       const incomplete = rows.some((r) => {
         if (!r.url.trim() || !r.branch.trim()) return true;
         if (!r.branchLocked) {
+          if (r.nonAssociatedProductRepo) {
+            const space = r.repoProjectSpace?.trim() ?? "";
+            const version = r.repoProductVersion?.trim() ?? "";
+            if (!isRepoContextReady(space, version)) return true;
+          }
           const pb = r.prodBranch?.trim() ?? "";
           if (!pb || parseCompositeLeadingId(pb) == null) return true;
           const rm = r.repoModule?.trim() ?? "";
@@ -434,6 +400,13 @@ export function RepoUpdateDialog({
             <p className="text-sm text-muted-foreground">{t("workbench.products.repoUpdateDialog.empty")}</p>
           ) : (
             rows.map((repo, index) => {
+              const cascade = getCascadeForRepo(repo);
+              const { space: effectiveSpace, version: effectiveVersion } = getRepoEffectiveSpaceVersion(
+                repo,
+                productSpace,
+                productVersion,
+              );
+              const repoModuleSelectDisabled = !isRepoContextReady(effectiveSpace, effectiveVersion);
               const rbVidKey =
                 repoDetailFetchCacheKey(repo.prodBranch ?? "", repo.repoModule ?? "") ?? "";
               const repoBranchLoading =
@@ -441,6 +414,8 @@ export function RepoUpdateDialog({
                 rbVidKey !== "" &&
                 !!(repo.repoModule?.trim()) &&
                 !!repoDetailLoadingVid[rbVidKey];
+              const standaloneSpace = repo.repoProjectSpace ?? "";
+              const standaloneVersion = repo.repoProductVersion ?? "";
 
               return (
               <div
@@ -472,6 +447,35 @@ export function RepoUpdateDialog({
                 </div>
 
                 <div className="grid grid-cols-12 gap-3">
+                  {!repo.branchLocked ? (
+                    <RepoStandaloneContextFields
+                      switchId={`repo-update-non-associated-${repo.clientKey}`}
+                      nonAssociated={!!repo.nonAssociatedProductRepo}
+                      onNonAssociatedChange={(checked) => handleRepoNonAssociatedChange(index, checked)}
+                      projectSpace={standaloneSpace}
+                      onProjectSpaceChange={(v) => handleRepoProjectSpaceChange(index, v)}
+                      productVersion={standaloneVersion}
+                      onProductVersionChange={(v) => handleRepoProductVersionChange(index, v)}
+                      projectSpaces={projectSpaces}
+                      versionOptions={cascade.versionOptions}
+                      versionsLoading={cascade.versionsLoading}
+                      disabled={saving}
+                    />
+                  ) : repo.nonAssociatedProductRepo ? (
+                    <RepoStandaloneContextFields
+                      switchId={`repo-update-non-associated-locked-${repo.clientKey}`}
+                      nonAssociated
+                      onNonAssociatedChange={() => {}}
+                      projectSpace={standaloneSpace}
+                      onProjectSpaceChange={() => {}}
+                      productVersion={standaloneVersion}
+                      onProductVersionChange={() => {}}
+                      projectSpaces={projectSpaces}
+                      versionOptions={[]}
+                      locked
+                    />
+                  ) : null}
+
                   <div className="col-span-12 space-y-1.5">
                     <Label className="text-xs">
                       {t("workbench.products.modal.appModule")}
@@ -488,18 +492,20 @@ export function RepoUpdateDialog({
                       <SearchableVirtualSelect
                         value={repo.repoModule ?? ""}
                         onValueChange={(v) => handleRepoModuleSelect(index, v)}
-                        options={appModuleOptions}
+                        options={cascade.moduleOptions}
                         placeholder={t("workbench.products.modal.appModulePlaceholder")}
                         searchPlaceholder={t("workbench.products.modal.searchFilterPlaceholder")}
                         emptyText={
                           repoModuleSelectDisabled
-                            ? t("workbench.products.modal.selectVersionFirst")
-                            : modulesLoading
+                            ? repo.nonAssociatedProductRepo
+                              ? t("workbench.products.modal.repoStandaloneSelectSpaceVersionFirst")
+                              : t("workbench.products.modal.selectVersionFirst")
+                            : cascade.modulesLoading
                               ? ""
                               : t("workbench.products.modal.moduleListEmpty")
                         }
-                        disabled={repoModuleSelectDisabled}
-                        isLoading={modulesLoading}
+                        disabled={repoModuleSelectDisabled || saving}
+                        isLoading={cascade.modulesLoading}
                       />
                     )}
                   </div>
@@ -513,10 +519,10 @@ export function RepoUpdateDialog({
                     prodBranchOptions={
                       repo.branchLocked
                         ? undefined
-                        : prodBranchOptions
+                        : cascade.prodBranchOptions
                     }
-                    prodBranchLoading={prodBranchLoading}
-                    prodBranchDisabled={repoModuleSelectDisabled}
+                    prodBranchLoading={cascade.prodBranchLoading}
+                    prodBranchDisabled={repoModuleSelectDisabled || saving}
                     onProdBranchChange={
                       repo.branchLocked ? undefined : (v) => handleProdBranchSelect(index, v)
                     }

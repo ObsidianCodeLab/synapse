@@ -8,12 +8,75 @@ import pytest
 
 from synapse.api.routes.dev_iwhalecloud import (
     OwnerOrderSyncError,
+    _merge_owned_work_item_record,
+    _merge_owned_work_items,
     _merge_owner_order_lists,
     sync_owner_orders_from_devcloud,
 )
 from synapse.scheduler import ScheduledTask, TriggerType
 from synapse.scheduler.executor import TaskExecutor
 from synapse.scheduler.task import TaskType
+
+
+def test_merge_owned_work_item_preserves_local_extensions():
+    old = {
+        "task_no": "T1",
+        "task_title": "旧标题",
+        "state": "开发中",
+        "portal_task_id": 9001,
+        "feature_id": "feat-T1",
+        "sop_node": "任务执行",
+        "local_process_state": "处理中",
+        "task_exec_status": "done",
+        "task_exec_tokens": 1200,
+    }
+    new = {
+        "task_no": "T1",
+        "task_title": "新标题",
+        "task_desc": "门户说明",
+        "created_date": "2026-06-11",
+        "sccb_work_hours": 2.5,
+        "state": "已完成",
+        "product_module_id": 10,
+        "product_module_name": "ZMDB",
+        "repo_url": "https://example.com/repo.git",
+    }
+
+    merged = _merge_owned_work_item_record(old, new)
+
+    assert merged["task_title"] == "新标题"
+    assert merged["state"] == "已完成"
+    assert merged["task_desc"] == "门户说明"
+    assert merged["portal_task_id"] == 9001
+    assert merged["feature_id"] == "feat-T1"
+    assert merged["sop_node"] == "任务执行"
+    assert merged["local_process_state"] == "处理中"
+    assert merged["task_exec_status"] == "done"
+    assert merged["task_exec_tokens"] == 1200
+
+
+def test_merge_owned_work_items_appends_new_and_keeps_orphan():
+    old_items = [
+        {
+            "task_no": "T-old",
+            "task_title": "仅本地",
+            "feature_id": "feat-old",
+        }
+    ]
+    new_items = [
+        {
+            "task_no": "T-new",
+            "task_title": "门户新单",
+            "state": "待处理",
+        }
+    ]
+
+    merged = _merge_owned_work_items(old_items, new_items)
+    by_no = {x["task_no"]: x for x in merged}
+
+    assert set(by_no) == {"T-old", "T-new"}
+    assert by_no["T-old"]["feature_id"] == "feat-old"
+    assert by_no["T-new"]["task_title"] == "门户新单"
 
 
 def test_merge_owner_orders_preserves_local_sop_state():
@@ -23,7 +86,15 @@ def test_merge_owner_orders_preserves_local_sop_state():
             "demand_status": "需求评审",
             "sop_node": "需求澄清",
             "local_process_state": "处理中",
-            "owned_work_items": [{"task_no": "T-old", "task_title": "旧单"}],
+            "prod": "my-product",
+            "owned_work_items": [
+                {
+                    "task_no": "T-old",
+                    "task_title": "旧单",
+                    "feature_id": "feat-old",
+                    "sop_node": "任务执行",
+                }
+            ],
         }
     ]
     new = [
@@ -32,7 +103,14 @@ def test_merge_owner_orders_preserves_local_sop_state():
             "demand_status": "需求设计",
             "sop_node": "应被忽略",
             "local_process_state": "应被忽略",
-            "owned_work_items": [{"task_no": "T-new", "task_title": "新单"}],
+            "prod": "应被忽略",
+            "owned_work_items": [
+                {
+                    "task_no": "T-new",
+                    "task_title": "新单",
+                    "state": "待处理",
+                }
+            ],
         },
         {
             "demand_no": "D2",
@@ -48,8 +126,13 @@ def test_merge_owner_orders_preserves_local_sop_state():
     assert d1["demand_status"] == "需求设计"
     assert d1["sop_node"] == "需求澄清"
     assert d1["local_process_state"] == "处理中"
-    task_nos = {x["task_no"] for x in d1["owned_work_items"]}
-    assert task_nos == {"T-old", "T-new"}
+    assert d1["prod"] == "my-product"
+    by_task = {x["task_no"]: x for x in d1["owned_work_items"]}
+    assert set(by_task) == {"T-old", "T-new"}
+    assert by_task["T-old"]["feature_id"] == "feat-old"
+    assert by_task["T-old"]["sop_node"] == "任务执行"
+    assert by_task["T-new"]["task_title"] == "新单"
+    assert by_task["T-new"]["state"] == "待处理"
 
     d2 = next(x for x in merged if x["demand_no"] == "D2")
     assert d2["local_process_state"] == "全人工"

@@ -164,10 +164,44 @@ def _normalize_owned_work_item_state(raw: Any) -> str:
     return "待处理"
 
 
+_OWNED_WORK_ITEM_CLOUD_KEYS = frozenset(
+    {
+        "task_no",
+        "task_title",
+        "task_desc",
+        "created_date",
+        "sccb_work_hours",
+        "state",
+        "product_module_id",
+        "product_module_name",
+        "repo_url",
+    }
+)
+
+
+def _merge_owned_work_item_record(old_t: dict[str, Any], new_t: dict[str, Any]) -> dict[str, Any]:
+    """研发单新老均有：门户字段以新数据为准，本地扩展字段从旧记录保留。
+
+    门户快照字段见 ``_portal_task_detail_to_owned_work_item``；本地常见扩展包括
+    ``portal_task_id``、``feature_id``、``sop_node``、``local_process_state``、
+    ``task_exec_*``（任务执行节点写入）等。
+    """
+    merged: dict[str, Any] = dict(new_t)
+    for key, old_val in old_t.items():
+        if key in _OWNED_WORK_ITEM_CLOUD_KEYS:
+            continue
+        if old_val is None:
+            continue
+        if isinstance(old_val, str) and not old_val.strip():
+            continue
+        merged[key] = old_val
+    return merged
+
+
 def _merge_owned_work_items(
     old_items: list[Any] | None, new_items: list[Any] | None
 ) -> list[dict[str, Any]]:
-    """研发单：新有老无则插入，老有新无则保留，新老均有则以新数据为准更新整条记录。"""
+    """研发单：新有老无则插入，老有新无则保留，新老均有则合并（见 ``_merge_owned_work_item_record``）。"""
     old_items = [x for x in (old_items or []) if isinstance(x, dict)]
     new_items = [x for x in (new_items or []) if isinstance(x, dict)]
 
@@ -191,7 +225,7 @@ def _merge_owned_work_items(
             continue
         seen_old_order.add(tn)
         if tn in new_by_task:
-            out.append(dict(new_by_task[tn]))
+            out.append(_merge_owned_work_item_record(old_by_task[tn], new_by_task[tn]))
         else:
             out.append(dict(old_by_task[tn]))
 
@@ -223,7 +257,7 @@ def _apply_local_process_state_on_new_demand_insert(row: dict[str, Any]) -> dict
 
 
 def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[str, Any]:
-    """需求单新老均有：以新数据为准更新，但保留老的 ``sop_node``、``local_process_state``。"""
+    """需求单新老均有：以新数据为准更新，但保留老的 ``sop_node``、``local_process_state``、``prod``。"""
     merged: dict[str, Any] = dict(new_d)
     merged["sop_node"] = old_d.get("sop_node")
     if old_d.get("local_process_state") == "预备中" and new_d.get("demand_status") == "需求评审":
@@ -232,6 +266,9 @@ def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[s
     else:
         merged["local_process_state"] = old_d.get("local_process_state")
         merged["sop_node"] = old_d.get("sop_node")
+    old_prod = _snapshot_norm_id(old_d.get("prod"))
+    if old_prod:
+        merged["prod"] = old_prod
     merged["owned_work_items"] = _merge_owned_work_items(
         old_d.get("owned_work_items"), new_d.get("owned_work_items")
     )
@@ -276,8 +313,8 @@ def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> N
     """将本次拉取的需求列表与已有 ``userwork.json`` 合并后落盘；写文件时使用 FileLock 与原子替换。
 
     合并规则：需求单与研发单均为「新有老无插入、老有新无保留、新老均有更新」；需求单更新时保留
-    ``sop_node``、``local_process_state``；新有老无且 ``demand_status`` 为需求设计/需求开发/需求测试时
-    ``local_process_state`` 置为全人工。研发单更新为全量替换单条。文件 JSON：``list``、``updated_at``。
+    ``sop_node``、``local_process_state``、``prod``；新有老无且 ``demand_status`` 为需求设计/需求开发/需求测试时
+    ``local_process_state`` 置为全人工。研发单更新时门户字段以新为准、本地扩展字段保留。文件 JSON：``list``、``updated_at``。
     """
     from filelock import FileLock
 

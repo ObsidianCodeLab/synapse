@@ -219,7 +219,11 @@
         "addRepo": "Add repository",
         "requiredField": "Required",
         "mainRepoErrorNone": "Exactly one primary repository is required",
-        "mainRepoErrorMany": "Only one primary repository allowed"
+        "mainRepoErrorMany": "Only one primary repository allowed",
+        "nonAssociatedProductRepo": "Non-associated product repository",
+        "nonAssociatedProductRepoHint": "When enabled, choose project space and product version for this repository only (for module/branch lookup). The snapshot stays in the local session only and is not sent to the unified service, so changes to the product's main attributes won't break traceability.",
+        "repoStandaloneSpaceVersionRequired": "Non-associated repositories require project space and product version",
+        "repoStandaloneSelectSpaceVersionFirst": "Select project space and product version for this repository first"
       },
       "detail": {
         "selectSidebarHint": "Select a repository, a knowledge section, or the ticket view on the left.",
