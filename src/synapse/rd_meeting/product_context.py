@@ -11,7 +11,7 @@ import httpx
 from synapse.api.routes.dev_iwhalecloud import _snapshot_norm_id
 from synapse.rd_meeting.devservice import read_devservice_host, unified_service_base_url
 from synapse.rd_meeting.paths import meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
+from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
 from synapse.rd_meeting.userwork_sync import _scope_row
 
 logger = logging.getLogger(__name__)
@@ -357,7 +357,7 @@ def save_prod_catalog_to_pipeline(scope_id: str, rows: list[dict[str, Any]], *, 
         ctx["selected_prod"] = selected_prod
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
 
 
 def ensure_prod_in_catalog(prod: str) -> tuple[list[dict[str, Any]], str]:
@@ -391,7 +391,7 @@ def save_product_session_cache(scope_id: str, cache: dict[str, Any]) -> None:
     ctx["product"] = cache_to_write
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
 
 
 def load_product_session_cache(scope_id: str) -> dict[str, Any] | None:

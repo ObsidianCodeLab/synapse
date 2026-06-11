@@ -90,6 +90,10 @@ def meeting_pipeline_path(scope_id: str) -> Path:
     return scope_dir(scope_id) / "meeting_pipeline.json"
 
 
+def meeting_pipeline_lock_path(scope_id: str) -> Path:
+    return scope_dir(scope_id) / "meeting_pipeline.lock"
+
+
 def archive_root(scope_id: str) -> Path:
     return scope_dir(scope_id) / "archive"
 

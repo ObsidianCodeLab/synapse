@@ -13,6 +13,8 @@ from filelock import FileLock
 from synapse.rd_meeting.paths import (
     agents_root,
     archive_root,
+    meeting_pipeline_lock_path,
+    meeting_pipeline_path,
     room_history_path,
     room_state_lock_path,
     room_state_path,
@@ -307,13 +309,47 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
 
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
+    """原子写 JSON；每次使用独立 .tmp 文件名，避免并发写固定 ``*.json.tmp`` 时 WinError 2。"""
+    import os
+    import time
+    import uuid
+
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = dict(payload)
     payload["updated_at"] = _now_iso()
     content = json.dumps(payload, ensure_ascii=False, indent=2, default=str)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    tmp.replace(path)
+    last_exc: OSError | None = None
+    for attempt in range(6):
+        tmp = path.parent / f"{path.name}.tmp.{os.getpid()}.{uuid.uuid4().hex[:10]}"
+        try:
+            tmp.write_text(content, encoding="utf-8")
+            tmp.replace(path)
+            return
+        except OSError as exc:
+            last_exc = exc
+            winerr = getattr(exc, "winerror", None)
+            # 2=tmp 已被并发 replace 消费；5/32=Windows 文件锁
+            if attempt >= 5 or winerr not in (2, 5, 32):
+                raise
+            time.sleep(0.05 * (2**attempt))
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+    if last_exc is not None:
+        raise last_exc
+
+
+def save_meeting_pipeline(scope_id: str, payload: dict[str, Any]) -> None:
+    """带文件锁落盘 ``meeting_pipeline.json``（重处理与 Host 异步写可能并发）。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    path = meeting_pipeline_path(sid)
+    lock = FileLock(str(meeting_pipeline_lock_path(sid)), timeout=30)
+    with lock:
+        write_json_file(path, payload)
 
 
 def load_room_state(scope_id: str) -> dict[str, Any] | None:

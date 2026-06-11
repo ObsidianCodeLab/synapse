@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
+from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
 from synapse.rd_sop.manifest import node_output_artifacts
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 
@@ -109,7 +109,7 @@ def _save_pipeline_context_assets(
     ctx[key] = assets
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
     if pipe is not None:
         pctx = pipe._data.get("context")
         if not isinstance(pctx, dict):

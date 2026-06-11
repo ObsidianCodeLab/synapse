@@ -32,7 +32,7 @@ from synapse.rd_meeting.product_context import (
     _repo_name_from_url,
     match_prod_row_by_prod,
 )
-from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
+from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +362,7 @@ def save_product_assets_to_pipeline(scope_id: str, assets: dict[str, Any]) -> No
     ctx["product_assets"] = assets
     raw["context"] = ctx
     raw["updated_at"] = _now_iso()
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
 
 
 def load_product_assets_from_pipeline(scope_id: str) -> dict[str, Any] | None:

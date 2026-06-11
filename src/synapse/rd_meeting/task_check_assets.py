@@ -7,7 +7,7 @@ import re
 from typing import Any, Literal
 
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
+from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import _load_pipeline_context_asset
 from synapse.rd_sop.nodes import stage_name_for_id
 
@@ -57,7 +57,7 @@ def _save_code_commit_assets(scope_id: str, assets: dict[str, Any]) -> None:
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
     ctx["code_commit_assets"] = assets
     raw["context"] = ctx
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
 
 
 def _overlay_flight_error_on_code_commit(scope_id: str, error_text: str) -> None:
@@ -109,7 +109,7 @@ def _bump_task_check_fail_count(scope_id: str) -> int:
     state["fail_count"] = count
     ctx["task_check_state"] = state
     raw["context"] = ctx
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
     return count
 
 

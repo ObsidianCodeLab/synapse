@@ -31,7 +31,7 @@ from synapse.rd_meeting.cursor_agent_cli import (
 )
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path, scope_dir
 from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
-from synapse.rd_meeting.room_runtime import read_json_file, write_json_file
+from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
     collect_task_rows,
@@ -191,7 +191,7 @@ def _save_task_exec_assets(scope_id: str, assets: dict[str, Any]) -> None:
     ctx["task_exec_assets"] = assets
     raw["context"] = ctx
     raw["updated_at"] = datetime.now().isoformat(timespec="seconds")
-    write_json_file(path, raw)
+    save_meeting_pipeline(scope_id, raw)
 
 
 def _collect_work_orders(scope_type: ScopeType, scope_id: str) -> list[dict[str, Any]]:

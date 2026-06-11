@@ -41,6 +41,7 @@ from synapse.rd_meeting.room_runtime import (
     read_json_file,
     save_room_state,
     sync_room_state_from_dev,
+    save_meeting_pipeline,
     write_json_file,
 )
 from synapse.rd_meeting.userwork_sync import build_title_index, patch_userwork_summary
@@ -278,9 +279,7 @@ class MeetingPipeline:
 
     def save(self) -> None:
         self._data["updated_at"] = _now_iso()
-        path = meeting_pipeline_path(self.scope_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        write_json_file(path, self._data)
+        save_meeting_pipeline(self.scope_id, self._data)
 
     def snapshot_for_api(self) -> dict[str, Any]:
         return {
@@ -1026,7 +1025,7 @@ def clear_current_node_reprocess_artifacts(
     raw["context"] = ctx
     raw["phase"] = "running"
     raw["updated_at"] = _now_iso()
-    write_json_file(path, raw)
+    save_meeting_pipeline(sid, raw)
 
 
 def _remove_agent_sop_node_dir(scope_id: str, node_id: str) -> None:
@@ -1128,6 +1127,8 @@ def clear_room_state_for_node_reprocess(
         "solution_review_blocked",
         "func_solution_blocked",
         "escalate_reason",
+        "last_error",
+        "last_pipeline_error",
     ):
         rs.pop(key, None)
 

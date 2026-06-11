@@ -145,8 +145,15 @@ def schedule_pipeline_background(
             logger.exception("background pipeline failed room=%s: %s", key, exc)
             if sid:
                 rs = dict(load_room_state(sid) or {})
-                rs["status"] = "failed"
-                rs["last_error"] = str(exc)[:500]
+                err = str(exc)[:500]
+                if is_room_run_in_progress(key):
+                    rs["last_pipeline_error"] = err
+                    if str(rs.get("status") or "") != "processing":
+                        rs["status"] = "processing"
+                    rs.pop("last_error", None)
+                else:
+                    rs["status"] = "failed"
+                    rs["last_error"] = err
                 save_room_state(sid, rs)
         finally:
             _pipeline_tasks.pop(key, None)
@@ -2260,6 +2267,8 @@ class MeetingRoomOrchestrator:
         room_state = load_room_state(sid) or {}
         room_state = dict(room_state)
         room_state["status"] = "processing"
+        room_state.pop("last_error", None)
+        room_state.pop("last_pipeline_error", None)
         room_state["current_node_id"] = node_id
         room_state["agents_active"] = [
             {"profile_id": p["profile_id"], "role": p["role"], "display_name": p["display_name"]}
