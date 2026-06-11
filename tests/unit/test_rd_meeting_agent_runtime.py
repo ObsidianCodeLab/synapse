@@ -31,9 +31,12 @@ def test_meeting_tool_names_exclude_list_skills():
     assert "list_skills" not in worker
     assert "delegate_to_agent" in host
     assert "delegate_to_agent" not in worker
+    assert "deliver_artifacts" not in worker
+    assert "deliver_artifacts" not in host
     assert "submit_meeting_work_plan" in host
     assert MEETING_COMMON_TOOL_NAMES <= host
     assert MEETING_HOST_ONLY_TOOL_NAMES <= host
+    assert MEETING_COMMON_TOOL_NAMES <= worker
 
 
 def test_apply_meeting_slim_tools_filters_and_restores():

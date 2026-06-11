@@ -198,7 +198,11 @@ class IMChannelHandler:
         if tool_name == "deliver_artifacts":
             from synapse.rd_meeting.work_plan import check_host_hitl_gate, session_id_from_agent
 
-            gate_err = check_host_hitl_gate(session_id_from_agent(self.agent), tool_name)
+            gate_err = check_host_hitl_gate(
+                session_id_from_agent(self.agent),
+                tool_name,
+                agent=self.agent,
+            )
             if gate_err:
                 return gate_err
             params = self._normalize_delivery_params(params)

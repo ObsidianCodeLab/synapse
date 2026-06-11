@@ -76,8 +76,17 @@ class MeetingRoomToolHandler:
 
     async def _submit_questionnaire(self, params: dict[str, Any]) -> str:
         from synapse.rd_meeting.hitl_submit import submit_questionnaire
+        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
 
         kind = str(params.get("kind") or "").strip().lower()
+        gate_err = check_host_forward_gate(
+            session_id_from_agent(self.agent),
+            "submit_hitl_questionnaire",
+            questionnaire_kind=kind,
+            agent=self.agent,
+        )
+        if gate_err:
+            return gate_err
         questions = params.get("questions")
         title = str(params.get("title") or "").strip()
         description = str(params.get("description") or "").strip()

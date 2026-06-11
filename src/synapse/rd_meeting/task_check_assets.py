@@ -125,6 +125,30 @@ def _analyze_feature_completeness(task_exec_text: str, flight_optimize_text: str
 
 
 def _analyze_flight_result(code_commit: dict[str, Any]) -> tuple[bool, str]:
+    tasks = code_commit.get("tasks") if isinstance(code_commit.get("tasks"), list) else []
+    if tasks:
+        pending_errors: list[str] = []
+        failed_errors: list[str] = []
+        for row in tasks:
+            if not isinstance(row, dict):
+                continue
+            flight = row.get("flight") if isinstance(row.get("flight"), dict) else {}
+            status = str(flight.get("status") or "").strip()
+            err = str(flight.get("error") or "").strip()
+            data = flight.get("data") if isinstance(flight.get("data"), dict) else {}
+            if status == "ok":
+                continue
+            if status == "failed":
+                desc = err or str(data.get("ciFlowInstRunStateDesc") or "") or "试飞构建失败"
+                failed_errors.append(f"{row.get('task_no')}: {desc}")
+            elif status in ("pending", "timeout", "partial", "skipped"):
+                pending_errors.append(err or f"{row.get('task_no')}: 试飞结果未就绪")
+        if failed_errors:
+            return False, "; ".join(failed_errors)
+        if pending_errors:
+            return False, "; ".join(pending_errors)
+        return True, ""
+
     flight = code_commit.get("flight") if isinstance(code_commit.get("flight"), dict) else {}
     status = str(flight.get("status") or "").strip()
     if status == "ok":

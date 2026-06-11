@@ -335,6 +335,8 @@ def build_task_verify_prompt(
             "## 目标达成说明",
             "## 覆盖功能点核对",
             "## 修改文件列表",
+            "## 变更摘要",
+            "（一行简述本次改造，用于 git commit message，勿含换行）",
             "## 遗留问题与风险",
             "## Token 与耗时估计（若无法精确统计可写「未知」）",
         ]
@@ -578,6 +580,10 @@ _COMPLETION_SECTION_RE = re.compile(
     r"##\s*完成状态[^\n]*\n+\s*(?:\*\*)?(completed|partial|failed)(?:\*\*)?",
     re.IGNORECASE,
 )
+_COMMIT_SUMMARY_SECTION_RE = re.compile(
+    r"##\s*变更摘要[^\n]*\n+\s*(.+?)(?=\n##|\Z)",
+    re.IGNORECASE | re.DOTALL,
+)
 _CURSOR_OUTPUT_MAX_CHUNK = 50_000
 
 
@@ -663,6 +669,18 @@ def _extract_report_from_log(log_path: str) -> str:
     if chunks:
         return "\n".join(chunks[-40:])
     return text[-8000:] if len(text) > 8000 else text
+
+
+def _extract_commit_summary(report_md: str) -> str:
+    report = report_md or ""
+    match = _COMMIT_SUMMARY_SECTION_RE.search(report)
+    if match:
+        summary = match.group(1).strip()
+        summary = re.sub(r"^[（(][^）)]*[）)]\s*", "", summary)
+        summary = " ".join(summary.split())
+        if summary and summary not in ("—", "-", "未知", "无"):
+            return summary[:500]
+    return ""
 
 
 def _infer_completion_status(report_md: str, develop_ok: bool) -> str:
@@ -1222,6 +1240,9 @@ def bootstrap_task_exec(
 
         report_md = _extract_report_from_log(str(verify_result.get("log_path") or verify_log))
         completion = _infer_completion_status(report_md, dev_result.get("status") == "ok")
+        commit_summary = _extract_commit_summary(report_md)
+        if not commit_summary:
+            commit_summary = str(order.get("goal") or order.get("task_title") or "").strip()[:500]
         status = "ok" if completion == "completed" and verify_result.get("status") == "ok" else (
             "partial" if completion == "partial" else "failed"
         )
@@ -1248,6 +1269,7 @@ def bootstrap_task_exec(
             "develop_log": str(dev_log),
             "verify_log": str(verify_log),
             "report_markdown": report_md,
+            "commit_summary": commit_summary,
         }
         session_id = str(round_metrics.get("session_id") or "").strip()
         if session_id:
@@ -1684,5 +1706,7 @@ def render_task_exec_report_markdown(data: dict[str, Any]) -> str:
             )
         if task.get("error"):
             lines.append(f"- 错误：{task['error']}")
+        if task.get("commit_summary"):
+            lines.append(f"- 提交摘要：{task.get('commit_summary')}")
         lines.append("")
     return "\n".join(lines)

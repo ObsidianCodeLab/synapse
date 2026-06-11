@@ -1697,22 +1697,93 @@ class MeetingRoomOrchestrator:
         """校验已通过但主控未交 interactive 问卷：强制重跑主控直至其生成（无系统兜底表单）。"""
         sid = scope_id.strip()
         rs_locked = load_room_state(sid) or {}
-        try:
-            from synapse.rd_meeting.work_plan import plan_awaiting_hitl
-
-            plan_pending = plan_awaiting_hitl(sid)
-        except Exception:
-            plan_pending = False
         from synapse.rd_meeting.hitl_closure_guard import (
             closure_guard_correction_prompt,
             load_closure_intent,
         )
+        from synapse.rd_meeting.hitl_lifecycle import (
+            node_archive_ready_for_review,
+            prompt_require_archive_doc,
+        )
+        from synapse.rd_meeting.work_plan import (
+            is_archive_doc_pending,
+            must_submit_interactive_questionnaire,
+        )
 
         closure_intent = load_closure_intent(sid, node_id)
+        if is_archive_doc_pending(sid) or (
+            closure_intent == "done" and not node_archive_ready_for_review(sid, node_id)
+        ):
+                rs = dict(load_room_state(sid) or {})
+                rs["status"] = "processing"
+                rs["rework_instruction"] = prompt_require_archive_doc()
+                save_room_state(sid, rs)
+                schedule_run_node(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    ticket_title=ticket_title,
+                    agent_pool=agent_pool,
+                )
+                append_history_event(
+                    sid,
+                    {
+                        "event": "awaiting_archive_doc",
+                        "room_id": room_id,
+                        "node_id": node_id,
+                        "text": "用户已收口，须先 doc-generate 更新归档产出",
+                        "log_type": "info",
+                        "agent_id": host_id,
+                    },
+                )
+                return {
+                    "status": "processing",
+                    "node_id": node_id,
+                    "awaiting_archive_doc": True,
+                    "skipped_nodes": skipped_nodes or None,
+                }
+
+        if closure_intent == "done":
+            return await self.enter_node_review_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                binding=binding,
+                report_body=report_body,
+                tokens_used=tokens_used,
+                duration_seconds=duration_seconds,
+                stage_id=stage_id,
+                ticket_title=ticket_title,
+                agent_pool=agent_pool,
+                skipped_nodes=skipped_nodes,
+            )
+
+        if not must_submit_interactive_questionnaire(sid, node_id):
+            if should_enter_node_review_after_hitl_locked(sid, node_id, rs_locked):
+                return await self.enter_node_review_gate(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    node_id=node_id,
+                    binding=binding,
+                    report_body=report_body,
+                    tokens_used=tokens_used,
+                    duration_seconds=duration_seconds,
+                    stage_id=stage_id,
+                    ticket_title=ticket_title,
+                    agent_pool=agent_pool,
+                    skipped_nodes=skipped_nodes,
+                )
+            return {
+                "status": "processing",
+                "node_id": node_id,
+                "skipped_nodes": skipped_nodes or None,
+            }
+
         if (
             closure_intent != "further"
             and should_enter_node_review_after_hitl_locked(sid, node_id, rs_locked)
-            and not plan_pending
         ):
             return await self.enter_node_review_gate(
                 scope_type=scope_type,
@@ -1832,6 +1903,21 @@ class MeetingRoomOrchestrator:
                     ticket_title=ticket_title,
                     skipped_nodes=skipped_nodes,
                 )
+            if kind == "result_confirm":
+                return self._gate_from_tool_questionnaire(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    node_id=node_id,
+                    binding=binding,
+                    questionnaire=retry_questionnaire,
+                    report_body=report_body,
+                    tokens_used=tokens_used,
+                    duration_seconds=duration_seconds,
+                    stage_id=stage_id,
+                    ticket_title=ticket_title,
+                    skipped_nodes=skipped_nodes,
+                )
             if kind == "exception":
                 return self._gate_from_tool_questionnaire(
                     scope_type=scope_type,
@@ -1868,7 +1954,10 @@ class MeetingRoomOrchestrator:
 
         rs = dict(load_room_state(sid) or {})
         rs["status"] = "processing"
-        rs["rework_instruction"] = prompt_require_interactive_questionnaire()
+        if load_closure_intent(sid, node_id) == "done":
+            rs["rework_instruction"] = prompt_require_archive_doc()
+        else:
+            rs["rework_instruction"] = prompt_require_interactive_questionnaire()
         save_room_state(sid, rs)
         schedule_run_node(
             scope_type=scope_type,
@@ -1951,6 +2040,9 @@ class MeetingRoomOrchestrator:
             approved = mode_norm == "approve"
 
         if not approved:
+            from synapse.rd_meeting.work_plan import mark_archive_doc_pending
+
+            mark_archive_doc_pending(sid)
             set_ready_for_node_review(sid, False)
             reset_human_confirm_lifecycle(sid)
             room_state = dict(room_state)
@@ -2589,13 +2681,33 @@ class MeetingRoomOrchestrator:
                     ticket_title=ticket_title,
                     skipped_nodes=skipped_nodes or None,
                 )
+            if t_kind == "result_confirm":
+                return self._gate_from_tool_questionnaire(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    node_id=node_id,
+                    binding=binding,
+                    questionnaire=tool_questionnaire,
+                    report_body=report_body,
+                    tokens_used=tokens_used,
+                    duration_seconds=duration,
+                    stage_id=stage_id,
+                    ticket_title=ticket_title,
+                    skipped_nodes=skipped_nodes or None,
+                )
 
         ready_for_review = should_enter_node_review_gate(sid, node_id, room_rs)
 
         try:
-            from synapse.rd_meeting.work_plan import plan_awaiting_hitl
+            from synapse.rd_meeting.work_plan import (
+                is_archive_doc_pending,
+                must_submit_interactive_questionnaire,
+            )
 
-            if need_human_confirm and plan_awaiting_hitl(sid):
+            if need_human_confirm and is_archive_doc_pending(sid):
+                ready_for_review = False
+            if need_human_confirm and must_submit_interactive_questionnaire(sid, node_id):
                 ready_for_review = False
         except Exception:
             pass
@@ -2625,9 +2737,12 @@ class MeetingRoomOrchestrator:
             and host_run_fn is not None
         ):
             try:
-                from synapse.rd_meeting.work_plan import plan_awaiting_hitl as _plan_awaiting_hitl
+                from synapse.rd_meeting.work_plan import (
+                    is_archive_doc_pending,
+                    must_submit_interactive_questionnaire,
+                )
 
-                if _plan_awaiting_hitl(sid):
+                if is_archive_doc_pending(sid) or must_submit_interactive_questionnaire(sid, node_id):
                     return await self._ensure_host_interactive_questionnaire(
                         scope_type=scope_type,
                         scope_id=sid,

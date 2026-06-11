@@ -9,13 +9,20 @@ import pytest
 from synapse.rd_meeting.room_runtime import history_to_chat_logs
 from synapse.rd_meeting.work_plan import (
     check_delegation_allowed,
+    check_host_forward_gate,
     check_host_hitl_gate,
+    clear_archive_doc_pending,
     clear_work_plan,
+    is_archive_doc_pending,
+    is_rd_meeting_host_agent,
+    mark_archive_doc_pending,
     mark_delegation_completed,
     mark_delegation_started,
     mark_plan_hitl_submitted,
+    must_submit_interactive_questionnaire,
     plan_awaiting_hitl,
     submit_work_plan,
+    sync_interactive_required_after_closure,
 )
 
 
@@ -144,7 +151,7 @@ def test_chat_logs_carry_node_id() -> None:
     logs = history_to_chat_logs(
         [
             {
-                "event": "node_started",
+                "event": "node_init",
                 "node_id": "req_clarify",
                 "text": "节点初始化\n\n已加载。",
                 "agent_id": "default",
@@ -152,8 +159,8 @@ def test_chat_logs_carry_node_id() -> None:
             }
         ]
     )
-    assert len(logs) == 1
-    assert logs[0]["nodeId"] == "req_clarify"
+    assert len(logs) >= 1
+    assert all(log.get("nodeId") == "req_clarify" for log in logs)
 
 
 def test_clear_work_plan(meeting_scope: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -217,9 +224,136 @@ def test_batch_complete_awaiting_hitl_gate(meeting_scope: str, monkeypatch: pyte
     assert "submit_hitl_questionnaire" in hint
     err = check_host_hitl_gate(session, "deliver_artifacts")
     assert err is not None
+    assert (
+        check_host_forward_gate(
+            session,
+            "run_skill_script",
+            skill_name="whalecloud-dev-tool-doc-generate",
+        )
+        is None
+    )
     mark_plan_hitl_submitted(meeting_scope, kind="interactive")
     assert plan_awaiting_hitl(meeting_scope) is False
+    clear_archive_doc_pending(meeting_scope)
     assert check_host_hitl_gate(session, "deliver_artifacts") is None
+
+
+def test_closure_done_mutually_excludes_interactive_requirement(
+    meeting_scope: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binding = {
+        "host_profile_id": "default",
+        "worker_profile_ids": ["worker-a"],
+        "node_id": "req_clarify",
+        "human_confirm": True,
+    }
+    monkeypatch.setattr(
+        "synapse.rd_meeting.work_plan.resolve_node_binding",
+        lambda *a, **k: binding,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.hitl_closure_guard.load_closure_intent",
+        lambda *a, **k: "done",
+    )
+    session = "rd_meeting:room-plan:host"
+    submit_work_plan(
+        session_id=session,
+        goal_summary="澄清",
+        items=[{"id": "t1", "agent_id": "worker-a", "task": "a", "reason": "r"}],
+    )
+    mark_delegation_completed(session, agent_id="worker-a", plan_item_id="t1")
+    assert plan_awaiting_hitl(meeting_scope) is False
+    assert must_submit_interactive_questionnaire(meeting_scope, "req_clarify") is False
+
+
+def test_archive_doc_pending_blocks_forward_until_doc_generate(meeting_scope: str) -> None:
+    session = "rd_meeting:room-plan:host"
+    mark_archive_doc_pending(meeting_scope)
+    assert is_archive_doc_pending(meeting_scope)
+    err = check_host_forward_gate(session, "deliver_artifacts")
+    assert err is not None
+    assert (
+        check_host_forward_gate(
+            session,
+            "run_skill_script",
+            skill_name="whalecloud-dev-tool-doc-generate",
+        )
+        is None
+    )
+    clear_archive_doc_pending(meeting_scope)
+    assert check_host_forward_gate(session, "deliver_artifacts") is None
+
+
+def test_further_closure_requires_interactive(meeting_scope: str) -> None:
+    sync_interactive_required_after_closure(meeting_scope, "further")
+    assert must_submit_interactive_questionnaire(meeting_scope, "req_clarify") is True
+    sync_interactive_required_after_closure(meeting_scope, "done")
+    assert must_submit_interactive_questionnaire(meeting_scope, "req_clarify") is False
+
+
+def test_worker_agent_bypasses_host_hitl_gate(meeting_scope: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    binding = {
+        "host_profile_id": "default",
+        "worker_profile_ids": ["worker-a", "worker-b"],
+        "node_id": "req_clarify",
+        "human_confirm": True,
+    }
+    monkeypatch.setattr(
+        "synapse.rd_meeting.work_plan.resolve_node_binding",
+        lambda *a, **k: binding,
+    )
+    host_session = "rd_meeting:room-plan:host"
+    submit_work_plan(
+        session_id=host_session,
+        goal_summary="澄清",
+        items=[
+            {"id": "t1", "agent_id": "worker-a", "task": "a", "reason": "r"},
+            {"id": "t2", "agent_id": "worker-b", "task": "b", "reason": "r"},
+        ],
+    )
+    mark_delegation_completed(host_session, agent_id="worker-a", plan_item_id="t1")
+    mark_delegation_completed(host_session, agent_id="worker-b", plan_item_id="t2")
+    assert plan_awaiting_hitl(meeting_scope) is True
+
+    class _HostSession:
+        id = host_session
+
+    class _WorkerAgent:
+        _current_session_id = "rd_meeting:room-plan:worker-a"
+        _current_session = _HostSession()
+
+    worker = _WorkerAgent()
+    assert is_rd_meeting_host_agent(worker) is False
+    assert (
+        check_host_hitl_gate(host_session, "deliver_artifacts", agent=worker) is None
+    )
+
+
+def test_redelegate_without_plan_item_id_clears_completed(
+    meeting_scope: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binding = {
+        "host_profile_id": "default",
+        "worker_profile_ids": ["worker-a"],
+        "node_id": "req_clarify",
+        "human_confirm": True,
+    }
+    monkeypatch.setattr(
+        "synapse.rd_meeting.work_plan.resolve_node_binding",
+        lambda *a, **k: binding,
+    )
+    session = "rd_meeting:room-plan:host"
+    submit_work_plan(
+        session_id=session,
+        goal_summary="g",
+        items=[{"id": "t1", "agent_id": "worker-a", "task": "t", "reason": "r"}],
+    )
+    mark_delegation_completed(session, agent_id="worker-a", plan_item_id="t1")
+    mark_plan_hitl_submitted(meeting_scope, kind="interactive")
+    assert plan_awaiting_hitl(meeting_scope) is False
+
+    mark_delegation_started(session, agent_id="worker-a")
+    assert plan_awaiting_hitl(meeting_scope) is False
 
 
 def test_redelegate_resets_hitl_until_batch_complete_again(

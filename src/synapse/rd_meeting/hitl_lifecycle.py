@@ -28,6 +28,17 @@ _PROMPT_REQUIRE_INTERACTIVE = """
 4. 调用工具后立即停止，不要重复总结正文。
 """
 
+_PROMPT_REQUIRE_ARCHIVE_DOC = """
+## ⚠️ 系统提示：须先更新归档产出（doc-generate）
+
+收到协作智能体或人工反馈后，须先调用 ``whalecloud-dev-tool-doc-generate`` 更新本节点归档 Markdown（如 ``需求澄清.md``），再委派、交问卷或进入节点确认总结。
+
+**本次要求**：
+1. 读 ``hitl_context.json``（如有）并 **write_file** 更新 ``clarify_sections.json`` / 上下文；
+2. 以 ``clarify_fill_ctx.json`` 为 ``CONTEXT_JSON``、**STRICT=true** 执行 doc-generate；
+3. 用户末题已选「否」时 **禁止** ``submit_hitl_questionnaire(kind=interactive)``，完成后系统将自动进入节点确认总结。
+"""
+
 
 def is_ready_for_node_review(room_state: dict[str, Any] | None) -> bool:
     if not isinstance(room_state, dict):
@@ -65,15 +76,23 @@ def should_enter_node_review_after_hitl_locked(
         return False
 
     try:
-        from synapse.rd_meeting.work_plan import get_work_plan, plan_awaiting_hitl, plan_requires_hitl
+        from synapse.rd_meeting.hitl_closure_guard import load_closure_intent
+        from synapse.rd_meeting.work_plan import (
+            get_work_plan,
+            is_archive_doc_pending,
+            must_submit_interactive_questionnaire,
+            plan_requires_hitl,
+        )
 
-        if plan_awaiting_hitl(sid):
+        if is_archive_doc_pending(sid):
+            return False
+        if must_submit_interactive_questionnaire(sid, nid):
             return False
         plan = get_work_plan(sid)
         if isinstance(plan, dict) and str(plan.get("node_id") or "") == nid:
             binding = resolve_node_binding(nid, scope_id=sid)
             if plan_requires_hitl(plan, human_confirm=bool(binding.get("human_confirm"))):
-                if not plan.get("hitl_submitted"):
+                if load_closure_intent(sid, nid) != "done" and not plan.get("hitl_submitted"):
                     return False
     except Exception:
         pass
@@ -182,18 +201,22 @@ def reset_human_confirm_lifecycle(scope_id: str) -> None:
     if not sid:
         return
     from synapse.rd_meeting.hitl_closure_guard import HITL_CLOSURE_INTENT_KEY
+    from synapse.rd_meeting.work_plan import ARCHIVE_DOC_PENDING_KEY, INTERACTIVE_REQUIRED_KEY
 
     rs = dict(load_room_state(sid) or {})
     rs.pop(READY_FOR_NODE_REVIEW_KEY, None)
     rs.pop(HITL_CLARIFY_ROUND_KEY, None)
     rs.pop(HITL_FEEDBACK_MODE_KEY, None)
     rs.pop(HITL_CLOSURE_INTENT_KEY, None)
+    rs.pop(ARCHIVE_DOC_PENDING_KEY, None)
+    rs.pop(INTERACTIVE_REQUIRED_KEY, None)
     save_room_state(sid, rs)
 
 
 def clear_hitl_gate_residual_state(room_state: dict[str, Any]) -> dict[str, Any]:
     """清理会中门控残留（重处理/节点初始化用；不触碰 reprocess_reason）。"""
     from synapse.rd_meeting.hitl_closure_guard import HITL_CLOSURE_INTENT_KEY
+    from synapse.rd_meeting.work_plan import ARCHIVE_DOC_PENDING_KEY, INTERACTIVE_REQUIRED_KEY
 
     rs = dict(room_state)
     for key in (
@@ -203,6 +226,8 @@ def clear_hitl_gate_residual_state(room_state: dict[str, Any]) -> dict[str, Any]
         "intervention_kind",
         "pending_questionnaire",
         HITL_CLOSURE_INTENT_KEY,
+        ARCHIVE_DOC_PENDING_KEY,
+        INTERACTIVE_REQUIRED_KEY,
     ):
         rs.pop(key, None)
     pending = rs.get("pending_delivery")
@@ -240,6 +265,10 @@ def bump_clarify_round(scope_id: str) -> int:
 
 def prompt_require_interactive_questionnaire() -> str:
     return _PROMPT_REQUIRE_INTERACTIVE.strip()
+
+
+def prompt_require_archive_doc() -> str:
+    return _PROMPT_REQUIRE_ARCHIVE_DOC.strip()
 
 
 def user_has_supplement_input(

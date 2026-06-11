@@ -96,11 +96,6 @@ def test_meeting_room_whitelist_tools_never_unknown() -> None:
     agent = MagicMock()
     handle = create_meeting_room_handler(agent)
     reg.register("meeting_room", handle)
-    # im_channel：Worker 交付 deliver_artifacts
-    from synapse.tools.handlers.im_channel import create_handler as create_im_handler
-
-    reg.register("im_channel", create_im_handler(agent))
-
     rebuild_engine_v2(explicit_lookup=reg.get_tool_class)
 
     unknown: list[str] = []

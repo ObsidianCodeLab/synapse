@@ -78,24 +78,47 @@ class SkillsHandler:
     def __init__(self, agent: "Agent"):
         self.agent = agent
 
+    def _maybe_clear_archive_doc_pending(self, tool_name: str, params: dict, result: str) -> None:
+        skill = str(params.get("skill_name") or "").strip().lower()
+        if tool_name not in ("execute_skill", "run_skill_script"):
+            return
+        if "doc-generate" not in skill and "doc_generate" not in skill:
+            return
+        if str(result or "").strip().startswith("❌"):
+            return
+        try:
+            from synapse.rd_meeting.work_plan import (
+                clear_archive_doc_pending,
+                meeting_context_from_session,
+                session_id_from_agent,
+            )
+
+            ctx = meeting_context_from_session(session_id_from_agent(self.agent))
+            if ctx:
+                clear_archive_doc_pending(ctx["scope_id"])
+        except Exception:
+            pass
+
     async def handle(self, tool_name: str, params: dict[str, Any]) -> str:
         """处理工具调用"""
-        from synapse.rd_meeting.work_plan import check_host_hitl_gate, session_id_from_agent
+        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
 
         session_id = session_id_from_agent(self.agent)
         if tool_name == "execute_skill":
-            gate_err = check_host_hitl_gate(
+            gate_err = check_host_forward_gate(
                 session_id,
                 tool_name,
                 skill_name=str(params.get("skill_name") or ""),
+                agent=self.agent,
             )
             if gate_err:
                 return gate_err
         elif tool_name == "run_skill_script":
-            gate_err = check_host_hitl_gate(
+            gate_err = check_host_forward_gate(
                 session_id,
                 tool_name,
                 skill_name=str(params.get("skill_name") or ""),
+                agent=self.agent,
             )
             if gate_err:
                 return gate_err
@@ -105,7 +128,9 @@ class SkillsHandler:
             elif tool_name == "get_skill_info":
                 return self._get_skill_info(params)
             elif tool_name == "run_skill_script":
-                return self._run_skill_script(params)
+                out = self._run_skill_script(params)
+                self._maybe_clear_archive_doc_pending(tool_name, params, out)
+                return out
             elif tool_name == "get_skill_reference":
                 return self._get_skill_reference(params)
             elif tool_name == "install_skill":
@@ -117,7 +142,9 @@ class SkillsHandler:
             elif tool_name == "manage_skill_enabled":
                 return self._manage_skill_enabled(params)
             elif tool_name == "execute_skill":
-                return await self._execute_skill(params)
+                out = await self._execute_skill(params)
+                self._maybe_clear_archive_doc_pending(tool_name, params, out)
+                return out
             elif tool_name == "uninstall_skill":
                 return self._uninstall_skill(params)
             else:

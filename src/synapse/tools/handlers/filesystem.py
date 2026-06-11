@@ -655,13 +655,30 @@ class FilesystemHandler:
             except Exception:
                 _exec_mode = "agent"
             if _exec_mode == "agent":
-                result += (
-                    "\n\n💡 当前为 Desktop 模式，用户无法直接访问服务器文件。"
-                    "请将文件的关键内容直接包含在回复中，"
-                    "或调用 deliver_artifacts(artifacts=[{type: 'file', path: '"
-                    + str(path)
-                    + "'}]) 使文件在前端可下载。"
-                )
+                try:
+                    from synapse.rd_meeting.live import parse_rd_meeting_session
+                    from synapse.rd_meeting.work_plan import is_rd_meeting_host_agent
+
+                    _sid = str(getattr(self.agent, "_current_session_id", "") or "").strip()
+                    _meeting_worker = (
+                        parse_rd_meeting_session(_sid) is not None
+                        and not is_rd_meeting_host_agent(self.agent)
+                    )
+                except Exception:
+                    _meeting_worker = False
+                if _meeting_worker:
+                    result += (
+                        "\n\n💡 研发会议室协作智能体：请在本轮回复中写明产物路径与摘要，"
+                        "由小鲸（Host）综合后向用户交付；**勿**调用 `deliver_artifacts`。"
+                    )
+                else:
+                    result += (
+                        "\n\n💡 当前为 Desktop 模式，用户无法直接访问服务器文件。"
+                        "请将文件的关键内容直接包含在回复中，"
+                        "或调用 deliver_artifacts(artifacts=[{type: 'file', path: '"
+                        + str(path)
+                        + "'}]) 使文件在前端可下载。"
+                    )
             else:
                 result += (
                     "\n\n💡 当前为 Desktop 模式且非 agent 执行模式，"

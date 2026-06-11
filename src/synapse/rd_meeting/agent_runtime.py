@@ -46,19 +46,10 @@ MEETING_HOST_ONLY_TOOL_NAMES: frozenset[str] = frozenset(
     }
 )
 
-MEETING_WORKER_EXTRA_TOOL_NAMES: frozenset[str] = frozenset(
-    {
-        "deliver_artifacts",
-    }
-)
-
-
 def meeting_tool_names_for_role(role: MeetingRole) -> frozenset[str]:
     names = set(MEETING_COMMON_TOOL_NAMES)
     if role == "host":
         names |= MEETING_HOST_ONLY_TOOL_NAMES
-    else:
-        names |= MEETING_WORKER_EXTRA_TOOL_NAMES
     return frozenset(names)
 
 

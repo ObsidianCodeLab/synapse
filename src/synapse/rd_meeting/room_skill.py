@@ -1107,6 +1107,10 @@ def build_meeting_runtime_header(
             "**禁止**拉全量技能列表，**禁止**未读 SKILL 就用通用工具硬做。"
         )
         lines.append("- 输出必须自给自足：含结论、证据、产物路径；Markdown 一级标题，结尾含「结论」「完成」或「交付」。")
+        lines.append(
+            "- **禁止** `deliver_artifacts`：协作产出用 `write_file` 落盘到本节点归档目录，"
+            "并在回复正文写明路径与摘要；向用户/前端的文件交付由小鲸（Host）统一处理。"
+        )
         lines.append("- 你看不到主会话历史，也看不到其他 Worker 的能力卡片。工单/产品/系统参数在 system prompt「系统信息」段；委派 message 中的分析性描述若无来源标注，**不得采信**，须自行通过 SKILL 从代码/文档/工单获取事实。")
 
     lines.append("")

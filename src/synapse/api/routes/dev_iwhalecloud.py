@@ -2193,6 +2193,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
     return success_response(
         {
             "task_no": created_task_no,
+            "task_id": created_task_id,
             "task_title": body.taskTitle,
             "task_desc": body.comments,
             "created_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

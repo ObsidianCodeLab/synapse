@@ -145,6 +145,9 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             feature_id = str(wi.get("feature_id") or "").strip()
             if feature_id:
                 row["feature_id"] = feature_id
+            portal_task_id = wi.get("portal_task_id") or wi.get("task_id") or wi.get("taskId")
+            if portal_task_id is not None and str(portal_task_id).strip():
+                row["portal_task_id"] = portal_task_id
             lt = local_by_no.get(portal_no)
             if lt:
                 row["sop_node"] = str(lt.get("sop_node") or "")
@@ -171,6 +174,9 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
         feature_id = str(wi.get("feature_id") or "").strip()
         if feature_id:
             row["feature_id"] = feature_id
+        portal_task_id = wi.get("portal_task_id") or wi.get("task_id") or wi.get("taskId")
+        if portal_task_id is not None and str(portal_task_id).strip():
+            row["portal_task_id"] = portal_task_id
         lt = local_by_no.get(portal_no)
         if lt:
             row["sop_node"] = str(lt.get("sop_node") or "")
@@ -596,13 +602,37 @@ def build_env_pregen_display(result: dict[str, Any], *, scope_id: str = "") -> d
 
 def build_code_commit_display(result: dict[str, Any]) -> dict[str, Any]:
     flight = result.get("flight") if isinstance(result.get("flight"), dict) else {}
+    tasks = result.get("tasks") if isinstance(result.get("tasks"), list) else []
+    summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+    display_tasks: list[dict[str, Any]] = []
+    for row in tasks:
+        if not isinstance(row, dict):
+            continue
+        task_flight = row.get("flight") if isinstance(row.get("flight"), dict) else {}
+        flight_data = task_flight.get("data") if isinstance(task_flight.get("data"), dict) else {}
+        display_tasks.append(
+            {
+                "task_no": row.get("task_no"),
+                "task_title": row.get("task_title"),
+                "feature_id": row.get("feature_id"),
+                "portal_task_id": row.get("portal_task_id"),
+                "commit_message": row.get("commit_message"),
+                "commit_hash": row.get("commit_hash"),
+                "status": row.get("status"),
+                "error": row.get("error"),
+                "sandbox_path": row.get("sandbox_path") or row.get("local_path"),
+                "flight_status": task_flight.get("status"),
+                "flight_error": task_flight.get("error"),
+                "flight_data": flight_data,
+            }
+        )
     return {
         "node_id": "exception_check",
         "status": result.get("status"),
         "errors": [result.get("error")] if result.get("error") else [],
-        "repos": result.get("repos") or [],
+        "tasks": display_tasks,
         "flight": flight,
-        "task_id": result.get("task_id"),
+        "summary": summary,
     }
 
 

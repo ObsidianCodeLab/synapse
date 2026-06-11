@@ -19,7 +19,15 @@ logger = logging.getLogger(__name__)
 PLAN_TYPE = "meeting_work_plan"
 PLAN_VERSION = "1"
 ROOM_STATE_KEY = "current_work_plan"
+ARCHIVE_DOC_PENDING_KEY = "archive_doc_pending"
+INTERACTIVE_REQUIRED_KEY = "interactive_required"
 HOST_HITL_ACTION = "submit_hitl"
+HOST_FORWARD_GATED_TOOLS = frozenset({
+    "deliver_artifacts",
+    "submit_hitl_questionnaire",
+    "delegate_to_agent",
+    "delegate_parallel",
+})
 DEFAULT_CLOSING_STEP: dict[str, str] = {
     "action": HOST_HITL_ACTION,
     "kind": "interactive",
@@ -40,6 +48,26 @@ def _now_iso() -> str:
 def is_rd_meeting_host_session(session_id: str) -> bool:
     parsed = parse_rd_meeting_session(session_id or "")
     return parsed is not None and parsed.get("role") == "host"
+
+
+def is_rd_meeting_host_agent(agent: Any) -> bool:
+    """判断当前 Agent 轮次是否为会议室 Host（非 Worker）。
+
+    Worker 委派时 ``_current_session`` 仍指向 Host Session 对象，但
+    ``_current_session_id`` 为 ``rd_meeting:{room}:{profile}`` 池化键；
+    角色判断必须优先后者，否则会误把 Worker 当成 Host 触发 HITL 门禁。
+    """
+    sid = str(getattr(agent, "_current_session_id", None) or "").strip()
+    parsed = parse_rd_meeting_session(sid)
+    if parsed is not None:
+        return parsed.get("role") == "host"
+    session = getattr(agent, "_current_session", None)
+    fallback = str(
+        getattr(session, "id", None)
+        or getattr(session, "session_id", None)
+        or ""
+    )
+    return is_rd_meeting_host_session(fallback)
 
 
 def meeting_context_from_session(session_id: str) -> dict[str, str] | None:
@@ -157,11 +185,17 @@ def plan_requires_hitl(plan: dict[str, Any], *, human_confirm: bool) -> bool:
 
 
 def plan_awaiting_hitl(scope_id: str, *, human_confirm: bool | None = None) -> bool:
+    """本批 Worker 已全部返回且 closing_step 仍待交 interactive（不含用户已选「否」收口）。"""
     plan = get_work_plan(scope_id)
     if not plan:
         return False
+    node_id = str(plan.get("node_id") or "").strip()
+    if node_id:
+        from synapse.rd_meeting.hitl_closure_guard import load_closure_intent
+
+        if load_closure_intent(scope_id, node_id) == "done":
+            return False
     if human_confirm is None:
-        node_id = str(plan.get("node_id") or "").strip()
         binding = resolve_node_binding(node_id, scope_id=scope_id) if node_id else {}
         human_confirm = bool(binding.get("human_confirm"))
     if not plan_requires_hitl(plan, human_confirm=bool(human_confirm)):
@@ -171,12 +205,86 @@ def plan_awaiting_hitl(scope_id: str, *, human_confirm: bool | None = None) -> b
     return is_plan_batch_complete(plan)
 
 
+def mark_archive_doc_pending(scope_id: str) -> None:
+    """Host 收到 Worker / 人机 / 节点确认反馈后，要求先 doc-generate 再推进。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    rs = dict(load_room_state(sid) or {})
+    rs[ARCHIVE_DOC_PENDING_KEY] = True
+    save_room_state(sid, rs)
+
+
+def clear_archive_doc_pending(scope_id: str) -> None:
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    rs = dict(load_room_state(sid) or {})
+    if ARCHIVE_DOC_PENDING_KEY in rs:
+        rs.pop(ARCHIVE_DOC_PENDING_KEY, None)
+        save_room_state(sid, rs)
+
+
+def is_archive_doc_pending(scope_id: str) -> bool:
+    rs = load_room_state((scope_id or "").strip()) or {}
+    return bool(rs.get(ARCHIVE_DOC_PENDING_KEY))
+
+
+def sync_interactive_required_after_closure(scope_id: str, intent: str) -> None:
+    """与末题收口互斥：选「否」不要求 interactive；选「是」要求后续交 interactive。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    rs = dict(load_room_state(sid) or {})
+    if intent == "done":
+        rs.pop(INTERACTIVE_REQUIRED_KEY, None)
+    elif intent == "further":
+        rs[INTERACTIVE_REQUIRED_KEY] = True
+    save_room_state(sid, rs)
+
+
+def must_submit_interactive_questionnaire(scope_id: str, node_id: str = "") -> bool:
+    """是否仍须提交 kind=interactive 会中问卷（与「本节点已无待决问题」互斥）。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if not sid:
+        return False
+    from synapse.rd_meeting.hitl_closure_guard import load_closure_intent
+
+    intent = load_closure_intent(sid, nid)
+    if intent == "done":
+        return False
+    rs = load_room_state(sid) or {}
+    if rs.get(INTERACTIVE_REQUIRED_KEY):
+        plan = get_work_plan(sid)
+        if isinstance(plan, dict) and plan.get("hitl_submitted"):
+            return False
+        pending_q = rs.get("pending_questionnaire")
+        if isinstance(pending_q, dict) and pending_q.get("schema"):
+            return False
+        return True
+    return plan_awaiting_hitl(sid)
+
+
+def _is_doc_generate_tool(tool_name: str, skill_name: str) -> bool:
+    if tool_name in ("execute_skill", "run_skill_script"):
+        skill = (skill_name or "").strip().lower()
+        return "doc-generate" in skill or "doc_generate" in skill
+    return False
+
+
 def batch_complete_hint(scope_id: str) -> str:
-    if not plan_awaiting_hitl(scope_id):
+    if not must_submit_interactive_questionnaire(scope_id):
+        if is_archive_doc_pending(scope_id):
+            return (
+                "\n\n---\n**系统提示**：本工作安排计划中的协作任务已全部返回。"
+                "请先 `whalecloud-dev-tool-doc-generate` 更新归档产出，再继续后续动作。"
+            )
         return ""
     return (
         "\n\n---\n**系统提示**：本工作安排计划中的协作任务已全部返回。"
-        "请综合各 Worker 产出调用 `submit_hitl_questionnaire`（kind=\"interactive\"），"
+        "请先 `whalecloud-dev-tool-doc-generate` 更新归档产出，"
+        "再调用 `submit_hitl_questionnaire`（kind=\"interactive\"）；"
         "勿在正文中写「待用户确认」代替表单。"
     )
 
@@ -408,6 +516,7 @@ def mark_delegation_started(
     if not isinstance(delegated, list):
         delegated = []
     pid = (plan_item_id or "").strip()
+    resolved_pid = pid
     if pid and pid not in delegated:
         delegated.append(pid)
     elif not pid:
@@ -415,6 +524,8 @@ def mark_delegation_started(
         for it in items:
             if isinstance(it, dict) and str(it.get("agent_id") or "").strip() == (agent_id or "").strip():
                 iid = str(it.get("id") or "")
+                if iid:
+                    resolved_pid = iid
                 if iid and iid not in delegated:
                     delegated.append(iid)
                 break
@@ -423,8 +534,10 @@ def mark_delegation_started(
     if had_hitl:
         plan["hitl_submitted"] = False
         completed = plan.get("completed_item_ids")
-        if isinstance(completed, list) and pid:
-            plan["completed_item_ids"] = [x for x in completed if str(x).strip() != pid]
+        if isinstance(completed, list) and resolved_pid:
+            plan["completed_item_ids"] = [
+                x for x in completed if str(x).strip() != resolved_pid
+            ]
     rs[ROOM_STATE_KEY] = plan
     if had_hitl:
         from synapse.rd_meeting.hitl_lifecycle import clear_ready_for_node_review
@@ -469,6 +582,7 @@ def mark_delegation_completed(
     plan["completed_item_ids"] = completed
     rs[ROOM_STATE_KEY] = plan
     save_room_state(scope_id, rs)
+    mark_archive_doc_pending(scope_id)
     return batch_complete_hint(scope_id)
 
 
@@ -486,17 +600,71 @@ def mark_plan_hitl_submitted(scope_id: str, *, kind: str = "interactive") -> Non
     plan = dict(plan)
     plan["hitl_submitted"] = True
     rs[ROOM_STATE_KEY] = plan
+    rs.pop(INTERACTIVE_REQUIRED_KEY, None)
     save_room_state(sid, rs)
 
 
 def session_id_from_agent(agent: Any) -> str:
+    """解析 Agent 当前执行上下文对应的 session id（优先池化键）。"""
+    sid = str(getattr(agent, "_current_session_id", None) or "").strip()
+    if parse_rd_meeting_session(sid):
+        return sid
     session = getattr(agent, "_current_session", None)
     return str(
         getattr(session, "id", None)
         or getattr(session, "session_id", None)
-        or getattr(agent, "_current_session_id", None)
+        or sid
         or ""
     )
+
+
+def check_host_forward_gate(
+    session_id: str,
+    tool_name: str,
+    *,
+    skill_name: str = "",
+    questionnaire_kind: str = "",
+    agent: Any = None,
+) -> str | None:
+    """Host 推进门禁：doc-generate 随时可做；收到反馈后须先 doc-generate，再按收口意图交 interactive。"""
+    if agent is not None:
+        if not is_rd_meeting_host_agent(agent):
+            return None
+        session_id = session_id_from_agent(agent)
+    elif not is_rd_meeting_host_session(session_id):
+        return None
+    ctx = meeting_context_from_session(session_id)
+    if ctx is None:
+        return None
+    scope_id = ctx["scope_id"]
+    node_id = ctx.get("node_id") or ""
+
+    if _is_doc_generate_tool(tool_name, skill_name):
+        return None
+
+    gated = tool_name in HOST_FORWARD_GATED_TOOLS or tool_name in PLAN_HITL_GATED_TOOLS
+    if not gated:
+        return None
+
+    if is_archive_doc_pending(scope_id):
+        return (
+            "❌ 收到协作智能体或人工反馈后，须先调用 `whalecloud-dev-tool-doc-generate` "
+            "更新本节点归档产出（如 `需求澄清.md`），再执行委派、问卷或交付。"
+        )
+
+    qkind = (questionnaire_kind or "").strip().lower()
+    if tool_name == "submit_hitl_questionnaire" and qkind == "exception":
+        return None
+
+    if must_submit_interactive_questionnaire(scope_id, node_id):
+        if tool_name == "submit_hitl_questionnaire" and qkind == "interactive":
+            return None
+        return (
+            "❌ 本节点仍有待决问题须用户确认：请先 `whalecloud-dev-tool-doc-generate` 更新归档产出，"
+            "再调用 `submit_hitl_questionnaire`（kind=\"interactive\"）。"
+            "用户末题选「否」后不再要求 interactive。"
+        )
+    return None
 
 
 def check_host_hitl_gate(
@@ -504,23 +672,12 @@ def check_host_hitl_gate(
     tool_name: str,
     *,
     skill_name: str = "",
+    agent: Any = None,
 ) -> str | None:
-    """本批协作任务已收齐且尚未 submit_hitl 时，阻止 Host 归档/交付类工具。"""
-    if not is_rd_meeting_host_session(session_id):
-        return None
-    ctx = meeting_context_from_session(session_id)
-    if ctx is None:
-        return None
-    if tool_name not in PLAN_HITL_GATED_TOOLS:
-        return None
-    if tool_name in ("execute_skill", "run_skill_script"):
-        skill = (skill_name or "").strip().lower()
-        if "doc-generate" not in skill and "doc_generate" not in skill:
-            return None
-    if not plan_awaiting_hitl(ctx["scope_id"]):
-        return None
-    return (
-        "❌ 本工作安排计划的协作任务已全部返回，但尚未调用 `submit_hitl_questionnaire`。"
-        "请先综合 Worker 产出提交 interactive 人机问卷，再归档或调用 doc-generate。"
-        "禁止在聊天中用「待用户确认」代替表单。"
+    """兼容旧名；见 ``check_host_forward_gate``。"""
+    return check_host_forward_gate(
+        session_id,
+        tool_name,
+        skill_name=skill_name,
+        agent=agent,
     )

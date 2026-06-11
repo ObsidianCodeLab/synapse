@@ -72,6 +72,19 @@ def test_task_check_flight_fail_redirects_to_task_feedback(tmp_path, monkeypatch
                 "context": {
                     "code_commit_assets": {
                         "status": "partial",
+                        "tasks": [
+                            {
+                                "task_no": "T1",
+                                "flight": {
+                                    "status": "failed",
+                                    "error": "编译失败",
+                                    "data": {
+                                        "ciFlowInstRunState": "1",
+                                        "ciFlowInstRunStateDesc": "构建失败",
+                                    },
+                                },
+                            }
+                        ],
                         "flight": {"status": "failed", "error": "编译失败"},
                     }
                 }

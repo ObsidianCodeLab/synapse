@@ -1137,8 +1137,18 @@ class MeetingRoomService:
 
             if user_wants_further_processing(effective_values, schema):
                 set_closure_intent(sid, "further")
+                from synapse.rd_meeting.work_plan import sync_interactive_required_after_closure
+
+                sync_interactive_required_after_closure(sid, "further")
             elif user_selected_no_further_processing(effective_values, schema):
                 set_closure_intent(sid, "done")
+                from synapse.rd_meeting.work_plan import sync_interactive_required_after_closure
+
+                sync_interactive_required_after_closure(sid, "done")
+
+        from synapse.rd_meeting.work_plan import mark_archive_doc_pending
+
+        mark_archive_doc_pending(sid)
 
         from synapse.rd_meeting.hitl_feedback import (
             build_hitl_round_record,
@@ -1258,6 +1268,9 @@ class MeetingRoomService:
             if dec_comment and not comment:
                 comment = dec_comment
             if not approved:
+                from synapse.rd_meeting.work_plan import mark_archive_doc_pending
+
+                mark_archive_doc_pending(sid)
                 rs2 = dict(load_room_state(sid) or {})
                 rs2["status"] = "processing"
                 save_room_state(sid, rs2)

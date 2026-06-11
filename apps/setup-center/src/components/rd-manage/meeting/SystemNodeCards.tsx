@@ -871,8 +871,9 @@ export function SystemEnvPregenCard({
 
 export function SystemCodeCommitCard({ payload }: { payload: Record<string, unknown> }) {
   const display = (payload.display as Record<string, unknown>) || payload;
-  const repos = asRows(display.repos);
+  const tasks = asRows(display.tasks);
   const flight = (display.flight as RowRecord) || {};
+  const summary = (display.summary as RowRecord) || {};
   const errors = (display.errors as string[]) || [];
 
   return (
@@ -881,11 +882,11 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
         gradient="rd-system-hero--sandbox"
         icon={<GitBranch className="h-6 w-6" />}
         title="代码提交"
-        subtitle="特性分支已提交，并收集试飞构建结果。"
+        subtitle="按研发子单提交特性分支，并收集试飞构建结果。"
         stats={[
-          { label: '仓库', value: repos.length },
+          { label: '子单', value: String(summary.total ?? tasks.length) },
+          { label: '提交', value: String(summary.commit_ok ?? '—') },
           { label: '试飞', value: String(flight.status || display.status || '—') },
-          { label: '状态', value: String(display.status || '—') },
         ]}
       />
       {errors.length > 0 ? (
@@ -895,28 +896,70 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
           ))}
         </ul>
       ) : null}
-      {repos.length > 0 ? (
-        <ul className="space-y-2 mt-3 mb-0">
-          {repos.map((row, idx) => (
-            <li key={`commit-${idx}`} className="rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-[11px]">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusBadge status={String(row.status || '')} />
-                <span className="text-slate-300">{String(row.repo_name || '—')}</span>
-                {row.commit_hash ? <span className="text-muted-foreground font-mono">{String(row.commit_hash).slice(0, 8)}</span> : null}
-              </div>
-              <CopyPath value={String(row.local_path || '')} />
-            </li>
-          ))}
+      {tasks.length > 0 ? (
+        <ul className="space-y-3 mt-3 mb-0">
+          {tasks.map((row, idx) => {
+            const flightData = (row.flight_data as RowRecord) || {};
+            const buildResult = asRows(flightData.buildResult);
+            return (
+              <li
+                key={`commit-${idx}`}
+                className="rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-[11px]"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={String(row.status || '')} />
+                  <span className="text-slate-300 font-medium">{String(row.task_no || '—')}</span>
+                  {row.feature_id ? (
+                    <span className="text-muted-foreground font-mono">{String(row.feature_id)}</span>
+                  ) : null}
+                  {row.commit_hash ? (
+                    <span className="text-muted-foreground font-mono">
+                      {String(row.commit_hash).slice(0, 8)}
+                    </span>
+                  ) : null}
+                </div>
+                {row.commit_message ? (
+                  <p className="text-muted-foreground mt-1 mb-0">{String(row.commit_message)}</p>
+                ) : null}
+                <CopyPath value={String(row.sandbox_path || '')} />
+                {row.flight_status ? (
+                  <div className="mt-2 pt-2 border-t border-slate-700/50">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">试飞</span>
+                      <StatusBadge status={String(row.flight_status)} />
+                      {flightData.ciFlowInstRunStateDesc ? (
+                        <span className="text-slate-400">{String(flightData.ciFlowInstRunStateDesc)}</span>
+                      ) : null}
+                    </div>
+                    {flightData.ciFlowInstBeginDate || flightData.ciFlowInstEndDate ? (
+                      <p className="text-muted-foreground mt-1 mb-0">
+                        {flightData.ciFlowInstBeginDate ? String(flightData.ciFlowInstBeginDate) : '—'}
+                        {' → '}
+                        {flightData.ciFlowInstEndDate ? String(flightData.ciFlowInstEndDate) : '—'}
+                      </p>
+                    ) : null}
+                    {buildResult.length > 0 ? (
+                      <ul className="mt-2 space-y-1 mb-0">
+                        {buildResult.map((item, brIdx) => (
+                          <li key={`br-${idx}-${brIdx}`} className="text-red-300/90">
+                            <span className="font-medium">{String(item.resultType || '检查项')}：</span>
+                            <span className="whitespace-pre-wrap break-all">
+                              {String(item.resultMsg || '').slice(0, 800)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {row.flight_error ? (
+                      <p className="text-red-400 mt-1 mb-0">{String(row.flight_error)}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+                {row.error ? <p className="text-red-400 mt-1 mb-0">{String(row.error)}</p> : null}
+              </li>
+            );
+          })}
         </ul>
-      ) : null}
-      {flight.status ? (
-        <div className="mt-3 rd-chat-card__section">
-          <div className="rd-chat-card__label mb-1">试飞结果</div>
-          <div className="rd-chat-card__meta-row">
-            <StatusBadge status={String(flight.status)} />
-            {flight.error ? <span className="text-red-400">{String(flight.error)}</span> : null}
-          </div>
-        </div>
       ) : null}
     </div>
   );

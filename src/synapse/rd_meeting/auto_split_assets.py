@@ -176,8 +176,10 @@ def _build_owned_work_item_from_create(
 ) -> dict[str, Any]:
     """create_task 响应 data → owned_work_items 单条（与门户快照字段一致）。"""
     row = data if isinstance(data, dict) else {}
+    task_id = row.get("task_id") or row.get("taskId")
     return {
         "task_no": str(row.get("task_no") or task_no).strip(),
+        "portal_task_id": task_id,
         "task_title": str(row.get("task_title") or getattr(req, "taskTitle", "") or ""),
         "task_desc": str(row.get("task_desc") or getattr(req, "comments", "") or ""),
         "created_date": str(row.get("created_date") or ""),

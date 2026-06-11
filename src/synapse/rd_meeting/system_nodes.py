@@ -328,23 +328,28 @@ def handle_code_commit(
 ) -> dict[str, Any]:
     """代码提交：特性分支提交并收集试飞结果。"""
     sid = scope_id.strip()
-    from synapse.rd_meeting.code_commit_assets import bootstrap_code_commit, format_code_commit_report
+    from synapse.rd_meeting.code_commit_assets import (
+        bootstrap_code_commit,
+        format_code_commit_log_report,
+        write_code_commit_archives,
+    )
 
-    assets = bootstrap_code_commit(sid, scope_type=scope_type, task_id=sid if scope_type == "task" else "")
+    assets = bootstrap_code_commit(sid, scope_type=scope_type)
     _save_pipeline_context_assets(sid, "code_commit_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
-    report_body = format_code_commit_report(assets, node_name=node_name)
+    report_body = format_code_commit_log_report(assets, node_name=node_name)
     stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
-    artifacts = _write_system_archive(sid, node_id, stage_name, report_body)
+    artifacts = write_code_commit_archives(sid, stage_name, assets)
 
     from synapse.rd_meeting.system_node_display import attach_system_node_display
 
     out = {
         "status": assets.get("status") or "ok",
         "error": assets.get("error") or "",
-        "repos": assets.get("repos") or [],
+        "tasks": assets.get("tasks") or [],
         "flight": assets.get("flight") or {},
+        "summary": assets.get("summary") or {},
         "artifacts": artifacts,
         "report_body": report_body,
         **assets,

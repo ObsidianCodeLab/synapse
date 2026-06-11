@@ -95,6 +95,16 @@ class AgentToolHandler:
         if not message:
             return "❌ message is required"
 
+        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
+
+        gate_err = check_host_forward_gate(
+            session_id_from_agent(self.agent),
+            "delegate_to_agent",
+            agent=self.agent,
+        )
+        if gate_err:
+            return gate_err
+
         orchestrator = self._get_orchestrator()
         if orchestrator is None:
             return "❌ Orchestrator not available — multi-agent mode may not be fully initialised"
@@ -142,6 +152,16 @@ class AgentToolHandler:
         import asyncio
         import json as _json
         from collections import Counter
+
+        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
+
+        gate_err = check_host_forward_gate(
+            session_id_from_agent(self.agent),
+            "delegate_parallel",
+            agent=self.agent,
+        )
+        if gate_err:
+            return gate_err
 
         tasks_param = params.get("tasks")
 
