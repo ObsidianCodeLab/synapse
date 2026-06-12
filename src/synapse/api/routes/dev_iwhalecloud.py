@@ -54,6 +54,16 @@ DEV_IWHALECLOUD_TASK_STAGE_CODE_AUDIT = 16960 # 代码走查
 DEV_IWHALECLOUD_TASK_STAGE_TO_CREATOR = 45059 # To Creator
 DEV_IWHALECLOUD_TASK_STAGE_ABNORMAL_CLOSE_AUDIT = 46082 # 异常关闭审核
 
+# 子单转阶段：从当前 taskFlowStageId 向后探测的最大步数（门户无列阶段 API）
+_TASK_FLOW_STAGE_PROBE_WINDOW = 20
+
+# stageCode → 门户 stageName（探测成功时与 stageCode 二选一匹配）
+_TASK_STAGE_CODE_LABELS: dict[str, str] = {
+    "START": "待处理",
+    "DESIGNING": "设计中",
+    "DEVELOPING": "开发中",
+}
+
 # 日志打印响应体最大长度
 _LOG_HTTPS_RESP_BODY_MAX = 8000
 
@@ -82,6 +92,11 @@ def _userinfo_encryption_path() -> Path:
 def _dev_iwhalecloud_session_path() -> Path:
     """独立的研发云 token 和 cookies 缓存文件。"""
     return settings.project_root / "data" / "iwhalecloud_session.json"
+
+
+def _task_flow_stage_cache_path() -> Path:
+    """研发云子单工作流阶段 ID 本地缓存（按 branchVersionId + stageCode）。"""
+    return settings.project_root / "data" / "iwhalecloud_task_flow_stage_cache.json"
 
 def _load_iwhalecloud_session() -> dict | None:
     path = _dev_iwhalecloud_session_path()
@@ -2291,17 +2306,27 @@ async def create_task(body: CreateTaskRequest) -> dict:
         created_task_no,
     )
 
-    # 步骤10：转开发中（仅做状态流转）
-    transfer_body = TransferTaskStageRequest(
-        taskNo=created_task_no,
-        ownerUserCode=employee_id,
-        operateUserCode=employee_id,
-        taskFlowStageId=DEV_IWHALECLOUD_TASK_STAGE_DEVELOPING,
+    # 步骤10：转开发中（按任务所属工作流解析 stageId，不同产品分支 ID 可能不是 3919）
+    transfer_result = await _transfer_task_to_stage_code(
+        task_no=created_task_no,
+        owner_user_code=employee_id,
+        operate_user_code=employee_id,
+        stage_code="DEVELOPING",
         comments="create_task 统一入口：自动转开发中",
     )
-    transfer_result = await _transfer_task_stage(transfer_body)
     if isinstance(transfer_result, dict) and transfer_result.get("errorcode") not in (None, 0):
+        logger.warning(
+            "create_task transfer_task_stage failed task_id=%s task_no=%s resp=%s",
+            created_task_id,
+            created_task_no,
+            transfer_result,
+        )
         return error_response(502, "任务已创建，但转开发中失败", error=str(transfer_result))
+    logger.info(
+        "create_task transfer_task_stage ok task_id=%s task_no=%s",
+        created_task_id,
+        created_task_no,
+    )
 
     # 步骤11：创建特性分支
     branch_result = await _create_feature_branch(CreateFeatureBranchRequest(taskNo=created_task_no, branchName=created_task_no))
@@ -2793,6 +2818,248 @@ def _build_transfer_task_stage_payload(body: TransferTaskStageRequest) -> dict:
         "taskFlowStageId": body.taskFlowStageId,
         "comments": body.comments or "",
     }
+
+
+def _task_stage_inner_from_response(data: Any) -> dict[str, Any]:
+    """从 ``_get_task_current_stage`` 的 data 字段取出 stage 对象。"""
+    if not isinstance(data, dict):
+        return {}
+    inner = data.get("data")
+    if isinstance(inner, dict) and "taskFlowStageId" in inner:
+        return inner
+    if isinstance(inner, dict) and isinstance(inner.get("data"), dict):
+        nested = inner.get("data")
+        return nested if isinstance(nested, dict) else {}
+    return {}
+
+
+def _is_task_stage_not_exist(resp: dict[str, Any]) -> bool:
+    msg = str(resp.get("message") or "")
+    err = str((resp.get("data") or {}).get("error") or "")
+    return "任务阶段不存在" in msg or "ZCM-AGILE-TASK-00010" in err
+
+
+def _load_task_flow_stage_cache() -> dict[str, dict[str, int]]:
+    path = _task_flow_stage_cache_path()
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("读取 task_flow_stage_cache 失败: %s", exc)
+        return {}
+    by_branch = raw.get("by_branch_version") if isinstance(raw, dict) else None
+    if not isinstance(by_branch, dict):
+        return {}
+    out: dict[str, dict[str, int]] = {}
+    for branch_key, stage_map in by_branch.items():
+        if not isinstance(stage_map, dict):
+            continue
+        normalized: dict[str, int] = {}
+        for code, stage_id in stage_map.items():
+            try:
+                normalized[str(code)] = int(stage_id)
+            except (TypeError, ValueError):
+                continue
+        if normalized:
+            out[str(branch_key)] = normalized
+    return out
+
+
+def _save_task_flow_stage_cache(cache: dict[str, dict[str, int]]) -> None:
+    path = _task_flow_stage_cache_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"by_branch_version": cache}
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _cache_get_task_flow_stage_id(branch_version_id: int | str | None, stage_code: str) -> int | None:
+    if branch_version_id is None:
+        return None
+    branch_key = str(branch_version_id).strip()
+    if not branch_key:
+        return None
+    stage_map = _load_task_flow_stage_cache().get(branch_key) or {}
+    stage_id = stage_map.get(stage_code)
+    return int(stage_id) if isinstance(stage_id, int) else None
+
+
+def _task_stage_matches_target(landed: dict[str, Any], stage_code: str) -> bool:
+    """转单后是否已到达目标阶段（优先 stageCode，其次 stageName）。"""
+    if not landed:
+        return False
+    target_code = str(stage_code or "").strip()
+    if not target_code:
+        return False
+    if str(landed.get("stageCode") or "").strip() == target_code:
+        return True
+    expected_name = _TASK_STAGE_CODE_LABELS.get(target_code)
+    return bool(expected_name and str(landed.get("stageName") or "").strip() == expected_name)
+
+
+def _record_task_flow_stage_probe(
+    branch_version_id: int | str | None,
+    landed: dict[str, Any],
+) -> None:
+    """探测或转单落地后，把 stageCode→stageId 记入同分支缓存。"""
+    code = str(landed.get("stageCode") or "").strip()
+    stage_id = landed.get("taskFlowStageId")
+    if code and isinstance(stage_id, int):
+        _cache_put_task_flow_stage_id(branch_version_id, code, int(stage_id))
+
+
+def _cache_put_task_flow_stage_id(
+    branch_version_id: int | str | None,
+    stage_code: str,
+    stage_id: int,
+) -> None:
+    if branch_version_id is None or not str(stage_code).strip():
+        return
+    branch_key = str(branch_version_id).strip()
+    if not branch_key:
+        return
+    cache = _load_task_flow_stage_cache()
+    stage_map = dict(cache.get(branch_key) or {})
+    stage_map[str(stage_code)] = int(stage_id)
+    cache[branch_key] = stage_map
+    _save_task_flow_stage_cache(cache)
+    logger.info(
+        "task_flow_stage_cache updated branch_version_id=%s stage_code=%s stage_id=%s",
+        branch_key,
+        stage_code,
+        stage_id,
+    )
+
+
+async def _get_task_stage_inner(task_no: str) -> dict[str, Any]:
+    st_resp = await _get_task_current_stage(task_no)
+    if not isinstance(st_resp, dict) or st_resp.get("errorcode") not in (None, 0):
+        return {}
+    return _task_stage_inner_from_response(st_resp.get("data"))
+
+
+async def _gateway_task_branch_version_id(task_no: str) -> int | None:
+    """从 work-item detail 读取 branchVersionId（工作流模板锚点，比 projectId 更稳）。"""
+    bearer = _load_dev_iwhalecloud_authorization()
+    url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/ai-gateway/devspace/rpc/v3/work-item/{task_no}/detail"
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                url,
+                headers={"Authorization": bearer, "Content-Type": "application/json"},
+                json={"withBranchVersion": "true"},
+            )
+            raw = resp.json()
+    except (httpx.RequestError, ValueError) as exc:
+        logger.warning("gateway work-item branchVersionId 失败 task_no=%s: %s", task_no, exc)
+        return None
+    if raw.get("code") != "9999":
+        return None
+    block = raw.get("data")
+    api = (block.get("apiTask") if isinstance(block, dict) else None) or {}
+    branch = (block.get("apiBranchVersionDto") if isinstance(block, dict) else None) or {}
+    for source in (api, branch):
+        if not isinstance(source, dict):
+            continue
+        raw_id = source.get("branchVersionId")
+        try:
+            return int(raw_id)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+async def _transfer_task_to_stage_code(
+    *,
+    task_no: str,
+    owner_user_code: str,
+    operate_user_code: str,
+    stage_code: str,
+    comments: str,
+) -> dict:
+    """将研发单转到指定 stageCode（如 DEVELOPING）。
+
+    研发云各产品分支的 taskFlowStageId 不同，且门户无「列阶段」只读 API。
+    不猜测全局 ID（如 3919），而是：
+    1. 读当前阶段；若已是目标（stageCode / stageName）则直接成功；
+    2. 同分支若有历史探测缓存则先试一次（避免重复扫描）；
+    3. 从当前 taskFlowStageId 向后逐个转单，以 stageName/stageCode 判断是否到达目标；
+    4. 每次落地写入 branchVersionId 缓存，供后续同分支复用。
+    """
+    branch_version_id = await _gateway_task_branch_version_id(task_no)
+    inner = await _get_task_stage_inner(task_no)
+    if not inner:
+        return error_response(502, "无法查询任务当前阶段")
+
+    if _task_stage_matches_target(inner, stage_code):
+        return success_response(inner, "任务已在目标阶段")
+
+    cached_id = _cache_get_task_flow_stage_id(branch_version_id, stage_code)
+    if cached_id is not None:
+        cached_body = TransferTaskStageRequest(
+            taskNo=task_no,
+            ownerUserCode=owner_user_code,
+            operateUserCode=operate_user_code,
+            taskFlowStageId=cached_id,
+            comments=comments,
+        )
+        cached_result = await _transfer_task_stage(cached_body)
+        if isinstance(cached_result, dict) and cached_result.get("errorcode") in (None, 0):
+            landed = await _get_task_stage_inner(task_no)
+            _record_task_flow_stage_probe(branch_version_id, landed)
+            if _task_stage_matches_target(landed, stage_code):
+                return cached_result
+
+    try:
+        base_id = int(inner.get("taskFlowStageId"))
+    except (TypeError, ValueError):
+        return error_response(502, "任务当前阶段 ID 无效")
+
+    target_label = _TASK_STAGE_CODE_LABELS.get(stage_code, stage_code)
+    last_result: dict[str, Any] = error_response(
+        502,
+        f"从阶段 {inner.get('stageName') or base_id} 向后未找到「{target_label}」",
+    )
+    for stage_id in range(base_id + 1, base_id + _TASK_FLOW_STAGE_PROBE_WINDOW + 1):
+        if cached_id is not None and stage_id == cached_id:
+            continue
+        body = TransferTaskStageRequest(
+            taskNo=task_no,
+            ownerUserCode=owner_user_code,
+            operateUserCode=operate_user_code,
+            taskFlowStageId=stage_id,
+            comments=comments,
+        )
+        attempt = await _transfer_task_stage(body)
+        last_result = attempt if isinstance(attempt, dict) else last_result
+        if not isinstance(attempt, dict) or attempt.get("errorcode") not in (None, 0):
+            msg = str(attempt.get("message") or "")
+            if "不存在" in msg or _is_task_stage_not_exist(attempt):
+                continue
+            return attempt
+
+        landed = await _get_task_stage_inner(task_no)
+        _record_task_flow_stage_probe(branch_version_id, landed)
+        if str(landed.get("stageType") or "").strip() == "FINISH":
+            return error_response(
+                502,
+                f"转单探测已越过终态「{landed.get('stageName') or stage_id}」，未找到「{target_label}」",
+                error=str(landed),
+            )
+        if _task_stage_matches_target(landed, stage_code):
+            logger.info(
+                "transfer_task_to_stage_code probed task_no=%s branch_version_id=%s "
+                "stage_code=%s stage_id=%s stage_name=%s",
+                task_no,
+                branch_version_id,
+                stage_code,
+                stage_id,
+                landed.get("stageName"),
+            )
+            return attempt
+
+    return last_result
+
 
 @router.post("/api/dev/iwhalecloud/transfer_task_stage")
 async def transfer_task_stage(body: TransferTaskStageRequest) -> dict:
