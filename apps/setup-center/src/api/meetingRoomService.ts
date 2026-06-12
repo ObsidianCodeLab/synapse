@@ -290,6 +290,59 @@ async function apiPost<T>(base: string, path: string, body: unknown): Promise<T>
   return j.data as T;
 }
 
+/** 一键开会 HTTP 超时（正常应秒级返回；超时后尝试按 scope 补救查 room） */
+export const OPEN_MEETING_HTTP_TIMEOUT_MS = 15_000;
+
+export function isAbortOrFetchTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || '';
+  const name = err.name || '';
+  return name === 'AbortError' || /AbortError|signal timed out|timed out|timeout/i.test(msg);
+}
+
+export type OpenMeetingRoomResult = MeetingRoomDetail & {
+  /** 请求超时但 meeting-summary 证实会议室已创建 */
+  recoveredFromTimeout?: boolean;
+};
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function tryRecoverOpenMeetingDetail(
+  base: string,
+  scopeType: MeetingRoomScopeType,
+  scopeId: string,
+): Promise<OpenMeetingRoomResult | null> {
+  const sid = scopeId.trim();
+  if (!sid) return null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) {
+      await sleep(1500);
+    }
+    try {
+      const summary = await fetchMeetingSummary(base, scopeType, sid);
+      const dev = summary.dev_status;
+      const mr =
+        dev && typeof dev.meeting_room === 'object' && dev.meeting_room !== null
+          ? (dev.meeting_room as { active?: boolean; room_id?: string })
+          : undefined;
+      const roomId = String(summary.room_id || mr?.room_id || '').trim();
+      const active = mr?.active;
+      if (!roomId || active === false) {
+        continue;
+      }
+      const detail = await fetchMeetingRoomDetail(base, roomId);
+      return { ...detail, recoveredFromTimeout: true };
+    } catch {
+      /* retry */
+    }
+  }
+  return null;
+}
+
 export async function fetchMeetingRooms(synapseApiBase: string): Promise<MeetingRoomListItem[]> {
   const base = synapseApiBase.replace(/\/$/, '');
   const data = await apiGet<{ list?: MeetingRoomListItem[] }>(base, '/api/dev/meeting-rooms');
@@ -1010,21 +1063,42 @@ export async function openMeetingRoom(
     syncUserwork?: boolean;
     soulInstruction?: string;
   },
-): Promise<MeetingRoomDetail> {
+): Promise<OpenMeetingRoomResult> {
   const base = synapseApiBase.replace(/\/$/, '');
   const prod = (options.prod || '').trim();
   if (!prod) {
     throw new Error('missing_prod');
   }
   const soulInstruction = (options.soulInstruction || '').trim();
-  return apiPost<MeetingRoomDetail>(base, '/api/dev/meeting-rooms/open', {
+  const body = {
     scope_type: scopeType,
     scope_id: scopeId,
     prod,
     sync_userwork: options.syncUserwork ?? true,
     promote_to_processing: options.promoteToProcessing ?? true,
     ...(soulInstruction ? { soul_instruction: soulInstruction } : {}),
-  });
+  };
+  try {
+    const res = await fetch(`${base}/api/dev/meeting-rooms/open`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(OPEN_MEETING_HTTP_TIMEOUT_MS),
+    });
+    const j = await parseJson(res);
+    if (j.errorcode !== 0) {
+      throw new Error(j.message || 'api_error');
+    }
+    return j.data as OpenMeetingRoomResult;
+  } catch (err) {
+    if (isAbortOrFetchTimeoutError(err)) {
+      const recovered = await tryRecoverOpenMeetingDetail(base, scopeType, scopeId);
+      if (recovered) {
+        return recovered;
+      }
+    }
+    throw err;
+  }
 }
 
 export function serializeHitlFormSubmission(

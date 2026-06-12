@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Literal
 
@@ -333,8 +334,10 @@ async def put_soul_instruction(body: PutSoulInstructionBody) -> dict:
 @router.post("/api/dev/meeting-rooms/open")
 async def open_meeting(body: OpenMeetingBody, request: Request) -> dict:
     pool = getattr(request.app.state, "agent_pool", None)
+    loop = asyncio.get_running_loop()
     try:
-        item = _service.open_meeting(
+        item = await asyncio.to_thread(
+            _service.open_meeting,
             body.scope_type,
             body.scope_id,
             prod=body.prod.strip(),
@@ -342,7 +345,17 @@ async def open_meeting(body: OpenMeetingBody, request: Request) -> dict:
             promote_to_processing=body.promote_to_processing,
             soul_instruction=body.soul_instruction,
             agent_pool=pool,
+            schedule_tail=False,
         )
+        if item.get("pipeline_async_pending"):
+            _service.schedule_open_meeting_async_tail(
+                loop,
+                scope_type=body.scope_type,
+                scope_id=body.scope_id.strip(),
+                prod_key=body.prod.strip(),
+                sync_userwork=body.sync_userwork,
+                agent_pool=pool,
+            )
         return success_response(item)
     except ValueError as exc:
         return error_response(400, str(exc))

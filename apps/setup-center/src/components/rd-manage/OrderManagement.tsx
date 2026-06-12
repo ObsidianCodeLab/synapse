@@ -1427,7 +1427,11 @@ export const OrderManagement: React.FC<{
         scopeId,
       });
       setActiveTicketId(ticket.id);
-      toast.success(t('rdManageOrder.openMeetingSuccess'));
+      toast.success(
+        detail.recoveredFromTimeout
+          ? t('rdManageOrder.openMeetingRecovered')
+          : t('rdManageOrder.openMeetingSuccess'),
+      );
       if (onViewChange) {
         onViewChange('workbench_meeting');
       } else {

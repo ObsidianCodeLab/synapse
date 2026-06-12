@@ -2769,6 +2769,7 @@
     "prodCatalogEmpty": "Product list is empty. Add products in Product Management first.",
     "actNow": "Act now",
     "openMeetingSuccess": "Meeting room opened",
+    "openMeetingRecovered": "Request timed out; the meeting room was created in the background",
     "openMeetingFailed": "Failed to open meeting: {{message}}",
     "productUnspecified": "Product not specified",
     "soulInstructionLabel": "Soul instruction",

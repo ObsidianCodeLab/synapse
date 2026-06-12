@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import uuid
@@ -76,6 +77,16 @@ from synapse.rd_sop.nodes import (
 logger = logging.getLogger(__name__)
 
 ScopeType = Literal["demand", "task"]
+
+_open_meeting_tail_tasks: dict[str, asyncio.Task[None]] = {}
+
+
+class OpenMeetingTailError(Exception):
+    """开门 async tail 失败（catalog 校验等），携带 stage 供 WS 推送。"""
+
+    def __init__(self, message: str, *, stage: str = "tail") -> None:
+        self.stage = stage
+        super().__init__(message)
 
 
 class MeetingRoomService:
@@ -527,12 +538,16 @@ class MeetingRoomService:
         promote_to_processing: bool = True,
         soul_instruction: str | None = None,
         agent_pool: Any | None = None,
+        schedule_tail: bool | None = None,
     ) -> dict[str, Any]:
         """一键开会：
 
         - 同步阶段（毫秒级）：写本地 dev_status / room_state / pipeline.json，立即返回 detail（含 room_id）。
         - 异步阶段（后台）：补做外部 HTTP（产品 catalog 校验 + userwork 回写）、节点初始化、主控提示词组装、
           调度首节点执行；过程通过 WebSocket 推送 ``meeting_room_pipeline`` 事件，前端订阅刷新即可。
+
+        ``schedule_tail=False``：仅跑同步 pipeline（供 FastAPI 在 ``to_thread`` 中调用），由路由层
+        再调用 :meth:`schedule_open_meeting_async_tail` 投递 tail，避免 worker 线程无法 ``create_task``。
 
         若运行环境不在 async 循环里（同步测试 / CLI），则回退为完全同步执行，保持向后兼容。
         """
@@ -554,20 +569,21 @@ class MeetingRoomService:
                 raise ValueError("meeting_room_already_active")
 
         from synapse.rd_meeting.pipeline import (
-            STEP_NODE_INIT,
             STEP_OPEN_MEETING,
             PipelineRunContext,
             run_pipeline_until_waiting,
         )
 
         try:
-            import asyncio
-
             loop = asyncio.get_running_loop()
-            async_mode = True
+            in_async = True
         except RuntimeError:
             loop = None
-            async_mode = False
+            in_async = False
+
+        api_thread_path = schedule_tail is False
+        defer_external = in_async or api_thread_path
+        should_schedule_tail = in_async if schedule_tail is None else bool(schedule_tail)
 
         ctx = PipelineRunContext(
             scope_type=scope_type,
@@ -576,29 +592,63 @@ class MeetingRoomService:
             sync_userwork=sync_userwork,
             promote_to_processing=promote_to_processing,
             agent_pool=agent_pool,
-            defer_external=async_mode,  # async 路径才异步外部调用
+            defer_external=defer_external,
         )
-        # 同步部分：跑到 WAITING（含 open_meeting / node_init / assemble_host_prompt）
         run_pipeline_until_waiting(ctx, initial_flow_step=STEP_OPEN_MEETING, create=True)
         if ctx.node_run_scheduled:
             ctx.detail["node_run_scheduled"] = True
 
-        if async_mode:
+        if defer_external:
             ctx.detail["pipeline_async_pending"] = True
-            # 后台补做外部调用，完成后通过 WebSocket 推一条 pipeline 事件
-            try:
-                loop.create_task(
-                    self._open_meeting_async_tail(
-                        scope_type=scope_type,
-                        scope_id=sid,
-                        prod_key=prod_key,
-                        sync_userwork=sync_userwork,
-                        agent_pool=agent_pool,
-                    )
+            if should_schedule_tail and loop is not None:
+                self.schedule_open_meeting_async_tail(
+                    loop,
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    prod_key=prod_key,
+                    sync_userwork=sync_userwork,
+                    agent_pool=agent_pool,
                 )
-            except Exception as exc:
-                logger.warning("open_meeting async tail schedule failed: %s", exc)
         return ctx.detail
+
+    def schedule_open_meeting_async_tail(
+        self,
+        loop: asyncio.AbstractEventLoop,
+        *,
+        scope_type: ScopeType,
+        scope_id: str,
+        prod_key: str,
+        sync_userwork: bool,
+        agent_pool: Any | None,
+    ) -> None:
+        """在 API 事件循环上调度开门 tail（去重；重活在线程池执行）。"""
+        sid = (scope_id or "").strip()
+        if not sid or loop.is_closed():
+            return
+
+        existing = _open_meeting_tail_tasks.get(sid)
+        if existing is not None and not existing.done():
+            logger.info("open_meeting async tail already running scope=%s", sid)
+            return
+
+        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+
+        _remember_scheduler_loop(loop)
+
+        async def _runner() -> None:
+            try:
+                await self._open_meeting_async_tail(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    prod_key=prod_key,
+                    sync_userwork=sync_userwork,
+                    agent_pool=agent_pool,
+                )
+            finally:
+                _open_meeting_tail_tasks.pop(sid, None)
+
+        task = loop.create_task(_runner())
+        _open_meeting_tail_tasks[sid] = task
 
     def submit_meeting_prod(
         self,
@@ -1117,6 +1167,101 @@ class MeetingRoomService:
         out["node_recovery"] = assessment
         return out
 
+    def _open_meeting_sync_tail(
+        self,
+        *,
+        scope_type: ScopeType,
+        scope_id: str,
+        prod_key: str,
+        sync_userwork: bool,
+        agent_pool: Any | None,
+    ) -> None:
+        """开门 tail 同步重活（catalog / git / userwork），在线程池执行。"""
+        sid = (scope_id or "").strip()
+        from synapse.rd_meeting.product_context import (
+            ensure_prod_in_catalog,
+            match_prod_row_by_prod,
+            save_prod_catalog_to_pipeline,
+        )
+        from synapse.rd_meeting.userwork_sync import patch_userwork_summary
+
+        dev = load_dev_status(sid) or {}
+        sop_display = str(dev.get("sop_node_display") or "")
+        local = str(dev.get("local_process_state") or "处理中")
+
+        catalog_rows, catalog_err = ensure_prod_in_catalog(prod_key)
+        if catalog_err:
+            raise OpenMeetingTailError(catalog_err, stage="catalog")
+
+        save_prod_catalog_to_pipeline(sid, catalog_rows, selected_prod=prod_key)
+
+        from synapse.rd_meeting.product_assets import (
+            bootstrap_product_assets,
+            save_product_assets_to_pipeline,
+        )
+
+        wire_hit = match_prod_row_by_prod(catalog_rows, prod_key)
+        assets = bootstrap_product_assets(
+            sid, prod_key, wire_row=wire_hit, catalog_rows=catalog_rows
+        )
+        save_product_assets_to_pipeline(sid, assets)
+        pipe = MeetingPipeline.load(sid)
+        if pipe is not None:
+            pctx = pipe.data.get("context")
+            if not isinstance(pctx, dict):
+                pctx = {}
+            pctx["product_assets"] = assets
+            pipe.data["context"] = pctx
+            pipe.save()
+
+        try:
+            from synapse.rd_meeting.host_prompt import assemble_host_prompt_bundle
+            from synapse.rd_meeting.host_prompt_cache import save_host_prompt_cache
+
+            run_node = str(dev.get("current_node_id") or "pending")
+            ticket_title = str(dev.get("ticket_title") or dev.get("demand_title") or "")
+            run_binding = resolve_node_binding(
+                run_node,
+                scope_type=scope_type,
+                scope_id=sid,
+                ticket_title=ticket_title,
+            )
+            bundle = assemble_host_prompt_bundle(
+                scope_type=scope_type,
+                scope_id=sid,
+                node_id=run_node,
+                binding=run_binding,
+                ticket_title=ticket_title,
+            )
+            save_host_prompt_cache(sid, bundle)
+        except Exception as exc:
+            logger.warning("refresh host prompt after product assets failed: %s", exc)
+
+        if sync_userwork:
+            patch_userwork_summary(
+                scope_type=scope_type,  # type: ignore[arg-type]
+                scope_id=sid,
+                sop_node=sop_display,
+                local_process_state=local,
+                prod=prod_key,
+            )
+
+        room_id = ""
+        mr = dev.get("meeting_room")
+        if isinstance(mr, dict):
+            room_id = str(mr.get("room_id") or "")
+        if room_id:
+            try:
+                schedule_run_node(
+                    scope_type=str(scope_type),
+                    scope_id=sid,
+                    room_id=room_id,
+                    ticket_title=str(dev.get("ticket_title") or dev.get("demand_title") or ""),
+                    agent_pool=agent_pool,
+                )
+            except Exception as exc:
+                logger.warning("schedule_run_node in async tail failed scope=%s: %s", sid, exc)
+
     async def _open_meeting_async_tail(
         self,
         *,
@@ -1126,110 +1271,29 @@ class MeetingRoomService:
         sync_userwork: bool,
         agent_pool: Any | None,
     ) -> None:
-        """开门后异步补做：产品 catalog 校验 + userwork 回写。
+        """开门后异步补做：产品 catalog 校验 + userwork 回写（重活在线程池）。
 
         失败通过 WebSocket 推 ``meeting_room_open_error``，由前端弹 toast；
         成功推 ``meeting_room_pipeline_ready``，前端刷新会议室即可。
         """
         sid = (scope_id or "").strip()
         try:
-            from synapse.rd_meeting.product_context import (
-                ensure_prod_in_catalog,
-                save_prod_catalog_to_pipeline,
+            await asyncio.to_thread(
+                self._open_meeting_sync_tail,
+                scope_type=scope_type,
+                scope_id=sid,
+                prod_key=prod_key,
+                sync_userwork=sync_userwork,
+                agent_pool=agent_pool,
             )
-            from synapse.rd_meeting.userwork_sync import patch_userwork_summary
-            from synapse.rd_meeting.dev_status import load_dev_status
-
-            dev = load_dev_status(sid) or {}
-            sop_display = str(dev.get("sop_node_display") or "")
-            local = str(dev.get("local_process_state") or "处理中")
-
-            catalog_rows, catalog_err = ensure_prod_in_catalog(prod_key)
-            if catalog_err:
-                await self._broadcast_meeting_event(
-                    "meeting_room_open_error",
-                    {"scope_id": sid, "error": catalog_err, "stage": "catalog"},
-                )
-                return
-
-            save_prod_catalog_to_pipeline(sid, catalog_rows, selected_prod=prod_key)
-
-            from synapse.rd_meeting.product_assets import (
-                bootstrap_product_assets,
-                save_product_assets_to_pipeline,
-            )
-            from synapse.rd_meeting.product_context import match_prod_row_by_prod
-            from synapse.rd_meeting.pipeline import MeetingPipeline
-
-            wire_hit = match_prod_row_by_prod(catalog_rows, prod_key)
-            assets = bootstrap_product_assets(
-                sid, prod_key, wire_row=wire_hit, catalog_rows=catalog_rows
-            )
-            save_product_assets_to_pipeline(sid, assets)
-            pipe = MeetingPipeline.load(sid)
-            if pipe is not None:
-                pctx = pipe.data.get("context")
-                if not isinstance(pctx, dict):
-                    pctx = {}
-                pctx["product_assets"] = assets
-                pipe.data["context"] = pctx
-                pipe.save()
-
-            try:
-                from synapse.rd_meeting.host_prompt import assemble_host_prompt_bundle
-                from synapse.rd_meeting.host_prompt_cache import save_host_prompt_cache
-                from synapse.rd_meeting.binding import resolve_node_binding
-
-                run_node = str(dev.get("current_node_id") or "pending")
-                ticket_title = str(dev.get("ticket_title") or dev.get("demand_title") or "")
-                run_binding = resolve_node_binding(
-                    run_node,
-                    scope_type=scope_type,
-                    scope_id=sid,
-                    ticket_title=ticket_title,
-                )
-                bundle = assemble_host_prompt_bundle(
-                    scope_type=scope_type,
-                    scope_id=sid,
-                    node_id=run_node,
-                    binding=run_binding,
-                    ticket_title=ticket_title,
-                )
-                save_host_prompt_cache(sid, bundle)
-            except Exception as exc:
-                logger.warning("refresh host prompt after product assets failed: %s", exc)
-
-            if sync_userwork:
-                patch_userwork_summary(
-                    scope_type=scope_type,  # type: ignore[arg-type]
-                    scope_id=sid,
-                    sop_node=sop_display,
-                    local_process_state=local,
-                    prod=prod_key,
-                )
-
-            # 外部校验通过 → 调度首节点执行（同步路径下此调度发生在 _step_assemble_host_prompt 末尾）
-            try:
-                from synapse.rd_meeting.orchestrator import schedule_run_node
-
-                room_id = ""
-                mr = dev.get("meeting_room")
-                if isinstance(mr, dict):
-                    room_id = str(mr.get("room_id") or "")
-                if room_id:
-                    schedule_run_node(
-                        scope_type=str(scope_type),
-                        scope_id=sid,
-                        room_id=room_id,
-                        ticket_title=str(dev.get("ticket_title") or dev.get("demand_title") or ""),
-                        agent_pool=agent_pool,
-                    )
-            except Exception as exc:
-                logger.warning("schedule_run_node in async tail failed scope=%s: %s", sid, exc)
-
             await self._broadcast_meeting_event(
                 "meeting_room_pipeline_ready",
                 {"scope_id": sid, "prod": prod_key},
+            )
+        except OpenMeetingTailError as exc:
+            await self._broadcast_meeting_event(
+                "meeting_room_open_error",
+                {"scope_id": sid, "error": str(exc), "stage": exc.stage},
             )
         except Exception as exc:
             logger.exception("open_meeting async tail failed scope=%s: %s", sid, exc)

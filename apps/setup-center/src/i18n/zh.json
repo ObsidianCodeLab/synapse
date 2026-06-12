@@ -2771,6 +2771,7 @@
     "prodCatalogEmpty": "产品列表为空，请先在产品管理中维护产品",
     "actNow": "立即处理",
     "openMeetingSuccess": "已开启研发会议室",
+    "openMeetingRecovered": "请求超时，会议室已在后台开启",
     "openMeetingFailed": "开会失败：{{message}}",
     "productUnspecified": "未指定产品",
     "soulInstructionLabel": "灵魂建议",

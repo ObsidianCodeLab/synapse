@@ -142,3 +142,43 @@ def test_open_meeting_twice_raises_when_active(monkeypatch, tmp_path):
     svc.open_meeting("demand", scope_id, prod="p", sync_userwork=False)
     with pytest.raises(ValueError, match="meeting_room_already_active"):
         svc.open_meeting("demand", scope_id, prod="p", sync_userwork=False)
+
+
+def test_open_meeting_api_path_defers_external(monkeypatch, tmp_path):
+    """schedule_tail=False（FastAPI to_thread 路径）应 defer 外部调用并标记 async pending。"""
+    from synapse.rd_meeting.service import MeetingRoomService
+
+    scope_id = "pipe-api-defer"
+    work = tmp_path / "work" / scope_id
+    work.mkdir(parents=True)
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.userwork_sync.build_title_index",
+        lambda: {scope_id: {"title": "T", "scope_type": "demand", "branch": ""}},
+    )
+
+    catalog_called = {"n": 0}
+
+    def _catalog(_prod: str):
+        catalog_called["n"] += 1
+        return ([{"prod": _prod}], "")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.product_context.ensure_prod_in_catalog",
+        _catalog,
+    )
+
+    svc = MeetingRoomService()
+    detail = svc.open_meeting(
+        "demand",
+        scope_id,
+        prod="myprod",
+        sync_userwork=False,
+        schedule_tail=False,
+    )
+
+    assert detail.get("pipeline_async_pending") is True
+    assert detail.get("room_id")
+    assert catalog_called["n"] == 0
+    pipe = MeetingPipeline.load(scope_id)
+    assert pipe.flow_step == STEP_WAITING
