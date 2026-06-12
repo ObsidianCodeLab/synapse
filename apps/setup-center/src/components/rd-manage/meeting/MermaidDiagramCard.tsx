@@ -17,6 +17,8 @@ import {
 
 import { normalizeMermaidSource } from '@/components/product/markdownCodeChildren';
 
+import { adaptMermaidSourceForTheme, fixMermaidSvgContrast } from './mermaidContrast';
+
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.2;
@@ -26,42 +28,73 @@ type RenderState =
   | { status: 'error'; message: string }
   | { status: 'done'; svg: string; naturalWidth: number; naturalHeight: number };
 
+/** Mermaid base 主题变量：显式指定填充/文字对比，避免浅色底+浅色字 */
 function buildThemeVariables(isDark: boolean) {
   return isDark
     ? {
-        primaryColor: 'rgba(32, 43, 34, 0.85)',
+        darkMode: true,
+        background: '#1e293b',
+        primaryColor: '#1a3328',
+        primaryTextColor: '#f8fafc',
         primaryBorderColor: '#33a06f',
-        primaryTextColor: '#e2e8f0',
-        lineColor: '#7c8aa0',
-        clusterBkg: 'rgba(30, 38, 46, 0.45)',
+        secondaryColor: '#334155',
+        secondaryTextColor: '#f1f5f9',
+        secondaryBorderColor: '#64748b',
+        tertiaryColor: '#3d4f63',
+        tertiaryTextColor: '#f1f5f9',
+        tertiaryBorderColor: '#64748b',
+        lineColor: '#94a3b8',
+        textColor: '#e2e8f0',
+        nodeTextColor: '#f8fafc',
+        labelTextColor: '#f8fafc',
+        mainBkg: '#1e293b',
+        clusterBkg: '#273449',
         clusterBorder: '#475569',
         nodeBorder: '#33a06f',
-        textColor: '#e2e8f0',
-        mainBkg: 'rgba(32, 43, 34, 0.85)',
-        edgeLabelBackground: '#1e293b',
-        actorBkg: 'rgba(32, 43, 34, 0.85)',
+        edgeLabelBackground: '#334155',
+        actorBkg: '#1a3328',
         actorBorder: '#33a06f',
-        actorTextColor: '#e2e8f0',
+        actorTextColor: '#f8fafc',
+        actorLineColor: '#64748b',
         signalColor: '#94a3b8',
-        signalTextColor: '#cbd5e1',
+        signalTextColor: '#e2e8f0',
+        noteBkgColor: '#422006',
+        noteTextColor: '#fef3c7',
+        noteBorderColor: '#d97706',
+        titleColor: '#f8fafc',
         fontSize: '14px',
       }
     : {
-        primaryColor: 'rgba(240, 253, 244, 0.9)',
-        primaryBorderColor: '#22c55e',
+        darkMode: false,
+        background: '#f8fafc',
+        primaryColor: '#dcfce7',
         primaryTextColor: '#0f172a',
-        lineColor: '#64748b',
-        clusterBkg: 'rgba(248, 250, 252, 0.7)',
-        clusterBorder: '#cbd5e1',
-        nodeBorder: '#22c55e',
+        primaryBorderColor: '#16a34a',
+        secondaryColor: '#e2e8f0',
+        secondaryTextColor: '#0f172a',
+        secondaryBorderColor: '#94a3b8',
+        tertiaryColor: '#f1f5f9',
+        tertiaryTextColor: '#0f172a',
+        tertiaryBorderColor: '#cbd5e1',
+        lineColor: '#475569',
         textColor: '#0f172a',
-        mainBkg: 'rgba(240, 253, 244, 0.9)',
-        edgeLabelBackground: '#f1f5f9',
-        actorBkg: 'rgba(240, 253, 244, 0.9)',
-        actorBorder: '#22c55e',
+        nodeTextColor: '#0f172a',
+        labelTextColor: '#0f172a',
+        mainBkg: '#ffffff',
+        clusterBkg: '#f1f5f9',
+        clusterBorder: '#cbd5e1',
+        nodeBorder: '#16a34a',
+        edgeLabelBackground: '#ffffff',
+        actorBkg: '#ecfdf5',
+        actorBorder: '#16a34a',
         actorTextColor: '#0f172a',
-        signalColor: '#475569',
-        signalTextColor: '#334155',
+        actorLineColor: '#64748b',
+        signalColor: '#334155',
+        signalTextColor: '#0f172a',
+        noteBkgColor: '#fef9c3',
+        noteTextColor: '#422006',
+        noteBorderColor: '#ca8a04',
+        titleColor: '#0f172a',
         fontSize: '14px',
       };
 }
@@ -83,7 +116,10 @@ function useMermaidSvg(source: string, isDark: boolean): RenderState {
   useEffect(() => {
     let cancelled = false;
     setState({ status: 'loading' });
-    const chart = normalizeMermaidSource(source.replace(/\n$/, ''));
+    const chart = adaptMermaidSourceForTheme(
+      normalizeMermaidSource(source.replace(/\n$/, '')),
+      isDark,
+    );
     if (!chart) {
       setState({ status: 'error', message: '空的图表定义' });
       return;
@@ -100,7 +136,8 @@ function useMermaidSvg(source: string, isDark: boolean): RenderState {
             "ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'",
         });
         mermaidSeq += 1;
-        const { svg } = await mermaid.render(`func-sol-diagram-${mermaidSeq}`, chart);
+        const { svg: rawSvg } = await mermaid.render(`func-sol-diagram-${mermaidSeq}`, chart);
+        const svg = fixMermaidSvgContrast(rawSvg);
         if (!cancelled) {
           const { width, height } = extractNaturalSize(svg);
           setState({ status: 'done', svg, naturalWidth: width, naturalHeight: height });
@@ -181,8 +218,9 @@ const ZoomToolbar: React.FC<{
 const DiagramCanvas: React.FC<{
   state: RenderState;
   zoom: number;
+  isDark: boolean;
   maxHeight?: number | string;
-}> = ({ state, zoom, maxHeight = 520 }) => {
+}> = ({ state, zoom, isDark, maxHeight = 520 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -241,10 +279,12 @@ const DiagramCanvas: React.FC<{
   const heightPx = state.naturalHeight > 0
     ? Math.round(state.naturalHeight * (widthPx / state.naturalWidth))
     : undefined;
+  const diagramSurface = isDark ? 'bg-slate-900/70' : 'bg-slate-50';
+
   return (
     <div
       ref={viewportRef}
-      className={`flex select-none overflow-hidden ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      className={`flex select-none overflow-hidden rounded-lg ${diagramSurface} ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       style={{ maxHeight }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -256,7 +296,7 @@ const DiagramCanvas: React.FC<{
         style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
       >
         <div
-          className="overflow-hidden [&_svg]:!block [&_svg]:!h-full [&_svg]:!w-full [&_svg]:!max-w-none"
+          className="overflow-hidden rounded-md [&_svg]:!block [&_svg]:!h-full [&_svg]:!w-full [&_svg]:!max-w-none [&_svg_foreignObject_div]:max-w-none [&_svg_foreignObject_span]:leading-snug"
           style={{ width: widthPx, height: heightPx }}
           dangerouslySetInnerHTML={{ __html: state.svg }}
         />
@@ -298,7 +338,7 @@ export const MermaidDiagramCard: React.FC<{
           }}
         />
       </div>
-      <DiagramCanvas state={state} zoom={zoom} />
+      <DiagramCanvas state={state} zoom={zoom} isDark={isDark} />
 
       <Modal
         open={fullscreen}
@@ -315,7 +355,7 @@ export const MermaidDiagramCard: React.FC<{
           </div>
         }
       >
-        <DiagramCanvas state={state} zoom={fsZoom} maxHeight="78vh" />
+        <DiagramCanvas state={state} zoom={fsZoom} isDark={isDark} maxHeight="78vh" />
       </Modal>
     </div>
   );

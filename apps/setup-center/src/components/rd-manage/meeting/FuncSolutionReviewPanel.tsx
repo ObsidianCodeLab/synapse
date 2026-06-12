@@ -42,6 +42,7 @@ import {
   type NodeReviewAgentRow,
   type NodeReviewMetrics,
 } from '../../../api/meetingRoomService';
+import { useAntThemeDark } from '../../rd-view/useAntThemeDark';
 import { MermaidDiagramCard } from './MermaidDiagramCard';
 import { PlanTransformationContent } from './PlanTransformationContent';
 import { ReviewMarkdown } from './ReviewMarkdown';
@@ -494,9 +495,7 @@ export function FuncSolutionReviewPanel({
   /** 本地逐条评审有未保存编辑时，禁止轮询 initialPayload 覆盖 planDrafts */
   const draftsDirtyRef = useRef(false);
   const overallCommentDirtyRef = useRef(false);
-  const isDark =
-    typeof document !== 'undefined' &&
-    document.documentElement.getAttribute('data-theme') === 'dark';
+  const isDark = useAntThemeDark();
 
   const reload = useCallback(async () => {
     if (!synapseApiBase || !roomId) return;
