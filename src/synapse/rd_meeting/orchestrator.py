@@ -2090,6 +2090,7 @@ class MeetingRoomOrchestrator:
                 scope_id=sid,
                 room_id=room_id,
                 ticket_title=ticket_title,
+                agent_pool=agent_pool,
             )
             return {"status": "rework", "node_id": node_id, "room_state": room_state}
 
