@@ -273,6 +273,34 @@ async def stop_meeting_room(room_id: str) -> dict:
         return error_response(500, "stop_meeting_room_failed", str(exc))
 
 
+class ResetToAuditBody(BaseModel):
+    comments: str = Field("", description="研发云转单备注")
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/reset-to-audit")
+async def reset_meeting_demand_to_audit(
+    room_id: str,
+    body: ResetToAuditBody | None = None,
+) -> dict:
+    """工单处理初始化：停跑 → 删除 work 目录 → 研发云回需求评审 → 回写 userwork。"""
+    comments = (body.comments if body else None) or ""
+    try:
+        item = await _service.reset_demand_to_audit(room_id, comments=comments)
+        return success_response(item)
+    except ValueError as exc:
+        msg = str(exc)
+        if "not_found" in msg or msg == "scope_id missing":
+            code = 404
+        elif msg == "demand_scope_only":
+            code = 400
+        else:
+            code = 400
+        return error_response(code, msg)
+    except Exception as exc:
+        logger.exception("reset_meeting_demand_to_audit failed: %s", exc)
+        return error_response(500, "reset_meeting_demand_to_audit_failed", str(exc))
+
+
 @router.get("/api/dev/soul-instruction")
 async def get_soul_instruction(scope_id: str) -> dict:
     """读取工单灵魂建议（work/<scope_id>/SOUL_INSTRUCTION.json）。"""

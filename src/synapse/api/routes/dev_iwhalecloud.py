@@ -3330,6 +3330,41 @@ async def transfer_demand_stage(body: TransferDemandStageRequest) -> dict:
     return _forward_response(resp)
 
 
+class TransferDemandToAuditRequest(BaseModel):
+    demandNo: str = Field(..., description="需求单号")
+    comments: str = Field("", description="转单备注")
+
+
+@router.post("/api/dev/iwhalecloud/transfer_demand_to_audit")
+async def transfer_demand_to_audit(body: TransferDemandToAuditRequest) -> dict:
+    """将需求单转到需求评审环节（taskFlowStageId=16959）。"""
+    userinfo = _load_userinfo_plain()
+    if not userinfo:
+        return error_response(400, "未登录，请先调用 /api/dev/iwhalecloud/login 完成引导")
+    employee_id = userinfo.get("employee_id", "")
+    if not employee_id:
+        return error_response(400, "userinfo 中缺少 employee_id（操作人工号）")
+
+    if not body.demandNo:
+        return error_response(400, "demandNo 不能为空")
+    url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/ai-gateway/devspace/rpc/v3/task/{body.demandNo}/stage"
+    payload = {
+        "ownerUserCode": employee_id,
+        "operateUserCode": employee_id,
+        "taskFlowStageId": DEV_IWHALECLOUD_DEMAND_STAGE_AUDIT,
+        "comments": body.comments or "",
+    }
+    logger.debug("transfer_demand_to_audit url:%s, payload:%s", url, payload)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(url, headers=_headers(), json=payload)
+            _log_httpx_response("transfer_demand_to_audit", resp)
+    except httpx.RequestError as exc:
+        logger.exception("调用研发云转需求单到需求评审环节接口异常: %s", exc)
+        return error_response(-1, f"调用研发云转需求单到需求评审环节接口异常: {exc}")
+    return _forward_response(resp)
+
+
 class TransferDemandToDesigningRequest(BaseModel):
     demandNo: str = Field(..., description="需求单号")
     comments: str = Field("", description="转单备注")

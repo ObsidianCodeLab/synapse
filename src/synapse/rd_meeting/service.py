@@ -971,6 +971,41 @@ class MeetingRoomService:
         payload["run_in_progress"] = True
         return payload
 
+    async def reset_demand_to_audit(
+        self,
+        room_id: str,
+        *,
+        comments: str = "",
+    ) -> dict[str, Any]:
+        """工单处理初始化：停跑、删除 work 目录、研发云回需求评审并回写 userwork。"""
+        rid = (room_id or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+
+        detail = self.get_room_detail(rid)
+        scope_id = ""
+        if detail is not None:
+            scope = detail.get("scope_type") or "demand"
+            if scope != "demand":
+                raise ValueError("demand_scope_only")
+            scope_id = str(detail.get("scope_id") or "").strip()
+
+        from synapse.rd_meeting.demand_init_reset import (
+            resolve_demand_scope_id,
+            reset_demand_work_to_audit,
+        )
+
+        if not scope_id:
+            scope_id = resolve_demand_scope_id(room_id=rid) or ""
+        if not scope_id:
+            raise ValueError("scope_id missing")
+
+        return await reset_demand_work_to_audit(
+            scope_id,
+            room_id=rid,
+            comments=comments,
+        )
+
     def stop_room_run(self, room_id: str, *, reason: str = "user_stop") -> dict[str, Any]:
         """终止当前节点后台运行，会议室标为 stopped。"""
         rid = (room_id or "").strip()

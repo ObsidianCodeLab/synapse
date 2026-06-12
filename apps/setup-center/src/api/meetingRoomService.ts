@@ -1106,6 +1106,30 @@ export async function stopMeetingRoom(
   );
 }
 
+export interface ResetDemandToAuditResult {
+  scope_id: string;
+  room_id?: string | null;
+  run_cancelled: boolean;
+  work_dir_removed: boolean;
+  userwork_applied: Record<string, string>;
+}
+
+export async function resetDemandToAudit(
+  synapseApiBase: string,
+  roomId: string,
+  comments?: string,
+): Promise<ResetDemandToAuditResult> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const body: { comments?: string } = {};
+  const remark = (comments || '').trim();
+  if (remark) body.comments = remark;
+  return apiPost<ResetDemandToAuditResult>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/reset-to-audit`,
+    body,
+  );
+}
+
 export async function recoverMeetingRoom(
   synapseApiBase: string,
   roomId: string,

@@ -945,7 +945,7 @@ textarea:not([data-slot]):focus {
 
 /* (legacy btnSmall override removed; see status section) */
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn) {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert) {
   border: 0;
   cursor: pointer;
   border-radius: 14px;
@@ -958,7 +958,7 @@ button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNati
   transition: background 0.15s, border-color 0.15s;
 }
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
   background: var(--bg-app);
   border-color: var(--muted2);
 }
@@ -5759,9 +5759,22 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   flex-shrink: 0;
   width: 1.375rem;
   height: 1.375rem;
-  cursor: default;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   filter: drop-shadow(0 0 8px rgb(239 68 68 / 0.65));
   animation: rd-meeting-soul-alert-pulse 2.8s ease-in-out infinite;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.rd-meeting-soul-alert:hover:not(:disabled) {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 12px rgb(220 38 38 / 0.85));
+}
+.rd-meeting-soul-alert:disabled {
+  cursor: wait;
+  opacity: 0.55;
+  animation: none;
 }
 .rd-meeting-soul-alert__svg {
   width: 100%;

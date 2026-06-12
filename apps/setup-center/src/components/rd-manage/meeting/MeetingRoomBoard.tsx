@@ -15,6 +15,7 @@ import {
   MEETING_ROOM_TOKEN_BUDGET,
   reprocessMeetingRoom,
   recoverMeetingRoom,
+  resetDemandToAudit,
   stopMeetingRoom,
   type MeetingNodeRecovery,
   type MeetingRoomChatLogWire,
@@ -1056,6 +1057,7 @@ const MeetingRoomTitleBar = ({
   viewNodeName,
   viewNodeToken,
   onBack,
+  onResetInitSuccess,
   synapseApiBase,
 }: {
   room: MeetingRoom;
@@ -1064,12 +1066,15 @@ const MeetingRoomTitleBar = ({
   viewNodeName: string;
   viewNodeToken: number;
   onBack: () => void;
+  /** 工单处理初始化成功后：关闭弹窗并从会议室主列表移除 */
+  onResetInitSuccess?: (roomId: string) => void;
   synapseApiBase?: string;
 }) => {
   const [soulModalOpen, setSoulModalOpen] = useState(false);
   const [soulDraft, setSoulDraft] = useState('');
   const [soulLoading, setSoulLoading] = useState(false);
   const [soulSaving, setSoulSaving] = useState(false);
+  const [resetInitLoading, setResetInitLoading] = useState(false);
   const soulHasContent = soulDraft.trim().length > 0;
 
   useEffect(() => {
@@ -1132,6 +1137,39 @@ const MeetingRoomTitleBar = ({
     }
   }, [room.ticketId, soulDraft, synapseApiBase]);
 
+  const handleResetToAudit = useCallback(() => {
+    const base = (synapseApiBase || '').trim();
+    if (!base || !room.id) {
+      toast.message('当前环境无法执行工单处理初始化');
+      return;
+    }
+    Modal.confirm({
+      title: '工单处理初始化',
+      content:
+        '将停止当前会议、删除本地工单目录，并把研发云需求单回退到「需求评审」。本地流水线产物将全部清除，之后需重新「一键开会」。',
+      okText: '确认初始化',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setResetInitLoading(true);
+        try {
+          await resetDemandToAudit(base, room.id);
+          toast.success('工单已初始化，研发云状态已回退至需求评审');
+          if (onResetInitSuccess) {
+            onResetInitSuccess(room.id);
+          } else {
+            onBack();
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          toast.error(`初始化失败：${msg}`);
+        } finally {
+          setResetInitLoading(false);
+        }
+      },
+    });
+  }, [onBack, onResetInitSuccess, room.id, synapseApiBase]);
+
   const isPipelineCurrent = viewNodeId === room.currentNode;
   const tokenBudget = MEETING_NODE_TOKEN_BUDGET;
   const tokenConsumed = viewNodeToken;
@@ -1188,7 +1226,13 @@ const MeetingRoomTitleBar = ({
         <div className="flex items-center justify-end gap-2 min-w-0 shrink-0 flex-wrap">
           <div className="rd-meeting-soul-cluster">
             <Tooltip title="工单处理初始化">
-              <span className="rd-meeting-soul-alert" role="img" aria-label="工单处理初始化">
+              <button
+                type="button"
+                className="rd-meeting-soul-alert"
+                aria-label="工单处理初始化"
+                onClick={handleResetToAudit}
+                disabled={resetInitLoading}
+              >
                 <svg
                   className="rd-meeting-soul-alert__svg"
                   viewBox="0 0 24 24"
@@ -1222,7 +1266,7 @@ const MeetingRoomTitleBar = ({
                   />
                   <circle className="rd-meeting-soul-alert__mark-dot" cx="12" cy="16.6" r="1.05" />
                 </svg>
-              </span>
+              </button>
             </Tooltip>
             <Tooltip title={`编辑本工单灵魂建议（work/${room.ticketId}/SOUL_INSTRUCTION.json）`}>
               <button
@@ -1582,6 +1626,7 @@ const InterventionDialog = ({
   onStopRun,
   onMergeNodeChat,
   onProdSubmitted,
+  onResetInitSuccess,
   synapseApiBase,
 }: { 
   room: MeetingRoom | null; 
@@ -1595,6 +1640,7 @@ const InterventionDialog = ({
   /** 按 SOP 节点合并协作流（来自 agents/<node_id>/room_history.jsonl） */
   onMergeNodeChat?: (nodeId: string, logs: LogEntry[]) => void;
   onProdSubmitted?: (detail: MeetingRoomDetail) => void;
+  onResetInitSuccess?: (roomId: string) => void;
   synapseApiBase?: string;
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -2005,6 +2051,7 @@ const InterventionDialog = ({
           viewNodeName={selectedNode?.name || resolveSopNodeName(chatNodeId)}
           viewNodeToken={viewNodeToken}
           onBack={onClose}
+          onResetInitSuccess={onResetInitSuccess}
           synapseApiBase={synapseApiBase}
         />
 
@@ -2908,6 +2955,16 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       });
   };
 
+  const handleResetInitSuccess = useCallback(
+    (roomId: string) => {
+      setDialogOpen(false);
+      setActiveRoom(null);
+      setRooms((prev) => prev.filter((r) => r.id !== roomId));
+      void reloadRooms({ silent: true });
+    },
+    [reloadRooms],
+  );
+
   const handleStopRun = () => {
     if (!activeRoom) return;
     const base = (synapseApiBase || '').trim();
@@ -2994,6 +3051,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
           onStopRun={handleStopRun}
           onMergeNodeChat={handleMergeNodeChat}
           onProdSubmitted={handleProdSubmitted}
+          onResetInitSuccess={handleResetInitSuccess}
           synapseApiBase={synapseApiBase}
         />
 
