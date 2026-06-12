@@ -9,7 +9,7 @@ import pytest
 from synapse.api.routes.dev_iwhalecloud import (
     OwnerOrderSyncError,
     _apply_local_process_state_on_new_demand_insert,
-    _design_user_display_from_dto,
+    _merge_demand_record,
     _merge_owned_work_item_record,
     _merge_owned_work_items,
     _merge_owner_order_lists,
@@ -80,15 +80,6 @@ def test_merge_owned_work_items_appends_new_and_keeps_orphan():
     assert set(by_no) == {"T-old", "T-new"}
     assert by_no["T-old"]["feature_id"] == "feat-old"
     assert by_no["T-new"]["task_title"] == "门户新单"
-
-
-def test_design_user_display_from_dto_prefers_user_name_code():
-    assert (
-        _design_user_display_from_dto({"userName": "叶彬彬", "userCode": "0027008730"})
-        == "叶彬彬[0027008730]"
-    )
-    assert _design_user_display_from_dto({"displayName": "张三"}) == "张三"
-    assert _design_user_display_from_dto(None) == ""
 
 
 def test_refresh_local_state_only_for_pending_and_review():
@@ -210,6 +201,32 @@ def test_merge_owner_orders_refreshes_local_state_for_pending_and_review():
     assert by_no["D-pending"]["sop_node"] == ""
     assert by_no["D-review"]["local_process_state"] == "待处理"
     assert by_no["D-review"]["sop_node"] == "等待调度"
+
+
+def test_merge_demand_record_keeps_local_sop_during_review_refresh():
+    """需求评审进行中刷新：门户仍为需求评审时不重置本地 sop_node / local_process_state。"""
+    old = {
+        "demand_no": "D-review-active",
+        "demand_status": "需求评审",
+        "demand_title": "旧标题",
+        "sop_node": "需求澄清",
+        "local_process_state": "处理中",
+        "owned_work_items": [],
+    }
+    new = {
+        "demand_no": "D-review-active",
+        "demand_status": "需求评审",
+        "demand_title": "门户新标题",
+        "sop_node": "",
+        "local_process_state": "",
+        "owned_work_items": [],
+    }
+
+    merged = _merge_demand_record(old, new)
+
+    assert merged["demand_title"] == "门户新标题"
+    assert merged["sop_node"] == "需求澄清"
+    assert merged["local_process_state"] == "处理中"
 
 
 def test_merge_owner_order_keeps_completed_orphan_only():

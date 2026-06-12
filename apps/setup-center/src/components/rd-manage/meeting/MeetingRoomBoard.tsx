@@ -1186,21 +1186,60 @@ const MeetingRoomTitleBar = ({
         </div>
 
         <div className="flex items-center justify-end gap-2 min-w-0 shrink-0 flex-wrap">
-          <Tooltip title={`编辑本工单灵魂建议（work/${room.ticketId}/SOUL_INSTRUCTION.json）`}>
-            <button
-              type="button"
-              className={`rd-meeting-soul-btn${soulHasContent ? ' rd-meeting-soul-btn--filled' : ''}`}
-              onClick={openSoulModal}
-              aria-label="编辑灵魂建议"
-            >
-              <span className="rd-meeting-soul-btn__aura" aria-hidden />
-              <span className="rd-meeting-soul-btn__icon-wrap" aria-hidden>
-                <Flame className="rd-meeting-soul-btn__flame w-3.5 h-3.5" />
+          <div className="rd-meeting-soul-cluster">
+            <Tooltip title="工单处理初始化">
+              <span className="rd-meeting-soul-alert" role="img" aria-label="工单处理初始化">
+                <svg
+                  className="rd-meeting-soul-alert__svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
+                >
+                  <defs>
+                    <linearGradient
+                      id={`rd-meeting-soul-alert-grad-${room.ticketId}`}
+                      x1="12"
+                      y1="3"
+                      x2="12"
+                      y2="20"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop offset="0%" stopColor="#fca5a5" />
+                      <stop offset="50%" stopColor="#ef4444" />
+                      <stop offset="100%" stopColor="#dc2626" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    className="rd-meeting-soul-alert__triangle"
+                    d="M12 3.2L20.66 19.2H3.34L12 3.2Z"
+                    fill={`url(#rd-meeting-soul-alert-grad-${room.ticketId})`}
+                  />
+                  <path
+                    className="rd-meeting-soul-alert__mark-line"
+                    d="M12 9v5.2"
+                    strokeLinecap="round"
+                  />
+                  <circle className="rd-meeting-soul-alert__mark-dot" cx="12" cy="16.6" r="1.05" />
+                </svg>
               </span>
-              <span className="rd-meeting-soul-btn__label">灵魂建议</span>
-              {soulHasContent ? <span className="rd-meeting-soul-btn__dot" aria-hidden /> : null}
-            </button>
-          </Tooltip>
+            </Tooltip>
+            <Tooltip title={`编辑本工单灵魂建议（work/${room.ticketId}/SOUL_INSTRUCTION.json）`}>
+              <button
+                type="button"
+                className={`rd-meeting-soul-btn${soulHasContent ? ' rd-meeting-soul-btn--filled' : ''}`}
+                onClick={openSoulModal}
+                aria-label="编辑灵魂建议"
+              >
+                <span className="rd-meeting-soul-btn__aura" aria-hidden />
+                <span className="rd-meeting-soul-btn__icon-wrap" aria-hidden>
+                  <Flame className="rd-meeting-soul-btn__flame w-3.5 h-3.5" />
+                </span>
+                <span className="rd-meeting-soul-btn__label">灵魂建议</span>
+                {soulHasContent ? <span className="rd-meeting-soul-btn__dot" aria-hidden /> : null}
+              </button>
+            </Tooltip>
+          </div>
           <Tooltip title={`会议开始于 ${formatMeetingStartedAt(room.meetingStartedAt)} · 累计处理 ${room.stageDuration}`}>
             <div className="inline-flex items-center gap-2 rounded-lg border border-border/50 bg-muted/25 px-3 py-1.5 text-[11px] text-muted-foreground">
               <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />

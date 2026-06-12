@@ -288,10 +288,13 @@ def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[s
     """需求单新老均有：门户字段（含 ``demand_designer``）以新数据为准；本地 ``prod`` 保留。
 
     刷新时仅当研发云 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与 ``sop_node``。
+    「需求评审 → 需求评审」且本地已在推进时保留本地值
     """
     merged: dict[str, Any] = dict(new_d)
+    st_old = _snapshot_norm_id(old_d.get("demand_status"))
+    st_new = _snapshot_norm_id(new_d.get("demand_status"))
     refreshed = _refresh_local_state_from_demand_status(new_d.get("demand_status"))
-    if refreshed is not None:
+    if refreshed is not None and not (st_new == "需求评审" and st_old == "需求评审"):
         merged["local_process_state"], merged["sop_node"] = refreshed
     else:
         merged["local_process_state"] = old_d.get("local_process_state")
