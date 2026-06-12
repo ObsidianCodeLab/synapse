@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
 
-from synapse.rd_meeting.sop_stage_hooks import run_sop_stage_transition_hook
+from synapse.rd_meeting.sop_stage_hooks import (
+    run_sop_stage_transition_hook,
+    schedule_sop_stage_transition_hook,
+)
 
 
 def _patch_userwork_paths(monkeypatch: pytest.MonkeyPatch, tmp_path, initial_status: str = "需求评审"):
@@ -179,3 +183,46 @@ async def test_task_scope_returns_todo():
     )
     assert out["status"] == "todo"
     assert "任务单" in out["message"]
+
+
+@pytest.mark.asyncio
+async def test_schedule_hook_from_worker_thread(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """pipeline to_thread 场景：后台线程应能把钩子投递回主事件循环。"""
+    calls: list[str] = []
+    history_events: list[dict] = []
+
+    async def _fake_designing(body):
+        calls.append(body.demandNo)
+        return {"errorcode": 0, "message": "success"}
+
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.transfer_demand_to_designing",
+        _fake_designing,
+    )
+    _patch_userwork_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.sop_stage_hooks.append_history_event",
+        lambda _sid, event: history_events.append(event),
+    )
+
+    from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+
+    _remember_scheduler_loop(asyncio.get_running_loop())
+
+    def _invoke_from_worker_thread() -> None:
+        schedule_sop_stage_transition_hook(
+            scope_type="demand",
+            scope_id="DEM-001",
+            from_stage=1,
+            to_stage=2,
+            completed_node_id="req_risk",
+            next_node_id="func_assign",
+        )
+
+    await asyncio.to_thread(_invoke_from_worker_thread)
+    await asyncio.sleep(0.05)
+
+    assert calls == ["DEM-001"]
+    assert len(history_events) == 1
+    assert history_events[0]["event"] == "sop_stage_transition_hook"
+    assert history_events[0]["hook_status"] == "ok"

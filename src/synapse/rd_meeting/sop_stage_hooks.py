@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Coroutine
 from typing import Any, Literal
 
 from synapse.rd_meeting.room_runtime import append_history_event
@@ -188,6 +189,35 @@ async def run_sop_stage_transition_hook(
     }
 
 
+def _dispatch_sop_stage_hook_task(coro: Coroutine[Any, Any, None]) -> bool:
+    """把跨阶段钩子协程调度到会议室主事件循环（兼容 pipeline 后台线程调用）。"""
+    coordinator_loop: asyncio.AbstractEventLoop | None = None
+    on_coordinator_thread = False
+    try:
+        coordinator_loop = asyncio.get_running_loop()
+        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+
+        _remember_scheduler_loop(coordinator_loop)
+        on_coordinator_thread = True
+    except RuntimeError:
+        from synapse.rd_meeting.orchestrator import _meeting_scheduler_loop
+
+        coordinator_loop = _meeting_scheduler_loop
+
+    if coordinator_loop is None or coordinator_loop.is_closed():
+        return False
+
+    if on_coordinator_thread:
+        coordinator_loop.create_task(coro)
+        return True
+
+    def _start_from_worker_thread() -> None:
+        coordinator_loop.create_task(coro)
+
+    coordinator_loop.call_soon_threadsafe(_start_from_worker_thread)
+    return True
+
+
 def schedule_sop_stage_transition_hook(
     *,
     scope_type: ScopeType,
@@ -231,8 +261,10 @@ def schedule_sop_stage_transition_hook(
         except Exception as exc:
             logger.warning("sop_stage_transition_hook task failed scope=%s: %s", scope_id, exc)
 
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_run())
-    except RuntimeError:
-        logger.debug("no event loop for sop_stage_transition_hook scope=%s", scope_id)
+    if not _dispatch_sop_stage_hook_task(_run()):
+        logger.warning(
+            "sop_stage_transition_hook: no event loop available, skipped scope=%s %s→%s",
+            scope_id,
+            from_stage,
+            to_stage,
+        )
