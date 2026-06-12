@@ -1,8 +1,8 @@
 /**
  * 熵分析接口 — Synapse 后端 HTTP API。
  *
- * 接口一：POST /api/entropy/entropy-analysis  总览（四类熵分 + 30 天趋势 + 仓库统计）
- * 接口二：POST /api/entropy/entropy-detail     详情（按熵类型返回子指标 + 分析结论）
+ * 接口一：POST /dev/iwhalecloud/synapse/entropy-analysis  总览（四类熵分 + 30 天趋势 + 仓库统计）
+ * 接口二：POST /dev/iwhalecloud/synapse/entropy-detail     详情（按熵类型返回子指标 + 分析结论）
  */
 
 import { proxyFetch } from "@/platform";
@@ -86,10 +86,6 @@ async function postEntropyApi<T>(
     body: JSON.stringify(body),
     timeoutSecs,
   });
-  // 第 88 行 resp 之后，加：
-console.log("[entropy] POST", `${base}${path}`, body);
-console.log("[entropy] RESP", resp.status, resp.body);
-
   let parsed: ApiEnvelope<T>;
   try {
     parsed = JSON.parse(resp.body) as ApiEnvelope<T>;
@@ -123,7 +119,7 @@ export async function fetchEntropyAnalysis(
 ): Promise<EntropyAnalysisData> {
   return postEntropyApi<EntropyAnalysisData>(
     synapseApiBase,
-    "/api/entropy/entropy-analysis",
+    "/dev/iwhalecloud/synapse/entropy-analysis",
     body,
   );
 }
@@ -138,7 +134,7 @@ export async function fetchEntropyDetail(
 ): Promise<EntropyDetailData> {
   return postEntropyApi<EntropyDetailData>(
     synapseApiBase,
-    "/api/entropy/entropy-detail",
+    "/dev/iwhalecloud/synapse/entropy-detail",
     body,
   );
 }
