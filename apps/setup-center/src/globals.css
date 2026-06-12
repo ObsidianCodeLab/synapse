@@ -108,6 +108,26 @@
   z-index: 99999 !important;
 }
 
+/* Sonner close/action buttons must not inherit legacy global button resets (styles.css). */
+[data-sonner-toast] [data-close-button] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+}
+
+[data-sonner-toast] [data-close-button] svg {
+  display: block !important;
+  width: 12px !important;
+  height: 12px !important;
+  flex-shrink: 0;
+}
+
 /* 修改 Monaco Diff Editor 中还原箭头的样式为红色不透明，且更大更清晰 */
 .monaco-diff-editor .codicon-arrow-right,
 .monaco-diff-editor .codicon-arrow-left,

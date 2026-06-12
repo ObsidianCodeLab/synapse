@@ -5,27 +5,36 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { IS_TAURI, IS_WINDOWS } from "@/platform/detect"
 
 function useDocTheme() {
   const attr = document.documentElement.getAttribute("data-theme")
   return (attr === "dark" ? "dark" : "light") as ToasterProps["theme"]
 }
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const TAURI_WIN_TOAST_OFFSET =
+  IS_TAURI && IS_WINDOWS
+    ? { top: "calc(var(--win-titlebar-height, 36px) + 8px)", right: "16px" }
+    : undefined
+
+const Toaster = ({ offset, ...props }: ToasterProps) => {
   const theme = useDocTheme()
 
   const toaster = (
     <Sonner
       theme={theme}
       className="toaster group"
+      offset={offset ?? TAURI_WIN_TOAST_OFFSET}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
         warning: <TriangleAlertIcon className="size-4" />,
         error: <OctagonXIcon className="size-4" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
+        close: <XIcon className="size-3" strokeWidth={2} />,
       }}
       style={
         {

@@ -1,11 +1,16 @@
 /**
- * 熵分析接口 — Synapse 后端 HTTP API。
+ * 熵分析接口 — 研发统一服务（产品公共服务 IP + 端口 10001）。
  *
  * 接口一：POST /dev/iwhalecloud/synapse/entropy-analysis  总览（四类熵分 + 30 天趋势 + 仓库统计）
  * 接口二：POST /dev/iwhalecloud/synapse/entropy-detail     详情（按熵类型返回子指标 + 分析结论）
  */
 
-import { proxyFetch } from "@/platform";
+import { IS_TAURI } from "@/platform";
+import {
+  getDevserviceHost,
+  postRdUnifiedJson,
+  RD_UNIFIED_PATHS,
+} from "@/api/rdUnifiedService";
 
 // ---------------------------------------------------------------------------
 // Request types
@@ -74,28 +79,18 @@ type ApiEnvelope<T> = {
 // ---------------------------------------------------------------------------
 
 async function postEntropyApi<T>(
-  synapseApiBase: string,
   path: string,
   body: unknown,
   timeoutSecs = 120,
 ): Promise<T> {
-  const base = synapseApiBase.replace(/\/$/, "");
-  const resp = await proxyFetch(`${base}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    timeoutSecs,
-  });
-  let parsed: ApiEnvelope<T>;
-  try {
-    parsed = JSON.parse(resp.body) as ApiEnvelope<T>;
-  } catch {
-    throw new Error(
-      resp.status >= 400
-        ? resp.body || `HTTP ${resp.status}`
-        : "entropy_api_invalid_json",
-    );
+  if (!IS_TAURI) {
+    throw new Error("rd_unified_tauri_only");
   }
+  const host = await getDevserviceHost();
+  if (!host) {
+    throw new Error("missing_devservice_ip");
+  }
+  const parsed = await postRdUnifiedJson<ApiEnvelope<T>>(host, path, body, timeoutSecs);
   if (parsed.code !== 0) {
     throw new Error(parsed.message || "entropy_api_error");
   }
@@ -114,14 +109,10 @@ async function postEntropyApi<T>(
  * 供产品详情页「熵分析」面板首屏展示。
  */
 export async function fetchEntropyAnalysis(
-  synapseApiBase: string,
+  _synapseApiBase: string,
   body: EntropyAnalysisRequest,
 ): Promise<EntropyAnalysisData> {
-  return postEntropyApi<EntropyAnalysisData>(
-    synapseApiBase,
-    "/dev/iwhalecloud/synapse/entropy-analysis",
-    body,
-  );
+  return postEntropyApi<EntropyAnalysisData>(RD_UNIFIED_PATHS.entropyAnalysis, body);
 }
 
 /**
@@ -129,12 +120,8 @@ export async function fetchEntropyAnalysis(
  * 供详情抽屉按需加载。
  */
 export async function fetchEntropyDetail(
-  synapseApiBase: string,
+  _synapseApiBase: string,
   body: EntropyDetailRequest,
 ): Promise<EntropyDetailData> {
-  return postEntropyApi<EntropyDetailData>(
-    synapseApiBase,
-    "/dev/iwhalecloud/synapse/entropy-detail",
-    body,
-  );
+  return postEntropyApi<EntropyDetailData>(RD_UNIFIED_PATHS.entropyDetail, body);
 }

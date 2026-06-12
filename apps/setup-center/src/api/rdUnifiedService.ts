@@ -33,6 +33,8 @@ export const RD_UNIFIED_PATHS = {
   destroyProd: "/dev/iwhalecloud/synapse/destroy_prod",
   /** 引导验证通过后登记处理人（后端 login / devservice-ip 也会调用） */
   rdViewAssigneeSave: "/dev/iwhalecloud/synapse/rd_view_assignee_save",
+  entropyAnalysis: "/dev/iwhalecloud/synapse/entropy-analysis",
+  entropyDetail: "/dev/iwhalecloud/synapse/entropy-detail",
 } as const;
 
 export type RdRepoInfo = {
@@ -457,6 +459,7 @@ export async function postRdUnifiedJson<T>(
   host: string,
   relativePath: string,
   body: unknown,
+  timeoutSecs = 60,
 ): Promise<T> {
   const url = `${rdUnifiedOrigin(host)}${relativePath.startsWith("/") ? "" : "/"}${relativePath}`;
   const json = JSON.stringify(body);
@@ -464,7 +467,7 @@ export async function postRdUnifiedJson<T>(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: json,
-    timeoutSecs: 60,
+    timeoutSecs,
   });
   let parsed: T;
   try {
