@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
+import sys
 
 import pytest
 
@@ -16,6 +19,7 @@ from synapse.rd_meeting.pipeline import (
     _step_reprocess_prep,
 )
 from synapse.rd_meeting.reprocess_assets import (
+    _force_rmtree,
     clear_product_code_and_doc_dirs,
     finish_reprocess_product_assets,
     force_refresh_product_assets,
@@ -43,6 +47,19 @@ def userwork_env(monkeypatch, tmp_path):
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: work_root)
 
     return {"uw_path": uw_path, "work_root": work_root, "write_userwork": _write_userwork}
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="readonly git pack simulation")
+def test_force_rmtree_removes_readonly_git_pack(tmp_path):
+    repo = tmp_path / "code" / "ZMDB"
+    pack_dir = repo / ".git" / "objects" / "pack"
+    pack_dir.mkdir(parents=True)
+    idx = pack_dir / "pack-deadbeef.idx"
+    idx.write_bytes(b"idx")
+    os.chmod(idx, stat.S_IREAD)
+
+    _force_rmtree(tmp_path / "code")
+    assert not (tmp_path / "code").exists()
 
 
 def test_clear_product_code_and_doc_dirs_removes_trees(userwork_env):

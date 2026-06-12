@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import stat
+import subprocess
+import sys
+import time
+from pathlib import Path
 from typing import Any, Literal
 
 from synapse.rd_meeting.dev_status import load_dev_status
@@ -60,6 +66,57 @@ def backfill_userwork_prod_if_missing(
     return True
 
 
+def _chmod_writable(path: Path) -> None:
+    try:
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+
+
+def _rmtree_onerror(func, path, _exc_info) -> None:
+    """Windows 上 git pack 等只读文件需先 chmod 再删。"""
+    _chmod_writable(Path(path))
+    func(path)
+
+
+def _force_rmtree(path: Path) -> None:
+    """尽力删除目录树（含 .git 只读/短暂占用），Windows 下带重试与 rmdir 兜底。"""
+    if not path.is_dir():
+        return
+
+    for root, dirs, files in os.walk(path, topdown=False):
+        for name in files:
+            _chmod_writable(Path(root) / name)
+        for name in dirs:
+            _chmod_writable(Path(root) / name)
+    _chmod_writable(path)
+
+    last_exc: OSError | None = None
+    for attempt in range(5):
+        try:
+            shutil.rmtree(path, onerror=_rmtree_onerror)
+            return
+        except OSError as exc:
+            last_exc = exc
+            time.sleep(0.25 * (attempt + 1))
+
+    if sys.platform == "win32":
+        proc = subprocess.run(
+            ["cmd", "/c", "rmdir", "/s", "/q", str(path)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if proc.returncode == 0 and not path.exists():
+            return
+        if proc.returncode != 0 and proc.stderr:
+            logger.warning("reprocess rmdir fallback stderr for %s: %s", path, proc.stderr.strip())
+
+    if last_exc is not None:
+        raise last_exc
+
+
 def clear_product_code_and_doc_dirs(scope_id: str) -> None:
     """强制删除 ``work/<scope>/code`` 与 ``doc``（重处理专用）。"""
     sid = (scope_id or "").strip()
@@ -67,7 +124,7 @@ def clear_product_code_and_doc_dirs(scope_id: str) -> None:
         return
     for root in (product_code_root(sid), product_doc_root(sid)):
         if root.is_dir():
-            shutil.rmtree(root)
+            _force_rmtree(root)
             logger.info("reprocess: removed product asset dir %s", root)
 
 
