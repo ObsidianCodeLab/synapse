@@ -630,12 +630,9 @@ class MeetingRoomService:
         if str(rs.get("intervention_kind") or "") != "prod_selection":
             raise ValueError("prod_selection_not_active")
 
-        from synapse.rd_meeting.node_init_prereq import (
-            clear_prod_selection_gate,
-            ensure_product_assets_if_absent,
-        )
         from synapse.rd_meeting.pipeline import (
             STEP_NODE_INIT,
+            STEP_REPROCESS_PREP,
             PipelineRunContext,
             run_pipeline_until_waiting,
         )
@@ -643,6 +640,10 @@ class MeetingRoomService:
         from synapse.rd_meeting.product_context import (
             ensure_prod_in_catalog,
             save_prod_catalog_to_pipeline,
+        )
+        from synapse.rd_meeting.reprocess_assets import (
+            clear_prod_selection_gate,
+            force_refresh_product_assets,
         )
 
         patch_userwork_summary(
@@ -666,7 +667,9 @@ class MeetingRoomService:
         if catalog_err:
             raise ValueError(catalog_err)
         save_prod_catalog_to_pipeline(sid, catalog_rows, selected_prod=prod_key)
-        ensure_product_assets_if_absent(sid, prod_key, scope_type=scope_type)
+        assets = force_refresh_product_assets(sid, prod_key, scope_type=scope_type)
+        if str(assets.get("status") or "") == "failed":
+            raise ValueError(str(assets.get("error") or "reprocess_assets_failed"))
 
         clear_prod_selection_gate(sid)
 
@@ -682,7 +685,10 @@ class MeetingRoomService:
         )
 
         pipe = MeetingPipeline.load(sid)
-        pipe.set_flow_step(STEP_NODE_INIT, reason="用户已选择产品，继续节点初始化")
+        completed = pipe.data.get("steps_completed") or []
+        if STEP_REPROCESS_PREP not in completed:
+            pipe.mark_step_completed(STEP_REPROCESS_PREP)
+        pipe.set_flow_step(STEP_NODE_INIT, reason="用户已选择产品，重处理资产已刷新，继续节点初始化")
         pipe.save()
 
         def _resume_node_init() -> None:
@@ -697,7 +703,7 @@ class MeetingRoomService:
                 "room_id": rid,
                 "scope_id": sid,
                 "prod": prod_key,
-                "flow_stage": "节点初始化",
+                "flow_stage": "重新处理准备",
                 "log_type": "info",
                 "chat_text": f"已绑定产品：{prod_key}",
             },

@@ -1,10 +1,12 @@
-"""node_init 前置：userwork prod 校验与 code/doc 资产补拉。"""
+"""重处理专用：prod 校验与强制刷新 code/doc 产品资产（不影响一键开会）。"""
 
 from __future__ import annotations
 
 import logging
+import shutil
 from typing import Any, Literal
 
+from synapse.rd_meeting.dev_status import load_dev_status
 from synapse.rd_meeting.paths import product_code_root, product_doc_root
 from synapse.rd_meeting.pipeline import STEP_WAITING, MeetingPipeline, PipelineRunContext
 from synapse.rd_meeting.room_runtime import append_history_event, load_room_state, save_room_state
@@ -16,7 +18,6 @@ ScopeType = Literal["demand", "task"]
 
 
 def resolve_userwork_prod(scope_type: ScopeType, scope_id: str) -> str:
-    """读取 userwork.json 中当前 scope 的 ``prod``（唯一键）。"""
     row = _scope_row(scope_type, scope_id)  # type: ignore[arg-type]
     return str(row.get("prod") or "").strip() if row else ""
 
@@ -26,14 +27,8 @@ def resolve_meeting_prod_fallback(
     *,
     dev_status: dict[str, Any] | None = None,
     pipe: MeetingPipeline | None = None,
-    ctx: PipelineRunContext | None = None,
 ) -> str:
-    """开会上下文中的 prod（userwork 尚未回写时的兜底）。"""
-    if ctx is not None:
-        prod = (ctx.prod or "").strip()
-        if prod:
-            return prod
-    data = dev_status if isinstance(dev_status, dict) else {}
+    data = dev_status if isinstance(dev_status, dict) else load_dev_status(scope_id) or {}
     mr = data.get("meeting_room")
     if isinstance(mr, dict):
         prod = str(mr.get("prod") or "").strip()
@@ -54,7 +49,6 @@ def backfill_userwork_prod_if_missing(
     scope_id: str,
     prod: str,
 ) -> bool:
-    """userwork 无 prod 但会议上下文已知 prod 时，补写 userwork 并返回 True。"""
     key = (prod or "").strip()
     if not key or resolve_userwork_prod(scope_type, scope_id):
         return False
@@ -66,44 +60,28 @@ def backfill_userwork_prod_if_missing(
     return True
 
 
-def _tree_has_any_file(root) -> bool:
-    if not root.is_dir():
-        return False
-    return any(path.is_file() for path in root.rglob("*"))
-
-
-def code_assets_present_on_disk(scope_id: str) -> bool:
-    """``code/`` 下存在任意文件即视为代码已落盘（不校验完整性）。"""
+def clear_product_code_and_doc_dirs(scope_id: str) -> None:
+    """强制删除 ``work/<scope>/code`` 与 ``doc``（重处理专用）。"""
     sid = (scope_id or "").strip()
-    return bool(sid) and _tree_has_any_file(product_code_root(sid))
+    if not sid:
+        return
+    for root in (product_code_root(sid), product_doc_root(sid)):
+        if root.is_dir():
+            shutil.rmtree(root)
+            logger.info("reprocess: removed product asset dir %s", root)
 
 
-def doc_assets_present_on_disk(scope_id: str) -> bool:
-    """``doc/`` 下存在任意文件即视为文档已落盘（不校验完整性）。"""
-    sid = (scope_id or "").strip()
-    return bool(sid) and _tree_has_any_file(product_doc_root(sid))
-
-
-def product_assets_present_on_disk(scope_id: str) -> bool:
-    """``code/`` 与 ``doc/`` 均已有文件时视为产品资产齐备。"""
-    return code_assets_present_on_disk(scope_id) and doc_assets_present_on_disk(scope_id)
-
-
-def ensure_product_assets_if_absent(
+def force_refresh_product_assets(
     scope_id: str,
     prod: str,
     *,
     scope_type: ScopeType = "demand",
-) -> dict[str, Any] | None:
-    """code 或 doc 缺文件时自动拉取产品资产；两侧均有文件则跳过。"""
+) -> dict[str, Any]:
+    """清空 code/doc 后重新拉取产品资产（code 删目录再 clone；doc 仅 D 状态）。"""
     sid = (scope_id or "").strip()
     prod_key = (prod or "").strip()
     if not sid or not prod_key:
-        return None
-    has_code = code_assets_present_on_disk(sid)
-    has_doc = doc_assets_present_on_disk(sid)
-    if has_code and has_doc:
-        return None
+        return {"status": "failed", "error": "scope_id 或 prod 为空"}
 
     from synapse.rd_meeting.product_assets import (
         bootstrap_product_assets,
@@ -115,9 +93,11 @@ def ensure_product_assets_if_absent(
         save_prod_catalog_to_pipeline,
     )
 
+    clear_product_code_and_doc_dirs(sid)
+
     catalog_rows, catalog_err = ensure_prod_in_catalog(prod_key)
     if catalog_err:
-        logger.warning("node_init assets pull skipped scope=%s: %s", sid, catalog_err)
+        logger.warning("reprocess assets pull failed scope=%s: %s", sid, catalog_err)
         return {"status": "failed", "error": catalog_err}
 
     save_prod_catalog_to_pipeline(sid, catalog_rows, selected_prod=prod_key)
@@ -134,12 +114,9 @@ def ensure_product_assets_if_absent(
     pipe.data["context"] = pctx
     pipe.save()
     logger.info(
-        "node_init auto materialized product assets scope=%s status=%s "
-        "(had_code=%s had_doc=%s)",
+        "reprocess force refreshed product assets scope=%s status=%s",
         sid,
         assets.get("status"),
-        has_code,
-        has_doc,
     )
     return assets
 
@@ -151,7 +128,6 @@ def enter_prod_selection_gate(
     room_id: str,
     run_node: str,
 ) -> None:
-    """userwork 与会议上下文均无 prod：挂起 pipeline，等待用户选择产品。"""
     sid = ctx.scope_id
     rs = dict(load_room_state(sid) or {})
     rs["status"] = "human_intervention"
@@ -172,15 +148,14 @@ def enter_prod_selection_gate(
             "room_id": room_id,
             "scope_id": sid,
             "node_id": run_node,
-            "flow_stage": "节点初始化",
+            "flow_stage": "重新处理准备",
             "log_type": "warning",
-            "chat_text": "工单未绑定产品（prod），请选择产品后继续节点初始化。",
+            "chat_text": "工单未绑定产品（prod），请选择产品后继续重处理。",
         },
     )
 
 
 def clear_prod_selection_gate(scope_id: str) -> None:
-    """用户提交 prod 后清除门控状态。"""
     sid = (scope_id or "").strip()
     if not sid:
         return
@@ -194,37 +169,67 @@ def clear_prod_selection_gate(scope_id: str) -> None:
     save_room_state(sid, rs)
 
 
-def prepare_node_init_prerequisites(
+def resolve_reprocess_prod(
+    scope_type: ScopeType,
+    scope_id: str,
+    *,
+    dev_status: dict[str, Any] | None = None,
+    pipe: MeetingPipeline | None = None,
+) -> str:
+    prod = resolve_userwork_prod(scope_type, scope_id)
+    if prod:
+        return prod
+    fallback = resolve_meeting_prod_fallback(scope_id, dev_status=dev_status, pipe=pipe)
+    if fallback:
+        backfill_userwork_prod_if_missing(
+            scope_type=scope_type,
+            scope_id=scope_id,
+            prod=fallback,
+        )
+        return fallback
+    return ""
+
+
+def finish_reprocess_product_assets(
     pipe: MeetingPipeline,
     ctx: PipelineRunContext,
     *,
-    dev_status: dict[str, Any],
     room_id: str,
     run_node: str,
+    dev_status: dict[str, Any],
 ) -> bool:
-    """node_init 前置检查。返回 True 表示可继续初始化；False 表示已挂起等待选 prod。"""
+    """``reprocess_prep`` 尾部：校验 prod → 清空 code/doc → 强制重拉。False 表示已挂起选 prod。"""
     sid = ctx.scope_id
     scope_type = ctx.scope_type
 
-    prod = resolve_userwork_prod(scope_type, sid)
-    if not prod:
-        fallback = resolve_meeting_prod_fallback(
-            sid,
-            dev_status=dev_status,
-            pipe=pipe,
-            ctx=ctx,
-        )
-        if fallback:
-            backfill_userwork_prod_if_missing(
-                scope_type=scope_type,
-                scope_id=sid,
-                prod=fallback,
-            )
-            prod = fallback
-
+    prod = resolve_reprocess_prod(
+        scope_type,
+        sid,
+        dev_status=dev_status,
+        pipe=pipe,
+    )
     if not prod:
         enter_prod_selection_gate(pipe, ctx, room_id=room_id, run_node=run_node)
         return False
 
-    ensure_product_assets_if_absent(sid, prod, scope_type=scope_type)
+    assets = force_refresh_product_assets(sid, prod, scope_type=scope_type)
+    status = str(assets.get("status") or "")
+    append_history_event(
+        sid,
+        {
+            "event": "reprocess_product_assets",
+            "room_id": room_id,
+            "scope_id": sid,
+            "node_id": run_node,
+            "prod": prod,
+            "asset_status": status,
+            "flow_stage": "重新处理准备",
+            "log_type": "info" if status in ("ok", "partial") else "warning",
+            "chat_text": (
+                f"重处理已刷新产品资产（{prod}）"
+                if status in ("ok", "partial")
+                else f"重处理刷新产品资产部分失败：{assets.get('error') or status}"
+            ),
+        },
+    )
     return True
