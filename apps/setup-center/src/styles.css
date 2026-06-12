@@ -4837,19 +4837,19 @@ button.btnApplyRestart:hover {
   animation-iteration-count: infinite !important;
 }
 [data-perf-mode="low"] .rd-meeting-soul-btn {
-  animation: rd-meeting-soul-btn-glow 2.6s ease-in-out infinite !important;
+  animation: rd-meeting-soul-btn-glow 5s ease-in-out infinite !important;
 }
 [data-perf-mode="low"] .rd-meeting-soul-btn::before {
-  animation: rd-meeting-soul-border-shift 4s linear infinite !important;
+  animation: rd-meeting-soul-border-shift 8s linear infinite !important;
 }
 [data-perf-mode="low"] .rd-meeting-soul-btn__aura {
-  animation: rd-meeting-soul-aura 3.2s ease-in-out infinite !important;
+  animation: rd-meeting-soul-aura 6s ease-in-out infinite !important;
 }
 [data-perf-mode="low"] .rd-meeting-soul-btn__flame {
-  animation: rd-meeting-soul-flame 1.35s ease-in-out infinite !important;
+  animation: rd-meeting-soul-flame 2.8s ease-in-out infinite !important;
 }
 [data-perf-mode="low"] .rd-meeting-soul-btn__dot {
-  animation: rd-meeting-soul-dot 1.8s ease-in-out infinite !important;
+  animation: rd-meeting-soul-dot 3.6s ease-in-out infinite !important;
 }
 [data-perf-mode="low"] .sidebar,
 [data-perf-mode="low"] .chainPanel {
@@ -5775,7 +5775,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
     0 0 0 1px rgb(167 139 250 / 0.08) inset,
     0 0 18px rgb(124 58 237 / 0.22),
     0 0 32px rgb(236 72 153 / 0.1);
-  animation: rd-meeting-soul-btn-glow 2.6s ease-in-out infinite;
+  animation: rd-meeting-soul-btn-glow 5s ease-in-out infinite;
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -5795,7 +5795,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
     rgb(167 139 250 / 0.85)
   );
   background-size: 220% 220%;
-  animation: rd-meeting-soul-border-shift 4s linear infinite;
+  animation: rd-meeting-soul-border-shift 8s linear infinite;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -5813,7 +5813,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
     rgb(249 115 22 / 0.28) 0%,
     transparent 52%
   );
-  animation: rd-meeting-soul-aura 3.2s ease-in-out infinite;
+  animation: rd-meeting-soul-aura 6s ease-in-out infinite;
   pointer-events: none;
 }
 .rd-meeting-soul-btn__icon-wrap {
@@ -5830,7 +5830,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   color: rgb(251 191 36);
   filter: drop-shadow(0 0 4px rgb(249 115 22 / 0.85)) drop-shadow(0 0 10px rgb(236 72 153 / 0.45));
   transform-origin: 50% 85%;
-  animation: rd-meeting-soul-flame 1.35s ease-in-out infinite;
+  animation: rd-meeting-soul-flame 2.8s ease-in-out infinite;
 }
 .rd-meeting-soul-btn__label {
   position: relative;
@@ -5848,7 +5848,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   border-radius: 9999px;
   background: rgb(251 191 36);
   box-shadow: 0 0 8px rgb(249 115 22 / 0.95);
-  animation: rd-meeting-soul-dot 1.8s ease-in-out infinite;
+  animation: rd-meeting-soul-dot 3.6s ease-in-out infinite;
 }
 .rd-meeting-soul-btn--filled {
   border-color: rgb(196 181 253 / 0.58);

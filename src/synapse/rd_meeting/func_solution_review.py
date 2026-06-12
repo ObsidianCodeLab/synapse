@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
+import subprocess
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -37,6 +40,14 @@ _BULLET_FIELD_RE = re.compile(
 )
 _MODULE_HEADING_NUM_RE = re.compile(r"^1\.7\.\d+\s+")
 _MERMAID_BLOCK_RE = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
+_MIN_MERMAID_SOURCE_LEN = 12
+_MIN_ARCHITECTURE_SUMMARY_LEN = 20
+_MERMAID_PLACEHOLDER_RE = re.compile(r"\b(?:TODO|TBD|占位符?|placeholder)\b", re.IGNORECASE)
+_MERMAID_DECL_LINE_RE = re.compile(
+    r"^\s*(?:flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt)\b",
+    re.IGNORECASE,
+)
+_MIN_DIAGRAM_COUNT = 2
 
 
 def uses_func_solution_gate(node_id: str) -> bool:
@@ -511,6 +522,147 @@ def load_func_solution_review_payload(scope_id: str) -> dict[str, Any] | None:
     return enrich_payload_from_archive(scope_id, data)
 
 
+def _infer_diagram_kind(mermaid: str) -> str:
+    first = (mermaid or "").split("\n", 1)[0].strip().lower()
+    if "sequencediagram" in first:
+        return "sequenceDiagram"
+    if first.startswith("graph"):
+        return "graph"
+    if "flowchart" in first:
+        return "flowchart"
+    return "other"
+
+
+def _diagram_label(diagram: dict[str, Any], index: int) -> str:
+    return str(diagram.get("id") or diagram.get("title") or f"diagram-{index + 1}").strip()
+
+
+def _validate_mermaid_diagrams_structure(diagrams: list[Any]) -> list[str]:
+    """结构门控：数量、类型组合、非空与非占位。"""
+    errors: list[str] = []
+    norm: list[dict[str, Any]] = [d for d in diagrams if isinstance(d, dict)]
+    if len(norm) < _MIN_DIAGRAM_COUNT:
+        errors.append(
+            f"overview.diagrams 至少需要 {_MIN_DIAGRAM_COUNT} 张 Mermaid 图"
+            "（flowchart + graph/sequenceDiagram）"
+        )
+        return errors
+
+    kinds: set[str] = set()
+    for i, diagram in enumerate(norm):
+        label = _diagram_label(diagram, i)
+        mermaid = str(diagram.get("mermaid") or "").strip()
+        if not mermaid:
+            errors.append(f"diagram[{label}] mermaid 为空")
+            continue
+        if len(mermaid) < _MIN_MERMAID_SOURCE_LEN:
+            errors.append(f"diagram[{label}] mermaid 过短（至少 {_MIN_MERMAID_SOURCE_LEN} 字符）")
+        if _MERMAID_PLACEHOLDER_RE.search(mermaid):
+            errors.append(f"diagram[{label}] 含占位符，须填写可渲染的真实图表")
+        first_line = mermaid.split("\n", 1)[0].strip()
+        if not _MERMAID_DECL_LINE_RE.match(first_line):
+            errors.append(
+                f"diagram[{label}] 首行须为合法 Mermaid 声明"
+                "（flowchart / graph / sequenceDiagram 等）"
+            )
+        kinds.add(_infer_diagram_kind(mermaid))
+
+    if "flowchart" not in kinds:
+        errors.append("overview.diagrams 须包含 flowchart 类型图（主业务流程/改造流程）")
+    if "graph" not in kinds and "sequenceDiagram" not in kinds:
+        errors.append(
+            "overview.diagrams 须包含 graph 或 sequenceDiagram 类型图（模块关系或关键时序）"
+        )
+    return errors
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _local_mmdc_executable() -> Path | None:
+    """``apps/setup-center`` 内 ``npm install`` 后的 mmdc（见 package.json devDependencies）。"""
+    bin_dir = _repo_root() / "apps" / "setup-center" / "node_modules" / ".bin"
+    for name in ("mmdc.cmd", "mmdc"):
+        candidate = bin_dir / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _resolve_mmdc_argv() -> list[str] | None:
+    """解析 mmdc：PATH 全局 → setup-center 本地 node_modules → npx 拉取。"""
+    mmdc = shutil.which("mmdc")
+    if mmdc:
+        return [mmdc]
+    local = _local_mmdc_executable()
+    if local:
+        return [str(local)]
+    npx = shutil.which("npx")
+    if npx:
+        return [npx, "-y", "@mermaid-js/mermaid-cli", "mmdc"]
+    return None
+
+
+def _validate_mermaid_syntax_with_mmdc(mermaid: str, *, diagram_id: str) -> str | None:
+    """mmdc 语法门控：可渲染则返回 None，否则返回错误文案。"""
+    argv_prefix = _resolve_mmdc_argv()
+    if not argv_prefix:
+        return None
+
+    with tempfile.TemporaryDirectory(prefix="synapse-mermaid-") as tmp:
+        tmp_path = Path(tmp)
+        inp = tmp_path / "diagram.mmd"
+        out = tmp_path / "diagram.svg"
+        inp.write_text(mermaid, encoding="utf-8")
+        cmd = [*argv_prefix, "-i", str(inp), "-o", str(out)]
+        run_kwargs: dict[str, Any] = {
+            "capture_output": True,
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+            "timeout": 60,
+        }
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        try:
+            proc = subprocess.run(cmd, **run_kwargs)
+        except subprocess.TimeoutExpired:
+            return f"diagram[{diagram_id}] Mermaid 语法校验超时"
+        except (FileNotFoundError, OSError) as exc:
+            return f"diagram[{diagram_id}] Mermaid 语法校验失败: {exc}"
+
+        if proc.returncode != 0:
+            msg = (proc.stderr or proc.stdout or "").strip().replace("\n", " ")
+            if len(msg) > 240:
+                msg = msg[:240] + "…"
+            return f"diagram[{diagram_id}] Mermaid 语法错误: {msg or 'mmdc 退出非零'}"
+    return None
+
+
+def _validate_mermaid_diagrams_syntax(diagrams: list[Any]) -> list[str]:
+    """对每张图执行 mmdc 语法校验；环境无 mmdc 时返回安装提示。"""
+    argv_prefix = _resolve_mmdc_argv()
+    if not argv_prefix:
+        return [
+            "Mermaid 语法门控需要 mmdc：请在 apps/setup-center 执行 npm install"
+            "（devDependency @mermaid-js/mermaid-cli），或全局安装 / 确保 npx 可用"
+        ]
+
+    errors: list[str] = []
+    for i, diagram in enumerate(diagrams):
+        if not isinstance(diagram, dict):
+            continue
+        mermaid = str(diagram.get("mermaid") or "").strip()
+        if not mermaid:
+            continue
+        label = _diagram_label(diagram, i)
+        err = _validate_mermaid_syntax_with_mmdc(mermaid, diagram_id=label)
+        if err:
+            errors.append(err)
+    return errors
+
+
 def _diagrams_from_markdown(md: str) -> list[dict[str, str]]:
     """从 Markdown 代码块提取 Mermaid 图（供评审 JSON 兜底补全）。"""
     diagrams: list[dict[str, str]] = []
@@ -544,8 +696,16 @@ def _validate_func_solution_payload(data: dict[str, Any] | None) -> list[str]:
         errors.append("transformation_plans 为空")
     overview = data.get("overview") if isinstance(data.get("overview"), dict) else {}
     diagrams = overview.get("diagrams") if isinstance(overview.get("diagrams"), list) else []
-    if not diagrams and not str(overview.get("architecture_summary") or "").strip():
-        errors.append("overview 须包含 mermaid 图或 architecture_summary")
+    summary = str(overview.get("architecture_summary") or "").strip()
+    if not summary:
+        errors.append("overview 缺少 architecture_summary（架构总述）")
+    elif len(summary) < _MIN_ARCHITECTURE_SUMMARY_LEN:
+        errors.append(
+            f"overview.architecture_summary 过短（至少 {_MIN_ARCHITECTURE_SUMMARY_LEN} 字符）"
+        )
+    errors.extend(_validate_mermaid_diagrams_structure(diagrams))
+    if diagrams and not any(e.startswith("overview.diagrams 至少需要") for e in errors):
+        errors.extend(_validate_mermaid_diagrams_syntax(diagrams))
     for i, plan in enumerate(data.get("transformation_plans") or []):
         if not str(plan.get("module_name") or "").strip():
             errors.append(f"plan[{i}] 缺少 module_name")
