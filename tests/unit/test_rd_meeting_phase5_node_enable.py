@@ -329,3 +329,54 @@ async def test_human_confirm_reject_triggers_rework(synapse_work_home, monkeypat
     assert rs.get("pending_delivery") is None
     assert rs.get("rework_instruction") == "边界描述不完整"
     assert scheduled == [scope_id]
+
+
+def test_confirm_node_delivery_reject_passes_agent_pool(monkeypatch):
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+    from synapse.rd_meeting.room_runtime import load_room_state, save_room_state
+
+    captured: dict[str, object] = {}
+
+    def _fake_schedule(**kwargs):
+        captured.update(kwargs)
+        return kwargs.get("room_id", "")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.schedule_run_node",
+        _fake_schedule,
+    )
+
+    scope_id = "scope-reject-pool"
+    save_room_state(
+        scope_id,
+        {
+            "status": "human_intervention",
+            "intervention_kind": "result_confirm",
+            "current_node_id": "boundary",
+            "pending_delivery": {
+                "node_id": "boundary",
+                "report_body": "# 交付结论\nOK",
+                "await_confirm": True,
+                "stage_id": 1,
+            },
+        },
+    )
+
+    pool = object()
+    orch = MeetingRoomOrchestrator()
+    out = orch.confirm_node_delivery(
+        scope_type="demand",
+        scope_id=scope_id,
+        room_id="room-reject-pool",
+        approved=False,
+        comment="请补充边界",
+        mode="reject",
+        agent_pool=pool,
+    )
+
+    assert out["status"] == "rework"
+    assert captured.get("agent_pool") is pool
+    rs = load_room_state(scope_id)
+    assert rs is not None
+    assert rs.get("pending_delivery") is None
+    assert rs.get("rework_instruction") == "请补充边界"

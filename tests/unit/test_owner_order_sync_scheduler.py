@@ -8,9 +8,12 @@ import pytest
 
 from synapse.api.routes.dev_iwhalecloud import (
     OwnerOrderSyncError,
+    _apply_local_process_state_on_new_demand_insert,
+    _design_user_display_from_dto,
     _merge_owned_work_item_record,
     _merge_owned_work_items,
     _merge_owner_order_lists,
+    _refresh_local_state_from_demand_status,
     sync_owner_orders_from_devcloud,
 )
 from synapse.scheduler import ScheduledTask, TriggerType
@@ -79,11 +82,37 @@ def test_merge_owned_work_items_appends_new_and_keeps_orphan():
     assert by_no["T-new"]["task_title"] == "门户新单"
 
 
+def test_design_user_display_from_dto_prefers_user_name_code():
+    assert (
+        _design_user_display_from_dto({"userName": "叶彬彬", "userCode": "0027008730"})
+        == "叶彬彬[0027008730]"
+    )
+    assert _design_user_display_from_dto({"displayName": "张三"}) == "张三"
+    assert _design_user_display_from_dto(None) == ""
+
+
+def test_refresh_local_state_only_for_pending_and_review():
+    assert _refresh_local_state_from_demand_status("待处理") == ("预备中", "")
+    assert _refresh_local_state_from_demand_status("需求评审") == ("待处理", "等待调度")
+    assert _refresh_local_state_from_demand_status("需求设计") is None
+    assert _refresh_local_state_from_demand_status("需求开发") is None
+
+
+def test_new_demand_insert_sets_full_manual_for_late_stages():
+    for stage in ("需求设计", "需求开发", "需求测试"):
+        row = _apply_local_process_state_on_new_demand_insert(
+            {"demand_no": "D-new", "demand_status": stage},
+        )
+        assert row["local_process_state"] == "全人工"
+        assert row["sop_node"] == ""
+
+
 def test_merge_owner_orders_preserves_local_sop_state():
     old = [
         {
             "demand_no": "D1",
             "demand_status": "需求评审",
+            "demand_designer": "旧设计",
             "sop_node": "需求澄清",
             "local_process_state": "处理中",
             "prod": "my-product",
@@ -101,6 +130,7 @@ def test_merge_owner_orders_preserves_local_sop_state():
         {
             "demand_no": "D1",
             "demand_status": "需求设计",
+            "demand_designer": "新设计[0001]",
             "sop_node": "应被忽略",
             "local_process_state": "应被忽略",
             "prod": "应被忽略",
@@ -115,6 +145,8 @@ def test_merge_owner_orders_preserves_local_sop_state():
         {
             "demand_no": "D2",
             "demand_status": "需求设计",
+            "sop_node": "",
+            "local_process_state": "",
             "owned_work_items": [],
         },
     ]
@@ -125,6 +157,7 @@ def test_merge_owner_orders_preserves_local_sop_state():
     assert len(merged) == 2
     d1 = next(x for x in merged if x["demand_no"] == "D1")
     assert d1["demand_status"] == "需求设计"
+    assert d1["demand_designer"] == "新设计[0001]"
     assert d1["sop_node"] == "需求澄清"
     assert d1["local_process_state"] == "处理中"
     assert d1["prod"] == "my-product"
@@ -138,6 +171,45 @@ def test_merge_owner_orders_preserves_local_sop_state():
     d2 = next(x for x in merged if x["demand_no"] == "D2")
     assert d2["local_process_state"] == "全人工"
     assert d2["sop_node"] == ""
+
+
+def test_merge_owner_orders_refreshes_local_state_for_pending_and_review():
+    old = [
+        {
+            "demand_no": "D-pending",
+            "demand_status": "需求评审",
+            "local_process_state": "待处理",
+            "sop_node": "等待调度",
+            "owned_work_items": [],
+        },
+        {
+            "demand_no": "D-review",
+            "demand_status": "待处理",
+            "local_process_state": "预备中",
+            "sop_node": "",
+            "owned_work_items": [],
+        },
+    ]
+    new = [
+        {
+            "demand_no": "D-pending",
+            "demand_status": "待处理",
+            "owned_work_items": [],
+        },
+        {
+            "demand_no": "D-review",
+            "demand_status": "需求评审",
+            "owned_work_items": [],
+        },
+    ]
+
+    merged, cleanup = _merge_owner_order_lists(old, new)
+    assert cleanup == []
+    by_no = {x["demand_no"]: x for x in merged}
+    assert by_no["D-pending"]["local_process_state"] == "预备中"
+    assert by_no["D-pending"]["sop_node"] == ""
+    assert by_no["D-review"]["local_process_state"] == "待处理"
+    assert by_no["D-review"]["sop_node"] == "等待调度"
 
 
 def test_merge_owner_order_keeps_completed_orphan_only():

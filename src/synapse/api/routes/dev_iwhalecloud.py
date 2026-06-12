@@ -255,29 +255,44 @@ def _merge_owned_work_items(
     return out
 
 
-def _apply_local_process_state_on_new_demand_insert(row: dict[str, Any]) -> dict[str, Any]:
-    """新有老无插入需求单时：指定阶段将 ``local_process_state`` 设为全人工。"""
-    out = dict(row)
-    st = _snapshot_norm_id(out.get("demand_status"))
+def _refresh_local_state_from_demand_status(
+    demand_status: Any,
+) -> tuple[str, str] | None:
+    """门户 ``demand_status`` → 刷新时应写入的 ``(local_process_state, sop_node)``。
+
+    仅 ``待处理`` / ``需求评审`` 会驱动本地状态更新；其余阶段返回 ``None``（保留本地值）。
+    """
+    st = _snapshot_norm_id(demand_status)
     if st in ("待处理", "To Creator"):
-        out["local_process_state"] = "预备中"
-        out["sop_node"] = ""
-    elif st == "需求评审":
-        out["local_process_state"] = "待处理"
-        out["sop_node"] = "等待调度"
-    elif st in ("需求设计", "需求开发", "需求测试"):
+        return "预备中", ""
+    if st == "需求评审":
+        return "待处理", "等待调度"
+    return None
+
+
+def _apply_local_process_state_on_new_demand_insert(row: dict[str, Any]) -> dict[str, Any]:
+    """新有老无插入需求单时：按门户阶段初始化 ``local_process_state`` / ``sop_node``。"""
+    out = dict(row)
+    refreshed = _refresh_local_state_from_demand_status(out.get("demand_status"))
+    if refreshed is not None:
+        out["local_process_state"], out["sop_node"] = refreshed
+        return out
+    st = _snapshot_norm_id(out.get("demand_status"))
+    if st in ("需求设计", "需求开发", "需求测试"):
         out["local_process_state"] = "全人工"
         out["sop_node"] = ""
     return out
 
 
 def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[str, Any]:
-    """需求单新老均有：以新数据为准更新，但保留老的 ``sop_node``、``local_process_state``、``prod``。"""
+    """需求单新老均有：门户字段（含 ``demand_designer``）以新数据为准；本地 ``prod`` 保留。
+
+    刷新时仅当研发云 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与 ``sop_node``。
+    """
     merged: dict[str, Any] = dict(new_d)
-    merged["sop_node"] = old_d.get("sop_node")
-    if old_d.get("local_process_state") == "预备中" and new_d.get("demand_status") == "需求评审":
-        merged["local_process_state"] = "待处理"
-        merged["sop_node"] = "等待调度"
+    refreshed = _refresh_local_state_from_demand_status(new_d.get("demand_status"))
+    if refreshed is not None:
+        merged["local_process_state"], merged["sop_node"] = refreshed
     else:
         merged["local_process_state"] = old_d.get("local_process_state")
         merged["sop_node"] = old_d.get("sop_node")
@@ -335,8 +350,10 @@ def _merge_owner_order_lists(
 def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> dict[str, Any]:
     """将本次拉取的需求列表与已有 ``userwork.json`` 合并后落盘；写文件时使用 FileLock 与原子替换。
 
-    合并规则：需求单与研发单均为「新有老无插入、新老均有更新」；需求单更新时保留
-    ``sop_node``、``local_process_state``、``prod``；门户下架（老有新无）时 ``local_process_state=已完成``
+    合并规则：需求单与研发单均为「新有老无插入、新老均有更新」；门户字段（含 ``demand_designer``）
+    以研发云为准；刷新时仅 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与
+    ``sop_node``，否则保留本地值；``prod`` 始终保留本地已选产品；门户下架（老有新无）时
+    ``local_process_state=已完成``
     保留待归档，否则从 userwork 剔除并回收 ``work/<demand_no>/``。研发单更新时门户字段以新为准、本地扩展字段保留。
     """
     from filelock import FileLock
