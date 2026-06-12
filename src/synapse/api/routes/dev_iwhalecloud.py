@@ -2660,6 +2660,91 @@ class UpdateTaskImpactEvaluationRequest(BaseModel):
     compatibilityImpact: str = Field(..., description="兼容性影响")
     userId: int = Field(..., description="用户ID")
 
+
+_IMPACT_EVALUATION_GROUP = "影响评估"
+_IMPACT_EVALUATION_FIELD_NAMES: dict[str, str] = {
+    "performanceImpact": "性能影响",
+    "functionalImpact": "功能影响",
+    "cfgChangeDescription": "配置变更说明",
+    "upgradeRisk": "升级风险",
+    "securityImpact": "安全影响",
+    "compatibilityImpact": "兼容性影响",
+}
+
+
+def _flatten_project_field_row(row: dict) -> dict | None:
+    """解析 GET project-fields 单条记录为扁平结构。"""
+    project_field = row.get("projectFieldDto") or {}
+    ad_project_field = project_field.get("adProjectField") or {}
+    custom_field = (project_field.get("customFieldDto") or {}).get("adCustomField") or {}
+    field_group = project_field.get("adProjectFieldGroup") or {}
+    project_field_id = ad_project_field.get("projectFieldId")
+    if project_field_id is None:
+        return None
+    try:
+        resolved_id = int(project_field_id)
+    except (TypeError, ValueError):
+        return None
+    return {
+        "projectFieldId": resolved_id,
+        "fieldName": custom_field.get("fieldName"),
+        "groupName": field_group.get("groupName"),
+        "projectId": ad_project_field.get("projectId"),
+    }
+
+
+def _flatten_project_fields_response(raw: object) -> list[dict]:
+    """从 project-fields 接口响应提取扁平字段列表。"""
+    if isinstance(raw, dict):
+        rows = raw.get("data")
+    elif isinstance(raw, list):
+        rows = raw
+    else:
+        return []
+    if not isinstance(rows, list):
+        return []
+    flattened: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        parsed = _flatten_project_field_row(row)
+        if parsed:
+            flattened.append(parsed)
+    return flattened
+
+
+def _impact_evaluation_field_ids_from_rows(rows: list[dict]) -> dict[str, int]:
+    """按字段中文名解析六项影响评估的 projectFieldId（不再写死固定 ID）。"""
+    label_to_key = {label: key for key, label in _IMPACT_EVALUATION_FIELD_NAMES.items()}
+    resolved: dict[str, int] = {}
+    for row in rows:
+        field_name = str(row.get("fieldName") or "").strip()
+        if field_name not in label_to_key:
+            continue
+        group_name = str(row.get("groupName") or "").strip()
+        if group_name and group_name != _IMPACT_EVALUATION_GROUP:
+            continue
+        key = label_to_key[field_name]
+        resolved[key] = int(row["projectFieldId"])
+    return resolved
+
+
+async def _fetch_task_project_fields(
+    task_id: int,
+    *,
+    client: httpx.AsyncClient,
+    csrf: str,
+    cookies: str,
+) -> list[dict]:
+    """读取子单 project-fields 定义（含影响评估六项）。"""
+    url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-devspace/task/{task_id}/project-fields"
+    headers = _build_get_task_patch_headers(csrf, cookies)
+    resp = await client.get(url, headers=headers)
+    _log_httpx_response("_fetch_task_project_fields", resp)
+    resp.raise_for_status()
+    return _flatten_project_fields_response(resp.json())
+
+
 def _build_update_task_impact_evaluation_headers(body: UpdateTaskImpactEvaluationRequest, csrf: str, cookies: str) -> dict:
     headers = {
         "accept": "application/json, text/javascript, */*; q=0.01",
@@ -2681,15 +2766,24 @@ def _build_update_task_impact_evaluation_headers(body: UpdateTaskImpactEvaluatio
     }
     return headers
 
-def _build_update_task_impact_evaluation_payload(body: UpdateTaskImpactEvaluationRequest) -> list[dict]:
-    payload = [
-        {"projectFieldId": 20085, "fieldValue": body.performanceImpact, "fieldValueDesc": body.performanceImpact, "userId": body.userId},
-        {"projectFieldId": 20086, "fieldValue": body.functionalImpact, "fieldValueDesc": body.functionalImpact, "userId": body.userId},
-        {"projectFieldId": 20087, "fieldValue": body.cfgChangeDescription, "fieldValueDesc": body.cfgChangeDescription, "userId": body.userId},
-        {"projectFieldId": 20088, "fieldValue": body.upgradeRisk, "fieldValueDesc": body.upgradeRisk, "userId": body.userId},
-        {"projectFieldId": 20089, "fieldValue": body.securityImpact, "fieldValueDesc": body.securityImpact, "userId": body.userId},
-        {"projectFieldId": 20413, "fieldValue": body.compatibilityImpact, "fieldValueDesc": body.compatibilityImpact, "userId": body.userId},
-    ]
+def _build_update_task_impact_evaluation_payload(
+    body: UpdateTaskImpactEvaluationRequest,
+    field_ids: dict[str, int],
+) -> list[dict]:
+    payload: list[dict] = []
+    for key, _label in _IMPACT_EVALUATION_FIELD_NAMES.items():
+        project_field_id = field_ids.get(key)
+        if project_field_id is None:
+            continue
+        field_value = getattr(body, key)
+        payload.append(
+            {
+                "projectFieldId": project_field_id,
+                "fieldValue": field_value,
+                "fieldValueDesc": field_value,
+                "userId": body.userId,
+            }
+        )
     return payload
 
 @router.post("/api/dev/iwhalecloud/update_task_impact_evaluation")
@@ -2700,7 +2794,7 @@ async def update_task_impact_evaluation(body: UpdateTaskImpactEvaluationRequest)
 async def _update_task_impact_evaluation(body: UpdateTaskImpactEvaluationRequest) -> dict:
     """
     内部调用：更新任务影响评估。
-    转调：POST /portal/zcm-devspace/task/{taskId}/project-fields/batch-modify
+    先 GET project-fields 按字段名解析 projectFieldId，再 POST batch-modify。
     """
     if not body.taskId:
         return error_response(400, "taskId 不能为空")
@@ -2711,12 +2805,48 @@ async def _update_task_impact_evaluation(body: UpdateTaskImpactEvaluationRequest
 
     url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-devspace/task/{body.taskId}/project-fields/batch-modify"
     headers = _build_update_task_impact_evaluation_headers(body, csrf, cookies)
-    payload = _build_update_task_impact_evaluation_payload(body)
-    logger.debug("update_task_impact_evaluation url:%s, headers:%s, payload:%s", url, headers, payload)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
+            field_rows = await _fetch_task_project_fields(
+                body.taskId,
+                client=client,
+                csrf=csrf,
+                cookies=cookies,
+            )
+            field_ids = _impact_evaluation_field_ids_from_rows(field_rows)
+            missing_labels = [
+                label
+                for key, label in _IMPACT_EVALUATION_FIELD_NAMES.items()
+                if key not in field_ids
+            ]
+            if missing_labels:
+                logger.warning(
+                    "update_task_impact_evaluation missing fields task_id=%s missing=%s resolved=%s",
+                    body.taskId,
+                    missing_labels,
+                    field_ids,
+                )
+                return error_response(
+                    502,
+                    f"任务单缺少影响评估字段，无法写入: {', '.join(missing_labels)}",
+                )
+            payload = _build_update_task_impact_evaluation_payload(body, field_ids)
+            logger.info(
+                "update_task_impact_evaluation task_id=%s field_ids=%s",
+                body.taskId,
+                field_ids,
+            )
+            logger.debug(
+                "update_task_impact_evaluation url:%s, headers:%s, payload:%s",
+                url,
+                headers,
+                payload,
+            )
             resp = await client.post(url, headers=headers, json=payload)
             _log_httpx_response("update_task_impact_evaluation", resp)
+    except httpx.HTTPStatusError as exc:
+        logger.exception("读取研发云任务 project-fields 失败: %s", exc)
+        return error_response(503, f"读取任务影响评估字段失败: {exc}")
     except httpx.RequestError as exc:
         logger.exception("调用研发云更新任务影响评估接口异常: %s", exc)
         return error_response(503, f"调用研发云接口异常: {exc}")
