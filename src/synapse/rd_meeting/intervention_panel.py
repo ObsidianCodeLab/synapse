@@ -6,7 +6,14 @@ from typing import Any, Literal
 
 from synapse.rd_sop.manifest import NODE_TYPES
 
-InterventionPanel = Literal["solution_review", "func_solution_review", "task_exec", "node_review", "hitl"]
+InterventionPanel = Literal[
+    "solution_review",
+    "func_solution_review",
+    "task_exec",
+    "node_review",
+    "hitl",
+    "prod_selection",
+]
 
 # 协同型（ai_human）节点完成门控使用的专用面板（非 MeetingHitlForm 问卷）
 _COLLAB_DEDICATED_PANEL: dict[str, InterventionPanel] = {
@@ -63,6 +70,9 @@ def resolve_intervention_panel(
     kind = (intervention_kind or "").strip().lower()
     sop = node_sop_type(nid)
     pending = pending_delivery if isinstance(pending_delivery, dict) else {}
+
+    if kind == "prod_selection":
+        return "prod_selection"
 
     if kind == "solution_review" or pending.get("solution_review_payload"):
         return "solution_review"

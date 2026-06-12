@@ -605,6 +605,17 @@ def _step_node_init(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         pipe.set_flow_step(STEP_WAITING, reason="无有效节点，跳过初始化")
         return
 
+    from synapse.rd_meeting.node_init_prereq import prepare_node_init_prerequisites
+
+    if not prepare_node_init_prerequisites(
+        pipe,
+        ctx,
+        dev_status=data,
+        room_id=room_id,
+        run_node=run_node,
+    ):
+        return
+
     scope_type = ctx.scope_type
     ticket_title = str(ctx.detail.get("ticket_title") or "")
     run_binding = resolve_node_binding(

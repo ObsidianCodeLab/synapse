@@ -37,6 +37,7 @@ import { SolutionReviewPanel } from './SolutionReviewPanel';
 import { FuncSolutionReviewPanel } from './FuncSolutionReviewPanel';
 import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
+import { MeetingProdSelectionPanel } from './panels/MeetingProdSelectionPanel';
 import type {
   NodeReviewPayload,
   FuncSolutionReviewPayload,
@@ -1541,6 +1542,7 @@ const InterventionDialog = ({
   onRecover,
   onStopRun,
   onMergeNodeChat,
+  onProdSubmitted,
   synapseApiBase,
 }: { 
   room: MeetingRoom | null; 
@@ -1553,6 +1555,7 @@ const InterventionDialog = ({
   onStopRun?: () => void;
   /** 按 SOP 节点合并协作流（来自 agents/<node_id>/room_history.jsonl） */
   onMergeNodeChat?: (nodeId: string, logs: LogEntry[]) => void;
+  onProdSubmitted?: (detail: MeetingRoomDetail) => void;
   synapseApiBase?: string;
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -1607,13 +1610,17 @@ const InterventionDialog = ({
         : null,
     [room, hitlNodeType, hitlTargetNodeId],
   );
+  const prodSelectionActive =
+    interventionPanel === 'prod_selection' ||
+    (room?.interventionKind || '').toLowerCase() === 'prod_selection';
   const hitlAvailable = Boolean(
     interventionPanel &&
       room?.status === 'human_intervention' &&
       !hitlLocked &&
-      isViewingHitlNode,
+      (prodSelectionActive || isViewingHitlNode),
   );
   const hitlBadgeText = useMemo(() => {
+    if (interventionPanel === 'prod_selection') return '选择产品';
     if (interventionPanel === 'solution_review') return '方案评审';
     if (interventionPanel === 'func_solution_review') return '函数级方案评审';
     if (interventionPanel === 'task_exec') return '任务执行评审';
@@ -2221,7 +2228,18 @@ const InterventionDialog = ({
 
           {/* Tab Body */}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {centerTab === 'hitl' && hitlAvailable && interventionPanel === 'task_exec' ? (
+            {centerTab === 'hitl' && hitlAvailable && interventionPanel === 'prod_selection' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+                <MeetingProdSelectionPanel
+                  synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
+                  onSubmitted={(detail) => {
+                    setCenterTab('detail');
+                    onProdSubmitted?.(detail);
+                  }}
+                />
+              </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'task_exec' ? (
               <div className="min-h-0 flex-1 overflow-hidden">
                 <TaskExecReviewPanel
                   synapseApiBase={synapseApiBase || ''}
@@ -2709,6 +2727,12 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       });
   };
 
+  const handleProdSubmitted = (detail: MeetingRoomDetail) => {
+    const updatedRoom = mapDetailToRoom(detail);
+    setActiveRoom(updatedRoom);
+    setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
+  };
+
   const handleHitlSubmit = (text: string, values: HitlFormValues) => {
     if (!activeRoom) return;
     const base = (synapseApiBase || '').trim();
@@ -2930,6 +2954,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
           onRecover={handleRecover}
           onStopRun={handleStopRun}
           onMergeNodeChat={handleMergeNodeChat}
+          onProdSubmitted={handleProdSubmitted}
           synapseApiBase={synapseApiBase}
         />
 

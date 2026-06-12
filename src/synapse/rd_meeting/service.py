@@ -600,6 +600,115 @@ class MeetingRoomService:
                 logger.warning("open_meeting async tail schedule failed: %s", exc)
         return ctx.detail
 
+    def submit_meeting_prod(
+        self,
+        room_id: str,
+        prod: str,
+        *,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """用户选择 prod 后回写 userwork 并从 node_init 继续 pipeline。"""
+        rid = (room_id or "").strip()
+        prod_key = (prod or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+        if not prod_key:
+            raise ValueError("请选择产品（prod）")
+
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+
+        rs = load_room_state(sid) or {}
+        if str(rs.get("intervention_kind") or "") != "prod_selection":
+            raise ValueError("prod_selection_not_active")
+
+        from synapse.rd_meeting.node_init_prereq import (
+            clear_prod_selection_gate,
+            ensure_product_assets_if_absent,
+        )
+        from synapse.rd_meeting.pipeline import (
+            STEP_NODE_INIT,
+            PipelineRunContext,
+            run_pipeline_until_waiting,
+        )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
+        from synapse.rd_meeting.product_context import (
+            ensure_prod_in_catalog,
+            save_prod_catalog_to_pipeline,
+        )
+
+        patch_userwork_summary(
+            scope_type=scope_type,
+            scope_id=sid,
+            prod=prod_key,
+            local_process_state=str(
+                (load_dev_status(sid) or {}).get("local_process_state") or "处理中"
+            ),
+            sop_node=str((load_dev_status(sid) or {}).get("sop_node_display") or ""),
+        )
+
+        dev = load_dev_status(sid) or {}
+        mr = dev.get("meeting_room")
+        if not isinstance(mr, dict):
+            mr = {}
+        dev["meeting_room"] = {**mr, "prod": prod_key, "active": True}
+        save_dev_status(sid, dev)
+
+        catalog_rows, catalog_err = ensure_prod_in_catalog(prod_key)
+        if catalog_err:
+            raise ValueError(catalog_err)
+        save_prod_catalog_to_pipeline(sid, catalog_rows, selected_prod=prod_key)
+        ensure_product_assets_if_absent(sid, prod_key, scope_type=scope_type)
+
+        clear_prod_selection_gate(sid)
+
+        ctx = PipelineRunContext(
+            scope_type=scope_type,
+            scope_id=sid,
+            prod=prod_key,
+            sync_userwork=True,
+            promote_to_processing=False,
+            agent_pool=agent_pool,
+            dev_status=dev,
+            detail=dict(detail),
+        )
+
+        pipe = MeetingPipeline.load(sid)
+        pipe.set_flow_step(STEP_NODE_INIT, reason="用户已选择产品，继续节点初始化")
+        pipe.save()
+
+        def _resume_node_init() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_NODE_INIT, create=False)
+
+        schedule_pipeline_background(rid, _resume_node_init, scope_id=sid)
+
+        append_history_event(
+            sid,
+            {
+                "event": "prod_selection_submitted",
+                "room_id": rid,
+                "scope_id": sid,
+                "prod": prod_key,
+                "flow_stage": "节点初始化",
+                "log_type": "info",
+                "chat_text": f"已绑定产品：{prod_key}",
+            },
+        )
+
+        titles = build_title_index()
+        payload = self._room_detail_payload(load_dev_status(sid) or dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
+
     def reprocess_current_node(
         self,
         room_id: str,

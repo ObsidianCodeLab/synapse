@@ -985,6 +985,21 @@ export async function putSoulInstruction(
   });
 }
 
+export async function submitMeetingRoomProd(
+  synapseApiBase: string,
+  roomId: string,
+  prod: string,
+): Promise<MeetingRoomDetail> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const key = (prod || '').trim();
+  if (!key) {
+    throw new Error('missing_prod');
+  }
+  return apiPost<MeetingRoomDetail>(base, `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/prod`, {
+    prod: key,
+  });
+}
+
 export async function openMeetingRoom(
   synapseApiBase: string,
   scopeType: MeetingRoomScopeType,

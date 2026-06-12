@@ -50,6 +50,10 @@ class PutSoulInstructionBody(BaseModel):
     instruction: str = Field("", description="灵魂建议正文，空字符串表示清除")
 
 
+class SubmitMeetingProdBody(BaseModel):
+    prod: str = Field(..., min_length=1, description="统一服务产品标识（get_prod_info.prod）")
+
+
 class InterveneBody(BaseModel):
     text: str = Field(..., description="人工指令或聊天内容")
     message_type: str = Field("instruction", description="instruction 或 chat")
@@ -317,6 +321,24 @@ async def open_meeting(body: OpenMeetingBody, request: Request) -> dict:
     except Exception as exc:
         logger.exception("open_meeting failed: %s", exc)
         return error_response(500, "open_meeting_failed", str(exc))
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/prod")
+async def submit_meeting_prod(room_id: str, body: SubmitMeetingProdBody, request: Request) -> dict:
+    """node_init 缺 prod 时用户选择产品并继续 pipeline。"""
+    pool = getattr(request.app.state, "agent_pool", None)
+    try:
+        item = _service.submit_meeting_prod(
+            room_id,
+            body.prod.strip(),
+            agent_pool=pool,
+        )
+        return success_response(item)
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("submit_meeting_prod failed: %s", exc)
+        return error_response(500, "submit_meeting_prod_failed", str(exc))
 
 
 @router.get("/api/dev/work/{scope_type}/{scope_id}/dev.status")

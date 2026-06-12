@@ -5,7 +5,8 @@ export type InterventionPanelKind =
   | 'func_solution_review'
   | 'task_exec'
   | 'node_review'
-  | 'hitl';
+  | 'hitl'
+  | 'prod_selection';
 
 /** 协同型节点（ai_human）禁止配置协作智能体阵容。 */
 export function collaborationWorkersConfigurable(
@@ -55,6 +56,7 @@ const INTERVENTION_KIND_LABELS: Record<string, string> = {
   interactive: '会中澄清',
   exception: '异常裁决',
   gate: '流程门控',
+  prod_selection: '选择产品',
 };
 
 export function interventionKindLabel(kind: string | null | undefined): string {
@@ -71,6 +73,10 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
   const current = (room.currentNode || '').trim();
   const kind = (room.interventionKind || '').trim().toLowerCase();
   const panel = (room.interventionPanel || '').trim();
+
+  if (kind === 'prod_selection' || panel === 'prod_selection') {
+    return current || 'pending';
+  }
 
   if (kind === 'task_exec' || panel === 'task_exec') {
     return pendingNid || current || 'task_exec';
@@ -130,12 +136,16 @@ export function resolveMeetingInterventionPanel(
     panel === 'func_solution_review' ||
     panel === 'task_exec' ||
     panel === 'node_review' ||
-    panel === 'hitl'
+    panel === 'hitl' ||
+    panel === 'prod_selection'
   ) {
     return panel;
   }
 
   const kind = (room.interventionKind || '').toLowerCase();
+  if (kind === 'prod_selection') {
+    return 'prod_selection';
+  }
   const nid = (nodeId || room.currentNode || '').trim();
 
   if (kind === 'task_exec' || room.taskExecPayload) {
