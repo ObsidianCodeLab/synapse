@@ -8,6 +8,7 @@ import pytest
 
 from synapse.rd_meeting.func_solution_review import (
     apply_human_decision,
+    ensure_func_solution_review_json_from_archive,
     enrich_payload_from_archive,
     format_revision_brief,
     load_func_solution_review_payload,
@@ -233,6 +234,54 @@ def test_parse_markdown_extracts_rationale():
     assert plans[0]["module_name"] == "索引模块"
     assert "优先级" in plans[0]["requirement_summary"]
     assert "改造类型" in plans[0]["design_rationale"]
+
+
+def test_ensure_review_json_bootstraps_from_markdown_only(tmp_path, monkeypatch):
+    """仅落盘 函数级方案.md 时，门控前应能自动补全 func_solution_review.json。"""
+    scope_id = "fs-bootstrap-json"
+    archive = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
+    archive.mkdir(parents=True)
+    md = """# 函数级方案
+
+## 改造范围概述
+
+本方案覆盖账单模块在线调账能力改造。
+
+```mermaid
+flowchart TD
+  A[入口] --> B[账单模块]
+```
+
+## 1.7 模块改造方案
+
+#### 1.7.1 账单模块
+
+- **涉及功能点**：在线调账与账单核对
+- **改造类型**：修改
+- **职责**：账单生命周期管理
+- **关键文件**：BillService.java
+"""
+    (archive / "函数级方案.md").write_text(md, encoding="utf-8")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.archive_dir",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.json_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "func_solution_review.json",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.md_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "函数级方案.md",
+    )
+
+    assert ensure_func_solution_review_json_from_archive(scope_id)
+    ok, errors = validate_func_solution_review_json(scope_id)
+    assert ok, errors
+    payload = load_func_solution_review_payload(scope_id)
+    assert payload is not None
+    assert len(payload.get("transformation_plans") or []) >= 1
+    assert payload["overview"]["diagrams"]
 
 
 def test_format_revision_brief_and_revise_validation(tmp_path, monkeypatch):

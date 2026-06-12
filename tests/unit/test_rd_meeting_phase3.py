@@ -108,6 +108,27 @@ def test_validate_node_archive_artifacts_checks_file_existence_only(tmp_path, mo
     assert len(present.artifacts) == 1
 
 
+def test_validate_node_archive_artifacts_requires_json_for_func_solution(tmp_path, monkeypatch):
+    scope_id = "21883305"
+    node_id = "func_solution"
+    stage_name = "需求设计"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    from synapse.rd_meeting.paths import scope_dir
+
+    dest = scope_dir(scope_id) / "archive" / stage_name / node_id
+    dest.mkdir(parents=True)
+    (dest / "函数级方案.md").write_text("# 函数级方案\n\n" + ("正文" * 40), encoding="utf-8")
+
+    only_md = validate_node_archive_artifacts(scope_id, stage_name, node_id)
+    assert not only_md.ok
+    assert any("func_solution_review.json" in e for e in only_md.errors)
+
+    (dest / "func_solution_review.json").write_text("{}", encoding="utf-8")
+    both = validate_node_archive_artifacts(scope_id, stage_name, node_id)
+    assert both.ok
+    assert len(both.artifacts) == 2
+
+
 def test_validate_node_output_rejects_short_body():
     bad = validate_node_output("boundary", "too short")
     assert not bad.ok

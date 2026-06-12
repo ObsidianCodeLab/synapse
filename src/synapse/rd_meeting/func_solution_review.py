@@ -36,6 +36,7 @@ _BULLET_FIELD_RE = re.compile(
     r"^-\s+(?:\*\*(.+?)\*\*[：:]\s*(.*)|([^：:\*]+)[：:]\s*(.*))$"
 )
 _MODULE_HEADING_NUM_RE = re.compile(r"^1\.7\.\d+\s+")
+_MERMAID_BLOCK_RE = re.compile(r"```mermaid\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
 
 def uses_func_solution_gate(node_id: str) -> bool:
@@ -510,19 +511,35 @@ def load_func_solution_review_payload(scope_id: str) -> dict[str, Any] | None:
     return enrich_payload_from_archive(scope_id, data)
 
 
-def validate_func_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
+def _diagrams_from_markdown(md: str) -> list[dict[str, str]]:
+    """从 Markdown 代码块提取 Mermaid 图（供评审 JSON 兜底补全）。"""
+    diagrams: list[dict[str, str]] = []
+    for i, block in enumerate(_MERMAID_BLOCK_RE.findall(md or "")):
+        mermaid = block.strip()
+        if not mermaid:
+            continue
+        first = mermaid.split("\n", 1)[0].strip().lower()
+        kind = "flowchart"
+        if "sequencediagram" in first:
+            kind = "sequenceDiagram"
+        elif first.startswith("graph"):
+            kind = "graph"
+        diagrams.append(
+            {
+                "id": f"diagram-{i + 1}",
+                "title": f"架构图 {i + 1}",
+                "kind": kind,
+                "mermaid": mermaid,
+            }
+        )
+    return diagrams
+
+
+def _validate_func_solution_payload(data: dict[str, Any] | None) -> list[str]:
     errors: list[str] = []
-    jpath = json_path(scope_id)
-    mpath = md_path(scope_id)
-    if not mpath.is_file():
-        errors.append(f"缺少约定产出物：{MD_NAME}")
-    if not jpath.is_file():
-        errors.append(f"缺少结构化评审产物：{JSON_NAME}")
-        return False, errors
-    data = load_func_solution_review_payload(scope_id)
     if not data:
         errors.append(f"{JSON_NAME} 无法解析")
-        return False, errors
+        return errors
     if not data.get("transformation_plans"):
         errors.append("transformation_plans 为空")
     overview = data.get("overview") if isinstance(data.get("overview"), dict) else {}
@@ -536,6 +553,62 @@ def validate_func_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
             errors.append(f"plan[{i}] 缺少 design_rationale")
         if not str(plan.get("expected_effect") or "").strip():
             errors.append(f"plan[{i}] 缺少 expected_effect")
+    return errors
+
+
+def ensure_func_solution_review_json_from_archive(scope_id: str) -> bool:
+    """JSON 缺失时从 ``函数级方案.md`` / context 自动补全并落盘（评审门控兜底）。"""
+    if json_path(scope_id).is_file():
+        return True
+    mpath = md_path(scope_id)
+    if not mpath.is_file():
+        return False
+    try:
+        md = mpath.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("ensure func_solution_review: read md failed %s: %s", mpath, exc)
+        return False
+
+    seed: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "overview": {"diagrams": _diagrams_from_markdown(md)},
+        "consistency_analysis": {
+            "summary": "（系统从函数级方案.md 自动生成的评审 payload，请在面板中核对）",
+            "compatibility_notes": [],
+            "contradiction_checks": [],
+        },
+        "transformation_plans": [],
+        "human_review": {"status": "pending", "comment": ""},
+    }
+    payload = enrich_payload_from_archive(scope_id, seed)
+    payload_errors = _validate_func_solution_payload(payload)
+    if payload_errors:
+        logger.info(
+            "ensure func_solution_review: bootstrap incomplete scope=%s errors=%s",
+            scope_id,
+            payload_errors,
+        )
+        return False
+    _write_json_file(json_path(scope_id), payload)
+    logger.info("ensure func_solution_review: bootstrapped %s from %s", scope_id, MD_NAME)
+    return True
+
+
+def validate_func_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
+    errors: list[str] = []
+    mpath = md_path(scope_id)
+    if not mpath.is_file():
+        errors.append(f"缺少约定产出物：{MD_NAME}")
+
+    if mpath.is_file():
+        ensure_func_solution_review_json_from_archive(scope_id)
+
+    jpath = json_path(scope_id)
+    if not jpath.is_file():
+        errors.append(f"缺少结构化评审产物：{JSON_NAME}")
+        return False, errors
+    data = load_func_solution_review_payload(scope_id)
+    errors.extend(_validate_func_solution_payload(data))
     return len(errors) == 0, errors
 
 

@@ -98,6 +98,12 @@ def test_dynamic_context_workers_summary_avoids_capability_card_duplication(host
     assert md.count("worker-default") == 0
 
 
+def test_format_section_system_includes_archive_dir():
+    md = _format_section_system({"archive_dir": "/work/demo/archive/需求分析/module_func"})
+    assert "- ARCHIVE_DIR：`/work/demo/archive/需求分析/module_func`" in md
+    assert "OUTPUT_DIR" in md
+
+
 def test_format_section_system_includes_server_url_for_base_scripts():
     md = _format_section_system(
         {

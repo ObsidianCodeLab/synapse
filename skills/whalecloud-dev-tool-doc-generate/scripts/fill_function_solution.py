@@ -54,13 +54,29 @@ def _repl_each(
 
 
 def _repl_modules(result: str, modules: list[dict[str, Any]]) -> str:
+    """处理 {{#each modules}} 块(支持内层 {{#each functions}} 嵌套).
+
+    由于 re 非贪婪 (.*?) 会在嵌套的 {{/each}} 处提前结束,
+    先把内层 each 块保存为占位符,处理外层后再展开.
+    """
+    # 步骤 1: 找出所有内层 {{#each functions}} 块, 用占位符替换
+    inner_pattern = r"\{\{#each functions\}\}(.*?)\{\{/each\}\}"
+    inner_blocks = []
+
+    def _save_inner(m: re.Match[str]) -> str:
+        idx = len(inner_blocks)
+        inner_blocks.append(m.group(0))
+        return f"__INNER_FN_BLOCK_{idx}__"
+
+    result = re.sub(inner_pattern, _save_inner, result, flags=re.DOTALL)
+
+    # 步骤 2: 处理外层 {{#each modules}} 块
     pattern = r"\{\{#each modules\}\}(.*?)\{\{/each\}\}"
 
     def _handler(match: re.Match[str]) -> str:
         block = match.group(1)
         if not modules:
             return "（无）"
-        fn_pattern = r"\{\{#each functions\}\}(.*?)\{\{/each\}\}"
         sections = []
         for idx, mod in enumerate(modules, 1):
             section = block.replace("{{@index}}", str(idx))
@@ -68,7 +84,7 @@ def _repl_modules(result: str, modules: list[dict[str, Any]]) -> str:
                 mod = {"module_name": str(mod)}
             functions = mod.get("functions") or []
 
-            def _repl_fn(fn_match: re.Match[str]) -> str:
+            def _repl_fn(fn_match: re.Match[str], functions: list = functions) -> str:
                 inner = fn_match.group(1)
                 if not functions:
                     return "（无）"
@@ -77,7 +93,13 @@ def _repl_modules(result: str, modules: list[dict[str, Any]]) -> str:
                     parts.append(_fill_row(inner, fn if isinstance(fn, dict) else {"signature": str(fn)}))
                 return "\n".join(parts)
 
-            section = re.sub(fn_pattern, _repl_fn, section, flags=re.DOTALL)
+            # 展开内层 each 块占位符
+            for fn_idx, fn_block in enumerate(inner_blocks):
+                ph = f"__INNER_FN_BLOCK_{fn_idx}__"
+                if ph in section:
+                    expanded = re.sub(inner_pattern, _repl_fn, fn_block, flags=re.DOTALL)
+                    section = section.replace(ph, expanded)
+
             for k, v in mod.items():
                 if k == "functions":
                     continue

@@ -119,6 +119,11 @@ def test_format_prior_section_in_runtime_header(
     )
     header = build_meeting_runtime_header(ctx, binding=binding)
 
+    assert "**会议产出路径**：" in header
+    assert "module_func" in header
+    path_pos = header.index("**会议产出路径**：")
+    output_pos = header.index("**会议产出**：")
+    assert path_pos < output_pos
     assert "## 前序 SOP 环节产出（本节点可用输入）" in header
     assert "技能强制要求" in header
     assert "流程强制转换" in header

@@ -131,6 +131,10 @@ def _format_section_system(system: dict[str, Any]) -> str:
         current_os = _detect_current_os_type()
     lines.append(f"- CURRENT_OS：`{current_os}` 请使用该操作系统对应的命令, 不要尝试非本操作系统的命令")
 
+    archive_dir = str(sys.get("archive_dir") or "").strip()
+    if archive_dir:
+        lines.append(f"- ARCHIVE_DIR：`{archive_dir}`（本节点归档目录 / OUTPUT_DIR）")
+
     synapse_url = str(sys.get("synapse_url") or unified_service_base_url() or "").strip()
     server_url = str(sys.get("server_url") or synapse_url or "").strip()
     if synapse_url:

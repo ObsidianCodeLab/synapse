@@ -162,6 +162,21 @@ def test_bootstrap_writes_code_and_doc(monkeypatch, tmp_path):
     assert "REPO_NAME：demo" in block
 
 
+def test_build_product_workspace_paths_archive_only_without_product_roots(monkeypatch, tmp_path):
+    scope_id = "21881452"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    block = build_product_workspace_paths_section(
+        None,
+        scope_id=scope_id,
+        stage_name="需求分析",
+        node_id="module_func",
+    )
+    assert "会议产出路径（OUTPUT_DIR / ARCHIVE_DIR）" in block
+    assert "module_func" in block
+    assert "CODE_PATH：" not in block
+
+
 def test_build_product_workspace_paths_includes_archive_dir(monkeypatch, tmp_path):
     scope_id = "21881451"
     work = tmp_path / "work" / scope_id

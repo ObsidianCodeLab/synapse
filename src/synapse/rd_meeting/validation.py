@@ -22,11 +22,17 @@ _REQUIRED_HEADING = re.compile(r"^#\s+\S+", re.MULTILINE)
 
 
 def _artifact_md_names(node_id: str) -> list[str]:
+    """仅 Markdown 产出物（内容级校验用）。"""
+    return [n for n in _artifact_required_names(node_id) if n.lower().endswith(".md")]
+
+
+def _artifact_required_names(node_id: str) -> list[str]:
+    """归档目录须存在的约定产出文件名（含 .md / .json 等单文件产物）。"""
     names: list[str] = []
     for name in node_output_artifacts(node_id):
         if not name or name.startswith("（"):
             continue
-        if name.lower().endswith(".md"):
+        if "." in name and not name.endswith("/"):
             names.append(name)
     return names
 
@@ -87,14 +93,14 @@ def validate_node_archive_artifacts(
     stage_name: str,
     node_id: str,
 ) -> NodeOutputValidation:
-    """校验归档目录下 NODE_OUTPUTS 约定的 Markdown 产出物（仅存在性）。
+    """校验归档目录下 NODE_OUTPUTS 约定的产出物（仅存在性）。
 
-    会议室节点验收以约定文件是否落盘为准；正文格式/关键词由人工或后续流程处理。
-    内容级校验保留在 ``validate_node_output`` / ``_validate_markdown_body``（可选、非门禁）。
+    含 ``func_solution_review.json`` / ``solution_review.json`` 等非 Markdown 结构化产物。
+    正文格式/关键词由人工或后续流程处理；内容级校验见 ``validate_node_output``。
     """
     from synapse.rd_meeting.paths import archive_node_dir, archive_stage_segment
 
-    names = _artifact_md_names(node_id)
+    names = _artifact_required_names(node_id)
     if not names:
         return NodeOutputValidation(ok=True, errors=[])
 

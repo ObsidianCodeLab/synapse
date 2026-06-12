@@ -572,72 +572,17 @@ def build_product_workspace_paths_section(
     archive_dir: str = "",
 ) -> str:
     """渲染 room_opened 落盘后的产品代码 / 文档路径（Host / Worker 必读）。"""
-    if not isinstance(init_context, dict):
-        return ""
-    product = init_context.get("product")
-    system = init_context.get("system")
-    prod = product if isinstance(product, dict) else {}
-    sys_map = system if isinstance(system, dict) else {}
+    prod: dict[str, Any] = {}
+    sys_map: dict[str, Any] = {}
+    if isinstance(init_context, dict):
+        product = init_context.get("product")
+        system = init_context.get("system")
+        prod = product if isinstance(product, dict) else {}
+        sys_map = system if isinstance(system, dict) else {}
 
     code_root = str(prod.get("code_root") or sys_map.get("product_code_root") or "").strip()
     doc_root = str(prod.get("doc_root") or sys_map.get("product_doc_root") or "").strip()
     work_dir = str(prod.get("work_order_dir") or sys_map.get("work_order_dir") or "").strip()
-    if not code_root and not doc_root and not work_dir:
-        return ""
-
-    lines: list[str] = ["## 产品工作区路径（room_opened 已落盘，必读）", ""]
-    lines.append(
-        "- **约定**：产品源码在 `work/<scope>/code/<repo_name>/`；"
-        "沙箱工程在 `work/<scope>/sandbox/<repo_name>/`（`SANDBOX_PATH` 由 `CODE_PATH` 将 `code` 改为 `sandbox`）；"
-        "产品文档在 `work/<scope>/doc/<doc_type>/`。"
-        "读代码 / 文档时**必须**使用下列路径，**禁止**臆造目录。"
-    )
-    if work_dir:
-        lines.append(f"- **工单工作目录**：`{work_dir}`")
-    if code_root:
-        lines.append(f"- **产品代码根目录**：`{code_root}`")
-    repos = prod.get("repos")
-    if isinstance(repos, list):
-        for r in repos:
-            if not isinstance(r, dict):
-                continue
-            name = str(r.get("repo_name") or "仓库").strip()
-            local = str(r.get("local_path") or "").strip()
-            code_path = str(r.get("code_path") or "").strip()
-            resolved = str(r.get("resolved_code_path") or "").strip() or resolve_repo_code_path(
-                local_path=local,
-                repo_name=name,
-                code_path=code_path,
-                code_root=code_root,
-            )
-            if not resolved:
-                continue
-            sandbox = (
-                str(r.get("resolved_sandbox_path") or "").strip()
-                or resolve_repo_sandbox_path(resolved)
-            )
-            st = str(r.get("materialize_status") or "").strip()
-            note = f"（{st}）" if st and st != "ok" else ""
-            lines.append(f"  - 代码 `{name}` 路径参数：")
-            lines.append(f"    REPO_NAME：{name}")
-            lines.append(f"    CODE_PATH：{resolved}{note}")
-            if sandbox:
-                lines.append(f"    SANDBOX_PATH：{sandbox}")
-    if doc_root:
-        lines.append(f"- **产品文档根目录**：`{doc_root}`")
-    docs = prod.get("docs")
-    if isinstance(docs, list):
-        for d in docs:
-            if not isinstance(d, dict):
-                continue
-            local = str(d.get("local_path") or "").strip()
-            if not local:
-                continue
-            dtype = str(d.get("doc_type") or "文档").strip()
-            st = str(d.get("materialize_status") or "").strip()
-            note = f"（{st}）" if st and st != "ok" else ""
-            lines.append(f"  - 文档 `{dtype}`：`{local}`{note}")
-
     archive_path = _resolve_archive_output_dir(
         work_dir=work_dir,
         scope_id=scope_id,
@@ -646,6 +591,64 @@ def build_product_workspace_paths_section(
         archive_dir=archive_dir,
         system=sys_map,
     )
+    has_product_paths = bool(code_root or doc_root or work_dir)
+    if not has_product_paths and not archive_path:
+        return ""
+
+    lines: list[str] = ["## 产品工作区路径（room_opened 已落盘，必读）", ""]
+    if has_product_paths:
+        lines.append(
+            "- **约定**：产品源码在 `work/<scope>/code/<repo_name>/`；"
+            "沙箱工程在 `work/<scope>/sandbox/<repo_name>/`（`SANDBOX_PATH` 由 `CODE_PATH` 将 `code` 改为 `sandbox`）；"
+            "产品文档在 `work/<scope>/doc/<doc_type>/`。"
+            "读代码 / 文档时**必须**使用下列路径，**禁止**臆造目录。"
+        )
+        if work_dir:
+            lines.append(f"- **工单工作目录**：`{work_dir}`")
+        if code_root:
+            lines.append(f"- **产品代码根目录**：`{code_root}`")
+        repos = prod.get("repos")
+        if isinstance(repos, list):
+            for r in repos:
+                if not isinstance(r, dict):
+                    continue
+                name = str(r.get("repo_name") or "仓库").strip()
+                local = str(r.get("local_path") or "").strip()
+                code_path = str(r.get("code_path") or "").strip()
+                resolved = str(r.get("resolved_code_path") or "").strip() or resolve_repo_code_path(
+                    local_path=local,
+                    repo_name=name,
+                    code_path=code_path,
+                    code_root=code_root,
+                )
+                if not resolved:
+                    continue
+                sandbox = (
+                    str(r.get("resolved_sandbox_path") or "").strip()
+                    or resolve_repo_sandbox_path(resolved)
+                )
+                st = str(r.get("materialize_status") or "").strip()
+                note = f"（{st}）" if st and st != "ok" else ""
+                lines.append(f"  - 代码 `{name}` 路径参数：")
+                lines.append(f"    REPO_NAME：{name}")
+                lines.append(f"    CODE_PATH：{resolved}{note}")
+                if sandbox:
+                    lines.append(f"    SANDBOX_PATH：{sandbox}")
+        if doc_root:
+            lines.append(f"- **产品文档根目录**：`{doc_root}`")
+        docs = prod.get("docs")
+        if isinstance(docs, list):
+            for d in docs:
+                if not isinstance(d, dict):
+                    continue
+                local = str(d.get("local_path") or "").strip()
+                if not local:
+                    continue
+                dtype = str(d.get("doc_type") or "文档").strip()
+                st = str(d.get("materialize_status") or "").strip()
+                note = f"（{st}）" if st and st != "ok" else ""
+                lines.append(f"  - 文档 `{dtype}`：`{local}`{note}")
+
     if archive_path:
         lines.append(f"- **会议产出路径（OUTPUT_DIR / ARCHIVE_DIR）**：`{archive_path}`")
     lines.append("")
@@ -1097,6 +1100,26 @@ def build_meeting_runtime_header(
     lines.append(f"- **会议工单**:[`{context.scope_id}`]-{context.ticket_title}")
     lines.append(f"- **涉及产品**：{product_label}")
     lines.append(f"- **会议任务**：{context.stage_name}阶段的{context.node_name}任务")
+    prod_map = init_context.get("product") if isinstance(init_context, dict) else {}
+    sys_map = init_context.get("system") if isinstance(init_context, dict) else {}
+    if not isinstance(prod_map, dict):
+        prod_map = {}
+    if not isinstance(sys_map, dict):
+        sys_map = {}
+    work_dir = str(prod_map.get("work_order_dir") or sys_map.get("work_order_dir") or "").strip()
+    archive_output_dir = _resolve_archive_output_dir(
+        work_dir=work_dir,
+        scope_id=context.scope_id,
+        stage_name=context.stage_name,
+        node_id=context.node_id,
+        archive_dir=context.archive_dir,
+        system=sys_map,
+    )
+    if archive_output_dir:
+        lines.append(
+            f"- **会议产出路径**：`{archive_output_dir}`"
+            "（`write_file` / `doc-generate` 的 OUTPUT_DIR 必须使用该目录，**禁止**写到其他路径）"
+        )
     lines.append(f"- **会议产出**：{meeting_outputs_label}（最终归档文件名必须**完全等于**这里列出的名字；详见下方归档约束）")
     lines.append(f"- **会议目标**：{context.node_intent}")
     reprocess_block = format_reprocess_instruction(context.scope_id, context.node_id)
