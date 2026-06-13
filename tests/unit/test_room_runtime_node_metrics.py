@@ -13,13 +13,16 @@ from synapse.rd_meeting.room_runtime import (
     DEFAULT_NODE_TOKEN_BUDGET,
     DEFAULT_TOKEN_BUDGET,
     compute_node_metrics_seconds,
+    compute_room_token_budget,
     compute_stage_elapsed_seconds,
     build_meeting_summary_nodes,
     default_room_state,
+    ensure_metrics_token_budget,
     finalize_node_metrics,
     load_room_state,
     refresh_node_metrics,
     resolve_node_seconds,
+    resolve_node_token_budget,
     save_room_state,
     sum_node_metrics_tokens,
     sync_metrics_tokens_from_node_metrics,
@@ -307,6 +310,7 @@ def test_sync_metrics_tokens_from_node_metrics_sums_nodes() -> None:
     }
     sync_metrics_tokens_from_node_metrics(rs, scope_id)
     assert rs["metrics"]["tokens"] == 3000
+    assert rs["metrics"]["token_budget"] == DEFAULT_NODE_TOKEN_BUDGET * 2
     assert sum_node_metrics_tokens(rs, scope_id) == 3000
 
 
@@ -356,3 +360,60 @@ def test_load_room_state_repairs_stale_metrics_tokens() -> None:
     loaded = load_room_state(scope_id)
     assert loaded is not None
     assert loaded["metrics"]["tokens"] == 4200
+
+
+def test_resolve_node_token_budget_defaults_and_system() -> None:
+    assert resolve_node_token_budget("req_clarify") == DEFAULT_NODE_TOKEN_BUDGET
+    assert resolve_node_token_budget("auto_split") is None
+
+
+def test_compute_room_token_budget_sums_started_sop_nodes_only() -> None:
+    rs = default_room_state(
+        room_id="room-budget",
+        scope_type="demand",
+        scope_id="budget_scope",
+        stage_id=1,
+        current_node_id="req_clarify",
+    )
+    rs["node_metrics"] = {
+        "req_clarify": {"started_at": "2026-06-05T10:00:00", "tokens": 100},
+        "module_func": {"started_at": "2026-06-05T11:00:00", "tokens": 200},
+        "auto_split": {"started_at": "2026-06-05T12:00:00", "tokens": 0},
+    }
+    assert compute_room_token_budget(rs) == DEFAULT_NODE_TOKEN_BUDGET * 2
+
+
+def test_ensure_metrics_token_budget_recomputes_from_started_nodes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from synapse.rd_meeting import room_runtime
+
+    monkeypatch.setattr(
+        room_runtime,
+        "load_meeting_room_config",
+        lambda: {
+            "node_overrides": {
+                "req_clarify": {"token_budget": 5_000_000},
+                "module_func": {"token_budget": 2_000_000},
+            }
+        },
+    )
+    scope_id = "budget_ensure_scope"
+    rs = default_room_state(
+        room_id="room-ensure-budget",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=1,
+        current_node_id="req_clarify",
+    )
+    rs["metrics"]["token_budget"] = DEFAULT_TOKEN_BUDGET
+    rs["node_metrics"] = {
+        "req_clarify": {"started_at": "2026-06-05T10:00:00"},
+        "module_func": {"started_at": "2026-06-05T11:00:00"},
+    }
+    save_room_state(scope_id, rs)
+
+    ensure_metrics_token_budget(scope_id)
+    after = load_room_state(scope_id)
+    assert after is not None
+    assert after["metrics"]["token_budget"] == 7_000_000

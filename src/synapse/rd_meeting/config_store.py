@@ -125,6 +125,7 @@ _SAVABLE_OVERRIDE_KEYS = (
     "cli_tool",
     "cli_model",
     "cli_model_custom",
+    "token_budget",
 )
 
 
@@ -138,12 +139,21 @@ def _normalize_overrides(value: Any) -> dict[str, Any]:
         entry: dict[str, Any] = {}
         for key in _SAVABLE_OVERRIDE_KEYS:
             if key in ov:
+                if key == "token_budget":
+                    try:
+                        val = int(ov[key])
+                        if val > 0:
+                            entry[key] = val
+                    except (TypeError, ValueError):
+                        pass
+                    continue
                 entry[key] = ov[key]
         if entry:
             entry.pop("skill_ids", None)
             nid = str(node_id)
             if is_system_node(nid):
                 entry.pop("human_confirm", None)
+                entry.pop("token_budget", None)
             if is_collaborative_node(nid):
                 entry["worker_profile_ids"] = []
             cleaned[nid] = entry
@@ -162,6 +172,7 @@ def _strip_legacy_override_fields(overrides: dict[str, Any]) -> dict[str, Any]:
         nid = str(node_id)
         if is_system_node(nid):
             entry.pop("human_confirm", None)
+            entry.pop("token_budget", None)
         if is_collaborative_node(nid):
             entry["worker_profile_ids"] = []
         if entry:

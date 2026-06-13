@@ -1,9 +1,9 @@
 /** 研发会议室 API（Phase 0/1/2） */
 
-/** 整场会议 token 预算（看板卡片进度条分母） */
-export const MEETING_ROOM_TOKEN_BUDGET = 20_000_000;
-/** 单个 SOP 节点 token 预算（会议室顶栏节点指标分母） */
+/** 单个 SOP 节点 token 预算默认值（会议室顶栏 / 阵容配置） */
 export const MEETING_NODE_TOKEN_BUDGET = 3_000_000;
+/** @deprecated 看板总预算由后端按已启动 SOP 节点预算之和返回 */
+export const MEETING_ROOM_TOKEN_BUDGET = 20_000_000;
 
 type SynapseWire = { errorcode: number; message?: string; data?: unknown };
 
@@ -26,7 +26,7 @@ export interface MeetingRoomListItem {
   meeting_room_active: boolean;
   updated_at?: string;
   tokenConsumed?: number;
-  tokenBudget?: number;
+  tokenBudget?: number | null;
   stageDuration?: string;
   /** ISO 时间，来自 room_state.metrics.stage_started_at */
   meetingStartedAt?: string;
@@ -197,6 +197,8 @@ export interface MeetingRoomNodeOverride {
   cli_model?: string;
   /** 任务执行节点：custom 模式下的模型名称 */
   cli_model_custom?: string;
+  /** 节点 Token 预算（非系统节点；默认 3M） */
+  token_budget?: number;
 }
 
 export interface MeetingRoomConfigPayload {
@@ -235,6 +237,10 @@ export interface MeetingRoomNodeBinding {
   cli_tool?: string;
   cli_model?: string;
   cli_model_custom?: string;
+  /** 节点 Token 预算（系统节点为 null/undefined） */
+  token_budget?: number | null;
+  /** 默认节点 Token 预算（3M） */
+  default_token_budget?: number | null;
 }
 
 export interface DevStatusPayload {
@@ -369,7 +375,7 @@ export interface MeetingRoomLivePayload {
   stage_id?: number;
   stage_name?: string;
   tokenConsumed?: number;
-  tokenBudget?: number;
+  tokenBudget?: number | null;
   stageDuration?: string;
   meetingStartedAt?: string;
   agents_active?: { profile_id: string; role?: string; status?: string }[];

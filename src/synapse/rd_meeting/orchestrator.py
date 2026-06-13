@@ -73,6 +73,7 @@ from synapse.rd_meeting.room_runtime import (
     finalize_node_metrics,
     load_room_state,
     save_room_state,
+    sync_metrics_tokens_from_node_metrics,
 )
 from synapse.rd_meeting.sop_stage_hooks import schedule_sop_stage_transition_hook
 from synapse.rd_meeting.room_skill import (
@@ -2290,6 +2291,7 @@ class MeetingRoomOrchestrator:
         if node_id not in nm or not isinstance(nm.get(node_id), dict):
             nm[node_id] = {"started_at": _now_iso(), "seconds": 0, "tokens": 0}
         room_state["node_metrics"] = nm
+        sync_metrics_tokens_from_node_metrics(room_state, sid)
         rework = str(room_state.pop("rework_instruction", "") or "").strip()
         existing_plan = room_state.get("current_work_plan")
         if isinstance(existing_plan, dict):

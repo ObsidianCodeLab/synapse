@@ -103,6 +103,16 @@ def test_req_clarify_binding_has_no_builtin_interactive_schema() -> None:
     assert resolve_hitl_form_schema("req_clarify", node_override={}) is None
 
 
+def test_func_solution_binding_has_no_default_result_confirm_schema() -> None:
+    assert resolve_hitl_form_schema("func_solution", node_override={}) is None
+    schema = resolve_hitl_schema_for_gate(
+        {"node_id": "func_solution", "human_confirm": True},
+        dynamic_schema=None,
+        intervention_kind="result_confirm",
+    )
+    assert schema is None
+
+
 def test_interactive_vs_result_confirm_schema() -> None:
     binding = {"node_id": "req_clarify", "human_confirm": True}
     interactive = resolve_hitl_schema_for_gate(

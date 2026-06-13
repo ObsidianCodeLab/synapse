@@ -1,4 +1,4 @@
-import type { NodeType } from '../../../rd-sop/constants';
+import { ALL_NODES, type NodeType } from '../../../rd-sop/constants';
 
 export type InterventionPanelKind =
   | 'solution_review'
@@ -7,6 +7,26 @@ export type InterventionPanelKind =
   | 'node_review'
   | 'hitl'
   | 'prod_selection';
+
+/** 协同型（ai_human）节点完成门控使用的专用面板（与后端 intervention_panel 对齐） */
+const COLLAB_DEDICATED_PANEL: Record<string, InterventionPanelKind> = {
+  solution_review: 'solution_review',
+  func_solution: 'func_solution_review',
+  task_exec: 'task_exec',
+  leader_review: 'node_review',
+};
+
+export function collabDedicatedPanel(nodeId: string): InterventionPanelKind | null {
+  return COLLAB_DEDICATED_PANEL[(nodeId || '').trim()] ?? null;
+}
+
+export function nodeTypeForId(
+  nodeId: string,
+  explicit?: NodeType | string,
+): NodeType | undefined {
+  if (explicit) return explicit as NodeType;
+  return ALL_NODES.find((n) => n.id === (nodeId || '').trim())?.type;
+}
 
 /** 协同型节点（ai_human）禁止配置协作智能体阵容。 */
 export function collaborationWorkersConfigurable(
@@ -119,6 +139,16 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
   return pendingNid || fromReview || current;
 }
 
+function resolveCollabDedicatedPanel(
+  nodeType: NodeType | string | undefined,
+  nodeId: string,
+  kind: string,
+): InterventionPanelKind | null {
+  if (nodeType !== 'ai_human') return null;
+  if (kind === 'interactive' || kind === 'exception') return null;
+  return collabDedicatedPanel(nodeId);
+}
+
 /**
  * 中栏「人工确认」Tab 应渲染的面板。
  * 优先使用 live 下发的 intervention_panel；否则按节点类型 + intervention_kind 推断。
@@ -147,6 +177,7 @@ export function resolveMeetingInterventionPanel(
     return 'prod_selection';
   }
   const nid = (nodeId || room.currentNode || '').trim();
+  const resolvedType = nodeTypeForId(nid, nodeType);
 
   if (kind === 'task_exec' || room.taskExecPayload) {
     return 'task_exec';
@@ -159,9 +190,14 @@ export function resolveMeetingInterventionPanel(
     return 'func_solution_review';
   }
 
+  const collabPanel = resolveCollabDedicatedPanel(resolvedType, nid, kind);
+  if (collabPanel) {
+    return collabPanel;
+  }
+
   if (
     (kind === 'interactive' || kind === 'exception' || room.hitlFormSchema) &&
-    humanConfirmSwitchVisible(nodeType)
+    humanConfirmSwitchVisible(resolvedType)
   ) {
     return 'hitl';
   }
@@ -170,14 +206,11 @@ export function resolveMeetingInterventionPanel(
     return 'node_review';
   }
 
-  if (nodeType === 'ai_human') {
-    if (nid === 'task_exec' && kind === 'task_exec') return 'task_exec';
-    if (nid === 'solution_review' && room.solutionReviewPayload) return 'solution_review';
-    if (nid === 'func_solution' && room.funcSolutionReviewPayload) return 'func_solution_review';
+  if (resolvedType === 'ai_human') {
     if (room.reviewPayload) return 'node_review';
   }
 
-  if (room.hitlFormSchema && nodeType !== 'ai_human' && nodeType !== 'ai') {
+  if (room.hitlFormSchema && resolvedType !== 'ai_human' && resolvedType !== 'ai') {
     return 'hitl';
   }
 

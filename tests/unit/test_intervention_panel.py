@@ -80,3 +80,36 @@ def test_binding_ai_forces_human_confirm_off() -> None:
     b = resolve_node_binding("boundary")
     assert b.get("type") == "ai"
     assert b.get("human_confirm") is False
+
+
+def test_func_solution_binding_has_no_default_hitl_schema() -> None:
+    b = resolve_node_binding("func_solution")
+    assert b.get("type") == "ai_human"
+    assert b.get("human_confirm") is True
+    assert b.get("hitl_form_schema") is None
+
+
+def test_func_solution_stale_hitl_schema_uses_review_panel() -> None:
+    """残留蓝色结果确认问卷时，仍须走函数级方案评审面板。"""
+    panel = resolve_intervention_panel(
+        node_id="func_solution",
+        intervention_kind="gate",
+        hitl_form_schema={
+            "title": "函数级方案 — 人工确认",
+            "render": {"accent": "blue"},
+            "questions": [{"id": "quality_check", "title": "产出质量"}],
+        },
+    )
+    assert panel == "func_solution_review"
+
+
+def test_func_solution_exception_still_uses_hitl() -> None:
+    panel = resolve_intervention_panel(
+        node_id="func_solution",
+        intervention_kind="exception",
+        hitl_form_schema={
+            "title": "异常裁决",
+            "questions": [{"id": "decision", "title": "下一步"}],
+        },
+    )
+    assert panel == "hitl"

@@ -83,6 +83,14 @@ def resolve_intervention_panel(
     if kind == "task_exec" or pending.get("task_exec_payload"):
         return "task_exec"
 
+    dedicated = collab_dedicated_panel(nid)
+    if (
+        is_collab_sop_type(sop)
+        and dedicated in ("func_solution_review", "solution_review", "task_exec")
+        and kind not in ("interactive", "exception")
+    ):
+        return dedicated
+
     # 会中问卷优先于 pending 内预取的 review_payload（避免详情页拉取 node-review 盖掉表单）
     if is_clarify_gate_active(kind, hitl_form_schema):
         return "hitl"
@@ -90,7 +98,6 @@ def resolve_intervention_panel(
     if kind == "result_confirm" or pending.get("review_payload"):
         return "node_review"
 
-    dedicated = collab_dedicated_panel(nid)
     if is_collab_sop_type(sop) and dedicated and kind in ("solution_review", "func_solution_review", "result_confirm", "gate", ""):
         if dedicated == "solution_review" and (
             kind == "solution_review" or pending.get("solution_review_payload")

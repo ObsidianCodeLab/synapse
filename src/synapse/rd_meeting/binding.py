@@ -10,6 +10,7 @@ from synapse.rd_meeting.config_store import (
     DEFAULT_LLM_ENDPOINT_KEY,
     load_meeting_room_config,
 )
+from synapse.rd_meeting.room_runtime import DEFAULT_NODE_TOKEN_BUDGET, resolve_node_token_budget
 from synapse.rd_meeting.hitl_form import resolve_hitl_form_schema
 from synapse.rd_meeting.intents import resolve_node_intent
 from synapse.rd_sop.manifest import (
@@ -88,6 +89,13 @@ def _merge_binding(base: dict[str, Any], override: dict[str, Any], *, node_id: s
         out["cli_model"] = normalize_cursor_cli_model(str(override.get("cli_model") or ""))
     if override.get("cli_model_custom") is not None:
         out["cli_model_custom"] = str(override.get("cli_model_custom") or "").strip()
+    if override.get("token_budget") is not None and not is_system_node(node_id):
+        try:
+            val = int(override["token_budget"])
+            if val > 0:
+                out["token_budget"] = val
+        except (TypeError, ValueError):
+            pass
     return out
 
 
@@ -145,6 +153,8 @@ def resolve_node_binding(
             "host_llm_endpoint_key": host_llm_endpoint,
             "worker_llm_endpoint_key": worker_llm_endpoint,
             "prompt_supplement": "",
+            "token_budget": resolve_node_token_budget(node_id),
+            "default_token_budget": DEFAULT_NODE_TOKEN_BUDGET,
         }
 
     base = dict(entry.get("default_binding") or {})
@@ -182,6 +192,7 @@ def resolve_node_binding(
     merged["cli_model"] = cli_model
     merged["cli_model_custom"] = cli_model_custom
 
+    node_budget = resolve_node_token_budget(node_id)
     return {
         "node_id": node_id,
         "node_name": str(entry.get("name") or node_id),
@@ -198,7 +209,9 @@ def resolve_node_binding(
         "default_node_intent": default_node_intent,
         "host_llm_endpoint_key": host_llm_endpoint,
         "worker_llm_endpoint_key": node_worker_endpoint,
+        "default_token_budget": DEFAULT_NODE_TOKEN_BUDGET if node_budget is not None else None,
         **merged,
+        "token_budget": node_budget,
     }
 
 

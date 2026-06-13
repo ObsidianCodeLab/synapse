@@ -11,8 +11,6 @@ import {
   serializeHitlFormSubmission,
   fetchSoulInstruction,
   putSoulInstruction,
-  MEETING_NODE_TOKEN_BUDGET,
-  MEETING_ROOM_TOKEN_BUDGET,
   reprocessMeetingRoom,
   recoverMeetingRoom,
   resetDemandToAudit,
@@ -73,6 +71,7 @@ import {
   effectiveHumanConfirmByType,
   resolveHitlTargetNodeId,
   resolveMeetingInterventionPanel,
+  nodeTypeForId,
   type InterventionPanelKind,
 } from './meetingInterventionPanel';
 import { MeetingChatEmpty, MeetingChatMessage } from './MeetingChatMessage';
@@ -156,7 +155,7 @@ interface MeetingRoom {
   stageDuration: string;
   meetingStartedAt?: string;
   tokenConsumed: number;
-  tokenBudget: number;
+  tokenBudget: number | null;
   agents: RoomAgent[];
   /** 当前节点协作流快照（卡片预览用） */
   logs: LogEntry[];
@@ -403,6 +402,9 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     Boolean(pendingDelivery?.solution_review_payload) ||
     room.interventionPanel === 'solution_review' ||
     Boolean(room.solutionReviewPayload);
+  const hitlPanelNodeId =
+    String(pendingDelivery?.node_id ?? '').trim() || nextNodeId;
+  const hitlPanelNodeType = nodeTypeForId(hitlPanelNodeId);
   const interventionPanel =
     (live.intervention_panel as InterventionPanelKind | undefined) ??
     room.interventionPanel ??
@@ -431,8 +433,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
             ? String(pendingDelivery.node_id)
             : room.hitlPendingNodeId,
       },
-      undefined,
-      nextNodeId,
+      hitlPanelNodeType,
+      hitlPanelNodeId,
     );
   const isSolutionReview =
     interventionKind === 'solution_review' || interventionPanel === 'solution_review';
@@ -456,8 +458,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       ? (typeof live.view_node_token === 'number' ? live.view_node_token : room.tokenConsumed)
       : (live.tokenConsumed ?? room.tokenConsumed),
     tokenBudget: live.view_node_id
-      ? (live.tokenBudget ?? MEETING_NODE_TOKEN_BUDGET)
-      : (live.tokenBudget ?? room.tokenBudget),
+      ? (typeof live.tokenBudget === 'number' ? live.tokenBudget : null)
+      : (typeof live.tokenBudget === 'number' ? live.tokenBudget : room.tokenBudget ?? 0),
     stageDuration: live.stageDuration || room.stageDuration,
     meetingStartedAt: live.meetingStartedAt || room.meetingStartedAt,
     hitlFormSchema:
@@ -568,7 +570,7 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
     stageDuration: item.stageDuration || '—',
     meetingStartedAt: item.meetingStartedAt,
     tokenConsumed: item.tokenConsumed ?? 0,
-    tokenBudget: item.tokenBudget ?? MEETING_ROOM_TOKEN_BUDGET,
+    tokenBudget: item.tokenBudget ?? 0,
     agents: buildAgentsFromDetail(item),
     allChatLogs: allChatLogs.length ? allChatLogs : logs,
     logs,
@@ -607,8 +609,18 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
         })?.func_solution_review_payload,
         hitlPendingNodeId: (item.room_state?.pending_delivery as { node_id?: string })?.node_id,
       },
-      undefined,
-      item.current_node_id,
+      nodeTypeForId(
+        String(
+          (item.room_state?.pending_delivery as { node_id?: string } | undefined)?.node_id ||
+            item.current_node_id ||
+            '',
+        ),
+      ),
+      String(
+        (item.room_state?.pending_delivery as { node_id?: string } | undefined)?.node_id ||
+          item.current_node_id ||
+          '',
+      ),
     ),
     solutionReviewPayload:
       ((item.room_state?.pending_delivery as { solution_review_payload?: SolutionReviewPayload })
@@ -1056,6 +1068,7 @@ const MeetingRoomTitleBar = ({
   viewNodeId,
   viewNodeName,
   viewNodeToken,
+  viewNodeBudget,
   onBack,
   onResetInitSuccess,
   synapseApiBase,
@@ -1065,6 +1078,8 @@ const MeetingRoomTitleBar = ({
   viewNodeId: string;
   viewNodeName: string;
   viewNodeToken: number;
+  /** 当前查看节点的 Token 预算（非系统节点；与 live 轮询 node_id 对齐） */
+  viewNodeBudget: number | null;
   onBack: () => void;
   /** 工单处理初始化成功后：关闭弹窗并从会议室主列表移除 */
   onResetInitSuccess?: (roomId: string) => void;
@@ -1171,12 +1186,12 @@ const MeetingRoomTitleBar = ({
   }, [onBack, onResetInitSuccess, room.id, synapseApiBase]);
 
   const isPipelineCurrent = viewNodeId === room.currentNode;
-  const tokenBudget = MEETING_NODE_TOKEN_BUDGET;
+  const tokenBudget = viewNodeBudget;
   const tokenConsumed = viewNodeToken;
-  const tokenPct = tokenBudget > 0
+  const tokenPct = tokenBudget != null && tokenBudget > 0
     ? Math.min(100, (tokenConsumed / tokenBudget) * 100)
     : 0;
-  const tokenHot = tokenBudget > 0 && tokenConsumed > tokenBudget * 0.9;
+  const tokenHot = tokenBudget != null && tokenBudget > 0 && tokenConsumed > tokenBudget * 0.9;
 
   return (
     <header className="shrink-0 border-b border-border/60 bg-gradient-to-r from-[color:var(--panel)] via-[color:var(--panel2)] to-[color:var(--panel)] px-4 py-3">
@@ -1302,6 +1317,7 @@ const MeetingRoomTitleBar = ({
               <span className="font-medium text-blue-300 truncate">{viewNodeName}</span>
             </div>
           </Tooltip>
+          {tokenBudget != null && tokenBudget > 0 ? (
           <Tooltip title={`节点 Token 消耗 ${tokenConsumed.toLocaleString()} / 预算 ${tokenBudget.toLocaleString()}`}>
             <div className="inline-flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/8 px-3 py-1.5 text-[11px] min-w-[140px]">
               <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -1319,6 +1335,7 @@ const MeetingRoomTitleBar = ({
               />
             </div>
           </Tooltip>
+          ) : null}
         </div>
       </div>
       <Modal
@@ -1520,10 +1537,20 @@ const RoomCard = ({
             <div className="flex-1 flex items-center gap-2">
               <span className="font-mono">{(room.tokenConsumed / 1000).toFixed(1)}k</span>
               <Progress 
-                percent={Math.min(100, (room.tokenConsumed / room.tokenBudget) * 100)} 
+                percent={
+                  room.tokenBudget != null && room.tokenBudget > 0
+                    ? Math.min(100, (room.tokenConsumed / room.tokenBudget) * 100)
+                    : 0
+                } 
                 showInfo={false} 
                 size="small"
-                strokeColor={room.tokenConsumed > room.tokenBudget * 0.9 ? '#ef4444' : '#3b82f6'}
+                strokeColor={
+                  room.tokenBudget != null &&
+                  room.tokenBudget > 0 &&
+                  room.tokenConsumed > room.tokenBudget * 0.9
+                    ? '#ef4444'
+                    : '#3b82f6'
+                }
                 trailColor="rgba(255,255,255,0.1)"
                 style={{ marginBottom: 0, minWidth: '40px' }}
               />
@@ -1627,11 +1654,14 @@ const InterventionDialog = ({
   onMergeNodeChat,
   onProdSubmitted,
   onResetInitSuccess,
+  onViewNodeChange,
   synapseApiBase,
 }: { 
   room: MeetingRoom | null; 
   open: boolean; 
   onClose: () => void;
+  /** 弹窗内选中的 SOP 节点（供外层 live 轮询带 node_id） */
+  onViewNodeChange?: (nodeId: string) => void;
   /** 仅中栏人工确认表单提交时使用，协作流只读 */
   onHitlSubmit?: (text: string, values: HitlFormValues) => void;
   onReprocess?: (nodeId: string, reason?: string) => void;
@@ -1670,6 +1700,7 @@ const InterventionDialog = ({
   };
 
   const [viewNodeToken, setViewNodeToken] = useState(0);
+  const [viewNodeBudget, setViewNodeBudget] = useState<number | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const lastLogKeyRef = useRef('');
   const interventionRoomIdRef = useRef<string | null>(null);
@@ -1679,6 +1710,10 @@ const InterventionDialog = ({
   const userPinnedNodeRef = useRef(false);
 
   const chatNodeId = selectedNodeId || room?.currentNode || 'pending';
+
+  useEffect(() => {
+    onViewNodeChange?.(chatNodeId);
+  }, [chatNodeId, onViewNodeChange]);
   /** 人工确认表单/结果确认仅归属当前流水线节点（或 review_payload 指定节点） */
   const hitlTargetNodeId = room ? resolveHitlTargetNodeId(room) : '';
   const isViewingHitlNode = Boolean(hitlTargetNodeId && chatNodeId === hitlTargetNodeId);
@@ -1859,6 +1894,7 @@ const InterventionDialog = ({
   useEffect(() => {
     if (!open || !room?.id || !chatNodeId) {
       setViewNodeToken(0);
+      setViewNodeBudget(null);
       return;
     }
     const base = (synapseApiBase || '').trim();
@@ -1877,6 +1913,9 @@ const InterventionDialog = ({
               ? live.view_node_token
               : live.tokenConsumed;
           setViewNodeToken(typeof tok === 'number' ? tok : 0);
+          setViewNodeBudget(
+            typeof live.tokenBudget === 'number' ? live.tokenBudget : null,
+          );
         })
         .catch(() => {
           /* 静默 */
@@ -2050,6 +2089,7 @@ const InterventionDialog = ({
           viewNodeId={chatNodeId}
           viewNodeName={selectedNode?.name || resolveSopNodeName(chatNodeId)}
           viewNodeToken={viewNodeToken}
+          viewNodeBudget={viewNodeBudget}
           onBack={onClose}
           onResetInitSuccess={onResetInitSuccess}
           synapseApiBase={synapseApiBase}
@@ -2653,6 +2693,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
   const [loading, setLoading] = useState(false);
   const [activeRoom, setActiveRoom] = useState<MeetingRoom | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogViewNodeId, setDialogViewNodeId] = useState<string | undefined>();
   const [configOpen, setConfigOpen] = useState(false);
   const [roomConfig, setRoomConfig] = useState<MeetingRoomConfigPayload | null>(null);
   const [agentProfiles, setAgentProfiles] = useState<Map<string, MeetingAgentProfileWire>>(
@@ -2746,17 +2787,20 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
     const roomId = activeRoom.id;
+    const viewNodeId = (dialogViewNodeId || '').trim() || undefined;
     const poll = () => {
-      void fetchMeetingRoomLive(base, roomId)
+      void fetchMeetingRoomLive(base, roomId, viewNodeId)
         .then((live) => {
           setActiveRoom((prev) => {
             if (!prev || prev.id !== roomId) return prev;
             const merged = applyLivePatch(prev, live);
             return merged;
           });
-          setRooms((prev) =>
-            prev.map((r) => (r.id === roomId ? applyLivePatch(r, live) : r)),
-          );
+          if (!viewNodeId) {
+            setRooms((prev) =>
+              prev.map((r) => (r.id === roomId ? applyLivePatch(r, live) : r)),
+            );
+          }
         })
         .catch(() => {
           /* 轮询失败静默，避免打断会中操作 */
@@ -2765,7 +2809,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     poll();
     const timer = window.setInterval(poll, 3000);
     return () => window.clearInterval(timer);
-  }, [dialogOpen, activeRoom?.id, synapseApiBase]);
+  }, [dialogOpen, activeRoom?.id, dialogViewNodeId, synapseApiBase]);
 
   useEffect(() => {
     const focus = consumeMeetingRoomFocus();
@@ -3044,7 +3088,11 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
         <InterventionDialog
           room={activeRoom}
           open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+          onClose={() => {
+            setDialogOpen(false);
+            setDialogViewNodeId(undefined);
+          }}
+          onViewNodeChange={setDialogViewNodeId}
           onHitlSubmit={handleHitlSubmit}
           onReprocess={handleReprocess}
           onRecover={handleRecover}

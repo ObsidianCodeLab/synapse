@@ -20,6 +20,8 @@ from synapse.rd_meeting.paths import (
     room_state_path,
     scope_dir,
 )
+from synapse.rd_meeting.config_store import load_meeting_room_config
+from synapse.rd_sop.manifest import is_system_node
 from synapse.rd_sop.nodes import ALL_NODES, node_display_name, stage_id_for_name
 
 logger = logging.getLogger(__name__)
@@ -27,8 +29,8 @@ logger = logging.getLogger(__name__)
 ScopeType = Literal["demand", "task"]
 RoomStatus = Literal["processing", "human_intervention", "completed", "failed", "stopped"]
 ROOM_STATE_SCHEMA_VERSION = 1
-DEFAULT_TOKEN_BUDGET = 20_000_000  # 整场会议 token 预算（看板卡片）
-DEFAULT_NODE_TOKEN_BUDGET = 3_000_000  # 单个 SOP 节点 token 预算（会议室顶栏）
+DEFAULT_TOKEN_BUDGET = 20_000_000  # 历史整场默认值（已废弃；看板总预算见 compute_room_token_budget）
+DEFAULT_NODE_TOKEN_BUDGET = 3_000_000  # 单个 SOP 节点 token 预算默认值（会议室顶栏 / 阵容配置）
 
 
 def _now_iso() -> str:
@@ -133,8 +135,44 @@ def sum_node_metrics_tokens(room_state: dict[str, Any], scope_id: str = "") -> i
     return total
 
 
+def resolve_node_token_budget(node_id: str) -> int | None:
+    """节点 token 预算：阵容配置 ``node_overrides`` 优先，默认 3M；系统节点无预算。"""
+    nid = (node_id or "").strip()
+    if not nid or is_system_node(nid):
+        return None
+    cfg = load_meeting_room_config()
+    overrides = cfg.get("node_overrides")
+    if isinstance(overrides, dict):
+        ov = overrides.get(nid)
+        if isinstance(ov, dict) and ov.get("token_budget") is not None:
+            try:
+                val = int(ov["token_budget"])
+                if val > 0:
+                    return val
+            except (TypeError, ValueError):
+                pass
+    return DEFAULT_NODE_TOKEN_BUDGET
+
+
+def compute_room_token_budget(room_state: dict[str, Any] | None) -> int:
+    """看板总预算：已启动（``node_metrics`` 有记录）的非系统 SOP 节点预算之和。"""
+    if not isinstance(room_state, dict):
+        return 0
+    nm = room_state.get("node_metrics")
+    if not isinstance(nm, dict):
+        return 0
+    total = 0
+    for nid, entry in nm.items():
+        if not isinstance(entry, dict):
+            continue
+        budget = resolve_node_token_budget(str(nid))
+        if budget is not None:
+            total += budget
+    return total
+
+
 def sync_metrics_tokens_from_node_metrics(room_state: dict[str, Any], scope_id: str = "") -> None:
-    """``node_metrics`` 变更后回写 ``metrics.tokens``。"""
+    """``node_metrics`` 变更后回写 ``metrics.tokens`` 与 ``metrics.token_budget``。"""
     if not isinstance(room_state, dict):
         return
     metrics = room_state.get("metrics")
@@ -142,6 +180,7 @@ def sync_metrics_tokens_from_node_metrics(room_state: dict[str, Any], scope_id: 
         metrics = {}
         room_state["metrics"] = metrics
     metrics["tokens"] = sum_node_metrics_tokens(room_state, scope_id)
+    metrics["token_budget"] = compute_room_token_budget(room_state)
 
 
 def resolve_node_seconds(nm: dict[str, Any], *, node_status: str = "") -> int:
@@ -249,7 +288,7 @@ def refresh_node_metrics(
 
 
 def ensure_metrics_token_budget(scope_id: str) -> None:
-    """将 ``room_state.metrics.token_budget`` 对齐为当前默认预算（幂等）。"""
+    """将 ``room_state.metrics.token_budget`` 对齐为已启动 SOP 节点预算之和（幂等）。"""
     sid = (scope_id or "").strip()
     if not sid:
         return
@@ -259,11 +298,12 @@ def ensure_metrics_token_budget(scope_id: str) -> None:
     metrics = rs.get("metrics")
     if not isinstance(metrics, dict):
         return
-    if int(metrics.get("token_budget") or 0) == DEFAULT_TOKEN_BUDGET:
+    expected = compute_room_token_budget(rs)
+    if int(metrics.get("token_budget") or 0) == expected:
         return
     payload = dict(rs)
     m = dict(metrics)
-    m["token_budget"] = DEFAULT_TOKEN_BUDGET
+    m["token_budget"] = expected
     payload["metrics"] = m
     save_room_state(sid, payload)
 
@@ -289,7 +329,7 @@ def default_room_state(
             "stage_started_at": now,
             "stage_seconds": 0,
             "tokens": 0,
-            "token_budget": DEFAULT_TOKEN_BUDGET,
+            "token_budget": 0,
         },
         "node_metrics": {},
         "agents_active": [],
@@ -440,7 +480,7 @@ def sync_room_state_from_dev(
                     stage_id=stage_id,
                     current_node_id=current_node_id,
                 )["metrics"]
-            payload["metrics"]["token_budget"] = DEFAULT_TOKEN_BUDGET
+            sync_metrics_tokens_from_node_metrics(payload, scope_id)
             if not isinstance(payload.get("node_metrics"), dict):
                 payload["node_metrics"] = {}
             if not isinstance(payload.get("agents_active"), list):

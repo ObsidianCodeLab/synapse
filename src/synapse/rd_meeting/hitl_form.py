@@ -201,6 +201,17 @@ def infer_clarify_hitl_schema(
     return None
 
 
+def _uses_collab_dedicated_review_panel(node_id: str) -> bool:
+    """协同节点（func_solution / solution_review / task_exec）走专用评审面板，禁止蓝色结果确认问卷。"""
+    from synapse.rd_meeting.intervention_panel import collab_dedicated_panel
+
+    return collab_dedicated_panel(node_id) in (
+        "func_solution_review",
+        "solution_review",
+        "task_exec",
+    )
+
+
 def resolve_hitl_schema_for_gate(
     binding: dict[str, Any],
     *,
@@ -228,6 +239,8 @@ def resolve_hitl_schema_for_gate(
         return normalize_hitl_schema(
             default_exception_hitl_schema(node_id, reason=reason)
         )
+    if _uses_collab_dedicated_review_panel(node_id):
+        return None
     if kind == "result_confirm" and node_id and binding.get("human_confirm"):
         return normalize_hitl_schema(default_hitl_form_schema(node_id))
     if node_id and binding.get("human_confirm"):
@@ -1046,6 +1059,8 @@ def resolve_hitl_form_schema(
     if isinstance(custom, dict) and custom.get("questions"):
         return normalize_hitl_schema(custom)
     if node_id == "req_clarify":
+        return None
+    if _uses_collab_dedicated_review_panel(node_id):
         return None
     return default_hitl_form_schema(node_id)
 

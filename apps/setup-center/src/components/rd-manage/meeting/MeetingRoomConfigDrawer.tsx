@@ -18,6 +18,7 @@ import {
   Cog,
   AlertCircle,
   Terminal,
+  Coins,
   type LucideIcon,
 } from 'lucide-react';
 import type { MeetingRoomNodeBinding } from '../../../api/meetingRoomService';
@@ -45,6 +46,7 @@ import {
 import {
   fetchMeetingRoomConfig,
   putMeetingRoomConfig,
+  MEETING_NODE_TOKEN_BUDGET,
   type MeetingRoomConfigPayload,
   type MeetingRoomNodeOverride,
 } from '../../../api/meetingRoomService';
@@ -296,6 +298,11 @@ function normalizeOverridesForSave(
       entry.human_confirm = ov.human_confirm;
     }
     if (ov.hitl_form_schema && b?.type !== 'system') entry.hitl_form_schema = ov.hitl_form_schema;
+    if (b?.type === 'system') {
+      delete entry.token_budget;
+    } else if (typeof ov.token_budget === 'number' && ov.token_budget > 0) {
+      entry.token_budget = ov.token_budget;
+    }
     out[nodeId] = entry;
   }
   return out;
@@ -455,6 +462,9 @@ export const MeetingRoomConfigDrawer: React.FC<{
   ).trim();
   const cliModelOptions = cliModelOptionsForTool(cliTool);
   const nodeOutputs = binding?.node_outputs ?? [];
+  const effectiveTokenBudget =
+    override.token_budget ?? binding?.token_budget ?? MEETING_NODE_TOKEN_BUDGET;
+  const defaultTokenBudget = binding?.default_token_budget ?? MEETING_NODE_TOKEN_BUDGET;
 
   const patchRoomLevel = (
     patch: Partial<
@@ -996,6 +1006,39 @@ export const MeetingRoomConfigDrawer: React.FC<{
                       </p>
                     </ConfigFieldBox>
                   </div>
+
+                  {!isSystemNode ? (
+                    <div>
+                      <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                        <Coins className="w-3.5 h-3.5 text-amber-400" />
+                        Token 预算
+                      </label>
+                      <ConfigFieldBox className="border-amber-500/20 bg-amber-500/[0.04]">
+                        <Input
+                          type="number"
+                          min={1}
+                          step={100_000}
+                          value={effectiveTokenBudget}
+                          onChange={(e) => {
+                            const raw = e.target.value.trim();
+                            if (!raw) {
+                              patchOverride({ token_budget: undefined });
+                              return;
+                            }
+                            const parsed = Number.parseInt(raw, 10);
+                            if (Number.isFinite(parsed) && parsed > 0) {
+                              patchOverride({ token_budget: parsed });
+                            }
+                          }}
+                          className="font-mono"
+                          addonAfter="tokens"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-2 mb-0 leading-relaxed">
+                          默认 {defaultTokenBudget.toLocaleString()}（3M）。会议室顶栏按当前节点预算展示；看板总预算为已启动 SOP 节点预算之和。
+                        </p>
+                      </ConfigFieldBox>
+                    </div>
+                  ) : null}
 
                   {!isSystemNode ? (
                     <div>
