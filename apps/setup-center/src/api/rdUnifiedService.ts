@@ -424,7 +424,31 @@ export async function checkOwnerInfoMatchesProduct(
   synapseApiBase: string,
   storedOwnerInfo: string,
 ): Promise<boolean> {
-  const data = await fetchSynapseJson<{ match?: boolean }>(
+  const data = await fetchProductManageScope(synapseApiBase, storedOwnerInfo);
+  return data.match === true;
+}
+
+export type ProductManageScope = "mine" | "team" | "department" | "none";
+
+export type ProductManageScopeResponse = {
+  match?: boolean;
+  scope?: ProductManageScope;
+  can_manage?: boolean;
+  local?: {
+    name?: string;
+    employee_id?: string;
+    department?: string;
+    team?: string;
+    position?: string;
+  };
+};
+
+/** 解析当前登录用户对产品的管理范围（我的 / 本团队 / 本部门 / 无） */
+export async function fetchProductManageScope(
+  synapseApiBase: string,
+  storedOwnerInfo: string,
+): Promise<ProductManageScopeResponse> {
+  return fetchSynapseJson<ProductManageScopeResponse>(
     synapseApiBase,
     "/api/dev/owner-info-matches-product",
     {
@@ -433,7 +457,6 @@ export async function checkOwnerInfoMatchesProduct(
       body: JSON.stringify({ stored_owner_info: storedOwnerInfo }),
     },
   );
-  return data.match === true;
 }
 
 export type IwhalecloudUserinfoSummary = {

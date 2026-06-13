@@ -41,7 +41,7 @@ import {
   validateRepoTokens,
 } from "@/api/rdUnifiedService";
 import type { ProdProcessDataPayload, RdRepoDetailRow } from "@/api/rdUnifiedService";
-import { assertOwnerInfoMatchesProduct, toastOwnerInfoGuardError } from "@/utils/ownerInfoGuard";
+import { assertCanManageProduct, toastOwnerInfoGuardError } from "@/utils/ownerInfoGuard";
 
 export type RepoUpdateDialogProps = {
   open: boolean;
@@ -291,7 +291,7 @@ export function RepoUpdateDialog({
   const handleSave = async () => {
     if (!product || !IS_TAURI) return;
     try {
-      await assertOwnerInfoMatchesProduct(synapseApiBase, product);
+      await assertCanManageProduct(synapseApiBase, product);
     } catch (e) {
       toastOwnerInfoGuardError(t, e);
       return;

@@ -1,11 +1,16 @@
 import { toast } from "sonner";
-import { checkOwnerInfoMatchesProduct } from "@/api/rdUnifiedService";
+import {
+  fetchProductManageScope,
+  type ProductManageScope,
+} from "@/api/rdUnifiedService";
 import type { Product } from "@/components/product/types";
 import { IS_TAURI } from "@/platform";
 
 export const OWNER_GUARD_MISSING_LOCAL = "owner_guard_missing_local";
 export const OWNER_GUARD_MISSING_PRODUCT = "owner_guard_missing_product";
 export const OWNER_GUARD_MISMATCH = "owner_guard_mismatch";
+
+export type { ProductManageScope };
 
 function isMissingLocalUserinfoError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -17,27 +22,35 @@ function isMissingLocalUserinfoError(err: unknown): boolean {
   );
 }
 
+function normalizeScope(raw: string | undefined): ProductManageScope {
+  if (raw === "mine" || raw === "team" || raw === "department") return raw;
+  return "none";
+}
+
 /**
- * 校验本机 userinfo 与产品在研发统一服务中记录的 owner_info 是否为同一负责人：
- * 解密两侧 JSON，比对 ``name`` 与 ``employee_id``（工号）。
+ * 解析当前登录用户对该产品的管理范围。
+ * 浏览器预览模式视为「我的」。
  */
-export async function assertOwnerInfoMatchesProduct(
+export async function resolveProductManageScope(
   synapseApiBase: string,
   product: Product,
-): Promise<void> {
+): Promise<ProductManageScope> {
+  if (!IS_TAURI) return "mine";
   const stored = (product.ownerInfo ?? "").trim();
   if (!stored) {
     throw new Error(OWNER_GUARD_MISSING_PRODUCT);
   }
   try {
-    const match = await checkOwnerInfoMatchesProduct(synapseApiBase, stored);
-    if (!match) {
-      throw new Error(OWNER_GUARD_MISMATCH);
+    const data = await fetchProductManageScope(synapseApiBase, stored);
+    if (data.can_manage === true && data.scope) {
+      return normalizeScope(data.scope);
     }
+    if (data.can_manage === false) {
+      return "none";
+    }
+    if (data.match === true) return "mine";
+    return normalizeScope(data.scope);
   } catch (err) {
-    if (err instanceof Error && err.message === OWNER_GUARD_MISMATCH) {
-      throw err;
-    }
     if (isMissingLocalUserinfoError(err)) {
       throw new Error(OWNER_GUARD_MISSING_LOCAL);
     }
@@ -46,7 +59,29 @@ export async function assertOwnerInfoMatchesProduct(
 }
 
 /**
- * 浏览器预览模式下视为负责人；Tauri 下与 assertOwnerInfoMatchesProduct 一致但不抛错。
+ * 校验当前用户是否可管理该产品（直接负责人、本团队或本部门继承）。
+ */
+export async function assertCanManageProduct(
+  synapseApiBase: string,
+  product: Product,
+): Promise<ProductManageScope> {
+  const scope = await resolveProductManageScope(synapseApiBase, product);
+  if (scope === "none") {
+    throw new Error(OWNER_GUARD_MISMATCH);
+  }
+  return scope;
+}
+
+/** @deprecated 使用 assertCanManageProduct；保留别名以兼容旧调用 */
+export async function assertOwnerInfoMatchesProduct(
+  synapseApiBase: string,
+  product: Product,
+): Promise<void> {
+  await assertCanManageProduct(synapseApiBase, product);
+}
+
+/**
+ * 浏览器预览模式下视为负责人；Tauri 下解析管理范围是否为「我的」。
  */
 export async function isCurrentUserProductOwner(
   synapseApiBase: string,
@@ -54,8 +89,22 @@ export async function isCurrentUserProductOwner(
 ): Promise<boolean> {
   if (!IS_TAURI) return true;
   try {
-    await assertOwnerInfoMatchesProduct(synapseApiBase, product);
-    return true;
+    const scope = await resolveProductManageScope(synapseApiBase, product);
+    return scope === "mine";
+  } catch {
+    return false;
+  }
+}
+
+/** 是否具备产品管理权限（含团队/部门继承） */
+export async function canManageProduct(
+  synapseApiBase: string,
+  product: Product,
+): Promise<boolean> {
+  if (!IS_TAURI) return true;
+  try {
+    const scope = await resolveProductManageScope(synapseApiBase, product);
+    return scope !== "none";
   } catch {
     return false;
   }

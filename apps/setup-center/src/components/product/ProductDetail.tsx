@@ -94,8 +94,8 @@ import {
 } from "@/api/rdUnifiedService";
 import type { ProdProcessDataPayload } from "@/api/rdUnifiedService";
 import {
-  assertOwnerInfoMatchesProduct,
-  isCurrentUserProductOwner,
+  assertCanManageProduct,
+  canManageProduct,
   toastOwnerInfoGuardError,
 } from "@/utils/ownerInfoGuard";
 import "./product-workbench.css";
@@ -311,8 +311,8 @@ export function ProductDetail({
   const [docIdsWithUnsavedEdits, setDocIdsWithUnsavedEdits] = useState<Set<string>>(
     () => new Set(),
   );
-  /** Tauri 下在异步校验前默认为 false，避免非负责人短暂看到写操作入口 */
-  const [isProductOwner, setIsProductOwner] = useState(!IS_TAURI);
+  /** Tauri 下在异步校验前默认为 false，避免无权限用户短暂看到写操作入口 */
+  const [canManage, setCanManage] = useState(!IS_TAURI);
   const [unsavedNavigationOpen, setUnsavedNavigationOpen] = useState(false);
   const docUnsavedRef = useRef(docIdsWithUnsavedEdits);
   docUnsavedRef.current = docIdsWithUnsavedEdits;
@@ -398,13 +398,13 @@ export function ProductDetail({
   useEffect(() => {
     if (!open || !product) return;
     if (!IS_TAURI) {
-      setIsProductOwner(true);
+      setCanManage(true);
       return;
     }
     let cancelled = false;
     void (async () => {
-      const ok = await isCurrentUserProductOwner(synapseApiBase, product);
-      if (!cancelled) setIsProductOwner(ok);
+      const ok = await canManageProduct(synapseApiBase, product);
+      if (!cancelled) setCanManage(ok);
     })();
     return () => {
       cancelled = true;
@@ -415,7 +415,7 @@ export function ProductDetail({
     const p = productRef.current;
     if (!p || !IS_TAURI) return true;
     try {
-      await assertOwnerInfoMatchesProduct(synapseApiBase, p);
+      await assertCanManageProduct(synapseApiBase, p);
       return true;
     } catch (e) {
       toastOwnerInfoGuardError(t, e);
@@ -1044,7 +1044,7 @@ export function ProductDetail({
 
   const handleSubmitDocs = async (categoryKey: string) => {
     if (!product || !IS_TAURI) return;
-    if (!isProductOwner) {
+    if (!canManage) {
       toast.error(t("workbench.products.ownerInfoGuardMismatch"));
       return;
     }
@@ -1192,7 +1192,7 @@ export function ProductDetail({
                               </Badge>
                             )}
                           </div>
-                          {isProductOwner && wireU !== "new" && (
+                          {canManage && wireU !== "new" && (
                             <div className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
                               <Button
                                 variant="ghost"
@@ -1256,7 +1256,7 @@ export function ProductDetail({
                           )}
                         </div>
 
-                        {wireU === "new" && isProductOwner && (
+                        {wireU === "new" && canManage && (
                           <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
                             <Button
                               type="button"
@@ -1337,7 +1337,7 @@ export function ProductDetail({
                     slot.wireState === "error";
                   /** 未创建(new) 或 失败(error) 时展示生成/重试 CTA；error 时先 E→N 再与 new 同流程进入 I */
                   const showGenerateBtn =
-                    isProductOwner &&
+                    canManage &&
                     (slot.wireState === "new" || slot.wireState === "error") &&
                     !hasGeneratedDocs &&
                     (canGenerateArchitecture || canGenerateManual);
@@ -1500,7 +1500,7 @@ export function ProductDetail({
                   </div>
                 </div>
 
-                {ticketU === "new" && isProductOwner && (
+                {ticketU === "new" && canManage && (
                   <div className="mb-3" onClick={(e) => e.stopPropagation()}>
                     <Button
                       type="button"
@@ -1850,10 +1850,10 @@ export function ProductDetail({
                     title={doc.title}
                     synapseApiBase={synapseApiBase}
                     excalidrawByFileName={doc.excalidrawByFileName}
-                    readonly={!!doc.readonly || !isProductOwner}
+                    readonly={!!doc.readonly || !canManage}
                     submitEnabled={
                       IS_TAURI &&
-                      isProductOwner &&
+                      canManage &&
                       knowledgeLocalDraftExists[doc.category as ProductKnowledgeCategory]
                     }
                     onDirtyChange={(dirty) => {
@@ -1878,7 +1878,7 @@ export function ProductDetail({
                     }}
                     onSubmit={() => handleSubmitDocs(doc.category)}
                     refineContext={
-                      IS_TAURI && product && isProductOwner && !doc.readonly
+                      IS_TAURI && product && canManage && !doc.readonly
                         ? {
                             prod_name: product.name,
                             doc_type: unifiedDocTypeForKnowledgeCategory(

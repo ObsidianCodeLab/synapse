@@ -4704,6 +4704,51 @@ def _owner_identities_match(local_blob: dict[str, Any], stored_cipher: str) -> b
     return local_name == stored_name and local_eid == stored_eid
 
 
+_POSITION_TEAM_LEADER = "团队负责人"
+_POSITION_DEPT_LEADER = "部门领导"
+ProductManageScope = Literal["mine", "team", "department", "none"]
+
+
+def _org_fields_from_user_blob(blob: dict[str, Any]) -> tuple[str, str, str]:
+    """从 userinfo / owner_info 解密 JSON 提取部门、团队、职位。"""
+    department = str(blob.get("department") or "").strip()
+    team = str(blob.get("team") or "").strip()
+    position = str(blob.get("position") or "").strip()
+    return department, team, position
+
+
+def _resolve_product_manage_scope(local_blob: dict[str, Any], stored_cipher: str) -> ProductManageScope:
+    """解析当前用户对产品的管理范围：我的 / 本团队 / 本部门 / 无。"""
+    if _owner_identities_match(local_blob, stored_cipher):
+        return "mine"
+    try:
+        stored_blob = _decrypt_owner_info_blob(stored_cipher)
+    except ValueError:
+        return "none"
+
+    local_dept, local_team, local_pos = _org_fields_from_user_blob(local_blob)
+    stored_dept, stored_team, _stored_pos = _org_fields_from_user_blob(stored_blob)
+
+    if local_pos == _POSITION_DEPT_LEADER:
+        if local_dept and stored_dept and local_dept == stored_dept:
+            return "department"
+        return "none"
+
+    if local_pos == _POSITION_TEAM_LEADER:
+        if (
+            local_dept
+            and stored_dept
+            and local_dept == stored_dept
+            and local_team
+            and stored_team
+            and local_team == stored_team
+        ):
+            return "team"
+        return "none"
+
+    return "none"
+
+
 async def fetch_owner_orders_from_devcloud(*, owner_info_cipher: str) -> tuple[list[dict[str, Any]], int]:
     """从研发云拉取负责人需求单及研发单摘要，不落盘。"""
     user_blob = _parse_owner_info_cipher(owner_info_cipher)
@@ -5528,8 +5573,11 @@ class OwnerInfoMatchProductRequest(BaseModel):
 @router.post("/api/dev/owner-info-matches-product")
 def owner_info_matches_product(body: OwnerInfoMatchProductRequest):
     """
-    产品归属校验：解密本机 ``userinfo.encryption`` 与入参 ``stored_owner_info``，
-    比对解密 JSON 中的 ``name`` 与 ``employee_id``（``username`` 别名）是否一致。
+    产品管理权限校验：解密本机 ``userinfo.encryption`` 与入参 ``stored_owner_info``，
+    按姓名+工号判定「我的」；团队负责人/部门领导按 owner 的部门、团队继承管理范围。
+
+    返回 ``scope``：``mine`` | ``team`` | ``department`` | ``none``；
+    ``match`` 仅表示直接负责人（``scope == mine``），兼容旧前端。
     """
     stored = body.stored_owner_info.strip()
     if not stored:
@@ -5549,11 +5597,20 @@ def owner_info_matches_product(body: OwnerInfoMatchProductRequest):
     if not local_eid:
         return error_response(400, "本机 userinfo 缺少 employee_id")
 
-    match = _owner_identities_match(local_blob, stored)
+    scope = _resolve_product_manage_scope(local_blob, stored)
+    local_dept, local_team, local_pos = _org_fields_from_user_blob(local_blob)
     return success_response(
         {
-            "match": match,
-            "local": {"name": local_name, "employee_id": local_eid},
+            "match": scope == "mine",
+            "scope": scope,
+            "can_manage": scope != "none",
+            "local": {
+                "name": local_name,
+                "employee_id": local_eid,
+                "department": local_dept,
+                "team": local_team,
+                "position": local_pos,
+            },
         }
     )
 

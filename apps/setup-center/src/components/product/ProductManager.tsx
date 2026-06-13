@@ -51,9 +51,10 @@ import {
 } from "@/api/rdUnifiedService";
 import type { ProdProcessDataPayload } from "@/api/rdUnifiedService";
 import {
-  assertOwnerInfoMatchesProduct,
-  isCurrentUserProductOwner,
+  assertCanManageProduct,
+  resolveProductManageScope,
   toastOwnerInfoGuardError,
+  type ProductManageScope,
 } from "@/utils/ownerInfoGuard";
 import "./product-workbench.css";
 
@@ -67,25 +68,29 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
   const [listRefreshing, setListRefreshing] = useState(false);
   const [listAutoRefresh, setListAutoRefresh] = useState(true);
   const [projectSpaces, setProjectSpaces] = useState<{label: string, value: string}[] | null>(null);
-  /** Tauri：解密 owner_info 后姓名+工号与本地一致的产品 id */
-  const [ownedProductIds, setOwnedProductIds] = useState<Set<string>>(() => new Set());
+  /** Tauri：解密 owner_info 后解析各产品的管理范围 */
+  const [productManageScopes, setProductManageScopes] = useState<Map<string, ProductManageScope>>(
+    () => new Map(),
+  );
 
   useEffect(() => {
     if (!IS_TAURI || products.length === 0) {
-      setOwnedProductIds(new Set());
+      setProductManageScopes(new Map());
       return;
     }
     let cancelled = false;
     (async () => {
-      const ids = new Set<string>();
-      await Promise.all(
+      const entries = await Promise.all(
         products.map(async (product) => {
-          if (await isCurrentUserProductOwner(synapseApiBase, product)) {
-            ids.add(product.id);
+          try {
+            const scope = await resolveProductManageScope(synapseApiBase, product);
+            return [product.id, scope] as const;
+          } catch {
+            return [product.id, "none" as const] as const;
           }
         }),
       );
-      if (!cancelled) setOwnedProductIds(ids);
+      if (!cancelled) setProductManageScopes(new Map(entries));
     })();
     return () => {
       cancelled = true;
@@ -303,7 +308,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
       return;
     }
     try {
-      await assertOwnerInfoMatchesProduct(synapseApiBase, product);
+      await assertCanManageProduct(synapseApiBase, product);
     } catch (e) {
       toastOwnerInfoGuardError(t, e);
       return;
@@ -358,7 +363,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
   const handleEdit = async (product: Product) => {
     if (IS_TAURI) {
       try {
-        await assertOwnerInfoMatchesProduct(synapseApiBase, product);
+        await assertCanManageProduct(synapseApiBase, product);
       } catch (e) {
         toastOwnerInfoGuardError(t, e);
         return;
@@ -371,7 +376,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
   const handleDeleteRequest = async (product: Product) => {
     if (IS_TAURI) {
       try {
-        await assertOwnerInfoMatchesProduct(synapseApiBase, product);
+        await assertCanManageProduct(synapseApiBase, product);
       } catch (e) {
         toastOwnerInfoGuardError(t, e);
         return;
@@ -433,7 +438,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
     if (editingProduct) {
       if (IS_TAURI) {
         try {
-          await assertOwnerInfoMatchesProduct(synapseApiBase, editingProduct);
+          await assertCanManageProduct(synapseApiBase, editingProduct);
         } catch (e) {
           toastOwnerInfoGuardError(t, e);
           return;
@@ -631,7 +636,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
                   <ProductCard
                   key={product.id}
                   product={product}
-                  isOwnedByCurrentUser={IS_TAURI && ownedProductIds.has(product.id)}
+                  manageScope={IS_TAURI ? productManageScopes.get(product.id) : "mine"}
                   onEdit={handleEdit}
                   onDelete={handleDeleteRequest}
                   onView={handleView}

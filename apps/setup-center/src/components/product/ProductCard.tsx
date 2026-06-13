@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { Edit2, Trash2, Ticket, Code, FileText, Check, Loader2, X, RefreshCw, GitBranch, Circle } from "lucide-react";
 import { Product, displayIdPipeName, type UnifiedWireAnalysisState } from "./types";
+import type { ProductManageScope } from "@/utils/ownerInfoGuard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 interface ProductCardProps {
   product: Product;
-  /** 本机 userinfo 与产品 owner_info 解密后姓名、工号一致时为 true（仅桌面端计算） */
-  isOwnedByCurrentUser?: boolean;
+  /** 当前用户对该产品的管理范围（仅桌面端计算） */
+  manageScope?: ProductManageScope;
   onEdit: (product: Product) => void | Promise<void>;
   onDelete: (product: Product) => void;
   onView: (product: Product) => void;
@@ -124,9 +125,33 @@ function AnalysisStatusBadge({
   );
 }
 
+const manageScopeBadgeClass: Record<Exclude<ProductManageScope, "none">, string> = {
+  mine: "border-primary/40 bg-primary/10 text-primary",
+  team: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  department: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-400",
+};
+
+const manageScopeI18n: Record<
+  Exclude<ProductManageScope, "none">,
+  { badge: string; tooltip: string }
+> = {
+  mine: {
+    badge: "workbench.products.cardMineBadge",
+    tooltip: "workbench.products.cardMineBadgeTooltip",
+  },
+  team: {
+    badge: "workbench.products.cardTeamBadge",
+    tooltip: "workbench.products.cardTeamBadgeTooltip",
+  },
+  department: {
+    badge: "workbench.products.cardDepartmentBadge",
+    tooltip: "workbench.products.cardDepartmentBadgeTooltip",
+  },
+};
+
 export function ProductCard({
   product,
-  isOwnedByCurrentUser = false,
+  manageScope,
   onEdit,
   onDelete,
   onView,
@@ -220,13 +245,13 @@ export function ProductCard({
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <div className="flex min-w-0 items-center gap-2">
-                {isOwnedByCurrentUser ? (
+                {manageScope && manageScope !== "none" ? (
                   <Badge
                     variant="outline"
-                    className="shrink-0 border-primary/40 bg-primary/10 px-1.5 py-0 text-[10px] font-medium text-primary"
-                    title={t("workbench.products.cardMineBadgeTooltip")}
+                    className={`shrink-0 px-1.5 py-0 text-[10px] font-medium ${manageScopeBadgeClass[manageScope]}`}
+                    title={t(manageScopeI18n[manageScope].tooltip)}
                   >
-                    {t("workbench.products.cardMineBadge")}
+                    {t(manageScopeI18n[manageScope].badge)}
                   </Badge>
                 ) : null}
                 <h3
