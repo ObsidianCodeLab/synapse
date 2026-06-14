@@ -406,13 +406,13 @@ export function DevToolsSkillPanel({
         }
       }
       await onSaveEnvKeys(skill.config.map((f) => f.key));
-      await loadSkills();
+      // configComplete 由 skillsWithConfig useMemo 依赖 envDraft 自动重算，无需重拉全表
     } catch (e) {
       setError(friendlyErr(e, t, "save"));
     } finally {
       setSaving(false);
     }
-  }, [onSaveEnvKeys, loadSkills, onEnvChange, t]);
+  }, [onSaveEnvKeys, onEnvChange, t]);
 
   const handleToggleEnabled = useCallback((skill: SkillInfo) => {
     if (skill.system) return;
@@ -445,14 +445,6 @@ export function DevToolsSkillPanel({
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        try {
-          await safeFetch(`${apiBaseUrl}/api/skills/reload`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
-            signal: AbortSignal.timeout(10_000),
-          });
-        } catch { /* ignore */ }
       } else if (IS_TAURI && dataMode !== "remote" && currentWorkspaceId) {
         await invoke("workspace_write_file", {
           workspaceId: currentWorkspaceId,
@@ -461,13 +453,12 @@ export function DevToolsSkillPanel({
         });
       }
       setEnabledDirty(false);
-      await loadSkills();
     } catch (e) {
       setError(friendlyErr(e, t, "save"));
     } finally {
       setSavingEnabled(false);
     }
-  }, [skills, enabledDraft, serviceRunning, apiBaseUrl, dataMode, currentWorkspaceId, loadSkills, t]);
+  }, [skills, enabledDraft, serviceRunning, apiBaseUrl, dataMode, currentWorkspaceId, t]);
 
   const handleDiscard = useCallback(() => { loadSkills(); }, [loadSkills]);
 
@@ -528,8 +519,17 @@ export function DevToolsSkillPanel({
       else {
         setDetailContent(detailEditContent);
         setDetailEditing(false);
+        // 用返回的 name/description 本地更新该项，无需重拉全表
+        if (data.name || data.description) {
+          setSkills((prev) =>
+            prev.map((s) =>
+              s.skillId === detailSkill.skillId
+                ? { ...s, name: data.name ?? s.name, description: data.description ?? s.description }
+                : s,
+            ),
+          );
+        }
         toast.success(t("skills.contentSaved"));
-        await loadSkills();
       }
     } catch (e) {
       setDetailContentError(`${t("skills.contentSaveFailed")}: ${e}`);

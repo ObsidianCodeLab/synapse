@@ -511,7 +511,7 @@ class SkillRegistry:
             return False
 
         self._skills[entry.skill_id] = entry
-        logger.info(f"Registered skill: {entry.skill_id} (name={entry.name})")
+        # logger.info(f"Registered skill: {entry.skill_id} (name={entry.name})")
         return True
 
     def unregister(self, key: str) -> bool:

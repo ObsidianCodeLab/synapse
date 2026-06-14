@@ -184,7 +184,7 @@ async def _auto_translate_new_skills(request: Request, install_url: str) -> None
 
 
 @router.get("/api/skills")
-async def list_skills(request: Request):
+async def list_skills(request: Request, rescan: bool = False):
     """List all available skills with their config schemas.
 
     Returns ALL discovered skills (including disabled ones) with correct
@@ -193,15 +193,17 @@ async def list_skills(request: Request):
     Uses a module-level cache to avoid re-scanning disk on every request.
     The cache is invalidated by install/uninstall/reload/edit operations via
     the cross-layer on-change callback.
+
+    Pass ``?rescan=1`` to force a full disk scan even when the Agent registry
+    is available.
     """
     global _skills_cache
-    if _skills_cache is not None:
+    if _skills_cache is not None and not rescan:
         return _skills_cache
 
     from synapse.skills.allowlist_io import read_allowlist
 
     skills_json_path, external_allowlist = read_allowlist()
-    # 用于生成 relative_path 的 base 仍需项目根目录
     try:
         from synapse.config import settings
 
@@ -209,22 +211,30 @@ async def list_skills(request: Request):
     except Exception:
         base_path = skills_json_path.parent.parent
 
-    try:
-        from synapse.skills.loader import SkillLoader
+    # 优先从 Agent 的已初始化 loader/registry 读取，避免重复扫盘
+    actual_agent = _resolve_agent(request)
+    agent_loader = getattr(actual_agent, "skill_loader", None) if actual_agent else None
+    agent_registry = getattr(actual_agent, "skill_registry", None) if actual_agent else None
 
-        loader = SkillLoader()
-        await asyncio.to_thread(loader.load_all, base_path)
-        all_skills = loader.registry.list_all()
-        effective_allowlist = loader.compute_effective_allowlist(external_allowlist)
-    except Exception:
-        actual_agent = _resolve_agent(request)
-        if actual_agent is None:
-            return {"skills": []}
-        registry = getattr(actual_agent, "skill_registry", None)
-        if registry is None:
-            return {"skills": []}
-        all_skills = registry.list_all()
-        effective_allowlist = external_allowlist
+    if agent_loader is not None and agent_registry is not None and not rescan:
+        all_skills = agent_registry.list_all()
+        try:
+            effective_allowlist = agent_loader.compute_effective_allowlist(external_allowlist)
+        except Exception:
+            effective_allowlist = external_allowlist
+    else:
+        try:
+            from synapse.skills.loader import SkillLoader
+
+            loader = SkillLoader()
+            await asyncio.to_thread(loader.load_all, base_path)
+            all_skills = loader.registry.list_all()
+            effective_allowlist = loader.compute_effective_allowlist(external_allowlist)
+        except Exception:
+            if agent_registry is None:
+                return {"skills": []}
+            all_skills = agent_registry.list_all()
+            effective_allowlist = external_allowlist
 
     skills = []
     for skill in all_skills:

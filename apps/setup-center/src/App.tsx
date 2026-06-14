@@ -6381,24 +6381,14 @@ export function App() {
       return <TeamViewView synapseApiBase={httpApiBase()} />;
     }
     if (view === "workbench_dev_tools") {
-      return disabledViews.includes("skills") ? (
-        <div className="card" style={{ opacity: 0.5, textAlign: "center", padding: 40 }}>
-          <p style={{ color: "#94a3b8", fontSize: 15 }}>{t("skills.disabledModuleHint")}</p>
-        </div>
-      ) : (
-        <DevToolsSkillPanel
-          venvDir={venvDir}
-          currentWorkspaceId={currentWorkspaceId}
-          envDraft={envDraft}
-          onEnvChange={setEnvDraft}
-          onSaveEnvKeys={async (keys) => {
-            await saveEnvKeys(keys);
-          }}
-          apiBaseUrl={apiBaseUrl}
-          serviceRunning={!!serviceStatus?.running}
-          dataMode={dataMode}
-        />
-      );
+      if (disabledViews.includes("skills")) {
+        return (
+          <div className="card" style={{ opacity: 0.5, textAlign: "center", padding: 40 }}>
+            <p style={{ color: "#94a3b8", fontSize: 15 }}>{t("skills.disabledModuleHint")}</p>
+          </div>
+        );
+      }
+      return null;
     }
     switch (stepId) {
       case "llm":
@@ -6689,10 +6679,22 @@ export function App() {
               }}
             />
           </div>
-          <div className="content" style={{ display: view !== "chat" ? undefined : "none", flex: 1, minHeight: 0 }}>
+          <div className="content" style={{ display: (view !== "chat" && !(view === "workbench_dev_tools" && !disabledViews.includes("skills"))) ? undefined : "none", flex: 1, minHeight: 0 }}>
             <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", opacity: 0.5 }}><div className="spinner" style={{ width: 24, height: 24 }} /></div>}>
             {renderStepContent()}
             </Suspense>
+          </div>
+          <div style={{ display: view === "workbench_dev_tools" && !disabledViews.includes("skills") ? undefined : "none", flex: 1, minHeight: 0, overflow: "auto" }}>
+            <DevToolsSkillPanel
+              venvDir={venvDir}
+              currentWorkspaceId={currentWorkspaceId}
+              envDraft={envDraft}
+              onEnvChange={setEnvDraft}
+              onSaveEnvKeys={async (keys) => { await saveEnvKeys(keys); }}
+              apiBaseUrl={apiBaseUrl}
+              serviceRunning={!!serviceStatus?.running}
+              dataMode={dataMode}
+            />
           </div>
         </div>
 

@@ -1,12 +1,12 @@
 ---
 name: whalecloud-dev-tool-c-code-access
-description: "研发会议室 C++ 代码精读。执行前须确认 USER_REQUEST、ENTRY_MODULE，并从 system「产品工作区路径」选取 REPO_NAME / CODE_PATH（禁止臆造路径）。在工单目录读码，GitNexus 图检索辅助。"
-label: C++ 代码阅读
+description: "研发会议室代码精读。执行前须确认 USER_REQUEST、ENTRY_MODULE，并从 system「产品工作区路径」选取 REPO_NAME / CODE_PATH（禁止臆造路径）。在工单目录读码，GitNexus 图检索辅助。"
+label: 代码阅读
 ---
 
-# C++ 代码阅读（研发会议室）
+# 代码阅读（研发会议室）
 
-围绕**用户诉求**与**入口模块**，在工单目录中的真实 C++ 源码上做**准确、高效**的定向阅读。
+围绕**用户诉求**与**入口模块**，在工单目录中的真实源码上做**准确、高效**的定向阅读。支持任意语言（C++、Java、Python、Go 等）。
 
 > **【执行前须确认】**
 >
@@ -57,7 +57,7 @@ run_skill_script(
 
 ## 何时加载
 
-- 需核验某 C++ 功能/模块实现、调用链、配置宏、接口
+- 需核验某功能/模块实现、调用链、配置项、接口定义
 - 已能从上下文归纳 **`USER_REQUEST`**，已从**产品文档**确认 **`ENTRY_MODULE`**，且已从 system「产品工作区路径」**选定**与目标代码对应的 **`REPO_NAME` / `CODE_PATH`**
 - 结论须含 `{REPO_NAME}:相对路径` 证据
 
@@ -110,18 +110,22 @@ run_skill_script(
 ### C1. 诉求驱动，入口锚定
 
 - 阅读须能回答 `USER_REQUEST`；无关扩圈立即停止。
-- 顺序：**架构入口** → `#include` 链 → 调用链（图检索 + 本地核对）→ 必要时 `search`/`cypher`。
+- 顺序：**架构入口** → 依赖链（import / include / 调用链）→ 图检索辅助 → 必要时 `search`/`cypher`。
 
 ### C2. 证据可核对
 
 - 结论附带 **`{REPO_NAME}:相对路径`**（及符号/行号若可读）。
 - 无法验证标 **`[待代码确认]`**。
 
-### C3. C++ 专项
+### C3. 语言适配
 
-- 头文件优先；入口文件优先级见下表。
-- 构建事实来自 `CODE_ROOT` 下 `CMakeLists.txt` / `Makefile*`。
-- 影响结论的 `#ifdef` 须写明条件编译约束。
+- 根据仓库实际语言，选用对应的依赖追踪方式：
+  - **C/C++**：`#include` 链、`Makefile` / `CMakeLists.txt`、`#ifdef` 条件编译
+  - **Java**：`import`、`pom.xml` / `build.gradle`、接口实现类
+  - **Python**：`import`、`pyproject.toml` / `setup.py`、类继承链
+  - **Go**：`import`、`go.mod`、接口实现
+  - **其他语言**：以架构文档中描述的入口/依赖约定为准
+- 影响结论的条件编译/特性开关须写明约束。
 
 ### C4. 本地读码 vs GitNexus
 
@@ -131,18 +135,18 @@ run_skill_script(
 
 ---
 
-## C++ 入口文件优先级
+## 入口文件优先级
 
 在 `ENTRY_FILES` 对应目录下选锚点：
 
 | 优先级 | 模式 | 说明 |
 |--------|------|------|
-| 0 | 架构表列出的 `.h` / `.cpp` | **最优先** |
-| 1 | 入口 `.cpp` 的 `#include "..."` 头文件 | 实现入口 |
-| 2 | `<Dir>/<DirName>Mgr.h` | 管理类 |
-| 3 | `<Dir>/<DirName>.h` | 同名主头 |
-| 4 | `Common.h` / `Base.h` | 公共基类 |
-| 5 | 目录内最大 `.h` | fallback |
+| 0 | 架构表列出的具体文件 | **最优先** |
+| 1 | 入口文件的直接依赖（import / include / 接口定义） | 实现入口 |
+| 2 | `<Dir>/<DirName>Manager` / `Mgr` / `Service` / `Controller` | 管理/服务类 |
+| 3 | `<Dir>/<DirName>` 同名主文件 | 同名主文件 |
+| 4 | `Common` / `Base` / `Utils` 公共基类 | 公共基础 |
+| 5 | 目录内最大文件 | fallback |
 
 ---
 
@@ -159,30 +163,30 @@ Phase 0 — 诉求、模块与读码路径确认
   0g. ENTRY_MODULE + 文档 → ENTRY_FILES；写入追踪表（含每条路径的文档依据，且落在 CODE_PATH / CODE_ROOT 可访问范围内）。
 
 Phase 1 — 工程确认（可选图线索）
-  1a. 在 CODE_PATH（必要时上溯到 CODE_ROOT）读 Makefile / CMakeLists.txt：TARGET、-D、-l。
+  1a. 在 CODE_PATH（必要时上溯到 CODE_ROOT）读构建文件（Makefile / CMakeLists.txt / pom.xml / build.gradle / go.mod / pyproject.toml 等）：TARGET、依赖、编译选项。
   1b. （可选）overview 写本地便于对照：
         run_skill_script(..., script_name="gnx-tools.js",
           args=["overview", "--url", "{GITNEXUS_URL}", "--repo", "{REPO_NAME}",
                 "--out", "{CODE_ROOT}/overview.json"])
-  1c. （可选）工程类型：
+  1c. （可选）工程类型检测：
         run_skill_script(..., script_name="detect-project-kind.js",
           args=["--cache", "{CODE_ROOT}", "--overview", "{CODE_ROOT}/overview.json"])
-      非 cpp_native / cpp_mixed 时注明，仅对架构标注的 C++ 路径执行本流程。
 
 Phase 2 — 入口精读（必读，本地读码）
+  【Token 节约强约束】读任何源文件前，**必须**先 Grep 定位目标符号/关键词的行号，再用 offset+limit 精确读取目标片段（±60 行），**禁止**直接 read_file 整个文件。仅当文件总行数 ≤ 120 行时，可不 Grep 直接全文读取。
   对 ENTRY_FILES（按入口优先级）：
-  2a. read_file("<CODE_PATH 或 CODE_ROOT 下的相对路径>") — 禁止臆造路径；优先从 CODE_PATH 向下展开。
-  2b. 提取类/方法、#include、与 USER_REQUEST 相关的逻辑。
-  2c. 入口为 .cpp 时，继续 read 其 `#include` 的 .h。
-  2d. 诉求涉及启动/CLI 时：在 CODE_ROOT 下 Grep `int main(`（*.cpp）。
-  2e. 跨目录依赖：在 CODE_ROOT 下 Grep `#include`、类名、宏名。
+  2a. 先 Grep 目标类名/函数名/关键词 → 获得行号 → read_file(path, offset=<行号-30>, limit=120)；禁止臆造路径；优先从 CODE_PATH 向下展开。
+  2b. 提取类/方法、依赖引用、与 USER_REQUEST 相关的逻辑。
+  2c. 追踪直接依赖：Grep 依赖文件中目标类/接口名 → 精确读取相关片段。
+  2d. 诉求涉及启动/CLI 时：在 CODE_ROOT 下 Grep 入口模式（如 `int main(`、`if __name__ == "__main__"`、`func main(`）。
+  2e. 跨目录依赖：在 CODE_ROOT 下 Grep 类名、接口名、关键符号。
 
 Phase 3 — 诉求驱动扩展（按需、早停）
   Phase 2 不足以回答时再执行：
   3a. run_skill_script(..., args=["search", "--url", "{GITNEXUS_URL}", "--repo", "{REPO_NAME}",
         "--query", "<类名/关键词>", "--limit", "15"])
   3b. run_skill_script(..., args=["explore"|"impact", ...]) — 已知符号/target。
-  3c. **回到本地验证**：对图检索给出的 filePath，用 read_file 在 CODE_ROOT 下核对上下文。
+  3c. **回到本地验证**：对图检索给出的 filePath，先 Grep 目标符号行号 → read_file(path, offset=<行号-30>, limit=120) 精确读取，**禁止**全文 read_file。
   3d. 必要时 run_skill_script(..., args=["cypher", ...])，filePath 过滤入口目录前缀。
   3e. 已能回答 USER_REQUEST 即停止。
 
@@ -205,15 +209,31 @@ Phase 4 — 输出阅读报告
 
 ---
 
-## 推荐本地 Grep 模式（C++）
+## 推荐本地 Grep 模式
 
-在 `CODE_ROOT` 下：
+在 `CODE_ROOT` 下（按语言选用）：
 
 ```text
+# C/C++
 #include\s+\"[^\"]+"
 class\s+\w+(Mgr|Manager|Ctrl|Service)
 #ifdef\s+_[A-Z0-9_]+
 int\s+main\s*\(
+
+# Java
+class\s+\w+\s+(implements|extends)
+@Override|@Service|@Component
+public\s+static\s+void\s+main
+
+# Python
+^class\s+\w+
+^def\s+\w+
+if\s+__name__\s*==\s*["']__main__["']
+
+# Go
+^func\s+\w+
+^type\s+\w+\s+(struct|interface)
+^func\s+main\(
 ```
 
 ---
@@ -239,6 +259,6 @@ int\s+main\s*\(
 - [ ] 已从 system「产品工作区路径」**选定**与目标代码对应的 `REPO_NAME` + `CODE_PATH`（多仓时已匹配，非默认第一组）
 - [ ] `CODE_PATH` / `CODE_ROOT` 可访问，架构文档已从 `{PRODUCT_DOC_ROOT}/产品架构/` 读取
 - [ ] `ENTRY_FILES` 已从架构导出
-- [ ] 入口文件已本地精读，`#include` 链已按需展开
+- [ ] 入口文件已本地精读，依赖链已按需展开
 - [ ] 图检索结论已在 `CODE_ROOT` 本地核对
 - [ ] 每条结论含 `{REPO_NAME}:路径` 证据

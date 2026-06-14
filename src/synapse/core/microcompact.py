@@ -22,6 +22,12 @@ TOOL_RESULT_EXPIRY_SECONDS = 600  # 10 分钟
 LARGE_RESULT_PREVIEW_CHARS = 500
 LARGE_RESULT_THRESHOLD_CHARS = 8000
 
+# 代码类工具结果（read_file / run_shell grep 等）专用阈值：更激进压缩
+# 读码场景下单次结果通常 5k-50k chars，但后续轮次无需保留原始文本
+CODE_TOOL_NAMES = frozenset({"read_file", "run_shell"})
+CODE_TOOL_THRESHOLD_CHARS = 2000   # 超过 2000 chars 就压缩
+CODE_TOOL_PREVIEW_CHARS = 300      # 只保留前 300 chars 预览
+
 
 def microcompact(
     messages: list[dict],
@@ -101,7 +107,23 @@ def microcompact(
                         block["content"] = "[expired tool result]"
                         cleaned += 1
 
-            # 2. Truncate large tool results to preview
+            # 2a. Code tool results — aggressively compress at lower threshold
+            if block_type == "tool_result" and not is_recent:
+                tool_name = str(block.get("tool_name", "") or "")
+                result_content = block.get("content", "")
+                if (
+                    tool_name in CODE_TOOL_NAMES
+                    and isinstance(result_content, str)
+                    and len(result_content) > CODE_TOOL_THRESHOLD_CHARS
+                ):
+                    preview = result_content[:CODE_TOOL_PREVIEW_CHARS]
+                    total = len(result_content)
+                    block["content"] = (
+                        f"{preview}\n\n... [{total} chars, {tool_name} result compressed by microcompact]"
+                    )
+                    cleaned += 1
+
+            # 2b. Truncate large tool results to preview (generic)
             if block_type == "tool_result" and not is_recent:
                 result_content = block.get("content", "")
                 if isinstance(result_content, str) and len(result_content) > large_result_threshold:

@@ -571,7 +571,7 @@ class SkillLoader:
                 )
             except Exception:
                 logger.debug("Failed to update skill runtime registry for %s", sid, exc_info=True)
-            logger.info(f"Loaded skill: {sid} (name={skill.metadata.name})")
+            # logger.info(f"Loaded skill: {sid} (name={skill.metadata.name})")
             return skill
 
         except Exception as e:
