@@ -379,6 +379,12 @@ export function MeetingNodeDetailPanel({
   }, [load, nodeState, nodeId, roomId]);
 
   useEffect(() => {
+    if (nodeState !== 'processing') return;
+    setReview((prev) => (prev ? { ...prev, artifacts: [] } : null));
+    setFallbackArtifacts([]);
+  }, [nodeState, nodeId]);
+
+  useEffect(() => {
     if (!pollMs || nodeState !== 'processing') return;
     const t = window.setInterval(() => void load(true), pollMs);
     return () => window.clearInterval(t);

@@ -52,15 +52,23 @@ export const MarkdownArtifactsPanel: React.FC<{
   emptyMessage = '暂无可预览的 Markdown 产出物',
 }) => {
   const entries = useMemo(() => files.filter((f) => f.relative_path), [files]);
+  const filesKey = useMemo(() => entries.map((e) => e.relative_path).join('\0'), [entries]);
 
   const [activePath, setActivePath] = useState<string | null>(null);
   const [contentByPath, setContentByPath] = useState<Record<string, string>>({});
+  const [missingPaths, setMissingPaths] = useState<Set<string>>(() => new Set());
   const [loadingPath, setLoadingPath] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
   const content = activePath ? (contentByPath[activePath] ?? '') : '';
-  const loading = Boolean(activePath && loadingPath === activePath);
+  const activeMissing = Boolean(activePath && missingPaths.has(activePath));
+  const loading = Boolean(activePath && loadingPath === activePath && !activeMissing);
   const [tocHeadings, setTocHeadings] = useState<MarkdownHeading[]>([]);
+
+  useEffect(() => {
+    setContentByPath({});
+    setMissingPaths(new Set());
+  }, [filesKey]);
 
   useEffect(() => {
     if (!entries.length) {
@@ -74,7 +82,7 @@ export const MarkdownArtifactsPanel: React.FC<{
 
   useEffect(() => {
     if (!activePath || !synapseApiBase || !roomId) return;
-    if (contentByPath[activePath] !== undefined) return;
+    if (contentByPath[activePath] !== undefined || missingPaths.has(activePath)) return;
 
     let cancelled = false;
     setLoadingPath(activePath);
@@ -84,8 +92,17 @@ export const MarkdownArtifactsPanel: React.FC<{
           setContentByPath((prev) => ({ ...prev, [activePath]: file.content }));
         }
       })
-      .catch(() => {
-        if (!cancelled) message.error('无法读取产出物');
+      .catch((err) => {
+        if (cancelled) return;
+        setMissingPaths((prev) => {
+          const next = new Set(prev);
+          next.add(activePath);
+          return next;
+        });
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('artifact_not_found')) {
+          message.error('无法读取产出物');
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingPath(null);
@@ -93,7 +110,7 @@ export const MarkdownArtifactsPanel: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [activePath, synapseApiBase, roomId, contentByPath]);
+  }, [activePath, synapseApiBase, roomId, contentByPath, missingPaths]);
 
   useLayoutEffect(() => {
     if (loading) {
@@ -167,6 +184,10 @@ export const MarkdownArtifactsPanel: React.FC<{
               <div className="flex min-h-[240px] items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin text-cyan-400" />
                 正在加载…
+              </div>
+            ) : activeMissing ? (
+              <div className="flex min-h-[240px] items-center justify-center px-6 text-center text-sm text-muted-foreground">
+                产出物已清理或尚未就绪，请稍候刷新
               </div>
             ) : (
               <ReviewMarkdown key={activePath ?? 'doc'} content={content} compact />
