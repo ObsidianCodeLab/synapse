@@ -58,9 +58,56 @@ def microcompact(
     seen_cache_refs: set[str] = set()
     seen_tool_fingerprints: dict[str, int] = {}
 
+    # 预建 tool_use_id → tool_name 映射（用于 Anthropic 格式的 tool_result block）
+    tool_id_to_name: dict[str, str] = {}
+    for msg in messages:
+        content = msg.get("content")
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                tid = block.get("id", "")
+                tname = block.get("name", "")
+                if tid and tname:
+                    tool_id_to_name[tid] = tname
+
     for i, msg in enumerate(messages):
         # Only process messages not in the last 3 (keep recent context intact)
         is_recent = i >= total_messages - 3
+
+        # --- OpenAI 格式：role=tool，content 是字符串 ---
+        if msg.get("role") == "tool" and not is_recent:
+            result_content = msg.get("content", "")
+            if isinstance(result_content, str) and len(result_content) > 0:
+                tool_name = msg.get("name", "") or ""
+                # fingerprint 去重
+                if result_content:
+                    fp = hashlib.md5(result_content[:4000].encode("utf-8", errors="ignore")).hexdigest()[:12]
+                    semantic_key = f"{tool_name}:{fp}"
+                    previous = seen_tool_fingerprints.get(semantic_key, 0)
+                    if previous >= 1:
+                        msg["content"] = (
+                            f"[tool result merged] 重复/相似的 {tool_name or 'tool'} 结果已合并；fingerprint={fp}。"
+                        )
+                        cleaned += 1
+                        continue
+                    seen_tool_fingerprints[semantic_key] = previous + 1
+                # 代码工具激进压缩
+                if tool_name in CODE_TOOL_NAMES and len(result_content) > CODE_TOOL_THRESHOLD_CHARS:
+                    msg["content"] = (
+                        f"{result_content[:CODE_TOOL_PREVIEW_CHARS]}\n\n"
+                        f"... [{len(result_content)} chars, {tool_name} result compressed by microcompact]"
+                    )
+                    cleaned += 1
+                    continue
+                # 通用大结果截断
+                if len(result_content) > large_result_threshold:
+                    msg["content"] = (
+                        f"{result_content[:preview_chars]}\n\n"
+                        f"... [{len(result_content)} chars total, truncated by microcompact]"
+                    )
+                    cleaned += 1
+            continue  # OpenAI role=tool 消息不再走 block 循环
 
         content = msg.get("content")
         if not isinstance(content, list):
@@ -84,7 +131,8 @@ def microcompact(
                         continue
                     seen_cache_refs.add(cache_key)
 
-                tool_name = str(block.get("tool_name", "") or "")
+                tool_use_id = str(block.get("tool_use_id", "") or "")
+                tool_name = tool_id_to_name.get(tool_use_id, "") or str(block.get("tool_name", "") or "")
                 if isinstance(result_content, str) and result_content:
                     fp = hashlib.md5(result_content[:4000].encode("utf-8", errors="ignore")).hexdigest()[:12]
                     semantic_key = f"{tool_name}:{fp}"
@@ -109,7 +157,8 @@ def microcompact(
 
             # 2a. Code tool results — aggressively compress at lower threshold
             if block_type == "tool_result" and not is_recent:
-                tool_name = str(block.get("tool_name", "") or "")
+                tool_use_id_2a = str(block.get("tool_use_id", "") or "")
+                tool_name = tool_id_to_name.get(tool_use_id_2a, "") or str(block.get("tool_name", "") or "")
                 result_content = block.get("content", "")
                 if (
                     tool_name in CODE_TOOL_NAMES
