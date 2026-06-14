@@ -37,7 +37,7 @@ export const HOST_REQUIRED_SKILLS: RequiredSkillRule[] = [
   { displayName: '人机问卷', skillIds: ['whalecloud-dev-tool-ask-user'] },
   { displayName: '文档生成', skillIds: ['whalecloud-dev-tool-doc-generate'] },
   { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },
-  { displayName: 'C++代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
+  { displayName: '代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
   { displayName: '函数级方案技能', skillIds: ['whalecloud-dev-tool-function-solution'] },
 ];
 
@@ -50,13 +50,13 @@ export const WORKER_REQUIRED_SKILLS_BY_PROFILE: Record<string, RequiredSkillRule
   'whalecloud-rd-expert': [
     { displayName: '模块功能技能', skillIds: ['whalecloud-dev-tool-module-function'] },
     { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },
-    { displayName: 'C++代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
+    { displayName: '代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
   ],
   'whalecloud-design-expert': [
     { displayName: '函数级方案技能', skillIds: ['whalecloud-dev-tool-function-solution'] },
     { displayName: '文档生成', skillIds: ['whalecloud-dev-tool-doc-generate'] },
     { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },
-    { displayName: 'C++代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
+    { displayName: '代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
   ],
 };
 

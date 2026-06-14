@@ -1193,7 +1193,7 @@ export const MeetingRoomConfigDrawer: React.FC<{
                         skillsModeAll={(hostAgent.skills_mode || '').toLowerCase() === 'all'}
                       />
                       <p className="text-[10px] text-muted-foreground mt-2 mb-0 px-0.5">
-                        固定小鲸 · 必备：方案评审、人机问卷、文档生成、研发工具共享脚本、C++代码阅读、函数级方案技能
+                        固定小鲸 · 必备：方案评审、人机问卷、文档生成、研发工具共享脚本、代码阅读、函数级方案技能
                       </p>
                     </ConfigFieldBox>
                   </div>
