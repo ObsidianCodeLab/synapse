@@ -2929,6 +2929,47 @@ class MeetingRoomOrchestrator:
                     skipped_nodes=skipped_nodes or None,
                 )
             if uses_func_solution_gate(node_id):
+                # 门控前自愈：清洗（在 validate 内）后仍校验失败，则带 mermaid 修复指引重跑一次
+                fs_ok, fs_errs = validate_func_solution_review_json(sid)
+                if not fs_ok and host_run_fn is not None and host_run_prompt:
+                    append_history_event(
+                        sid,
+                        {
+                            "event": "host_retry",
+                            "room_id": room_id,
+                            "node_id": node_id,
+                            "reason": "函数级方案评审产物校验未通过，自动重跑一次（注入校验错误与 Mermaid 修复指引）",
+                            "errors": fs_errs,
+                            "log_type": "warning",
+                            "agent_id": host_run_profile_id,
+                        },
+                    )
+                    retry_prompt = (
+                        f"{host_run_prompt}\n\n"
+                        "## ⚠️ 系统提示：函数级方案评审产物未通过校验\n"
+                        "上一次产出的 `func_solution_review.json` / `函数级方案.md` 校验未通过，"
+                        "具体错误如下，请逐条修复后**重新落盘双文件**（doc-generate 写 .md，write_file 写 .json）：\n"
+                        f"{chr(10).join('- ' + e for e in fs_errs)}\n\n"
+                        "**Mermaid 修复要点（高频错误）**：\n"
+                        "- 节点标签含 `{ } ( ) / \\`、空格或中文标点时，**必须**用双引号包裹，"
+                        '如 `J[/bake/{iNo}]` 应写成 `J["/bake/{iNo}"]`；\n'
+                        "- 首行须为合法声明（flowchart / graph / sequenceDiagram 等）；\n"
+                        "- 禁止空图或占位符（TODO / TBD / placeholder）；\n"
+                        "- 至少 2 张图：flowchart + (graph 或 sequenceDiagram)。\n"
+                        "修复后立即停止，不要重复总结。"
+                    )
+                    retry_result = await host_run_fn(retry_prompt)
+                    append_history_event(
+                        sid,
+                        {
+                            "event": "host_retry_end",
+                            "room_id": room_id,
+                            "node_id": node_id,
+                            "success": bool(getattr(retry_result, "success", False)),
+                            "log_type": "info",
+                            "agent_id": host_run_profile_id,
+                        },
+                    )
                 return await self.enter_func_solution_review_gate(
                     scope_type=scope_type,
                     scope_id=sid,

@@ -20,6 +20,8 @@ from synapse.rd_meeting.func_solution_review import (
     _resolve_mmdc_argv,
     _validate_mermaid_diagrams_structure,
     _validate_mermaid_diagrams_syntax,
+    _sanitize_mermaid_source,
+    sanitize_mermaid_diagrams,
 )
 
 VALID_FLOWCHART = "flowchart LR\n  Entry[入口] --> Module[账单模块]"
@@ -413,7 +415,32 @@ def test_mermaid_structure_rejects_placeholder():
     assert any("占位符" in e for e in errors)
 
 
-def test_mermaid_syntax_gate_reports_mmdc_missing(monkeypatch):
+def test_sanitize_mermaid_quotes_special_char_labels():
+    """含 {}()/ 的方括号标签自动补引号（如 J[/bake/{iNo}] → J["/bake/{iNo}"]）。"""
+    src = "flowchart LR\n  I --> J[/bake/{iNo}]\n  J --> K[done]"
+    fixed = _sanitize_mermaid_source(src)
+    assert 'J["/bake/{iNo}"]' in fixed
+    # 无特殊字符的标签保持不变
+    assert "K[done]" in fixed
+
+
+def test_sanitize_mermaid_keeps_quoted_and_plain_labels():
+    src = 'flowchart LR\n  A["already quoted (x)"] --> B[plain]'
+    assert _sanitize_mermaid_source(src) == src
+
+
+def test_sanitize_mermaid_diagrams_inplace_reports_change():
+    diagrams = [
+        {"id": "d1", "mermaid": "flowchart LR\n  A --> B[/p/{id}]"},
+        {"id": "d2", "mermaid": "flowchart LR\n  A --> B[ok]"},
+    ]
+    assert sanitize_mermaid_diagrams(diagrams) is True
+    assert 'B["/p/{id}"]' in diagrams[0]["mermaid"]
+    assert sanitize_mermaid_diagrams(diagrams) is False
+
+
+def test_mermaid_syntax_gate_skips_when_mmdc_missing(monkeypatch):
+    """无 mmdc 时降级跳过语法门控，不得当硬错误导致节点必挂。"""
     monkeypatch.setattr(
         "synapse.rd_meeting.func_solution_review._resolve_mmdc_argv",
         lambda: None,
@@ -421,8 +448,7 @@ def test_mermaid_syntax_gate_reports_mmdc_missing(monkeypatch):
     errors = _validate_mermaid_diagrams_syntax(
         [{"id": "d1", "mermaid": VALID_FLOWCHART}],
     )
-    assert any("mmdc" in e for e in errors)
-    assert any("apps/setup-center" in e for e in errors)
+    assert errors == []
 
 
 def test_resolve_mmdc_prefers_setup_center_local(monkeypatch, tmp_path):

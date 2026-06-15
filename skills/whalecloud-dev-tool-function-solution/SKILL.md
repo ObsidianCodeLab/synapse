@@ -384,6 +384,7 @@ Step 10 — 文档落地（调用 whalecloud-dev-tool-doc-generate）
 Step 11 — 结构化评审 JSON（func_solution_review.json）
   11a. 组装 `func_solution_review.json`（schema_version=1），**必须**包含：
       - `overview.diagrams[]`：至少 2 条 Mermaid（flowchart + graph/sequenceDiagram）
+        - **标签引号（强制）**：节点标签含 `{ } ( ) / \`、空格或中文标点时，**必须**用双引号包裹，否则 mermaid 解析失败。如 `J[/bake/{iNo}]` 须写成 `J["/bake/{iNo}"]`；首行须为合法声明，禁止空图或占位符
       - `overview.architecture_summary`
       - `consistency_analysis`：summary + compatibility_notes + contradiction_checks
       - `transformation_plans[]`：每条含 requirement_ref、module_name、title、design_rationale、design_evidence、expected_effect；`content_markdown` **可留空**（系统会从 `函数级方案.md` §1.7 同名模块小节补全四类评审卡片），若填写须含 `**模块概要**` / `**函数设计清单**` / `**函数伪代码**` / `**模块内部调用关系**` 小节，**禁止**仅写一段 prose 摘要；`human_review.status` 初始为 `pending`

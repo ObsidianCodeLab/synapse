@@ -49,6 +49,13 @@ _MERMAID_DECL_LINE_RE = re.compile(
 )
 _MIN_DIAGRAM_COUNT = 2
 
+# LLM 生成 flowchart 时最高频的语法错误：节点矩形标签 `id[text]` 中
+# text 含 {}()/\ 等特殊字符却未加引号，mermaid 会解析失败。
+# 仅处理最常见的方括号矩形节点：捕获 节点ID + `[` + 标签 + `]`，
+# 标签未以引号开头且不含 [] " 时，若含特殊字符则补引号（确定性修复，零 LLM 往返）。
+_MERMAID_RECT_LABEL_RE = re.compile(r"([A-Za-z0-9_\u4e00-\u9fff]+)\[([^\[\]\"\n]+)\]")
+_MERMAID_LABEL_SPECIAL_RE = re.compile(r"[{}()/\\]")
+
 
 def uses_func_solution_gate(node_id: str) -> bool:
     """该节点走专用函数级方案评审门控。"""
@@ -640,14 +647,61 @@ def _validate_mermaid_syntax_with_mmdc(mermaid: str, *, diagram_id: str) -> str 
     return None
 
 
+def _sanitize_mermaid_source(mermaid: str) -> str:
+    """确定性修复：给含特殊字符的方括号节点标签补引号（如 ``J[/bake/{iNo}]`` → ``J["/bake/{iNo}"]``）。"""
+
+    def _repl(m: re.Match[str]) -> str:
+        node_id, label = m.group(1), m.group(2)
+        if not _MERMAID_LABEL_SPECIAL_RE.search(label):
+            return m.group(0)
+        return f'{node_id}["{label.strip()}"]'
+
+    return _MERMAID_RECT_LABEL_RE.sub(_repl, mermaid)
+
+
+def sanitize_mermaid_diagrams(diagrams: list[Any]) -> bool:
+    """就地清洗每张图的 mermaid 源；有改动返回 True（供调用方决定是否回写）。"""
+    changed = False
+    for diagram in diagrams:
+        if not isinstance(diagram, dict):
+            continue
+        original = str(diagram.get("mermaid") or "")
+        if not original.strip():
+            continue
+        fixed = _sanitize_mermaid_source(original)
+        if fixed != original:
+            diagram["mermaid"] = fixed
+            changed = True
+    return changed
+
+
+def sanitize_func_solution_review_diagrams(scope_id: str) -> bool:
+    """读取 func_solution_review.json，清洗 overview.diagrams 标签并按需回写。"""
+    data = load_func_solution_review_payload(scope_id)
+    if not isinstance(data, dict):
+        return False
+    overview = data.get("overview") if isinstance(data.get("overview"), dict) else None
+    if not isinstance(overview, dict):
+        return False
+    diagrams = overview.get("diagrams")
+    if not isinstance(diagrams, list):
+        return False
+    if not sanitize_mermaid_diagrams(diagrams):
+        return False
+    _write_json_file(json_path(scope_id), data)
+    logger.info("func_solution_review: 已确定性清洗 mermaid 标签并回写 %s", scope_id)
+    return True
+
+
 def _validate_mermaid_diagrams_syntax(diagrams: list[Any]) -> list[str]:
-    """对每张图执行 mmdc 语法校验；环境无 mmdc 时返回安装提示。"""
+    """对每张图执行 mmdc 语法校验；环境无 mmdc 时跳过门控（降级为非硬错误）。"""
     argv_prefix = _resolve_mmdc_argv()
     if not argv_prefix:
-        return [
-            "Mermaid 语法门控需要 mmdc：请在 apps/setup-center 执行 npm install"
-            "（devDependency @mermaid-js/mermaid-cli），或全局安装 / 确保 npx 可用"
-        ]
+        logger.warning(
+            "func_solution_review: 未找到 mmdc（PATH / setup-center node_modules / npx 均不可用），"
+            "跳过 Mermaid 语法门控；建议在 apps/setup-center 执行 npm install"
+        )
+        return []
 
     errors: list[str] = []
     for i, diagram in enumerate(diagrams):
@@ -767,6 +821,8 @@ def validate_func_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
     if not jpath.is_file():
         errors.append(f"缺少结构化评审产物：{JSON_NAME}")
         return False, errors
+    # L1 确定性清洗：mmdc 校验前先给含特殊字符的节点标签补引号并回写
+    sanitize_func_solution_review_diagrams(scope_id)
     data = load_func_solution_review_payload(scope_id)
     errors.extend(_validate_func_solution_payload(data))
     return len(errors) == 0, errors
