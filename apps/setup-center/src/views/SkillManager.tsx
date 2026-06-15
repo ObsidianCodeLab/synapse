@@ -29,6 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ModalOverlay } from "../components/ModalOverlay";
+import { InternalSkills } from "@/components/internal-skills";
 import { isWhalecloudDevToolSkill, rdToolDisplayLabel } from "../utils/whalecloudDevToolSkill";
 
 // ─── i18n 辅助：按当前语言优先显示中文名/描述 ───
@@ -1309,7 +1310,7 @@ export function SkillManager({
   serviceRunning?: boolean;
   dataMode?: "local" | "remote";
 }) {
-  const [tab, setTab] = useState<"installed" | "marketplace">("installed");
+  const [tab, setTab] = useState<"installed" | "marketplace" | "internal">("installed");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2328,7 +2329,7 @@ export function SkillManager({
         <ToggleGroup
           type="single"
           value={tab}
-          onValueChange={(v) => { if (v) setTab(v as "installed" | "marketplace"); }}
+          onValueChange={(v) => { if (v) setTab(v as "installed" | "marketplace" | "internal"); }}
           variant="outline"
           className="justify-start"
         >
@@ -2353,6 +2354,12 @@ export function SkillManager({
             className="text-sm min-w-[5.5rem] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary"
           >
             {t("skills.marketplace")}
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            value="internal"
+            className="text-sm min-w-[5.5rem] data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary"
+          >
+            {t("skills.internal")}
           </ToggleGroupItem>
         </ToggleGroup>
         <div className="flex-1" />
@@ -2809,6 +2816,9 @@ export function SkillManager({
           </div>
         </div>
       )}
+
+      {/* 内部技能 */}
+      {tab === "internal" && <InternalSkills venvDir={venvDir} />}
 
       {/* 技能详情弹窗 */}
       {detailSkill && (
