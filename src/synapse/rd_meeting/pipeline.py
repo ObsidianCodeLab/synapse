@@ -1033,6 +1033,11 @@ def clear_current_node_reprocess_artifacts(
 
 
 def _remove_agent_sop_node_dir(scope_id: str, node_id: str) -> None:
+    # 删目录前先冻结本轮已统计 token 为 carry 基线：activity.jsonl 是 token 唯一真相源，
+    # 随目录一起删除后无法回溯，必须先落基线，否则重处理/增量修订后整场 token 会变少失真。
+    from synapse.rd_meeting.room_runtime import freeze_node_carry_tokens
+
+    freeze_node_carry_tokens(scope_id, node_id)
     node_dir = agent_sop_node_dir(scope_id, node_id)
     if node_dir.is_dir():
         try:
@@ -1134,6 +1139,8 @@ def clear_room_state_for_node_reprocess(
         "escalate_reason",
         "last_error",
         "last_pipeline_error",
+        "reprocess_reason",
+        "reprocess_until_node_id",
     ):
         rs.pop(key, None)
 

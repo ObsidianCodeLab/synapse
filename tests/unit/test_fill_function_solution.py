@@ -92,6 +92,33 @@ def test_render_repos_table_includes_app_module(fill_mod):
     assert issues == []
 
 
+def test_empty_list_emits_table_placeholder_row(fill_mod):
+    tmpl = TEMPLATE.read_text(encoding="utf-8")
+    ctx = _minimal_ctx(terms=[])
+    out = fill_mod.render(tmpl, ctx)
+    terms_idx = out.find("### 1.5")
+    assert terms_idx >= 0
+    section = out[terms_idx : terms_idx + 120]
+    assert "| 术语 | 含义 |" in section
+    assert "| （无） |" in section
+    assert "\n（无）\n" not in section
+
+
+def test_pipe_in_cell_is_escaped(fill_mod):
+    ctx = _minimal_ctx(
+        repos=[
+            {
+                "branch_id": "4531|主分支",
+                "app_module": "ZMDB",
+                "repo_url": "https://git.example/ZMDB.git",
+                "change_desc": "索引改造",
+            }
+        ]
+    )
+    out = fill_mod.render(TEMPLATE.read_text(encoding="utf-8"), ctx)
+    assert "4531\\|主分支" in out
+
+
 def test_fill_writes_markdown(tmp_path, fill_mod):
     ctx_path = tmp_path / "ctx.json"
     out_path = tmp_path / "out.md"

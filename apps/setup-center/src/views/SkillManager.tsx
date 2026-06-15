@@ -2818,7 +2818,7 @@ export function SkillManager({
       )}
 
       {/* 内部技能 */}
-      {tab === "internal" && <InternalSkills venvDir={venvDir} />}
+      {tab === "internal" && <InternalSkills apiBaseUrl={apiBaseUrl} serviceRunning={serviceRunning} />}
 
       {/* 技能详情弹窗 */}
       {detailSkill && (

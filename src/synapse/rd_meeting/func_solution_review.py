@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -409,6 +410,22 @@ def format_revision_brief(payload: dict[str, Any], overall_comment: str = "") ->
     return "\n".join(lines).strip()
 
 
+def _plan_content_snapshot(plan: dict[str, Any]) -> str:
+    """已通过改造方案的内容指纹（供 revision_context 冻结校验）。"""
+    raw = json.dumps(
+        {
+            "module_name": str(plan.get("module_name") or "").strip(),
+            "title": str(plan.get("title") or "").strip(),
+            "design_rationale": str(plan.get("design_rationale") or "").strip(),
+            "expected_effect": str(plan.get("expected_effect") or "").strip(),
+            "content_markdown": str(plan.get("content_markdown") or "").strip(),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def _plan_immutable_summary(plan: dict[str, Any]) -> str:
     """已通过改造方案的简短摘要（供 revision_context 冻结说明）。"""
     for key in ("design_rationale", "expected_effect", "content_markdown"):
@@ -455,6 +472,7 @@ def build_revision_context(
                 {
                     **base,
                     "summary": _plan_immutable_summary(plan),
+                    "content_snapshot": _plan_content_snapshot(plan),
                 }
             )
     return {
@@ -942,7 +960,60 @@ def validate_func_solution_review_json(scope_id: str) -> tuple[bool, list[str]]:
     sanitize_func_solution_review_diagrams(scope_id)
     data = load_func_solution_review_payload(scope_id)
     errors.extend(_validate_func_solution_payload(data))
+    # 闸 3：增量修订模式下，已通过（冻结）方案禁止被改动
+    errors.extend(validate_revision_frozen_plans(scope_id, data))
     return len(errors) == 0, errors
+
+
+def validate_revision_frozen_plans(
+    scope_id: str,
+    data: dict[str, Any] | None,
+) -> list[str]:
+    """闸 3：增量修订时校验 approved_plans 冻结内容未被改动、状态仍为 approved。
+
+    无 revision_context 时返回空（非修订模式不约束）。命中的 plan 内容指纹与冻结
+    快照不一致、或评审状态被改掉 → 报错，门控不放行，自愈循环会打回让模型还原。
+    """
+    if not has_revision_context(scope_id):
+        return []
+    ctx = load_revision_context(scope_id)
+    if not isinstance(ctx, dict):
+        return []
+    frozen = ctx.get("approved_plans")
+    if not isinstance(frozen, list) or not frozen:
+        return []
+    if not isinstance(data, dict):
+        return ["增量修订校验：无法解析 func_solution_review.json"]
+
+    by_id = {
+        str(p.get("id") or ""): p
+        for p in (data.get("transformation_plans") or [])
+        if isinstance(p, dict)
+    }
+    errors: list[str] = []
+    for row in frozen:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("id") or "").strip()
+        snap = str(row.get("content_snapshot") or "").strip()
+        title = str(row.get("title") or row.get("module_name") or pid).strip()
+        if not pid or not snap:
+            # 旧版 revision_context 无快照，跳过逐字校验（向后兼容）
+            continue
+        cur = by_id.get(pid)
+        if cur is None:
+            errors.append(f"已冻结方案 `{pid}` {title} 被删除，禁止改动 approved 方案")
+            continue
+        cur_status = str((cur.get("human_review") or {}).get("status") or "").strip().lower()
+        if cur_status != "approved":
+            errors.append(
+                f"已冻结方案 `{pid}` {title} 的评审状态被改为 {cur_status or '空'}，必须保持 approved"
+            )
+        if _plan_content_snapshot(cur) != snap:
+            errors.append(
+                f"已冻结方案 `{pid}` {title} 的内容被改动，本次仅允许修订 plans_to_revise 中的方案，请还原"
+            )
+    return errors
 
 
 def ensure_human_review_pending_for_gate(

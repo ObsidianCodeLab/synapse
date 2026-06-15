@@ -86,6 +86,8 @@ def test_clear_room_state_for_node_reprocess(monkeypatch):
             "delegation_started": True,
             "delegated_item_ids": ["t1"],
         },
+        "reprocess_reason": "上次重处理要求",
+        "reprocess_until_node_id": node_id,
     }
 
     clear_room_state_for_node_reprocess(scope, node_id)
@@ -100,6 +102,8 @@ def test_clear_room_state_for_node_reprocess(monkeypatch):
     assert "stopped_at" not in rs
     assert "hitl_locked" not in rs
     assert "current_work_plan" not in rs
+    assert "reprocess_reason" not in rs
+    assert "reprocess_until_node_id" not in rs
 
 
 def test_clear_room_state_for_node_reprocess_keeps_other_node_work_plan(monkeypatch):

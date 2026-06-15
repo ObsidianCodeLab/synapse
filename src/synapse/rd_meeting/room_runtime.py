@@ -80,7 +80,10 @@ def finalize_node_metrics(
         node_metrics = {}
     prev = node_metrics.get(nid) if isinstance(node_metrics.get(nid), dict) else {}
     started = str(prev.get("started_at") or now)
-    tokens = aggregate_node_activity_tokens(sid, nid)
+    # carry_tokens：上一轮重处理/增量修订前冻结的历史 token 基线；
+    # activity.jsonl 在删 agents 目录时会被清掉，必须叠加基线才能反映真实累计损耗。
+    carry = max(int(prev.get("carry_tokens") or 0), 0)
+    tokens = carry + aggregate_node_activity_tokens(sid, nid)
     seconds = compute_node_metrics_seconds(started, now)
 
     entry = {
@@ -89,6 +92,8 @@ def finalize_node_metrics(
         "seconds": seconds,
         "tokens": tokens,
     }
+    if carry > 0:
+        entry["carry_tokens"] = carry
     node_metrics[nid] = entry
     room_state["node_metrics"] = node_metrics
     sync_metrics_tokens_from_node_metrics(room_state, sid)
@@ -96,6 +101,38 @@ def finalize_node_metrics(
 
 
 _LEGACY_NODE_TOKEN_PLACEHOLDERS = frozenset({64, 128, 256})
+
+
+def freeze_node_carry_tokens(scope_id: str, node_id: str) -> int:
+    """删 agents 目录（重处理/增量修订）前调用：把本轮已统计 token 冻结为 carry 基线。
+
+    activity.jsonl 是 token 唯一真相源，删目录后会丢失；本函数在删除前把
+    ``carry_tokens（历史基线）+ 本轮 activity 汇总`` 落回 room_state.node_metrics，
+    使后续 finalize/live 汇总叠加该基线，重处理后 token 只增不减，损耗真实。
+    """
+    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
+
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if not sid or not nid:
+        return 0
+    rs = dict(load_room_state(sid) or {})
+    nm = rs.get("node_metrics")
+    if not isinstance(nm, dict):
+        return 0
+    prev = nm.get(nid) if isinstance(nm.get(nid), dict) else {}
+    carry = max(int(prev.get("carry_tokens") or 0), 0) + aggregate_node_activity_tokens(sid, nid)
+    if carry <= 0:
+        return 0
+    entry = dict(prev)
+    entry["carry_tokens"] = carry
+    entry["tokens"] = carry
+    nm[nid] = entry
+    rs["node_metrics"] = nm
+    sync_metrics_tokens_from_node_metrics(rs, sid)
+    save_room_state(sid, rs)
+    logger.info("freeze_node_carry_tokens: scope=%s node=%s carry=%d", sid, nid, carry)
+    return carry
 
 
 def archived_node_tokens(nm: dict[str, Any]) -> int:
@@ -212,7 +249,9 @@ def resolve_node_tokens_live(
         return static
     from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
 
-    live = aggregate_node_activity_tokens(sid, nid)
+    # 进行中（含重处理/修订重跑）：carry_tokens 历史基线 + 本轮 activity 实时汇总。
+    carry = max(int(nm.get("carry_tokens") or 0), 0)
+    live = carry + aggregate_node_activity_tokens(sid, nid)
     return live if live > 0 else static
 
 

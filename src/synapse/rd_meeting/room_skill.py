@@ -836,9 +836,30 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
             summary = str(row.get("summary") or "").strip()
             lines.append(f"  - `{pid}` {title}：{summary}" if summary else f"  - `{pid}` {title}")
 
+    revise_module_names = [
+        str(row.get("module_name") or "").strip()
+        for row in to_revise
+        if isinstance(row, dict) and str(row.get("module_name") or "").strip()
+    ]
+    mods_arg = ",".join(dict.fromkeys(revise_module_names))
     lines.append(
-        "- **落盘要求**：更新 `func_solution_review.json` 中对应 plan 字段并同步 `函数级方案.md` "
-        "对应章节；待修订 plan 的 `human_review.status` 须重置为 `pending`。"
+        "- **落盘要求（强制局部修订，禁止全量覆盖）**："
+        "先更新 `func_solution_review.json` 中**仅** `plans_to_revise` 对应 plan 的字段，"
+        "其 `human_review.status` 重置为 `pending`；`approved_plans` 条目**原样保留**。"
+    )
+    lines.append(
+        "- **`函数级方案.md` 落盘**：**只能**用 doc-generate 的 `--patch-modules` 局部模式，"
+        "禁止用全量三参数形式整篇重渲（会触发冻结校验失败被打回）。命令形如："
+    )
+    lines.append(
+        "  ```\n"
+        "  python scripts/fill_function_solution.py --patch-modules <模板> "
+        f"<CONTEXT_JSON> 函数级方案.md \"{mods_arg or '<待修订模块名,逗号分隔>'}\"\n"
+        "  ```"
+    )
+    lines.append(
+        "  其中 `CONTEXT_JSON.modules` 只需包含上述待修订模块；脚本只会替换命中的 §1.7.N 小节，"
+        "其余章节字节级保留。`approved_plans` 对应模块严禁出现在 `--patch-modules` 参数中。"
     )
     return "\n".join(lines)
 

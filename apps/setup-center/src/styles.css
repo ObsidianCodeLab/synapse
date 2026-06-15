@@ -6215,6 +6215,10 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   height: 400px;
   max-height: min(400px, 55vh);
 }
+.rd-stage2-artifacts__body--structured .rd-stage2-artifacts__preview {
+  flex: 1;
+  min-width: 0;
+}
 @media (min-width: 768px) {
   .rd-stage2-artifacts__body {
     flex-direction: row;

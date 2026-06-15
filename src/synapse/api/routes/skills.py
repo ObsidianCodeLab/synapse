@@ -23,6 +23,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from pathlib import Path
 
 import httpx
@@ -43,6 +44,10 @@ registered at the bottom of this module."""
 
 _organize_cache: dict | None = None
 _organize_cache_hash: str | None = None
+
+_internal_skills_cache: dict[str, dict] = {}
+_internal_skills_cache_at: dict[str, float] = {}
+_INTERNAL_SKILLS_CACHE_TTL = 3600
 
 
 def _invalidate_skills_cache() -> None:
@@ -1157,6 +1162,115 @@ async def search_marketplace(q: str = "agent"):
     except Exception as e:
         logger.warning("skills.sh API error: %s", e)
         return {"skills": [], "count": 0, "error": str(e)}
+
+
+def _normalize_internal_skill_type(skill_type: str) -> str:
+    normalized = (skill_type or "official").strip()
+    if normalized not in ("official", "self_operated"):
+        raise HTTPException(status_code=400, detail="skill_type 必须为 official 或 self_operated")
+    return normalized
+
+
+async def _get_internal_skills_data(skill_type: str, *, refresh: bool = False) -> dict:
+    global _internal_skills_cache, _internal_skills_cache_at
+
+    now = time.time()
+    cached = _internal_skills_cache.get(skill_type)
+    cached_at = _internal_skills_cache_at.get(skill_type, 0.0)
+    if not refresh and cached is not None and now - cached_at < _INTERNAL_SKILLS_CACHE_TTL:
+        return cached
+
+    from synapse.skills.platform_crawler import crawl
+
+    try:
+        data = await asyncio.to_thread(crawl, skill_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    _internal_skills_cache[skill_type] = data
+    _internal_skills_cache_at[skill_type] = now
+    return data
+
+
+@router.get("/api/internal-skills/hot")
+async def internal_skills_hot(skill_type: str = "official", refresh: bool = False):
+    """内部技能热榜（下载 / 星标 / 最近更新 Top8）。"""
+    from synapse.skills.platform_crawler import group_hot_columns
+
+    normalized = _normalize_internal_skill_type(skill_type)
+    data = await _get_internal_skills_data(normalized, refresh=refresh)
+    hot_flat = data.get(normalized, {}).get("hot") or []
+    return {"skill_type": normalized, "columns": group_hot_columns(hot_flat)}
+
+
+@router.get("/api/internal-skills/all")
+async def internal_skills_all(skill_type: str = "official", refresh: bool = False):
+    """内部技能全量列表。"""
+    normalized = _normalize_internal_skill_type(skill_type)
+    data = await _get_internal_skills_data(normalized, refresh=refresh)
+    return {
+        "skill_type": normalized,
+        "skills": data.get(normalized, {}).get("all") or [],
+        "total": len(data.get(normalized, {}).get("all") or []),
+    }
+
+
+@router.post("/api/internal-skills/install")
+async def internal_skills_install(request: Request):
+    """通过 whalehub 安装内部技能到项目 ``skills/`` 目录。"""
+    from synapse.skills.allowlist_io import upsert_skill_ids
+    from synapse.skills.platform_crawler import install_skill as _install_internal_skill
+    from synapse.skills.platform_crawler import skills_install_dir
+
+    body = await request.json()
+    slug = (body.get("slug") or "").strip()
+    if not slug:
+        return {"error": "slug is required"}
+
+    try:
+        await asyncio.to_thread(_install_internal_skill, slug)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    except RuntimeError as exc:
+        logger.error("Internal skill install failed (%s): %s", slug, exc)
+        return {"error": str(exc)}
+    except Exception as exc:
+        logger.error("Internal skill install failed (%s): %s", slug, exc, exc_info=True)
+        return {"error": str(exc)}
+
+    target_dir = skills_install_dir() / slug
+    skill_md = target_dir / "SKILL.md"
+    if not skill_md.is_file():
+        import shutil
+
+        shutil.rmtree(str(target_dir), ignore_errors=True)
+        return {"error": f"技能已下载，但未找到有效的 SKILL.md: {skill_md}"}
+
+    try:
+        from synapse.skills.parser import SkillParser
+
+        SkillParser().parse_directory(target_dir)
+    except Exception as exc:
+        import shutil
+
+        logger.error("Installed internal skill %s has invalid SKILL.md, removing: %s", slug, exc)
+        shutil.rmtree(str(target_dir), ignore_errors=True)
+        return {
+            "error": (
+                f"技能文件已下载，但 SKILL.md 格式无效，无法加载：{exc}。"
+                "该技能可能不兼容 Synapse 格式，已自动清理。"
+            )
+        }
+
+    try:
+        upsert_skill_ids({slug})
+    except Exception as exc:
+        logger.warning("Failed to upsert %s into skills.json: %s", slug, exc)
+
+    await _propagate(request, "install")
+    return {"status": "ok", "slug": slug, "skill_id": slug, "install_dir": str(target_dir)}
 
 
 # ──────────────────────────────────────────────────────────────────────

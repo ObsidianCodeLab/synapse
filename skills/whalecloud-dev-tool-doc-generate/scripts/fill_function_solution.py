@@ -2,7 +2,8 @@
 """函数级方案.md 模板填充脚本（结构化 CONTEXT_JSON → Markdown）。
 
 doc-generate 在 OUTPUT=函数级方案.md 时**必须**调用本脚本；禁止手填模板。
-脚本仅输出到 .tmp 草稿路径，交付物由 doc-generate 经 read_file + write_file 写入。
+脚本以显式 UTF-8（newline="\n"）直接落盘到第 3 参指定的输出路径（可为最终交付路径），
+模型无需再 read_file + write_file 把整篇正文内联一遍（大文档会触发输出 token 上限被截断）。
 """
 from __future__ import annotations
 
@@ -21,14 +22,31 @@ def _g(ctx: dict[str, Any], key: str, default: str = "[待补充]") -> str:
     return str(val)
 
 
+def _escape_md_cell(val: Any) -> str:
+    """GFM 表格单元格内 | 须转义，否则整行无法解析为表格。"""
+    if val is None:
+        return ""
+    return str(val).replace("|", "\\|")
+
+
 def _fill_row(template: str, item: dict[str, Any] | Any) -> str:
     row = template
     if isinstance(item, dict):
         for k, v in item.items():
-            row = row.replace("{{" + k + "}}", "" if v is None else str(v))
+            row = row.replace("{{" + k + "}}", _escape_md_cell(v))
     else:
-        row = row.replace("{{.}}", str(item))
+        row = row.replace("{{.}}", _escape_md_cell(item))
     return row
+
+
+def _empty_table_body(inner: str, *, fallback: str = "（无）") -> str:
+    """空列表时若模板为表格行，输出占位行而非裸文本（避免破坏 GFM 表格）。"""
+    line = inner.strip().split("\n", 1)[0].strip()
+    if not line.startswith("|"):
+        return fallback
+    col_count = max(1, line.count("|") - 1)
+    cells = [fallback if i == 0 else "" for i in range(col_count)]
+    return "| " + " | ".join(cells) + " |"
 
 
 def _repl_each(
@@ -43,7 +61,7 @@ def _repl_each(
     def _handler(match: re.Match[str]) -> str:
         inner = match.group(1)
         if not items:
-            return empty
+            return _empty_table_body(inner, fallback=empty)
         rows = []
         for idx, item in enumerate(items, 1):
             line = inner.replace("{{@index}}", str(idx))
@@ -87,7 +105,7 @@ def _repl_modules(result: str, modules: list[dict[str, Any]]) -> str:
             def _repl_fn(fn_match: re.Match[str], functions: list = functions) -> str:
                 inner = fn_match.group(1)
                 if not functions:
-                    return "（无）"
+                    return _empty_table_body(inner)
                 parts = []
                 for fn in functions:
                     parts.append(_fill_row(inner, fn if isinstance(fn, dict) else {"signature": str(fn)}))
@@ -103,7 +121,7 @@ def _repl_modules(result: str, modules: list[dict[str, Any]]) -> str:
             for k, v in mod.items():
                 if k == "functions":
                     continue
-                section = section.replace("{{" + k + "}}", "" if v is None else str(v))
+                section = section.replace("{{" + k + "}}", _escape_md_cell(v))
             sections.append(section.rstrip())
         return "\n\n".join(sections)
 
@@ -465,6 +483,107 @@ def fill(
     print(f"[OK] Written: {out_path}")
 
 
+# ── 增量修订：仅重渲指定 §1.7.N 模块小节，其余内容字节级保留 ──────────────
+
+_MODULE_EACH_RE = re.compile(
+    r"###\s*1\.7\s+模块改造方案\s*\n+(\{\{#each modules\}\}.*\{\{/each\}\})\s*\n+###\s+1\.8\b",
+    re.DOTALL,
+)
+_SECTION_17_RE = re.compile(r"(?m)^####\s+1\.7\.\d+\s+(.+?)\s*$")
+_SECTION_18_RE = re.compile(r"(?m)^###\s+1\.8\b")
+
+
+def _extract_module_each_block(template: str) -> str:
+    """从模板抽出 §1.7 的 ``{{#each modules}}...{{/each}}`` 块（含内层 functions）。"""
+    m = _MODULE_EACH_RE.search(template)
+    if not m:
+        raise ValueError("模板缺少 §1.7 {{#each modules}} 块，无法局部修订")
+    return m.group(1)
+
+
+def _render_one_module_section(each_block: str, module: dict[str, Any], index: int) -> str:
+    """渲染单个模块的 §1.7.N 小节，保留原编号 index。"""
+    rendered = _repl_modules(each_block, [module]).strip()
+    rendered = re.sub(r"(?m)^####\s+1\.7\.1\s+", f"#### 1.7.{index} ", rendered, count=1)
+    rendered = re.sub(r"\{\{[^}]+\}\}", "[待补充]", rendered)
+    return rendered.rstrip()
+
+
+def patch_modules(
+    template_path: str | Path,
+    ctx_source: str | Path | dict[str, Any],
+    existing_md_path: str | Path,
+    target_modules: list[str],
+    *,
+    overrides: dict[str, Any] | None = None,
+    timestamp: str | None = None,
+) -> list[str]:
+    """仅替换 existing_md 中命中 target_modules 的 §1.7.N 小节，原地落盘。
+
+    返回实际被替换的模块名列表。未命中的目标模块抛错（避免静默全量/漏改）。
+    """
+    with open(template_path, encoding="utf-8") as f:
+        tmpl = f.read()
+    ctx = ctx_source if isinstance(ctx_source, dict) else _load_context(ctx_source)
+    ctx = merge_context(ctx, overrides, timestamp=timestamp)
+    validate_context_or_raise(ctx)
+
+    mpath = Path(existing_md_path)
+    if not mpath.is_file():
+        raise ValueError(f"待修订文档不存在，无法局部修订：{existing_md_path}")
+    md = mpath.read_text(encoding="utf-8")
+
+    each_block = _extract_module_each_block(tmpl)
+    ctx_modules = {
+        str(m.get("module_name") or "").strip(): m
+        for m in (ctx.get("modules") or [])
+        if isinstance(m, dict) and str(m.get("module_name") or "").strip()
+    }
+
+    # 现有 MD 内 §1.7.N 小节的边界（heading 起点 → 下一 §1.7 heading / §1.8 起点）。
+    headings = list(_SECTION_17_RE.finditer(md))
+    if not headings:
+        raise ValueError("现有文档缺少 §1.7.N 模块小节，无法局部修订")
+    sec18 = _SECTION_18_RE.search(md)
+    sec18_start = sec18.start() if sec18 else len(md)
+
+    spans: dict[str, tuple[int, int, int]] = {}
+    for i, h in enumerate(headings):
+        name = h.group(1).strip()
+        start = h.start()
+        end = headings[i + 1].start() if i + 1 < len(headings) else sec18_start
+        idx_m = re.match(r"^####\s+1\.7\.(\d+)\s+", md[start : h.end() + 1])
+        idx = int(idx_m.group(1)) if idx_m else i + 1
+        spans[name] = (start, end, idx)
+
+    targets = [str(x).strip() for x in target_modules if str(x).strip()]
+    if not targets:
+        raise ValueError("未提供待修订模块名（target_modules 为空）")
+
+    patched: list[str] = []
+    # 从后往前替换，避免前面替换改变后面 span 偏移。
+    for name in sorted(targets, key=lambda n: spans.get(n, (-1,))[0], reverse=True):
+        if name not in spans:
+            raise ValueError(f"现有文档未找到模块小节「{name}」，无法局部修订")
+        if name not in ctx_modules:
+            raise ValueError(f"CONTEXT_JSON.modules 缺少待修订模块「{name}」")
+        start, end, idx = spans[name]
+        new_section = _render_one_module_section(each_block, ctx_modules[name], idx) + "\n\n"
+        if "{{" in new_section or "{{#each" in new_section:
+            raise ValueError(f"模块「{name}」渲染后仍含未解析占位符")
+        md = md[:start] + new_section + md[end:]
+        patched.append(name)
+
+    issues = validate_filled(md)
+    if issues:
+        raise ValueError("局部修订后整篇校验失败: " + "; ".join(issues))
+
+    with open(mpath, "w", encoding="utf-8", newline="\n") as f:
+        f.write(md)
+    print(f"[OK] Patched modules {patched} -> {existing_md_path}")
+    return patched
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--validate-only":
         try:
@@ -476,12 +595,24 @@ if __name__ == "__main__":
             sys.exit(1)
         sys.exit(0)
 
+    if len(sys.argv) == 6 and sys.argv[1] == "--patch-modules":
+        # --patch-modules <template.md> <ctx.json> <existing.md> <module1,module2,...>
+        try:
+            mods = [x.strip() for x in sys.argv[5].split(",") if x.strip()]
+            patch_modules(sys.argv[2], sys.argv[3], sys.argv[4], mods)
+        except (ValueError, json.JSONDecodeError) as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
     if len(sys.argv) != 4:
         print(
             "Usage:\n"
             "  python scripts/fill_function_solution.py <template.md> "
             "<context.json|inline-json> <output.md>\n"
-            "  python scripts/fill_function_solution.py --validate-only <context.json|inline-json>"
+            "  python scripts/fill_function_solution.py --validate-only <context.json|inline-json>\n"
+            "  python scripts/fill_function_solution.py --patch-modules <template.md> "
+            "<context.json|inline-json> <existing.md> <module1,module2,...>"
         )
         sys.exit(1)
     try:

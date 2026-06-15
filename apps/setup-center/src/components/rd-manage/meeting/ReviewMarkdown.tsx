@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+
+import { normalizeArtifactMarkdown } from './normalizeArtifactMarkdown';
 
 export interface MarkdownHeading {
   level: number;
@@ -205,23 +207,29 @@ export function ReviewMarkdown({
   content,
   compact = false,
   className = '',
+  normalizeTables = false,
 }: {
   content: string;
   compact?: boolean;
+  normalizeTables?: boolean;
   className?: string;
 }) {
+  const normalizedContent = useMemo(
+    () => (normalizeTables ? normalizeArtifactMarkdown(content) : content),
+    [content, normalizeTables],
+  );
   // 每次渲染重建 components，避免 useMemo 导致标题 id / 序号在二次渲染时错位
   const components = buildMarkdownComponents(compact);
 
   return (
     <div className={`review-markdown ${className}`}>
       <ReactMarkdown
-        key={content.slice(0, 64) + content.length}
+        key={normalizedContent.slice(0, 64) + normalizedContent.length}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={components}
       >
-        {content || '_（空文档）_'}
+        {normalizedContent || '_（空文档）_'}
       </ReactMarkdown>
     </div>
   );

@@ -874,15 +874,16 @@ class MeetingRoomService:
     ) -> None:
         """将一次性重处理原因写入 pipeline context，供 reprocess_prep 落盘到 room_state。"""
         reason_text = (reason or "").strip()
-        if not reason_text:
-            return
         pctx = pipe._data.get("context")
         if not isinstance(pctx, dict):
             pctx = {}
-        pctx["reprocess_reason"] = reason_text
-        until = (until_node_id or "").strip()
-        if until:
-            pctx["reprocess_until_node_id"] = until
+        pctx.pop("reprocess_reason", None)
+        pctx.pop("reprocess_until_node_id", None)
+        if reason_text:
+            pctx["reprocess_reason"] = reason_text
+            until = (until_node_id or "").strip()
+            if until:
+                pctx["reprocess_until_node_id"] = until
         pipe._data["context"] = pctx
 
     def reprocess_node(

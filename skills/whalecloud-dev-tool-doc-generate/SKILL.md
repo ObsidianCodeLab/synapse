@@ -64,10 +64,12 @@ run_skill_script(
   args=[
     "skills/whalecloud-dev-tool-doc-generate/templates/函数级方案.md",
     "{OUTPUT_DIR}/.tmp/_function_solution_fill_ctx.json",
-    "{OUTPUT_DIR}/.tmp/_function_solution_fill_out.md"
+    "{OUTPUT_DIR}/函数级方案.md"
   ]
 )
 ```
+
+> 第 3 参为**最终交付路径**：脚本以显式 UTF-8 直接落盘，模型不再 `read_file` + `write_file` 内联整篇（避免大文档输出截断）。
 
 契约预检：
 
@@ -119,13 +121,15 @@ run_skill_script(
 |------|------|
 | 读模板 `templates/*.md` | UTF-8 |
 | 读 `CONTEXT_JSON` / `CONTEXT_FILES` | UTF-8；非法 JSON 或解码失败 → **中止** |
-| 写 `{OUTPUT_DIR}/{OUTPUT}` | **必须** `write_file`（UTF-8，无 BOM），换行 `\n` |
+| 写 `{OUTPUT_DIR}/{OUTPUT}` | 小文档 `write_file`（UTF-8，无 BOM）；大文档由脚本 `open(encoding="utf-8", newline="\n")` 分段写（见下「大文档分段写」） |
+| 校验/统计中文文件 | **必须** `write_file` 落 `*.py` + `run_shell python xxx.py`（`open(encoding="utf-8")`）；**禁止** PowerShell 与 `python -c` 内联中文脚本 |
 | `OUTPUT_MODE=content` / `both` | 通道输出的 Markdown 正文须为 UTF-8 字符串，不得经错误编码转码 |
 
 **写盘方式（强制）**：
 
-- **必须**使用 Synapse `write_file` 工具写入 `{OUTPUT_DIR}/{OUTPUT}`（内置 UTF-8，自动创建父目录）。
-- **禁止**通过 `run_shell`、Python `open()`、Node `fs.writeFileSync`、PowerShell `Set-Content`/`Out-File`/`>` 重定向等方式写盘（Windows 下易产出 UTF-16 或 GBK 乱码）。
+- 小文档（约 ≤ 8KB 且 ≤ 200 行）**必须**使用 Synapse `write_file` 工具写入 `{OUTPUT_DIR}/{OUTPUT}`（内置 UTF-8，自动创建父目录）。
+- **禁止**模型用 `run_shell`、`python -c` 内联、Node `fs.writeFileSync`、PowerShell `Set-Content`/`Out-File`/`>` 重定向等临时方式写盘（Windows 下易产出 UTF-16 或 GBK 乱码）。
+- **例外（大文档）**：技能脚本（如 `scripts/fill_function_solution.py`）可用 Python `open(path, "w", encoding="utf-8", newline="\n")` 显式 UTF-8 落盘，并按 section 分段写（见下「大文档分段写」）。
 
 ```json
 {
@@ -134,9 +138,18 @@ run_skill_script(
 }
 ```
 
+**大文档分段写（强制）**：
+
+- 当填充后正文较大（约 > 8KB 或 > 200 行）时，**禁止**让模型在单次工具调用的 `content` 内联输出整篇正文——极易触发输出 token 上限被截断，导致 `content` 丢失、写盘报「缺少必要参数 content」。
+- 改由技能脚本（如 `scripts/fill_function_solution.py`）**按 section 分多次写入**：脚本内统一用 `open(path, "w"/"a", encoding="utf-8", newline="\n")` 显式 UTF-8 落盘，单段控制在安全大小（≤ 8KB）；模型只负责组装 `CONTEXT_JSON` 与触发脚本，不内联整篇正文。
+- 脚本直接写出的交付物，模型用 `read_file` 抽查即可，**无需**再 `read_file` + `write_file` 把整篇正文重新内联一遍。
+
 **写后自检（含中文时必做）**：
 
 - 用 `read_file` 读回 `{OUTPUT_DIR}/{OUTPUT}`，确认中文可读、无 U+FFFD 替换字符或典型乱码（如 `Ã©`、`ï¿½`）。
+- **统计/结构校验脚本规范（强制）**：任何对中文 Markdown / JSON 的读取、行数/字符统计、JSON 结构校验，**必须**走 `write_file` 落一个 `*.py` 脚本 + `run_shell python xxx.py` 执行，脚本内 `open(..., encoding="utf-8")` 显式指定编码。
+  - **禁止**用 PowerShell（`Get-Content`/`Set-Content`/`Select-String`/`ConvertFrom-Json` 等）读写含中文的文件（GBK/UTF-16 混乱会乱码，如 `MDB缁勪欢`）。
+  - **禁止**用 `python -c "..."` 内联含中文或 f-string 的脚本（单行转义/括号极易 `SyntaxError`）。
 - 自检失败 → **中止**，不得交付乱码文件；检查是否误用了非 `write_file` 的写盘方式后重试。
 
 ### D. 输出模式
@@ -189,9 +202,12 @@ Step 2 — 收集变量
 Step 3 — 填充模板
   3a. 若 `OUTPUT`（或 `TEMPLATE`）为 `函数级方案.md`（**强制，禁止手填**）：
       - 将 Step 2 合并后的变量对象用 `write_file` 写入 `{OUTPUT_DIR}/.tmp/_function_solution_fill_ctx.json`（内联 `CONTEXT_JSON` 时亦须先落盘供脚本读取）
-      - **必须** `run_skill_script`（见上文「共享脚本」）：`fill_function_solution.py` + 模板路径 + ctx.json + `_function_solution_fill_out.md` 三个参数
+      - **必须** `run_skill_script`（见上文「共享脚本」）：`fill_function_solution.py` + 模板路径 + ctx.json + **最终交付路径 `{OUTPUT_DIR}/{OUTPUT}`** 三个参数；脚本以显式 UTF-8（`open(encoding="utf-8", newline="\n")`）**直接落盘交付物**，大文档可分 section 多次写入
       - 脚本非零退出或校验失败 → **中止**；**禁止**手填 `{{VAR}}` / `{{#each}}` 或跳过脚本
-      - `read_file` 读取 `_function_solution_fill_out.md`，**必须**以 `write_file` 写入 `{OUTPUT_DIR}/{OUTPUT}`（交付物不得仅依赖脚本 `open` 写盘）；可删除 `.tmp` 下临时文件
+      - **禁止**模型把脚本产物 `read_file` 回来再 `write_file` 内联整篇正文（大文档会触发输出 token 上限被截断）；脚本已落盘，模型仅用 `read_file` 抽查关键段确认中文可读、无残留占位符即可
+      - **增量修订模式（仅 `函数级方案.md`）**：当输入含「增量修订」指令（存在 `revision_context.json`）时，**禁止全量重渲**，必须改用局部模式：
+        `fill_function_solution.py --patch-modules <模板> <ctx.json> <已存在的 函数级方案.md> "<待修订模块名,逗号分隔>"`；
+        `ctx.json.modules` 只需包含待修订模块，脚本只替换命中的 §1.7.N 小节、其余章节字节级保留；`approved_plans` 对应模块**严禁**出现在参数中（出现会触发冻结校验失败被打回）
   3b. 其他模板：读取 `templates/{TEMPLATE}`，按 [references/template-filling.md](references/template-filling.md) 手填；`需求澄清.md` **必须** `scripts/fill_clarify.py`（第 4 参数 `true`=STRICT；先 merge `clarify_sections.json`）
   3c. 空列表按规范写「（无）」或保留调用方提供的占位说明（`函数级方案.md` 由脚本处理）。
   3d. 自检：无未解析 `{{` 占位符、无 `{{#each` 残留；`函数级方案.md` 须含模板固定章节与表头（见 template-filling.md）。
@@ -254,7 +270,9 @@ OUTPUT_MODE: file
 | OUTPUT_DIR 不可写 | **中止** |
 | CONTEXT_JSON 非法 JSON | **中止**，说明解析错误 |
 | 模板 / 上下文 / 输出文件 UTF-8 解码失败 | **中止**，指明路径与环节 |
-| 写后自检发现中文乱码 | **中止**，确认是否使用了 `write_file` 后重试 |
+| 写后自检发现中文乱码 | **中止**，确认是否使用了 `write_file`（小文档）或脚本 `open(encoding="utf-8")`（大文档）后重试 |
+| 用 PowerShell / `python -c` 内联读写或校验中文文件 | **禁止**，改为 `write_file` 落 `*.py` + `run_shell python xxx.py`（显式 UTF-8）重试 |
+| 大文档模型 inline 输出整篇致 `content` 截断丢失 | **中止**，改用技能脚本按 section 分段 `open` 写（≤ 8KB/段）后重试 |
 | 未使用 `write_file` 写盘 | **中止**，改用 `write_file` 重写 |
 | `OUTPUT=函数级方案.md` 未执行 `scripts/fill_function_solution.py` 或手填模板 | **中止**，按 Step 3a 重试 |
 | `scripts/fill_function_solution.py` 执行失败或 `CONTEXT_JSON 契约校验失败` | **中止**，对照 skeleton.json 修正键名后重试 |
