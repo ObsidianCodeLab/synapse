@@ -90,8 +90,18 @@ export function normalizeArtifactMarkdown(md: string): string {
       while (i < lines.length) {
         const bodyTrim = lines[i].trim();
         if (bodyTrim === '') {
-          out.push(lines[i]);
-          i += 1;
+          // 函数级方案.md 常在分隔行与数据行、数据行之间插入空行；仅当下一条非空行仍是数据行时跳过
+          let k = i + 1;
+          while (k < lines.length && lines[k].trim() === '') k += 1;
+          const nextTrim = k < lines.length ? lines[k].trim() : '';
+          const nextIsDataRow =
+            Boolean(nextTrim) &&
+            isTableRow(nextTrim) &&
+            !(k + 1 < lines.length && isSeparatorRow(lines[k + 1].trim()));
+          if (nextIsDataRow) {
+            i += 1;
+            continue;
+          }
           break;
         }
         if (EMPTY_PLACEHOLDER_RE.test(bodyTrim)) {
