@@ -951,6 +951,30 @@ async def get_task_exec(room_id: str) -> dict:
     )
 
 
+@router.get("/api/dev/meeting-rooms/{room_id}/task-exec/code-diffs")
+async def get_task_exec_code_diffs(room_id: str) -> dict:
+    """任务执行评审：各子单沙箱 git diff（过滤测试/归档/AGENTS.md）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.task_exec import load_task_exec_payload
+    from synapse.rd_meeting.task_exec_code_diff import collect_task_exec_code_diffs
+
+    payload = load_task_exec_payload(sid)
+    if payload is None:
+        return error_response(404, "task_exec_not_found")
+    if str(payload.get("status") or "").lower() == "running":
+        return error_response(409, "task_exec_still_running")
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            **collect_task_exec_code_diffs(sid),
+        }
+    )
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/task-exec/decision")
 async def submit_task_exec_decision(
     room_id: str,

@@ -8,6 +8,7 @@ import time
 from typing import Any, Literal
 
 from synapse.rd_meeting.product_assets import _run_git, resolve_sandbox_path_for_product_module
+from synapse.rd_meeting.task_exec_code_diff import collect_repo_commit_stage_paths
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
     collect_task_rows,
@@ -58,11 +59,21 @@ def _commit_and_push(
         entry["error"] = "缺少沙箱本地路径"
         return entry
 
-    ok, detail = _run_git(["git", "-C", repo_root, "add", "-A"], timeout=120.0)
+    ok, detail, stage_paths = collect_repo_commit_stage_paths(repo_root)
     if not ok:
         entry["status"] = "failed"
-        entry["error"] = detail or "git add 失败"
+        entry["error"] = detail or "git status 失败"
         return entry
+
+    if stage_paths:
+        ok, detail = _run_git(
+            ["git", "-C", repo_root, "add", "--", *stage_paths],
+            timeout=120.0,
+        )
+        if not ok:
+            entry["status"] = "failed"
+            entry["error"] = detail or "git add 失败"
+            return entry
 
     ok, detail = _run_git(
         ["git", "-C", repo_root, "commit", "-m", commit_message],

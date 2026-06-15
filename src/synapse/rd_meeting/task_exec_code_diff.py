@@ -1,0 +1,406 @@
+"""任务执行评审：基于 git diff 采集沙箱未提交变更（过滤测试/归档/AGENTS.md）。"""
+
+from __future__ import annotations
+
+import base64
+import logging
+import re
+import subprocess
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+from synapse.rd_meeting.product_assets import _run_git
+from synapse.rd_meeting.task_exec import load_task_exec_payload
+
+logger = logging.getLogger(__name__)
+
+MAX_DIFF_FILE_BYTES = 512_000
+_SKIP_BASENAMES = frozenset({"agents.md"})
+_TEST_DIR_NAMES = frozenset({"test", "tests", "__tests__", "spec", "testing", "e2e", "fixtures"})
+_TEST_FILE_RE = re.compile(
+    r"("
+    r"^test_.+\.py$|"
+    r"^.+_test\.(py|go|java|js|ts|tsx|jsx)$|"
+    r"^.+\.(test|spec)\.(ts|tsx|js|jsx|py)$|"
+    r"^.+Test\.java$"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def normalize_repo_rel_path(path: str) -> str:
+    return PurePosixPath(str(path or "").replace("\\", "/")).as_posix().lstrip("./")
+
+
+def is_test_file(rel_path: str) -> bool:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return False
+    parts = [p.lower() for p in norm.split("/")]
+    if any(p in _TEST_DIR_NAMES for p in parts):
+        return True
+    name = parts[-1]
+    return bool(_TEST_FILE_RE.match(name))
+
+
+def is_synapse_archive_or_agents_md(rel_path: str) -> bool:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return False
+    parts = [p.lower() for p in norm.split("/")]
+    if "synapse_archive" in parts:
+        return True
+    return parts[-1].lower() in _SKIP_BASENAMES
+
+
+def should_include_commit_file(rel_path: str) -> bool:
+    """代码提交环节：排除 synapse_archive 与 AGENTS.md。"""
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return False
+    return not is_synapse_archive_or_agents_md(norm)
+
+
+def should_include_diff_file(rel_path: str) -> bool:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return False
+    if is_synapse_archive_or_agents_md(norm):
+        return False
+    if is_test_file(norm):
+        return False
+    return True
+
+
+def _parse_status_paths(status_out: str) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for raw in status_out.splitlines():
+        line = raw.rstrip("\r")
+        if not line:
+            continue
+        if len(line) >= 3 and line[2] == " ":
+            code = line[:2]
+            path = line[3:].strip()
+        elif len(line) >= 2 and line[1] == " ":
+            code = f"{line[0]} "
+            path = line[2:].strip()
+        else:
+            continue
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1].strip()
+        norm = normalize_repo_rel_path(path)
+        if not norm:
+            continue
+        if code.strip() == "??" or code == "??":
+            rows.append(("added", norm))
+        elif "D" in code:
+            rows.append(("deleted", norm))
+        else:
+            rows.append(("modified", norm))
+    return rows
+
+
+def _parse_numstat(numstat_out: str) -> dict[str, dict[str, int]]:
+    stats: dict[str, dict[str, int]] = {}
+    for line in numstat_out.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        rel = normalize_repo_rel_path(parts[2])
+        if not rel:
+            continue
+        add_raw, del_raw = parts[0], parts[1]
+        stats[rel] = {
+            "additions": int(add_raw) if add_raw.isdigit() else 0,
+            "deletions": int(del_raw) if del_raw.isdigit() else 0,
+        }
+    return stats
+
+
+def decode_text_bytes(data: bytes, *, encoding: str = "utf-8") -> str:
+    """按指定编码解码文本（默认 UTF-8，供 API 兼容字段）。"""
+    if not data:
+        return ""
+    try:
+        return data.decode(encoding)
+    except (UnicodeDecodeError, LookupError):
+        return data.decode("utf-8", errors="replace")
+
+
+def _bytes_to_b64(data: bytes) -> str:
+    if not data:
+        return ""
+    return base64.b64encode(data).decode("ascii")
+
+
+def _repo_file_path(repo_root: Path, rel_path: str) -> Path:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return repo_root
+    return repo_root.joinpath(*norm.split("/"))
+
+
+def _resolve_git_repo_root(repo_path: Path) -> Path | None:
+    """sandbox_path 可能是仓库内子目录（如 .../Zmdb），统一解析到 git 根目录。"""
+    if not repo_path.is_dir():
+        return None
+    ok, top = _run_git(["git", "-C", str(repo_path), "rev-parse", "--show-toplevel"], timeout=30.0)
+    if not ok or not top.strip():
+        return None
+    resolved = Path(top.strip())
+    return resolved if resolved.is_dir() else None
+
+
+def _read_git_object_bytes(repo_root: Path, spec: str) -> bytes:
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "show", spec],
+            capture_output=True,
+            timeout=60.0,
+        )
+    except subprocess.TimeoutExpired:
+        return b""
+    except (FileNotFoundError, OSError) as exc:
+        logger.debug("git show failed %s: %s", spec, exc)
+        return b""
+    if proc.returncode != 0:
+        return b""
+    data = proc.stdout
+    if len(data) > MAX_DIFF_FILE_BYTES:
+        return b""
+    if b"\x00" in data[:4096]:
+        return b""
+    return data
+
+
+def _read_git_head_bytes(repo_root: Path, rel_path: str) -> bytes:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return b""
+    return _read_git_object_bytes(repo_root, f"HEAD:{norm}")
+
+
+def _read_git_index_bytes(repo_root: Path, rel_path: str) -> bytes:
+    norm = normalize_repo_rel_path(rel_path)
+    if not norm:
+        return b""
+    return _read_git_object_bytes(repo_root, f":{norm}")
+
+
+def _resolve_worktree_path(repo_root: Path, rel_path: str) -> Path | None:
+    path = _repo_file_path(repo_root, rel_path)
+    if path.is_file():
+        return path
+    ok, listed = _run_git(["git", "-C", str(repo_root), "ls-files", "--", rel_path], timeout=30.0)
+    if ok and listed.strip():
+        for line in listed.splitlines():
+            candidate = normalize_repo_rel_path(line.strip())
+            if not candidate:
+                continue
+            resolved = _repo_file_path(repo_root, candidate)
+            if resolved.is_file():
+                return resolved
+    return None
+
+
+def _read_worktree_bytes(repo_root: Path, rel_path: str) -> bytes:
+    path = _resolve_worktree_path(repo_root, rel_path)
+    if path is None:
+        return b""
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        logger.debug("read worktree file failed %s: %s", path, exc)
+        return b""
+    if len(data) > MAX_DIFF_FILE_BYTES:
+        return b""
+    if b"\x00" in data[:4096]:
+        return b""
+    return data
+
+
+def _read_modified_bytes(repo_root: Path, rel_path: str, status: str) -> bytes:
+    """变更后：工作区未提交内容，必要时回退暂存区。"""
+    if status == "deleted":
+        return b""
+    worktree = _read_worktree_bytes(repo_root, rel_path)
+    index = _read_git_index_bytes(repo_root, rel_path)
+    head = _read_git_head_bytes(repo_root, rel_path)
+    if worktree and worktree != head:
+        return worktree
+    if index and index != head:
+        return index
+    if worktree:
+        return worktree
+    return index
+
+
+def _collect_uncommitted_path_statuses(repo_root: Path) -> list[tuple[str, str]]:
+    """未提交变更：git diff HEAD + status + 未跟踪文件。"""
+    merged: dict[str, str] = {}
+    root = str(repo_root)
+
+    ok, diff_names = _run_git(["git", "-C", root, "diff", "HEAD", "--name-only"], timeout=60.0)
+    if ok:
+        for line in diff_names.splitlines():
+            rel = normalize_repo_rel_path(line.strip())
+            if rel and should_include_diff_file(rel):
+                merged.setdefault(rel, "modified")
+
+    ok, status_out = _run_git(["git", "-C", root, "status", "--porcelain"], timeout=60.0)
+    if ok:
+        for status, rel in _parse_status_paths(status_out):
+            if should_include_diff_file(rel):
+                merged[rel] = status
+
+    ok, untracked = _run_git(
+        ["git", "-C", root, "ls-files", "--others", "--exclude-standard"],
+        timeout=60.0,
+    )
+    if ok:
+        for line in untracked.splitlines():
+            rel = normalize_repo_rel_path(line.strip())
+            if rel and should_include_diff_file(rel):
+                merged[rel] = "added"
+
+    return sorted(merged.items(), key=lambda item: item[0])
+
+
+def collect_repo_code_diff_files(repo_path: str) -> list[dict[str, Any]]:
+    """单仓库未提交 diff（相对 HEAD），返回 Monaco 可用的 original/modified。"""
+    declared = Path(str(repo_path or "").strip())
+    if not declared.is_dir():
+        return []
+
+    root = _resolve_git_repo_root(declared) or declared
+
+    ok, _ = _run_git(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], timeout=30.0)
+    if not ok:
+        return []
+
+    ok, numstat_out = _run_git(["git", "-C", str(root), "diff", "HEAD", "--numstat"], timeout=60.0)
+    numstat = _parse_numstat(numstat_out if ok else "")
+
+    rows: list[dict[str, Any]] = []
+    for rel_path, status in _collect_uncommitted_path_statuses(root):
+        original_bytes = _read_git_head_bytes(root, rel_path)
+        modified_bytes = _read_modified_bytes(root, rel_path, status)
+        if status != "deleted" and not modified_bytes and not original_bytes:
+            continue
+        if status == "added" and not modified_bytes:
+            continue
+        if status != "added" and status != "deleted" and original_bytes == modified_bytes:
+            continue
+
+        stat = numstat.get(rel_path, {"additions": 0, "deletions": 0})
+        rows.append(
+            {
+                "path": rel_path,
+                "status": status,
+                "original_b64": _bytes_to_b64(original_bytes),
+                "modified_b64": _bytes_to_b64(modified_bytes),
+                "original": decode_text_bytes(original_bytes),
+                "modified": decode_text_bytes(modified_bytes),
+                "has_modified": bool(modified_bytes),
+                "additions": int(stat.get("additions") or 0),
+                "deletions": int(stat.get("deletions") or 0),
+                "language": infer_diff_language(rel_path),
+            }
+        )
+    rows.sort(key=lambda x: str(x.get("path") or ""))
+    return rows
+
+
+def collect_repo_commit_stage_paths(repo_path: str) -> tuple[bool, str, list[str]]:
+    """列出代码提交应暂存的路径（排除 synapse_archive / AGENTS.md）。"""
+    root = str(repo_path or "").strip()
+    if not root:
+        return False, "缺少仓库路径", []
+
+    ok, status_out = _run_git(["git", "-C", root, "status", "--porcelain"], timeout=120.0)
+    if not ok:
+        return False, status_out or "git status 失败", []
+
+    paths = [
+        rel_path
+        for _status, rel_path in _parse_status_paths(status_out)
+        if should_include_commit_file(rel_path)
+    ]
+    return True, "", paths
+
+
+def infer_diff_language(rel_path: str) -> str:
+    ext = Path(rel_path).suffix.lower()
+    return {
+        ".py": "python",
+        ".java": "java",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".go": "go",
+        ".rs": "rust",
+        ".sql": "sql",
+        ".xml": "xml",
+        ".html": "html",
+        ".css": "css",
+        ".scss": "scss",
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".md": "markdown",
+        ".sh": "shell",
+        ".vue": "html",
+        ".cpp": "cpp",
+        ".c": "c",
+        ".h": "cpp",
+        ".hpp": "cpp",
+    }.get(ext, "plaintext")
+
+
+def collect_task_exec_code_diffs(scope_id: str) -> dict[str, Any]:
+    """汇总任务执行各子单沙箱的未提交 git diff。"""
+    payload = load_task_exec_payload(scope_id) or {}
+    tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+
+    files: list[dict[str, Any]] = []
+    seen_repo_roots: set[str] = set()
+    task_count = 0
+
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        if str(task.get("status") or "").lower() == "running":
+            continue
+        sandbox = str(task.get("sandbox_path") or "").strip()
+        if not sandbox:
+            continue
+        sandbox_path = Path(sandbox)
+        repo_root = _resolve_git_repo_root(sandbox_path) or sandbox_path
+        repo_key = str(repo_root.resolve()).lower()
+        if repo_key in seen_repo_roots:
+            continue
+        seen_repo_roots.add(repo_key)
+        task_no = str(task.get("task_no") or "").strip()
+        task_count += 1
+        for entry in collect_repo_code_diff_files(sandbox):
+            rel = str(entry.get("path") or "")
+            file_id = f"{task_no}:{rel}" if task_no else rel
+            files.append(
+                {
+                    **entry,
+                    "id": file_id,
+                    "task_no": task_no,
+                    "sandbox_path": sandbox,
+                }
+            )
+
+    return {
+        "files": files,
+        "summary": {
+            "file_count": len(files),
+            "task_count": task_count,
+            "additions": sum(int(f.get("additions") or 0) for f in files),
+            "deletions": sum(int(f.get("deletions") or 0) for f in files),
+        },
+    }

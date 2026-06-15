@@ -501,3 +501,87 @@ def test_ensure_metrics_token_budget_recomputes_from_started_nodes(
     after = load_room_state(scope_id)
     assert after is not None
     assert after["metrics"]["token_budget"] == 7_000_000
+
+
+def test_finalize_node_metrics_includes_task_exec_tool_tokens(tmp_path, monkeypatch) -> None:
+    from synapse.rd_meeting.task_exec import NODE_ID, RESULT_JSON
+
+    scope_id = "nm_task_exec_tools"
+    node_id = NODE_ID
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / node_id
+    archive.mkdir(parents=True)
+    (archive / RESULT_JSON).write_text(
+        json.dumps(
+            {
+                "summary": {"total_tokens": 4200, "total_duration_sec": 90},
+                "tasks": [{"task_no": "T-1", "tokens_used": 4200, "status": "ok"}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.archive_node_dir",
+        lambda sid, stage, nid: archive,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.stage_name_for_id",
+        lambda _stage: "开发中",
+    )
+
+    room_state = default_room_state(
+        room_id="room-task-exec",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=4,
+        current_node_id=node_id,
+    )
+    room_state["node_metrics"] = {
+        node_id: {"started_at": "2026-06-05T10:00:00", "tokens": 0},
+    }
+
+    entry = finalize_node_metrics(
+        room_state,
+        scope_id=scope_id,
+        node_id=node_id,
+        completed_at="2026-06-05T10:05:00",
+    )
+    assert entry["tokens"] == 4200
+    assert int((room_state.get("metrics") or {}).get("tokens") or 0) == 4200
+
+
+def test_refresh_node_metrics_task_exec_human_intervention(tmp_path, monkeypatch) -> None:
+    from synapse.rd_meeting.task_exec import NODE_ID, RESULT_JSON
+
+    scope_id = "nm_task_exec_live"
+    node_id = NODE_ID
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / node_id
+    archive.mkdir(parents=True)
+    (archive / RESULT_JSON).write_text(
+        json.dumps({"summary": {"total_tokens": 1800}, "tasks": []}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.archive_node_dir",
+        lambda sid, stage, nid: archive,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.stage_name_for_id",
+        lambda _stage: "开发中",
+    )
+
+    rs = default_room_state(
+        room_id="room-task-exec-live",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=4,
+        current_node_id=node_id,
+        status="human_intervention",
+    )
+    rs["node_metrics"] = {node_id: {"started_at": "2026-06-05T10:00:00", "tokens": 0}}
+    save_room_state(scope_id, rs)
+
+    tokens = refresh_node_metrics(scope_id, node_id, current_node_id=node_id)
+    assert tokens == 1800
+    saved = load_room_state(scope_id) or {}
+    assert int((saved.get("node_metrics") or {}).get(node_id, {}).get("tokens") or 0) == 1800

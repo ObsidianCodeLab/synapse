@@ -6700,6 +6700,70 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   line-height: 1.6;
 }
 
+/* 代码差异 · 字符集 Segmented（紧凑，与 10px 标签对齐） */
+.rd-task-exec-encoding-segmented.ant-segmented {
+  padding: 1px;
+  min-height: 22px;
+  font-size: 10px;
+  line-height: 1;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.22) !important;
+  box-shadow: none !important;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-group {
+  gap: 0;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-item {
+  border-radius: 9999px !important;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-item-label {
+  min-height: 20px;
+  padding: 0 7px;
+  line-height: 20px;
+  font-size: 10px;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-item:not(.ant-segmented-item-selected) {
+  color: rgb(161 161 170) !important;
+  background: transparent !important;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-item.ant-segmented-item-selected {
+  color: rgb(244 244 245) !important;
+  background: rgb(34 211 238 / 0.18) !important;
+  box-shadow: none !important;
+}
+.rd-task-exec-encoding-segmented.ant-segmented .ant-segmented-thumb {
+  border-radius: 9999px !important;
+  background: rgb(34 211 238 / 0.18) !important;
+  box-shadow: none !important;
+}
+
+/* 任务执行代码差异：单窗 inline diff，暗红删 / 淡绿增（辅助 CSS，主题色为主） */
+.rd-task-exec-diff-inline .monaco-diff-editor .line-delete,
+.rd-task-exec-diff-inline .monaco-diff-editor .char-delete,
+.rd-task-exec-diff-inline .monaco-diff-editor .delete-sign,
+.rd-task-exec-diff-inline .monaco-diff-editor .gutter-delete,
+.rd-task-exec-diff-inline .monaco-diff-editor .inline-deleted-margin-view-zone {
+  background-color: rgb(139 48 48 / 0.18) !important;
+}
+
+.rd-task-exec-diff-inline .monaco-diff-editor .line-insert,
+.rd-task-exec-diff-inline .monaco-diff-editor .char-insert,
+.rd-task-exec-diff-inline .monaco-diff-editor .insert-sign,
+.rd-task-exec-diff-inline .monaco-diff-editor .gutter-insert {
+  background-color: rgb(61 107 69 / 0.14) !important;
+}
+
+/* 任务执行代码差异：只读评审，隐藏 DiffEditor 还原箭头 */
+.rd-task-exec-diff-editor .codicon-arrow-right,
+.rd-task-exec-diff-editor .codicon-arrow-left,
+.rd-task-exec-diff-editor .codicon-revert,
+.rd-task-exec-diff-editor .revert-change-button,
+.rd-task-exec-diff-editor .diff-revert-button {
+  display: none !important;
+  pointer-events: none !important;
+}
+
 .rd-cli-log-entry {
   border-radius: 0.625rem;
   border: 1px solid rgb(255 255 255 / 0.06);

@@ -68,9 +68,7 @@ def finalize_node_metrics(
     node_id: str,
     completed_at: str | None = None,
 ) -> dict[str, Any]:
-    """归档 ``room_state.node_metrics[node_id]``：completed_at、seconds、tokens（activity 汇总）。"""
-    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
-
+    """归档 ``room_state.node_metrics[node_id]``：completed_at、seconds、tokens（activity + 工具汇总）。"""
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     now = completed_at or _now_iso()
@@ -83,7 +81,7 @@ def finalize_node_metrics(
     # carry_tokens：上一轮重处理/增量修订前冻结的历史 token 基线；
     # activity.jsonl 在删 agents 目录时会被清掉，必须叠加基线才能反映真实累计损耗。
     carry = max(int(prev.get("carry_tokens") or 0), 0)
-    tokens = carry + aggregate_node_activity_tokens(sid, nid)
+    tokens = _aggregate_node_runtime_tokens(sid, nid, carry=carry)
     seconds = compute_node_metrics_seconds(started, now)
 
     entry = {
@@ -101,17 +99,57 @@ def finalize_node_metrics(
 
 
 _LEGACY_NODE_TOKEN_PLACEHOLDERS = frozenset({64, 128, 256})
+_NODE_TOKEN_LIVE_STATUSES = frozenset({"processing", "human_intervention"})
+
+
+def aggregate_node_external_tool_tokens(scope_id: str, node_id: str) -> int:
+    """非 activity.jsonl 路径的节点工具 token（如 task_exec Cursor CLI）。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if not sid or not nid:
+        return 0
+    if nid == "task_exec":
+        from synapse.rd_meeting.task_exec import aggregate_task_exec_tool_tokens
+
+        return aggregate_task_exec_tool_tokens(sid)
+    return 0
+
+
+def _aggregate_node_runtime_tokens(scope_id: str, node_id: str, *, carry: int = 0) -> int:
+    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
+
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    base = max(int(carry or 0), 0)
+    if not sid or not nid:
+        return base
+    return base + aggregate_node_activity_tokens(sid, nid) + aggregate_node_external_tool_tokens(sid, nid)
+
+
+def _node_metrics_entry_is_live(
+    room_state: dict[str, Any],
+    node_id: str,
+    entry: dict[str, Any],
+    *,
+    current_node_id: str = "",
+) -> bool:
+    nid = (node_id or "").strip()
+    cur = (current_node_id or str(room_state.get("current_node_id") or "")).strip()
+    status = str(room_state.get("status") or "")
+    if not nid or str(entry.get("completed_at") or "").strip():
+        return False
+    if cur and nid != cur:
+        return False
+    return status in _NODE_TOKEN_LIVE_STATUSES
 
 
 def freeze_node_carry_tokens(scope_id: str, node_id: str) -> int:
     """删 agents 目录（重处理/增量修订）前调用：把本轮已统计 token 冻结为 carry 基线。
 
     activity.jsonl 是 token 唯一真相源，删目录后会丢失；本函数在删除前把
-    ``carry_tokens（历史基线）+ 本轮 activity 汇总`` 落回 room_state.node_metrics，
+    ``carry_tokens（历史基线）+ 本轮 activity/工具汇总`` 落回 room_state.node_metrics，
     使后续 finalize/live 汇总叠加该基线，重处理后 token 只增不减，损耗真实。
     """
-    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
-
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     if not sid or not nid:
@@ -121,7 +159,7 @@ def freeze_node_carry_tokens(scope_id: str, node_id: str) -> int:
     if not isinstance(nm, dict):
         return 0
     prev = nm.get(nid) if isinstance(nm.get(nid), dict) else {}
-    carry = max(int(prev.get("carry_tokens") or 0), 0) + aggregate_node_activity_tokens(sid, nid)
+    carry = max(int(prev.get("carry_tokens") or 0), 0) + _aggregate_node_runtime_tokens(sid, nid, carry=0)
     if carry <= 0:
         return 0
     entry = dict(prev)
@@ -192,13 +230,14 @@ def sum_node_metrics_tokens(room_state: dict[str, Any], scope_id: str = "") -> i
         if not isinstance(entry, dict):
             continue
         nid_s = str(nid)
-        is_live = (
-            status == "processing"
-            and nid_s == cur
-            and not str(entry.get("completed_at") or "").strip()
+        is_live = _node_metrics_entry_is_live(
+            {"current_node_id": cur, "status": status},
+            nid_s,
+            entry,
+            current_node_id=cur,
         )
         if is_live and sid:
-            total += resolve_node_tokens_live(sid, nid_s, entry, node_status="processing")
+            total += resolve_node_tokens_live(sid, nid_s, entry, node_status=status)
         else:
             total += archived_node_tokens(entry)
     return total
@@ -271,19 +310,18 @@ def resolve_node_tokens_live(
     *,
     node_status: str,
 ) -> int:
-    """节点 token 动态值：进行中从 activity.jsonl 汇总，否则用归档 tokens。"""
+    """节点 token 动态值：进行中从 activity.jsonl + 节点工具 token 汇总，否则用归档 tokens。"""
     static = archived_node_tokens(nm)
-    if node_status != "processing":
+    if node_status not in _NODE_TOKEN_LIVE_STATUSES:
         return static
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     if not sid or not nid:
         return static
-    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
 
-    # 进行中（含重处理/修订重跑）：carry_tokens 历史基线 + 本轮 activity 实时汇总。
+    # 进行中（含重处理/修订重跑）：carry_tokens 历史基线 + 本轮 activity/工具实时汇总。
     carry = max(int(nm.get("carry_tokens") or 0), 0)
-    live = carry + aggregate_node_activity_tokens(sid, nid)
+    live = _aggregate_node_runtime_tokens(sid, nid, carry=carry)
     return live if live > 0 else static
 
 
@@ -321,9 +359,7 @@ def refresh_node_metrics(
     *,
     current_node_id: str = "",
 ) -> int:
-    """进行中节点 live 轮询：从 activity.jsonl 汇总 token 并写回 node_metrics。"""
-    from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
-
+    """进行中节点 live 轮询：从 activity.jsonl + 节点工具 token 汇总并写回 node_metrics。"""
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     if not sid or not nid:
@@ -331,21 +367,22 @@ def refresh_node_metrics(
 
     rs = load_room_state(sid)
     if not isinstance(rs, dict):
-        return aggregate_node_activity_tokens(sid, nid)
+        from synapse.rd_meeting.agent_activity import aggregate_node_activity_tokens
+
+        return _aggregate_node_runtime_tokens(sid, nid)
 
     nm = rs.get("node_metrics")
     if not isinstance(nm, dict):
         nm = {}
     entry = dict(nm.get(nid) if isinstance(nm.get(nid), dict) else {})
     cur = (current_node_id or str(rs.get("current_node_id") or "")).strip()
-    is_processing = not entry.get("completed_at") and (not cur or nid == cur)
+    is_live = _node_metrics_entry_is_live(rs, nid, entry, current_node_id=cur)
 
-    if not is_processing:
+    if not is_live:
         return archived_node_tokens(entry)
 
     carry = max(int(entry.get("carry_tokens") or 0), 0)
-    live_tokens = aggregate_node_activity_tokens(sid, nid)
-    combined = carry + live_tokens
+    combined = _aggregate_node_runtime_tokens(sid, nid, carry=carry)
     tokens = combined if combined > 0 else archived_node_tokens(entry)
 
     payload = dict(rs)

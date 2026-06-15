@@ -725,6 +725,44 @@ export async function submitTaskExecDecision(
   );
 }
 
+export interface TaskExecCodeDiffFile {
+  id: string;
+  path: string;
+  task_no?: string;
+  sandbox_path?: string;
+  status?: string;
+  original?: string;
+  modified?: string;
+  original_b64?: string;
+  modified_b64?: string;
+  additions?: number;
+  deletions?: number;
+  language?: string;
+}
+
+export interface TaskExecCodeDiffResponse {
+  room_id?: string;
+  scope_id?: string;
+  files: TaskExecCodeDiffFile[];
+  summary?: {
+    file_count?: number;
+    task_count?: number;
+    additions?: number;
+    deletions?: number;
+  };
+}
+
+export async function fetchTaskExecCodeDiffs(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<TaskExecCodeDiffResponse> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<TaskExecCodeDiffResponse>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/code-diffs`,
+  );
+}
+
 export async function saveSolutionReviewTasks(
   synapseApiBase: string,
   roomId: string,

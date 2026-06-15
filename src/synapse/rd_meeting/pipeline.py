@@ -1576,6 +1576,19 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     rs["status"] = "processing"
     rs["current_node_id"] = run_node
     rs["agents_active"] = [{"profile_id": "cli", "role": "system", "display_name": "CLI"}]
+    nm = rs.get("node_metrics")
+    if not isinstance(nm, dict):
+        nm = {}
+    if run_node not in nm or not isinstance(nm.get(run_node), dict):
+        from synapse.rd_meeting.room_runtime import sync_metrics_tokens_from_node_metrics
+
+        nm[run_node] = {
+            "started_at": datetime.now().isoformat(timespec="seconds"),
+            "seconds": 0,
+            "tokens": 0,
+        }
+        rs["node_metrics"] = nm
+        sync_metrics_tokens_from_node_metrics(rs, sid)
     save_room_state(sid, rs)
     ctx.room_state = rs
 

@@ -829,9 +829,36 @@ def _summary_from_rows(task_rows: list[dict[str, Any]], *, task_total: int) -> d
     }
 
 
+def aggregate_task_exec_tool_tokens(scope_id: str) -> int:
+    """任务执行 Cursor CLI 工具累计 token（来自 task_exec_result.json）。"""
+    data = _read_result(scope_id)
+    if not isinstance(data, dict):
+        return 0
+    summary = data.get("summary")
+    if isinstance(summary, dict):
+        total = int(summary.get("total_tokens") or 0)
+        if total > 0:
+            return total
+    tasks = data.get("tasks")
+    if isinstance(tasks, list):
+        return sum(int(t.get("tokens_used") or 0) for t in tasks if isinstance(t, dict))
+    return 0
+
+
+def sync_task_exec_node_metrics(scope_id: str) -> int:
+    """将 CLI 累计 token 写回 room_state.node_metrics[task_exec]。"""
+    from synapse.rd_meeting.room_runtime import refresh_node_metrics
+
+    sid = (scope_id or "").strip()
+    if not sid:
+        return 0
+    return refresh_node_metrics(sid, NODE_ID)
+
+
 def _persist_task_exec_state(scope_id: str, result_doc: dict[str, Any]) -> None:
     _write_result(scope_id, result_doc)
     _save_task_exec_assets(scope_id, result_doc)
+    sync_task_exec_node_metrics(scope_id)
 
 
 def write_task_exec_cli_starting(
