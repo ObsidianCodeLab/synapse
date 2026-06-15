@@ -207,7 +207,7 @@ export function ReviewMarkdown({
   content,
   compact = false,
   className = '',
-  normalizeTables = false,
+  normalizeTables = true,
 }: {
   content: string;
   compact?: boolean;
