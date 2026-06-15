@@ -760,7 +760,10 @@ def patch_owned_work_item_task_exec(
                 item["task_exec_duration_sec"] = duration_seconds
                 if report_excerpt:
                     item["task_exec_report_excerpt"] = report_excerpt[:2000]
-                item["sop_node"] = "任务执行"
+                if status == "ok":
+                    from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_DEV_DONE
+
+                    item["state"] = OWNED_WORK_ITEM_STATE_DEV_DONE
                 modified = True
                 break
             break

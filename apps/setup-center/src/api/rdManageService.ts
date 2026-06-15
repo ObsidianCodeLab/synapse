@@ -1,5 +1,5 @@
-/** 研发子单状态（与 Synapse userwork owned_work_items.state 一致） */
-export type OwnedWorkItemState = '待处理' | '开发中' | '已完成' | '异常';
+/** 研发子单状态（Synapse 本地维护，与门户阶段无关） */
+export type OwnedWorkItemState = '待处理' | '开发完成' | '提交完成' | '已完成';
 
 /** 与 Synapse 接口 `data` 字段一致：研发子单 */
 export interface OwnedWorkItem {
@@ -94,7 +94,7 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
               "方案详见：\nhttps://alidocs.dingtalk.com/i/nodes/oP0MALyR8k795XrxcKyPRpMz83bzYmDO?utm_scene=team_space\n 三.系统设计",
             created_date: "2026-04-30 09:17:43",
             sccb_work_hours: null,
-            state: "开发中",
+            state: "开发完成",
             product_module_id: 18598,
             product_module_name: "RATECTR-ZXBilling",
             repo_url: "https://git-nj.iwhalecloud.com/xmjfbss/RATECTR-ZXBilling.git",
@@ -105,7 +105,7 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
             task_desc: "对齐缴费变更通知 Format_id 与单测补充。",
             created_date: "2026-04-30 10:05:00",
             sccb_work_hours: 4,
-            state: "开发中",
+            state: "开发完成",
             product_module_id: 18598,
             product_module_name: "RATECTR-ZXBilling",
             repo_url: "https://git-nj.iwhalecloud.com/xmjfbss/RATECTR-ZXBilling.git",
@@ -168,7 +168,7 @@ export function getRdManageDemandsMockPayload(): RdManageDemandsPayload {
             task_desc: "REST 限流网关接入",
             created_date: "2026-04-26 09:00:00",
             sccb_work_hours: 16,
-            state: "开发中",
+            state: "开发完成",
             product_module_id: 20001,
             product_module_name: "gateway-module",
             repo_url: "https://git.example.com/org/gateway.git",

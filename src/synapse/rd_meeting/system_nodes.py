@@ -342,6 +342,22 @@ def handle_code_commit(
     stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
     artifacts = write_code_commit_archives(sid, stage_name, assets)
 
+    from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_COMMIT_DONE
+    from synapse.rd_meeting.auto_split_assets import _resolve_demand_no
+    from synapse.rd_meeting.userwork_sync import patch_owned_work_item_state
+
+    demand_no = _resolve_demand_no(scope_type, sid)
+    for row in assets.get("tasks") or []:
+        if not isinstance(row, dict) or row.get("status") != "ok":
+            continue
+        task_no = str(row.get("task_no") or "").strip()
+        if task_no:
+            patch_owned_work_item_state(
+                demand_no=demand_no,
+                task_no=task_no,
+                state=OWNED_WORK_ITEM_STATE_COMMIT_DONE,
+            )
+
     from synapse.rd_meeting.system_node_display import attach_system_node_display
 
     out = {

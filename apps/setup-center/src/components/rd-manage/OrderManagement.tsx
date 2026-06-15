@@ -404,9 +404,9 @@ function demandItemFallbackFromTicket(ticket: Ticket): DemandListItem {
 
 const OWNED_STATE_CLASS: Record<OwnedWorkItemState, string> = {
   待处理: 'rd-order-owned-state--pending',
-  开发中: 'rd-order-owned-state--active',
+  开发完成: 'rd-order-owned-state--active',
+  提交完成: 'rd-order-owned-state--active',
   已完成: 'rd-order-owned-state--done',
-  异常: 'rd-order-owned-state--error',
 };
 
 function OwnedWorkItemStateBadge({ state }: { state: OwnedWorkItemState }) {

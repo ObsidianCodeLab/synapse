@@ -162,21 +162,33 @@ def _snapshot_norm_id(value: Any) -> str:
     return str(value).strip()
 
 
-_OWNED_WORK_ITEM_STATES = frozenset({"待处理", "开发中", "已完成", "异常"})
+OWNED_WORK_ITEM_STATE_PENDING = "待处理"
+OWNED_WORK_ITEM_STATE_DEV_DONE = "开发完成"
+OWNED_WORK_ITEM_STATE_COMMIT_DONE = "提交完成"
+OWNED_WORK_ITEM_STATE_COMPLETED = "已完成"
+
+_OWNED_WORK_ITEM_STATES = frozenset(
+    {
+        OWNED_WORK_ITEM_STATE_PENDING,
+        OWNED_WORK_ITEM_STATE_DEV_DONE,
+        OWNED_WORK_ITEM_STATE_COMMIT_DONE,
+        OWNED_WORK_ITEM_STATE_COMPLETED,
+    }
+)
 
 
 def _normalize_owned_work_item_state(raw: Any) -> str:
-    """门户阶段名 → owned_work_items.state（四态之一）。"""
-    s = _safe_str(raw).strip()
+    """归一化研发单子单 ``state``（本地维护；未知/历史值回落为待处理）。"""
+    s = _snapshot_norm_id(raw)
     if s in _OWNED_WORK_ITEM_STATES:
         return s
-    if any(x in s for x in ("异常", "失败", "error", "fail")):
-        return "异常"
-    if any(x in s for x in ("完成", "走查", "done", "closed")):
-        return "已完成"
-    if any(x in s for x in ("开发", "coding", "dev")):
-        return "开发中"
-    return "待处理"
+    if s in ("已完成",):
+        return OWNED_WORK_ITEM_STATE_COMPLETED
+    if s in ("开发中", "开发完成"):
+        return OWNED_WORK_ITEM_STATE_DEV_DONE
+    if s in ("提交完成",):
+        return OWNED_WORK_ITEM_STATE_COMMIT_DONE
+    return OWNED_WORK_ITEM_STATE_PENDING
 
 
 _OWNED_WORK_ITEM_CLOUD_KEYS = frozenset(
@@ -186,37 +198,49 @@ _OWNED_WORK_ITEM_CLOUD_KEYS = frozenset(
         "task_desc",
         "created_date",
         "sccb_work_hours",
-        "state",
         "product_module_id",
         "product_module_name",
         "repo_url",
     }
 )
 
+# 研发单子单不再维护 sop_node / local_process_state；合并时丢弃历史残留。
+_OWNED_WORK_ITEM_STRIPPED_KEYS = frozenset({"sop_node", "local_process_state"})
+
+
+def _sanitize_owned_work_item(item: dict[str, Any]) -> dict[str, Any]:
+    out = dict(item)
+    for key in _OWNED_WORK_ITEM_STRIPPED_KEYS:
+        out.pop(key, None)
+    return out
+
 
 def _merge_owned_work_item_record(old_t: dict[str, Any], new_t: dict[str, Any]) -> dict[str, Any]:
-    """研发单新老均有：门户字段以新数据为准，本地扩展字段从旧记录保留。
+    """研发单新老均有：门户字段以新数据为准；``state`` 与本地扩展字段从旧记录保留。
 
     门户快照字段见 ``_portal_task_detail_to_owned_work_item``；本地常见扩展包括
-    ``portal_task_id``、``feature_id``、``sop_node``、``local_process_state``、
-    ``task_exec_*``（任务执行节点写入）等。
+    ``portal_task_id``、``feature_id``、``task_exec_*``（任务执行节点写入）等。
     """
     merged: dict[str, Any] = dict(new_t)
+    merged["state"] = _normalize_owned_work_item_state(old_t.get("state"))
     for key, old_val in old_t.items():
-        if key in _OWNED_WORK_ITEM_CLOUD_KEYS:
+        if key in _OWNED_WORK_ITEM_CLOUD_KEYS or key in _OWNED_WORK_ITEM_STRIPPED_KEYS:
+            continue
+        if key == "state":
             continue
         if old_val is None:
             continue
         if isinstance(old_val, str) and not old_val.strip():
             continue
         merged[key] = old_val
-    return merged
+    return _sanitize_owned_work_item(merged)
 
 
 def _merge_owned_work_items(
     old_items: list[Any] | None, new_items: list[Any] | None
 ) -> list[dict[str, Any]]:
-    """研发单：新有老无则插入，老有新无则保留，新老均有则合并（见 ``_merge_owned_work_item_record``）。"""
+    """研发单：新有老无插入；老有新无仅 ``state=已完成`` 保留待归档；新老均有合并。"""
+    from synapse.rd_meeting.owner_order_refresh import should_keep_orphan_work_item
     old_items = [x for x in (old_items or []) if isinstance(x, dict)]
     new_items = [x for x in (new_items or []) if isinstance(x, dict)]
 
@@ -241,15 +265,17 @@ def _merge_owned_work_items(
         seen_old_order.add(tn)
         if tn in new_by_task:
             out.append(_merge_owned_work_item_record(old_by_task[tn], new_by_task[tn]))
-        else:
-            out.append(dict(old_by_task[tn]))
+        elif should_keep_orphan_work_item(old_by_task[tn]):
+            out.append(_sanitize_owned_work_item(old_by_task[tn]))
 
     seen_new_append: set[str] = set()
     for t in new_items:
         tn = _snapshot_norm_id(t.get("task_no"))
         if not tn or tn in old_by_task or tn in seen_new_append:
             continue
-        out.append(dict(t))
+        inserted = _sanitize_owned_work_item(dict(t))
+        inserted["state"] = OWNED_WORK_ITEM_STATE_PENDING
+        out.append(inserted)
         seen_new_append.add(tn)
 
     return out
@@ -353,11 +379,11 @@ def _merge_owner_order_lists(
 def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> dict[str, Any]:
     """将本次拉取的需求列表与已有 ``userwork.json`` 合并后落盘；写文件时使用 FileLock 与原子替换。
 
-    合并规则：需求单与研发单均为「新有老无插入、新老均有更新」；门户字段（含 ``demand_designer``）
-    以研发云为准；刷新时仅 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与
-    ``sop_node``，否则保留本地值；``prod`` 始终保留本地已选产品；门户下架（老有新无）时
-    ``local_process_state=已完成``
-    保留待归档，否则从 userwork 剔除并回收 ``work/<demand_no>/``。研发单更新时门户字段以新为准、本地扩展字段保留。
+    合并规则：需求单「新有老无插入、新老均有更新」；门户字段（含 ``demand_designer``）以研发云为准；
+    刷新时仅 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与 ``sop_node``，否则保留
+    本地值；``prod`` 始终保留本地已选产品；需求单门户下架（老有新无）时 ``local_process_state=已完成`` 保留
+    待归档，否则剔除并回收 ``work/<demand_no>/``。研发单：新有老无插入且 ``state=待处理``；老有新无仅
+    ``state=已完成`` 保留；新老均有时门户字段以新为准、``state`` 与本地扩展保留；子单不维护 ``sop_node``。
     """
     from filelock import FileLock
 
@@ -2218,7 +2244,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
         "task_desc": "任务描述",
         "created_date": "创建时间",
         "sccb_work_hours": "工时",
-        "state": "待处理|开发中|已完成|异常",
+        "state": "待处理|开发完成|提交完成|已完成",
         "product_module_id": "应用模块ID",
         "product_module_name": "应用模块名称",
         "repo_url": "仓库URL",
@@ -2363,7 +2389,7 @@ async def create_task(body: CreateTaskRequest) -> dict:
             "task_desc": body.comments,
             "created_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "sccb_work_hours": None,
-            "state": "开发中",
+            "state": OWNED_WORK_ITEM_STATE_PENDING,
             "product_module_id": branch_data.get("productModuleId") if isinstance(branch_data, dict) else None,
             "product_module_name": branch_data.get("productModuleName") if isinstance(branch_data, dict) else (body.productModuleName or ""),
             "repo_url": branch_data.get("repoUrl") if isinstance(branch_data, dict) else "",
@@ -4016,7 +4042,7 @@ def _portal_task_detail_to_owned_work_item(detail: dict) -> dict | None:
                 sccb_work_hours = None
 
     flow = detail.get("adTaskFlowStage")
-    portal_stage = _safe_str(flow.get("stageName")) if isinstance(flow, dict) else ""
+    _ = flow  # state 本地维护，不读取门户阶段
 
     pmd = detail.get("productModuleDto")
     if isinstance(pmd, dict):
@@ -4034,7 +4060,7 @@ def _portal_task_detail_to_owned_work_item(detail: dict) -> dict | None:
         "task_desc": _safe_str(ad.get("comments")),
         "created_date": _safe_str(ad.get("createdDate")),
         "sccb_work_hours": sccb_work_hours,
-        "state": _normalize_owned_work_item_state(portal_stage),
+        "state": OWNED_WORK_ITEM_STATE_PENDING,
         "product_module_id": product_module_id,
         "product_module_name": product_module_name,
         "repo_url": repo_url,
@@ -4906,7 +4932,7 @@ async def get_demand_by_user(body: GetDemandByUserRequest) -> dict:
 
     每条需求在落盘数据中含 **owned_work_items**：该需求下研发单摘要列表（串行拉门户详情后映射），每项为扁平
     snake_case 字段：``task_no``、``task_title``、``task_desc``（门户 adTask.comments）、``created_date``、
-    ``sccb_work_hours``（由分钟换算，空为 null）、``state``（待处理/开发中/已完成/异常）、
+    ``sccb_work_hours``（由分钟换算，空为 null）、``state``（本地维护：待处理/开发完成/提交完成/已完成）、
     ``product_module_id``、``product_module_name``、``repo_url``。
     各需求单下研发单为**串行**拉取（先需求 A 再需求 B，单需求内 work-items 与详情亦顺序请求）。
     拉取 work-items 需 ai-gateway **Bearer**：优先 owner_info 解密 JSON 的 ``token``，否则使用

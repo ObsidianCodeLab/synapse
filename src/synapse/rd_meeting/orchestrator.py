@@ -585,6 +585,24 @@ class MeetingRoomOrchestrator:
                 sop_node=str(dev.get("sop_node_display") or node_display_name(str(dev.get("current_node_id")))),
                 local_process_state=str(dev.get("local_process_state") or "").strip() or None,
             )
+            if node_id == "diff_analysis" and scope_type == "task":
+                try:
+                    from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_COMPLETED
+                    from synapse.rd_meeting.auto_split_assets import _resolve_demand_no
+                    from synapse.rd_meeting.userwork_sync import patch_owned_work_item_state
+
+                    demand_no = _resolve_demand_no("task", sid)
+                    patch_owned_work_item_state(
+                        demand_no=demand_no,
+                        task_no=sid,
+                        state=OWNED_WORK_ITEM_STATE_COMPLETED,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "patch owned work item state after diff_analysis failed scope=%s: %s",
+                        sid,
+                        exc,
+                    )
 
         # 节点完成 + 已推进到下一节点 → 异步触发 node_finish → init → assemble → schedule_run_node
         # 让 SOP 流程自动接力，不再依赖人工再次"一键开会"。

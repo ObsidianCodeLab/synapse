@@ -177,6 +177,8 @@ def _build_owned_work_item_from_create(
     """create_task 响应 data → owned_work_items 单条（与门户快照字段一致）。"""
     row = data if isinstance(data, dict) else {}
     task_id = row.get("task_id") or row.get("taskId")
+    from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_PENDING
+
     return {
         "task_no": str(row.get("task_no") or task_no).strip(),
         "portal_task_id": task_id,
@@ -184,7 +186,7 @@ def _build_owned_work_item_from_create(
         "task_desc": str(row.get("task_desc") or getattr(req, "comments", "") or ""),
         "created_date": str(row.get("created_date") or ""),
         "sccb_work_hours": row.get("sccb_work_hours"),
-        "state": "待处理",
+        "state": OWNED_WORK_ITEM_STATE_PENDING,
         "product_module_id": row.get("product_module_id"),
         "product_module_name": str(
             row.get("product_module_name") or getattr(req, "productModuleName", "") or ""

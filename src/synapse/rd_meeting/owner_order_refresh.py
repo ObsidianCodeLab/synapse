@@ -52,6 +52,13 @@ def should_keep_orphan_demand(demand: dict[str, Any]) -> bool:
     return _snapshot_norm_id(demand.get("local_process_state")) == "已完成"
 
 
+def should_keep_orphan_work_item(task: dict[str, Any]) -> bool:
+    """门户已删研发单（老有新无）时：仅 ``state=已完成`` 保留待归档。"""
+    from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_COMPLETED
+
+    return _snapshot_norm_id(task.get("state")) == OWNED_WORK_ITEM_STATE_COMPLETED
+
+
 def cleanup_orphan_work_directories(demand_nos: list[str]) -> list[str]:
     """回收 ``work/<demand_no>/`` 残留目录；返回实际删除成功的 demand_no。"""
     cleaned: list[str] = []

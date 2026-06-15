@@ -25,7 +25,7 @@ def test_merge_owned_work_item_preserves_local_extensions():
     old = {
         "task_no": "T1",
         "task_title": "旧标题",
-        "state": "开发中",
+        "state": "开发完成",
         "portal_task_id": 9001,
         "feature_id": "feat-T1",
         "sop_node": "任务执行",
@@ -48,22 +48,23 @@ def test_merge_owned_work_item_preserves_local_extensions():
     merged = _merge_owned_work_item_record(old, new)
 
     assert merged["task_title"] == "新标题"
-    assert merged["state"] == "已完成"
+    assert merged["state"] == "开发完成"
     assert merged["task_desc"] == "门户说明"
     assert merged["portal_task_id"] == 9001
     assert merged["feature_id"] == "feat-T1"
-    assert merged["sop_node"] == "任务执行"
-    assert merged["local_process_state"] == "处理中"
+    assert "sop_node" not in merged
+    assert "local_process_state" not in merged
     assert merged["task_exec_status"] == "done"
     assert merged["task_exec_tokens"] == 1200
 
 
-def test_merge_owned_work_items_appends_new_and_keeps_orphan():
+def test_merge_owned_work_items_appends_new_and_drops_non_completed_orphan():
     old_items = [
         {
             "task_no": "T-old",
             "task_title": "仅本地",
             "feature_id": "feat-old",
+            "state": "开发中",
         }
     ]
     new_items = [
@@ -77,9 +78,26 @@ def test_merge_owned_work_items_appends_new_and_keeps_orphan():
     merged = _merge_owned_work_items(old_items, new_items)
     by_no = {x["task_no"]: x for x in merged}
 
-    assert set(by_no) == {"T-old", "T-new"}
-    assert by_no["T-old"]["feature_id"] == "feat-old"
+    assert set(by_no) == {"T-new"}
     assert by_no["T-new"]["task_title"] == "门户新单"
+
+
+def test_merge_owned_work_items_keeps_completed_orphan():
+    old_items = [
+        {
+            "task_no": "T-done",
+            "task_title": "已完成孤儿",
+            "state": "已完成",
+            "sop_node": "任务执行",
+        }
+    ]
+    new_items: list[dict] = []
+
+    merged = _merge_owned_work_items(old_items, new_items)
+    assert len(merged) == 1
+    assert merged[0]["task_no"] == "T-done"
+    assert merged[0]["state"] == "已完成"
+    assert "sop_node" not in merged[0]
 
 
 def test_refresh_local_state_only_for_pending_and_review():
@@ -153,9 +171,7 @@ def test_merge_owner_orders_preserves_local_sop_state():
     assert d1["local_process_state"] == "处理中"
     assert d1["prod"] == "my-product"
     by_task = {x["task_no"]: x for x in d1["owned_work_items"]}
-    assert set(by_task) == {"T-old", "T-new"}
-    assert by_task["T-old"]["feature_id"] == "feat-old"
-    assert by_task["T-old"]["sop_node"] == "任务执行"
+    assert set(by_task) == {"T-new"}
     assert by_task["T-new"]["task_title"] == "新单"
     assert by_task["T-new"]["state"] == "待处理"
 

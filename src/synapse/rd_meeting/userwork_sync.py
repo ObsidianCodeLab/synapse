@@ -11,6 +11,7 @@ from typing import Any, Literal
 from filelock import FileLock
 
 from synapse.api.routes.dev_iwhalecloud import (
+    OWNED_WORK_ITEM_STATE_PENDING,
     _atomic_write_json_file,
     _owner_order_file_lock_path,
     _owner_order_file_name,
@@ -122,6 +123,72 @@ def patch_userwork_summary(
         return applied
 
 
+def patch_owned_work_item_state(
+    *,
+    demand_no: str,
+    task_no: str,
+    state: str,
+) -> bool:
+    """更新 ``owned_work_items[]`` 中单条研发子单的本地 ``state``。"""
+    from synapse.api.routes.dev_iwhalecloud import (
+        OWNED_WORK_ITEM_STATE_PENDING,
+        _normalize_owned_work_item_state,
+    )
+
+    path: Path = _owner_order_file_name()
+    if not path.is_file():
+        return False
+
+    dn = _snapshot_norm_id(demand_no)
+    tn = _snapshot_norm_id(task_no)
+    if not dn or not tn:
+        return False
+
+    next_state = _normalize_owned_work_item_state(state) or OWNED_WORK_ITEM_STATE_PENDING
+
+    lock = FileLock(str(_owner_order_file_lock_path()), timeout=30)
+    with lock:
+        try:
+            raw = path.read_text(encoding="utf-8")
+            prev = json.loads(raw)
+            if not isinstance(prev, dict):
+                return False
+            existing_list = prev.get("list")
+            if not isinstance(existing_list, list):
+                return False
+        except (OSError, json.JSONDecodeError):
+            return False
+
+        modified = False
+        for demand in existing_list:
+            if not isinstance(demand, dict):
+                continue
+            if _snapshot_norm_id(demand.get("demand_no")) != dn:
+                continue
+            owned = demand.get("owned_work_items")
+            if not isinstance(owned, list):
+                continue
+            for item in owned:
+                if not isinstance(item, dict):
+                    continue
+                if _snapshot_norm_id(item.get("task_no")) != tn:
+                    continue
+                item["state"] = next_state
+                modified = True
+                break
+            break
+
+        if not modified:
+            return False
+
+        payload = {
+            "list": existing_list,
+            "updated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        _atomic_write_json_file(path, payload)
+        return True
+
+
 def append_owned_work_items_to_demand(
     demand_no: str,
     work_items: list[dict[str, Any]],
@@ -170,6 +237,8 @@ def append_owned_work_items_to_demand(
                 if not tn or tn in existing_nos:
                     continue
                 owned.append(dict(item))
+                if isinstance(owned[-1], dict):
+                    owned[-1]["state"] = OWNED_WORK_ITEM_STATE_PENDING
                 existing_nos.add(tn)
                 added.append(tn)
                 modified = True
