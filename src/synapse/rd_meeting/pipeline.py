@@ -77,6 +77,7 @@ STEP_ASSEMBLE_HOST_PROMPT = "assemble_host_prompt"
 STEP_NODE_REVIEW = "node_review"
 STEP_NODE_FINISH = "node_finish"
 STEP_REPROCESS_PREP = "reprocess_prep"
+STEP_RESUME_REVISION = "resume_revision"
 STEP_SYSTEM_NODE_EXEC = "system_node_exec"
 STEP_TASK_EXEC_CLI = "task_exec_cli"
 STEP_WAITING = "waiting"
@@ -91,6 +92,7 @@ _VALID_FLOW_STEPS = frozenset(
         STEP_NODE_REVIEW,
         STEP_NODE_FINISH,
         STEP_REPROCESS_PREP,
+        STEP_RESUME_REVISION,
         STEP_SYSTEM_NODE_EXEC,
         STEP_TASK_EXEC_CLI,
         STEP_WAITING,
@@ -119,6 +121,7 @@ FLOW_STEP_LABEL: dict[str, str] = {
     STEP_NODE_REVIEW: "节点确认总结",
     STEP_NODE_FINISH: "节点收尾",
     STEP_REPROCESS_PREP: "重新处理准备",
+    STEP_RESUME_REVISION: "增量修订准备",
     STEP_SYSTEM_NODE_EXEC: "系统节点执行",
     STEP_TASK_EXEC_CLI: "任务执行 CLI",
     STEP_WAITING: "流程待机",
@@ -133,6 +136,7 @@ FLOW_STEP_NEXT: dict[str, str] = {
     STEP_NODE_REVIEW: STEP_WAITING,  # NODE_REVIEW → 等用户确认 → confirm_node_delivery → NODE_FINISH
     STEP_NODE_FINISH: STEP_NODE_INIT,
     STEP_REPROCESS_PREP: STEP_NODE_INIT,
+    STEP_RESUME_REVISION: STEP_NODE_INIT,
 }
 
 
@@ -1150,6 +1154,59 @@ def clear_room_state_for_node_reprocess(
     return rs
 
 
+def clear_room_state_for_revision_resume(
+    scope_id: str,
+    node_id: str,
+) -> dict[str, Any]:
+    """函数级方案增量修订：清理门控残留与 host 缓存，保留归档与 revision_context。"""
+    from synapse.rd_meeting.host_prompt_cache import clear_host_prompt_cache
+
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    clear_host_prompt_cache(sid)
+    _clear_meeting_todo_sessions(sid)
+
+    from synapse.rd_meeting.hitl_lifecycle import clear_hitl_gate_residual_state
+
+    rs = dict(load_room_state(sid) or {})
+    rs["status"] = "processing"
+    rs["phase"] = "running"
+    rs = clear_hitl_gate_residual_state(rs)
+    for key in (
+        "pending_delivery",
+        "agents_active",
+        "rework_instruction",
+        "user_context_pending",
+        "participants",
+        "pending_host_llm_begin_kind",
+        "stopped_at",
+        "stopped_reason",
+        "stopped_prev_status",
+        "solution_review_blocked",
+        "func_solution_blocked",
+        "escalate_reason",
+        "last_error",
+        "last_pipeline_error",
+        "reprocess_reason",
+        "reprocess_until_node_id",
+        "intervention_kind",
+    ):
+        rs.pop(key, None)
+
+    plan = rs.get("current_work_plan")
+    if isinstance(plan, dict) and str(plan.get("node_id") or "").strip() == nid:
+        rs.pop("current_work_plan", None)
+
+    node_metrics = rs.get("node_metrics")
+    if isinstance(node_metrics, dict) and nid:
+        nm = dict(node_metrics)
+        nm.pop(nid, None)
+        rs["node_metrics"] = nm
+
+    save_room_state(sid, rs)
+    return rs
+
+
 def _clear_reprocess_context_if_done(scope_id: str, finished_node_id: str) -> None:
     """重处理原因一次性生效：收尾到锚点节点后清除 room_state 中的注入字段。"""
     sid = (scope_id or "").strip()
@@ -1254,6 +1311,57 @@ def _step_reprocess_prep(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None
     pipe.set_flow_step(
         FLOW_STEP_NEXT[STEP_REPROCESS_PREP],
         reason=f"过程数据已清理，重新初始化节点 {run_node}",
+    )
+
+
+def _step_resume_revision(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
+    """函数级方案增量修订：保留归档与 revision_context，仅清理 agent 过程目录与门控态。"""
+    sid = ctx.scope_id
+    data = ctx.dev_status or load_dev_status(sid) or {}
+    room_id = pipe.room_id or str((data.get("meeting_room") or {}).get("room_id") or "")
+    run_node = _resolve_run_node_id(pipe, data)
+    if run_node in ("pending", ""):
+        pipe.mark_step_completed(STEP_RESUME_REVISION)
+        pipe.set_flow_step(STEP_WAITING, reason="无有效节点，无法增量修订")
+        return
+
+    from synapse.rd_meeting.func_solution_review import has_revision_context
+
+    if run_node != "func_solution" or not has_revision_context(sid):
+        pipe.mark_step_completed(STEP_RESUME_REVISION)
+        pipe.set_flow_step(
+            STEP_REPROCESS_PREP,
+            reason="非函数级方案增量修订，回退整节点重处理",
+        )
+        return
+
+    _remove_agent_sop_node_dir(sid, run_node)
+
+    from synapse.rd_meeting.hitl_lifecycle import reset_human_confirm_lifecycle
+    from synapse.rd_meeting.hitl_submit import clear_pending_questionnaire
+
+    reset_human_confirm_lifecycle(sid)
+    clear_pending_questionnaire(sid)
+    ctx.room_state = clear_room_state_for_revision_resume(sid, run_node)
+    pipe.set_phase("running", sync_room_state=False)
+
+    append_history_event(
+        sid,
+        {
+            "event": "resume_revision_prep",
+            "room_id": room_id,
+            "node_id": run_node,
+            "text": "函数级方案增量修订：已保留归档与 revision_context，重新调度 Agent 修订",
+            "flow_stage": FLOW_STEP_LABEL[STEP_RESUME_REVISION],
+            "log_type": "info",
+            "agent_id": "system",
+        },
+    )
+
+    pipe.mark_step_completed(STEP_RESUME_REVISION)
+    pipe.set_flow_step(
+        FLOW_STEP_NEXT[STEP_RESUME_REVISION],
+        reason=f"增量修订准备完成，重新初始化节点 {run_node}",
     )
 
 
@@ -1629,6 +1737,7 @@ FLOW_STEP_HANDLERS: dict[str, StepHandler] = {
     STEP_SYSTEM_NODE_EXEC: _step_system_node_exec,
     STEP_TASK_EXEC_CLI: _step_task_exec_cli,
     STEP_REPROCESS_PREP: _step_reprocess_prep,
+    STEP_RESUME_REVISION: _step_resume_revision,
     STEP_NODE_FINISH: _step_node_finish,
 }
 

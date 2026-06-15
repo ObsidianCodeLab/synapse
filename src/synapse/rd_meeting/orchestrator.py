@@ -1077,6 +1077,7 @@ class MeetingRoomOrchestrator:
     ) -> dict[str, Any]:
         """函数级方案节点：加载 func_solution_review.json，进入专用人工评审面板。"""
         from synapse.rd_meeting.func_solution_review import (
+            clear_revision_context,
             ensure_human_review_pending_for_gate,
             load_func_solution_review_payload,
             validate_func_solution_review_json,
@@ -1124,6 +1125,7 @@ class MeetingRoomOrchestrator:
         fs_payload = load_func_solution_review_payload(sid)
         if isinstance(fs_payload, dict):
             fs_payload = ensure_human_review_pending_for_gate(sid, fs_payload)
+        clear_revision_context(sid)
         pending: dict[str, Any] = {
             "node_id": node_id,
             "report_body": report_body,
@@ -1510,22 +1512,10 @@ class MeetingRoomOrchestrator:
             raise
 
         if dec == "revise":
-            from synapse.rd_meeting.func_solution_review import format_revision_brief
+            from synapse.rd_meeting.func_solution_review import write_revision_context
 
-            room_state = dict(load_room_state(sid) or {})
-            room_state["status"] = "human_intervention"
-            room_state["intervention_kind"] = "exception"
-            room_state["func_solution_blocked"] = True
-            reprocess_reason = format_revision_brief(payload, comment)
-            if reprocess_reason:
-                room_state["reprocess_reason"] = reprocess_reason
-                room_state["reprocess_until_node_id"] = node_id
-            pending = dict(pending)
-            pending["func_solution_review_payload"] = payload
-            room_state["pending_delivery"] = pending
-            finalize_node_metrics(room_state, scope_id=sid, node_id=node_id)
-            save_room_state(sid, room_state)
-            set_phase(sid, "exception_gate")
+            write_revision_context(sid, payload, comment)
+
             append_history_event(
                 sid,
                 {
@@ -1537,11 +1527,19 @@ class MeetingRoomOrchestrator:
                     "agent_id": "user",
                 },
             )
+
+            from synapse.rd_meeting.service import MeetingRoomService
+
+            detail = MeetingRoomService().resume_func_solution_revision(
+                room_id,
+                agent_pool=agent_pool,
+            )
             return {
-                "status": "blocked",
+                **detail,
+                "status": "revising",
                 "node_id": node_id,
                 "func_solution_review_payload": payload,
-                "room_state": room_state,
+                "run_in_progress": True,
             }
 
         stage_id = int(pending.get("stage_id") or stage_id_for_node_id(node_id))
