@@ -34,7 +34,6 @@ import {
 import {
   fetchFuncSolutionReview,
   fetchNodeReview,
-  reprocessMeetingRoom,
   saveFuncSolutionPlanReviews,
   submitFuncSolutionReviewDecision,
   type FuncSolutionReviewPayload,
@@ -627,28 +626,7 @@ export function FuncSolutionReviewPanel({
       });
 
       if (decision === 'revise') {
-        message.success('已提交修订意见，正在触发方案重新设计…');
-        try {
-          const brief = needsChangePlans
-            .map((p) => {
-              const c = (planDrafts[p.id]?.comment || '').trim();
-              return `【${p.title || p.module_name}】${c}`;
-            })
-            .join('\n');
-          await reprocessMeetingRoom(
-            synapseApiBase,
-            roomId,
-            'func_solution',
-            brief || overallComment.trim() || undefined,
-          );
-          message.success('已触发函数级方案重新处理');
-        } catch (e) {
-          message.warning(
-            e instanceof Error
-              ? `评审意见已保存，但自动重跑失败：${e.message}。请手动点击「重新处理」。`
-              : '评审意见已保存，请手动点击「重新处理」',
-          );
-        }
+        message.success('已提交修订意见，正在按 marked plans 增量修订…');
       } else {
         message.success('函数级方案评审已通过');
       }
@@ -736,7 +714,7 @@ export function FuncSolutionReviewPanel({
             showIcon
             className="mb-4"
             message="上次评审要求修订方案"
-            description="小鲸将根据各条评审意见调整对应改造方案；若未自动重跑，请对本节点执行「重新处理」。"
+            description="系统将保留已通过改造方案，仅按各条评审意见修订 marked plans；修订完成后会再次进入本评审面板。"
           />
         ) : null}
 

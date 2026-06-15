@@ -920,6 +920,79 @@ class MeetingRoomService:
             agent_pool=agent_pool,
         )
 
+    def resume_func_solution_revision(
+        self,
+        room_id: str,
+        *,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """函数级方案评审修订：保留归档，走 resume_revision→node_init 增量改 marked plans。"""
+        rid = (room_id or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        from synapse.rd_meeting.func_solution_review import has_revision_context
+
+        if not has_revision_context(sid):
+            raise ValueError("func_solution_revision_context_missing")
+
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+
+        rs = load_room_state(sid) or {}
+        current = str(
+            rs.get("current_node_id") or detail.get("current_node_id") or "func_solution"
+        ).strip()
+        if current != "func_solution":
+            raise ValueError("not_func_solution_node")
+
+        from synapse.rd_meeting.pipeline import (
+            STEP_RESUME_REVISION,
+            PipelineRunContext,
+            run_pipeline_until_waiting,
+        )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
+
+        cancel_room_run(rid)
+
+        dev = load_dev_status(sid) or {}
+        dev["local_process_state"] = "处理中"
+        save_dev_status(sid, dev)
+
+        ctx = PipelineRunContext(
+            scope_type=scope_type,
+            scope_id=sid,
+            sync_userwork=False,
+            promote_to_processing=False,
+            agent_pool=agent_pool,
+            dev_status=dev,
+            detail=dict(detail),
+        )
+
+        pipe = MeetingPipeline.load(sid)
+        pipe.set_flow_step(STEP_RESUME_REVISION, reason="函数级方案增量修订")
+        pipe.save()
+
+        def _run_revision_pipeline() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_RESUME_REVISION)
+
+        schedule_pipeline_background(rid, _run_revision_pipeline, scope_id=sid)
+
+        dev = load_dev_status(sid) or {}
+        titles = build_title_index()
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
+
     def _validate_historical_reprocess_target(self, *, target: str, current: str) -> list[str]:
         """校验历史重处理目标，返回 [target..current] 闭区间节点 id。"""
         if is_system_node(target):

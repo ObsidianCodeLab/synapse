@@ -8,13 +8,19 @@ import pytest
 
 from synapse.rd_meeting.func_solution_review import (
     apply_human_decision,
+    build_revision_context,
+    clear_revision_context,
     ensure_func_solution_review_json_from_archive,
     enrich_payload_from_archive,
     format_revision_brief,
+    has_revision_context,
     load_func_solution_review_payload,
+    load_revision_context,
     normalize_payload,
+    revision_context_path,
     save_plan_reviews,
     validate_func_solution_review_json,
+    write_revision_context,
     _parse_plans_from_markdown,
     _validate_func_solution_payload,
     _resolve_mmdc_argv,
@@ -645,3 +651,57 @@ def test_validate_payload_blocks_single_diagram(tmp_path, monkeypatch):
     ok, errors = validate_func_solution_review_json(scope_id)
     assert not ok
     assert any("至少需要 2 张" in e for e in errors)
+
+
+def test_build_revision_context_splits_approved_and_needs_change():
+    payload = normalize_payload(dict(SAMPLE_REVIEW))
+    plans = payload["transformation_plans"]
+    plans.append(
+        {
+            **plans[0],
+            "id": "plan-2",
+            "title": "已通过方案",
+            "human_review": {"status": "approved", "comment": ""},
+        }
+    )
+    plans[0]["human_review"] = {
+        "status": "needs_change",
+        "comment": "应复用 TaskService",
+    }
+    ctx = build_revision_context(payload, "总体收紧")
+    assert len(ctx["plans_to_revise"]) == 1
+    assert ctx["plans_to_revise"][0]["id"] == "plan-1"
+    assert ctx["plans_to_revise"][0]["comment"] == "应复用 TaskService"
+    assert len(ctx["approved_plans"]) == 1
+    assert ctx["approved_plans"][0]["id"] == "plan-2"
+    assert ctx["overall_comment"] == "总体收紧"
+
+
+def test_write_and_clear_revision_context(tmp_path, monkeypatch):
+    scope_id = "fs-revision-ctx"
+    archive, patch = _archive_paths(tmp_path, scope_id)
+    archive.mkdir(parents=True)
+    review = dict(SAMPLE_REVIEW)
+    review["transformation_plans"][0]["human_review"] = {
+        "status": "needs_change",
+        "comment": "改接口",
+    }
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(review, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    patch(monkeypatch)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "revision_context.json",
+    )
+
+    assert not has_revision_context(scope_id)
+    write_revision_context(scope_id, review, "请修订")
+    assert has_revision_context(scope_id)
+    loaded = load_revision_context(scope_id)
+    assert loaded is not None
+    assert loaded["plans_to_revise"][0]["comment"] == "改接口"
+    clear_revision_context(scope_id)
+    assert not has_revision_context(scope_id)

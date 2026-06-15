@@ -783,6 +783,66 @@ def format_reprocess_instruction(scope_id: str, node_id: str) -> str:
     return "\n".join(lines)
 
 
+def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> str:
+    """函数级方案增量修订：渲染 revision_context 驱动的说明段。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if nid != "func_solution":
+        return ""
+
+    from synapse.rd_meeting.func_solution_review import (
+        REVISION_CONTEXT_NAME,
+        load_revision_context,
+        revision_context_path,
+    )
+
+    ctx = load_revision_context(sid)
+    if not ctx:
+        return ""
+
+    ctx_path = revision_context_path(sid)
+    lines = [
+        "## 函数级方案增量修订（人工评审反馈，必须遵循）",
+        "",
+        f"- **状态**：本节点处于**增量修订**（非首次生成、非整节点重跑）。",
+        f"- **修订上下文**：必须先 `read_file` `{ctx_path}`（`{REVISION_CONTEXT_NAME}`），"
+        "再读 `func_solution_review.json` 与 `函数级方案.md`。",
+        "- **仅改 marked**：只修订 `plans_to_revise` 中列出的 plan id；"
+        "`approved_plans` 中条目内容与评审状态**禁止改动**。",
+    ]
+    overall = str(ctx.get("overall_comment") or "").strip()
+    if overall:
+        lines.append(f"- **总体意见**：{overall}")
+
+    to_revise = ctx.get("plans_to_revise") if isinstance(ctx.get("plans_to_revise"), list) else []
+    if to_revise:
+        lines.append("- **待修订改造方案**：")
+        for row in to_revise:
+            if not isinstance(row, dict):
+                continue
+            pid = str(row.get("id") or "").strip()
+            title = str(row.get("title") or row.get("module_name") or pid).strip()
+            comment = str(row.get("comment") or "").strip()
+            lines.append(f"  - `{pid}` {title}：{comment}" if comment else f"  - `{pid}` {title}")
+
+    frozen = ctx.get("approved_plans") if isinstance(ctx.get("approved_plans"), list) else []
+    if frozen:
+        lines.append("- **已通过（冻结，禁止修改）**：")
+        for row in frozen:
+            if not isinstance(row, dict):
+                continue
+            pid = str(row.get("id") or "").strip()
+            title = str(row.get("title") or row.get("module_name") or pid).strip()
+            summary = str(row.get("summary") or "").strip()
+            lines.append(f"  - `{pid}` {title}：{summary}" if summary else f"  - `{pid}` {title}")
+
+    lines.append(
+        "- **落盘要求**：更新 `func_solution_review.json` 中对应 plan 字段并同步 `函数级方案.md` "
+        "对应章节；待修订 plan 的 `human_review.status` 须重置为 `pending`。"
+    )
+    return "\n".join(lines)
+
+
 def _format_meeting_outputs(binding: dict[str, Any] | None) -> str:
     """从 binding.node_outputs 渲染「会议产出」展示串（与归档强约束一一对应）。"""
     if not isinstance(binding, dict):
@@ -838,6 +898,13 @@ _HOST_DUTY_TEXTS: dict[str, str] = {
         "- **函数级方案（协同门控）**：产出 `函数级方案.md` + `func_solution_review.json`；"
         "JSON 须含 Mermaid 总览图与逐条 `transformation_plans`（需求-模块-改造方案关联）；"
         "**禁止** interactive HITL；人工在「函数级方案评审」面板逐条确认。"
+    ),
+    "iter_collab_func_solution_revision": (
+        "- **函数级方案（增量修订）**：必须先读归档目录下 `revision_context.json`、"
+        "现有 `func_solution_review.json` 与 `函数级方案.md`；"
+        "**仅修订** `plans_to_revise` 中列出的改造方案并同步 MD 对应章节；"
+        "`approved_plans` 中条目**禁止修改**内容与 `human_review.status=approved`；"
+        "overview / consistency 仅在本次修订波及总览一致性时才调整；完成后回写 JSON 与 MD。"
     ),
     "iter_collab_leader_review": (
         "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
@@ -987,15 +1054,29 @@ def _collab_node_suffix(node_id: str) -> str:
     return "default"
 
 
-def _host_duty_keys_shared(rules_kind: MeetingRulesKind, node_id: str) -> list[str]:
+def _host_duty_keys_shared(
+    rules_kind: MeetingRulesKind,
+    node_id: str,
+    *,
+    scope_id: str = "",
+) -> list[str]:
     """按节点类型返回共性主持职责的文案 key 序列（顺序即输出顺序）。"""
     keys: list[str] = ["know_product", "focus_goal"]
+    nid = (node_id or "").strip()
 
     # 迭代语义
     if rules_kind == "human":
         keys += ["iter_human_multipoll", "iter_human_confirm"]
     elif rules_kind == "collab":
-        keys.append(f"iter_collab_{_collab_node_suffix(node_id)}")
+        if nid == "func_solution":
+            from synapse.rd_meeting.func_solution_review import has_revision_context
+
+            if has_revision_context(scope_id):
+                keys.append("iter_collab_func_solution_revision")
+            else:
+                keys.append("iter_collab_func_solution")
+        else:
+            keys.append(f"iter_collab_{_collab_node_suffix(node_id)}")
     else:  # ai
         keys += ["iter_ai_autonomous", "iter_ai_no_hitl"]
 
@@ -1029,7 +1110,7 @@ def _append_host_duties_shared(
     rules_kind: MeetingRulesKind = "ai",
 ) -> None:
     """主持职责：按节点规则模板裁剪共性说明（表驱动，文案见 ``_HOST_DUTY_TEXTS``）。"""
-    for key in _host_duty_keys_shared(rules_kind, context.node_id):
+    for key in _host_duty_keys_shared(rules_kind, context.node_id, scope_id=context.scope_id):
         lines.append(_HOST_DUTY_TEXTS[key])
 
 
@@ -1126,6 +1207,10 @@ def build_meeting_runtime_header(
     if reprocess_block:
         lines.append("")
         lines.append(reprocess_block)
+    revision_block = format_func_solution_revision_instruction(context.scope_id, context.node_id)
+    if revision_block:
+        lines.append("")
+        lines.append(revision_block)
     lines.append(f"- **人工确认**：{confirm_label}")
     from synapse.rd_meeting.prior_outputs import (
         format_prior_sop_outputs_section,

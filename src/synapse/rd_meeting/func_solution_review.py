@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 NODE_ID = "func_solution"
 STAGE_NAME = "需求设计"
 JSON_NAME = "func_solution_review.json"
+REVISION_CONTEXT_NAME = "revision_context.json"
 MD_NAME = "函数级方案.md"
 SCHEMA_VERSION = 1
+REVISION_CONTEXT_SCHEMA_VERSION = 1
+_PLAN_SUMMARY_MAX_LEN = 240
 MIN_HUMAN_REVIEW_COMMENT_LEN = 20
 
 PlanReviewStatus = Literal["pending", "approved", "needs_change"]
@@ -72,6 +75,10 @@ def json_path(scope_id: str) -> Path:
 
 def md_path(scope_id: str) -> Path:
     return archive_dir(scope_id) / MD_NAME
+
+
+def revision_context_path(scope_id: str) -> Path:
+    return archive_dir(scope_id) / REVISION_CONTEXT_NAME
 
 
 def _now_iso() -> str:
@@ -400,6 +407,106 @@ def format_revision_brief(payload: dict[str, Any], overall_comment: str = "") ->
     if lines:
         lines.insert(0, "函数级方案评审未通过，请按下列意见调整对应改造方案后重新落盘：")
     return "\n".join(lines).strip()
+
+
+def _plan_immutable_summary(plan: dict[str, Any]) -> str:
+    """已通过改造方案的简短摘要（供 revision_context 冻结说明）。"""
+    for key in ("design_rationale", "expected_effect", "content_markdown"):
+        text = str(plan.get(key) or "").strip()
+        if text:
+            one_line = " ".join(text.split())
+            if len(one_line) > _PLAN_SUMMARY_MAX_LEN:
+                return one_line[: _PLAN_SUMMARY_MAX_LEN - 1] + "…"
+            return one_line
+    title = str(plan.get("title") or plan.get("module_name") or "").strip()
+    return title or "（无摘要）"
+
+
+def build_revision_context(
+    payload: dict[str, Any],
+    overall_comment: str = "",
+) -> dict[str, Any]:
+    """构建函数级方案增量修订上下文（写入 revision_context.json）。"""
+    plans = payload.get("transformation_plans") or []
+    plans_to_revise: list[dict[str, Any]] = []
+    approved_plans: list[dict[str, Any]] = []
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        pid = str(plan.get("id") or "").strip()
+        review = plan.get("human_review") if isinstance(plan.get("human_review"), dict) else {}
+        status = str(review.get("status") or "").strip().lower()
+        base = {
+            "id": pid,
+            "title": str(plan.get("title") or "").strip(),
+            "module_name": str(plan.get("module_name") or "").strip(),
+            "requirement_ref": str(plan.get("requirement_ref") or "").strip(),
+            "requirement_summary": str(plan.get("requirement_summary") or "").strip(),
+        }
+        if status == "needs_change":
+            plans_to_revise.append(
+                {
+                    **base,
+                    "comment": str(review.get("comment") or "").strip(),
+                }
+            )
+        elif status == "approved":
+            approved_plans.append(
+                {
+                    **base,
+                    "summary": _plan_immutable_summary(plan),
+                }
+            )
+    return {
+        "schema_version": REVISION_CONTEXT_SCHEMA_VERSION,
+        "node_id": NODE_ID,
+        "created_at": _now_iso(),
+        "overall_comment": (overall_comment or "").strip(),
+        "plans_to_revise": plans_to_revise,
+        "approved_plans": approved_plans,
+        "archive_files": {
+            "review_json": JSON_NAME,
+            "markdown": MD_NAME,
+            "revision_context": REVISION_CONTEXT_NAME,
+        },
+    }
+
+
+def write_revision_context(
+    scope_id: str,
+    payload: dict[str, Any],
+    overall_comment: str = "",
+) -> dict[str, Any]:
+    ctx = build_revision_context(payload, overall_comment)
+    if not ctx.get("plans_to_revise"):
+        raise ValueError("no_plans_need_change")
+    _write_json_file(revision_context_path(scope_id), ctx)
+    logger.info(
+        "func_solution_revision: wrote %s scope=%s revise=%d approved=%d",
+        REVISION_CONTEXT_NAME,
+        scope_id,
+        len(ctx.get("plans_to_revise") or []),
+        len(ctx.get("approved_plans") or []),
+    )
+    return ctx
+
+
+def load_revision_context(scope_id: str) -> dict[str, Any] | None:
+    return _read_json_file(revision_context_path(scope_id))
+
+
+def has_revision_context(scope_id: str) -> bool:
+    return revision_context_path(scope_id).is_file()
+
+
+def clear_revision_context(scope_id: str) -> None:
+    path = revision_context_path(scope_id)
+    if path.is_file():
+        try:
+            path.unlink()
+            logger.info("func_solution_revision: cleared %s scope=%s", REVISION_CONTEXT_NAME, scope_id)
+        except OSError as exc:
+            logger.warning("func_solution_revision: clear failed %s: %s", path, exc)
 
 
 def _normalize_overview(raw: Any) -> dict[str, Any]:
