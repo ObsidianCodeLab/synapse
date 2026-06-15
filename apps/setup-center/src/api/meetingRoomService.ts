@@ -707,6 +707,7 @@ export interface TaskExecReprocessRound {
     total_tokens?: number;
     total_duration_sec?: number;
   };
+  note?: string;
 }
 
 export interface TaskExecGetResponse {

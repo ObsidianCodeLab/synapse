@@ -1300,6 +1300,7 @@ def _step_reprocess_prep(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None
             "room_id": room_id,
             "node_id": run_node,
             "node_ids": range_ids if historical else [run_node],
+            "reprocess_reason": reason,
             "text": prep_text,
             "flow_stage": FLOW_STEP_LABEL[STEP_REPROCESS_PREP],
             "log_type": "info",

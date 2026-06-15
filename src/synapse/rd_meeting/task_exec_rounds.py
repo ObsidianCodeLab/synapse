@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime
 from typing import Any
 
 from synapse.rd_meeting.pipeline import MeetingPipeline
+from synapse.rd_meeting.paths import agent_sop_node_dir
 from synapse.rd_meeting.task_exec import NODE_ID, load_task_exec_payload
 
 logger = logging.getLogger(__name__)
@@ -74,15 +76,144 @@ def _synthetic_round_from_payload(payload: dict[str, Any], *, round_num: int = 1
     }
 
 
+def _round_from_cli_result(
+    result: dict[str, Any],
+    *,
+    round_num: int,
+    kind: str,
+    reason: str = "",
+    requested_at: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "round": round_num,
+        "kind": kind,
+        "reason": reason,
+        "requested_at": requested_at or result.get("started_at") or _now_iso(),
+        "started_at": result.get("started_at"),
+        "finished_at": result.get("finished_at"),
+        "status": str(result.get("status") or "unknown").strip().lower(),
+        "summary": _summary_from_result(result),
+    }
+
+
+def _placeholder_superseded_round(*, round_num: int = 1) -> dict[str, Any]:
+    return {
+        "round": round_num,
+        "kind": "initial",
+        "reason": "",
+        "requested_at": None,
+        "started_at": None,
+        "finished_at": None,
+        "status": "superseded",
+        "summary": {},
+        "note": "首轮执行详情未保留（重处理时已清理过程数据）",
+    }
+
+
+def _backfill_rounds_from_history(scope_id: str) -> list[dict[str, Any]]:
+    """从 task_exec 节点 room_history 重建轮次（兼容功能上线前的重处理）。"""
+    sid = (scope_id or "").strip()
+    path = agent_sop_node_dir(sid, NODE_ID) / "room_history.jsonl"
+    if not path.is_file():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        try:
+            raw = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(raw, dict):
+            events.append(raw)
+
+    rounds: list[dict[str, Any]] = []
+    for ev in events:
+        event_name = str(ev.get("event") or "").strip()
+        node_id = str(ev.get("node_id") or "").strip()
+        if node_id and node_id != NODE_ID:
+            continue
+        ts = str(ev.get("ts") or "").strip() or None
+
+        if event_name == "reprocess_prep":
+            reason = str(ev.get("reprocess_reason") or "").strip()
+            if not rounds:
+                rounds.append(_placeholder_superseded_round())
+            elif str(rounds[-1].get("status") or "").lower() in ("running", "pending", ""):
+                _finalize_open_round(rounds)
+            rounds.append(
+                {
+                    "round": len(rounds) + 1,
+                    "kind": "reprocess",
+                    "reason": reason,
+                    "requested_at": ts or _now_iso(),
+                    "started_at": None,
+                    "finished_at": None,
+                    "status": "pending",
+                    "summary": {},
+                }
+            )
+            continue
+
+        if event_name != "task_exec_cli_finished":
+            continue
+
+        result = ev.get("result") if isinstance(ev.get("result"), dict) else {}
+        if not result:
+            continue
+
+        if rounds and str(rounds[-1].get("status") or "").lower() in ("pending", "running", ""):
+            last = rounds[-1]
+            last.update(
+                _round_from_cli_result(
+                    result,
+                    round_num=int(last.get("round") or len(rounds)),
+                    kind=str(last.get("kind") or "reprocess"),
+                    reason=str(last.get("reason") or ""),
+                    requested_at=str(last.get("requested_at") or ts or ""),
+                )
+            )
+            continue
+
+        kind = "reprocess" if rounds else "initial"
+        rounds.append(
+            _round_from_cli_result(
+                result,
+                round_num=len(rounds) + 1,
+                kind=kind,
+                requested_at=ts,
+            )
+        )
+    return rounds
+
+
+def _ensure_rounds_persisted(scope_id: str, rounds: list[dict[str, Any]]) -> None:
+    if not rounds:
+        return
+    pipe, ctx = _pipeline_context(scope_id)
+    if pipe is None or _rounds_from_ctx(ctx):
+        return
+    _save_rounds(pipe, rounds)
+
+
 def load_task_exec_rounds(scope_id: str) -> list[dict[str, Any]]:
-    """读取任务执行轮次；无记录时从当前 task_exec_result 合成首轮（兼容历史工单）。"""
+    """读取任务执行轮次；无记录时从历史或 task_exec_result 回填。"""
     _, ctx = _pipeline_context(scope_id)
     rounds = _rounds_from_ctx(ctx)
     if rounds:
         return rounds
+
+    rounds = _backfill_rounds_from_history(scope_id)
+    if rounds:
+        _ensure_rounds_persisted(scope_id, rounds)
+        return rounds
+
     payload = load_task_exec_payload(scope_id)
     if isinstance(payload, dict):
-        return [_synthetic_round_from_payload(payload)]
+        rounds = [_synthetic_round_from_payload(payload)]
+        _ensure_rounds_persisted(scope_id, rounds)
+        return rounds
     return []
 
 

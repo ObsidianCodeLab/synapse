@@ -186,6 +186,9 @@ function TaskExecRoundsPanel({
               ) : round.kind === 'initial' ? (
                 <p className="mt-2 mb-0 text-[12px] text-muted-foreground">首轮执行，无额外处理建议</p>
               ) : null}
+              {round.note ? (
+                <p className="mt-1 mb-0 text-[11px] text-muted-foreground/80">{round.note}</p>
+              ) : null}
             </div>
           );
         })}
@@ -363,8 +366,8 @@ export function TaskExecReviewPanel({
   }, [isRunning, synapseApiBase, roomId]);
 
   useEffect(() => {
-    if (!initialPayload || isRunning) void refresh();
-  }, [initialPayload, isRunning, refresh]);
+    void refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (!isRunning) return;

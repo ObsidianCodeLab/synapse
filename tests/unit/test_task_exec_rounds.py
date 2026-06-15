@@ -67,3 +67,28 @@ def test_load_task_exec_rounds_synthetic_from_payload(tmp_path, monkeypatch):
     assert len(rounds) == 1
     assert rounds[0]["round"] == 1
     assert rounds[0]["summary"]["total_tokens"] == 253350
+
+
+def test_backfill_rounds_from_task_exec_history(tmp_path, monkeypatch):
+    scope_id = "te-rounds-hist"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    work = tmp_path / "work" / scope_id
+    hist_dir = work / "agents" / "task_exec"
+    hist_dir.mkdir(parents=True)
+    MeetingPipeline.create(scope_id, scope_type="demand")
+    history = hist_dir / "room_history.jsonl"
+    history.write_text(
+        "\n".join(
+            [
+                '{"event":"reprocess_prep","node_id":"task_exec","reprocess_reason":"需补单测","ts":"2026-06-16T02:10:46"}',
+                '{"event":"task_exec_cli_finished","node_id":"task_exec","ts":"2026-06-16T02:17:23","result":{"status":"ok","started_at":"2026-06-16T02:11:07","finished_at":"2026-06-16T02:17:23","summary":{"total":1,"ok":1,"total_tokens":99,"total_duration_sec":10}}}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    rounds = load_task_exec_rounds(scope_id)
+    assert len(rounds) == 2
+    assert rounds[0]["status"] == "superseded"
+    assert rounds[1]["kind"] == "reprocess"
+    assert rounds[1]["reason"] == "需补单测"
+    assert rounds[1]["summary"]["total_tokens"] == 99
