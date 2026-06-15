@@ -258,6 +258,56 @@ def test_merge_owner_order_keeps_completed_orphan_only():
 
 
 @pytest.mark.asyncio
+async def test_sync_owner_orders_from_devcloud_syncs_rd_view(monkeypatch):
+    async def fake_fetch(**_kwargs):
+        return (
+            [{"demand_no": "D1", "local_process_state": "处理中", "demand_title": "t1"}],
+            1,
+        )
+
+    persist_calls: list[dict] = []
+
+    def fake_persist(*, out_list):
+        persist_calls.append({"out_list": out_list})
+        return {"removed_demands": ["D-old"], "cleaned_work_dirs": ["D-old"]}
+
+    view_sync_calls: list[list] = []
+
+    async def fake_view_sync(*, demands=None, timeout=60.0):
+        view_sync_calls.append(list(demands or []))
+        return {"status": "ok", "synced": len(demands or []), "failed": 0, "errors": []}
+
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.load_owner_info_cipher_from_file",
+        lambda: "cipher",
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.load_owner_order_snapshot_from_file",
+        lambda: {"list": [{"demand_no": "D1", "local_process_state": "处理中"}]},
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.fetch_owner_orders_from_devcloud",
+        fake_fetch,
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.persist_owner_order_snapshot_to_file",
+        fake_persist,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.owner_order_refresh.sync_userwork_view_to_unified_service",
+        fake_view_sync,
+    )
+
+    result = await sync_owner_orders_from_devcloud()
+
+    assert result["merged_list_size"] == 1
+    assert result["removed_demands"] == ["D-old"]
+    assert result["view_sync"]["synced"] == 1
+    assert len(view_sync_calls) == 1
+    assert view_sync_calls[0][0]["demand_no"] == "D1"
+
+
+@pytest.mark.asyncio
 async def test_system_sync_owner_orders_skips_without_userinfo(monkeypatch):
     monkeypatch.setattr(
         "synapse.api.routes.dev_iwhalecloud.load_owner_info_cipher_from_file",
