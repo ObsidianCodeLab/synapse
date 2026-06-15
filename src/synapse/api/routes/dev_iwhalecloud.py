@@ -4905,15 +4905,26 @@ async def sync_owner_orders_from_devcloud(*, owner_info_cipher: str | None = Non
     prev_count = len(prev_snap.get("list") or []) if isinstance(prev_snap, dict) else 0
 
     out_list, total = await fetch_owner_orders_from_devcloud(owner_info_cipher=cipher)
-    await asyncio.to_thread(persist_owner_order_snapshot_to_file, out_list=out_list)
+    persist_result = await asyncio.to_thread(persist_owner_order_snapshot_to_file, out_list=out_list)
 
     merged_snap = load_owner_order_snapshot_from_file()
-    merged_count = len(merged_snap.get("list") or []) if isinstance(merged_snap, dict) else len(out_list)
+    merged_list = merged_snap.get("list") if isinstance(merged_snap, dict) else None
+    merged_count = len(merged_list or []) if merged_list is not None else len(out_list)
+
+    from synapse.rd_meeting.owner_order_refresh import sync_userwork_view_to_unified_service
+
+    view_sync = await sync_userwork_view_to_unified_service(
+        demands=[x for x in (merged_list or out_list) if isinstance(x, dict)],
+    )
+
     return {
         "total_from_cloud": total,
         "fetched": len(out_list),
         "previous_list_size": prev_count,
         "merged_list_size": merged_count,
+        "removed_demands": persist_result.get("removed_demands") or [],
+        "cleaned_work_dirs": persist_result.get("cleaned_work_dirs") or [],
+        "view_sync": view_sync,
     }
 
 

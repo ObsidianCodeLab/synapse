@@ -32,8 +32,8 @@ def test_build_rd_view_demand_save_payload_maps_sop_fields(monkeypatch, tmp_path
         lambda _dn: {"current_node_id": "req_clarify"},
     )
     monkeypatch.setattr(
-        "synapse.rd_meeting.owner_order_refresh.resolve_run_status",
-        lambda *_a, **_k: "处理中",
+        "synapse.rd_meeting.owner_order_refresh.run_status_slug_for_demand",
+        lambda *_a, **_k: "running",
     )
 
     demand = {
@@ -48,13 +48,13 @@ def test_build_rd_view_demand_save_payload_maps_sop_fields(monkeypatch, tmp_path
 
     assert payload["demand_no"] == "21878317"
     assert payload["sop_node_id"] == "req_clarify"
-    assert payload["stage"] == "需求分析"
+    assert payload["stage"] == "analysis"
     assert payload["seq_id"] == 1
     assert payload["name"] == "需求澄清"
     assert payload["assignee_id"] == "E001"
     assert payload["product_name"] == "billing-core"
     assert payload["processing_mode"] == "ai"
-    assert payload["run_status"] == "处理中"
+    assert payload["run_status"] == "running"
     assert payload["comments"] == []
 
 

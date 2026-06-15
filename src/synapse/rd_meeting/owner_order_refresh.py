@@ -30,6 +30,28 @@ logger = logging.getLogger(__name__)
 
 RD_VIEW_DEMAND_SAVE_PATH = "/dev/iwhalecloud/synapse/rd_view_demand_save"
 
+# 统一服务 rd_view 阶段 slug（与 stage_id 对齐）
+_STAGE_ID_TO_SLUG: dict[int, str] = {
+    0: "pending",
+    1: "analysis",
+    2: "design",
+    3: "rd",
+    4: "developing",
+    5: "code_review",
+}
+
+# resolve_run_status 中文 → 统一服务 run_status slug
+_RUN_STATUS_TO_SLUG: dict[str, str] = {
+    "处理中": "running",
+    "待人工": "human_intervention",
+    "已完成": "completed",
+    "异常": "failed",
+    "已停止": "stopped",
+    "待处理": "pending",
+    "全人工": "full_manual",
+    "待定": "pending",
+}
+
 _ROOM_STATUS_TO_RUN_STATUS = {
     "processing": "处理中",
     "human_intervention": "待人工",
@@ -45,6 +67,15 @@ _PIPELINE_PHASE_TO_RUN_STATUS = {
     "completed": "已完成",
     "running": "处理中",
 }
+
+
+def stage_slug_for_id(stage_id: int) -> str:
+    return _STAGE_ID_TO_SLUG.get(stage_id, "pending")
+
+
+def run_status_slug_for_demand(demand_no: str, *, local_process_state: str = "") -> str:
+    cn = resolve_run_status(demand_no, local_process_state=local_process_state)
+    return _RUN_STATUS_TO_SLUG.get(cn, "pending")
 
 
 def should_keep_orphan_demand(demand: dict[str, Any]) -> bool:
@@ -147,11 +178,11 @@ def build_rd_view_demand_save_payload(
         "demand_desc": str(demand.get("demand_desc") or ""),
         "demand_create_time": str(demand.get("demand_create_time") or ""),
         "sop_node_id": node_id,
-        "stage": stage_name_for_id(stage_id),
+        "stage": stage_slug_for_id(stage_id),
         "seq_id": seq_index_for_node_id(node_id),
         "name": node_display_name(node_id),
         "local_process_state": local,
-        "run_status": resolve_run_status(dn, local_process_state=local),
+        "run_status": run_status_slug_for_demand(dn, local_process_state=local),
         "priority": "高",
         "assignee_id": (assignee_id or "").strip(),
         "product_name": str(demand.get("prod") or "").strip(),

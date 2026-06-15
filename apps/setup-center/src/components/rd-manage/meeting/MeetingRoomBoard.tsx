@@ -552,28 +552,138 @@ function chatLogPreviewText(log: LogEntry): string {
   return '…';
 }
 
-/** 卡片预览：当前节点协作会议流；悬停时自动滚动，非悬停时静止（默认贴底展示最新） */
+function RoomCardChatLogRow({
+  log,
+  index,
+  room,
+}: {
+  log: LogEntry;
+  index: number;
+  room: MeetingRoom;
+}) {
+  const agent = room.agents.find((a) => a.id === log.agentId);
+  const speaker = resolveChatSpeakerName(
+    log,
+    agent?.name || resolveSpeakerName(room, log.agentId),
+  );
+  const role = log.speakerRole || (log.agentId === 'system' ? 'system' : 'host');
+  return (
+    <div className="min-w-0">
+      <div className="mb-0.5 flex items-center gap-1.5 text-[9px] leading-none">
+        <span className={`truncate font-medium ${chatSpeakerAccentClass(role)}`}>{speaker}</span>
+        <span className="shrink-0 font-mono text-muted-foreground/70">{log.timestamp}</span>
+      </div>
+      <p className="line-clamp-2 text-[11px] leading-snug text-foreground/85">
+        {chatLogPreviewText(log)}
+      </p>
+    </div>
+  );
+}
+
+const ROOM_CARD_CHAT_LOOP_GAP_PX = 8;
+
+function RoomCardChatStreamMarker({ kind }: { kind: 'start' | 'end' }) {
+  const label = kind === 'start' ? '起始' : '结束';
+  return (
+    <div
+      className="flex items-center gap-2 py-0.5"
+      aria-label={kind === 'start' ? '会议进度起始' : '会议进度结束'}
+    >
+      <span className="h-px flex-1 bg-border/70" aria-hidden />
+      <span className="shrink-0 rounded-full border border-border/60 bg-background/80 px-2 py-0.5 font-mono text-[8px] tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <span className="h-px flex-1 bg-border/70" aria-hidden />
+    </div>
+  );
+}
+
+/** 卡片预览：当前节点协作会议流；悬停时自动滚动，非悬停时保持当前位置 */
 const RoomCardChatStream = ({
   room,
   logs,
-  rosterAgents,
 }: {
   room: MeetingRoom;
   logs: LogEntry[];
-  rosterAgents: RoomAgent[];
 }) => {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const scrollOffsetRef = useRef(0);
+  const trackHeightRef = useRef(0);
+  const loopSegmentRef = useRef(0);
+  const prevTailKeyRef = useRef('');
   const [hovered, setHovered] = useState(false);
+  const [loopSegment, setLoopSegment] = useState(0);
   const logsTailKey = getLogsTailKey(logs);
+
+  const normalizeScrollOffset = useCallback((offset: number) => {
+    const segment = loopSegmentRef.current;
+    if (segment <= 0) return Math.max(0, offset);
+    let next = offset;
+    while (next >= segment) next -= segment;
+    while (next < 0) next += segment;
+    return next;
+  }, []);
+
+  const syncLoopMetrics = useCallback(() => {
+    const track = trackRef.current;
+    const viewport = viewportRef.current;
+    if (!track || !viewport) return;
+    const trackHeight = track.offsetHeight;
+    trackHeightRef.current = trackHeight;
+    const canLoop = trackHeight > viewport.clientHeight + 1 && logs.length > 0;
+    const segment = canLoop ? trackHeight + ROOM_CARD_CHAT_LOOP_GAP_PX : 0;
+    loopSegmentRef.current = segment;
+    setLoopSegment(segment);
+  }, [logs.length]);
+
+  const syncScrollOffset = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
+    const normalized = Math.min(normalizeScrollOffset(el.scrollTop), maxScroll);
+    el.scrollTop = normalized;
+    scrollOffsetRef.current = normalized;
+  }, [normalizeScrollOffset]);
+
+  useEffect(() => {
+    syncLoopMetrics();
+    const track = trackRef.current;
+    const viewport = viewportRef.current;
+    if (!track || !viewport) return;
+    const ro = new ResizeObserver(() => {
+      syncLoopMetrics();
+      window.requestAnimationFrame(() => syncScrollOffset());
+    });
+    ro.observe(track);
+    ro.observe(viewport);
+    return () => ro.disconnect();
+  }, [logsTailKey, syncLoopMetrics, syncScrollOffset]);
 
   useEffect(() => {
     const el = viewportRef.current;
     if (!el || hovered) return;
+
+    const trackHeight = trackHeightRef.current;
     const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
-    el.scrollTop = maxScroll;
-    scrollOffsetRef.current = maxScroll;
-  }, [logsTailKey, hovered]);
+    const bottomOfFirstCopy = Math.max(0, trackHeight - el.clientHeight);
+    const isFirstPaint = prevTailKeyRef.current === '';
+    const wasAtBottom =
+      loopSegmentRef.current > 0
+        ? normalizeScrollOffset(el.scrollTop) >= bottomOfFirstCopy - 4
+        : maxScroll - el.scrollTop <= 4;
+    prevTailKeyRef.current = logsTailKey;
+
+    if (isFirstPaint || wasAtBottom) {
+      const target = loopSegmentRef.current > 0 ? bottomOfFirstCopy : maxScroll;
+      el.scrollTop = target;
+      scrollOffsetRef.current = target;
+    } else {
+      const clamped = Math.min(normalizeScrollOffset(el.scrollTop), maxScroll);
+      el.scrollTop = clamped;
+      scrollOffsetRef.current = clamped;
+    }
+  }, [logsTailKey, hovered, normalizeScrollOffset]);
 
   useEffect(() => {
     if (!hovered) return;
@@ -581,31 +691,96 @@ const RoomCardChatStream = ({
     if (!el) return;
 
     let raf = 0;
+    let pausedAtBottomUntil = 0;
     const speed = 0.4;
+    const bottomPauseMs = 2800;
 
     const step = () => {
       const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
       if (maxScroll <= 0) return;
-      scrollOffsetRef.current += speed;
-      if (scrollOffsetRef.current >= maxScroll) {
-        scrollOffsetRef.current = 0;
+
+      const segment = loopSegmentRef.current;
+      const now = performance.now();
+
+      if (segment > 0) {
+        scrollOffsetRef.current += speed;
+        if (scrollOffsetRef.current >= segment) {
+          scrollOffsetRef.current -= segment;
+        }
+        el.scrollTop = scrollOffsetRef.current;
+        raf = requestAnimationFrame(step);
+        return;
       }
+
+      if (scrollOffsetRef.current >= maxScroll - 0.5) {
+        scrollOffsetRef.current = maxScroll;
+        el.scrollTop = maxScroll;
+        if (pausedAtBottomUntil === 0) {
+          pausedAtBottomUntil = now + bottomPauseMs;
+        }
+        if (now < pausedAtBottomUntil) {
+          raf = requestAnimationFrame(step);
+          return;
+        }
+        pausedAtBottomUntil = 0;
+        scrollOffsetRef.current = 0;
+        el.scrollTop = 0;
+        raf = requestAnimationFrame(step);
+        return;
+      }
+
+      pausedAtBottomUntil = 0;
+      scrollOffsetRef.current += speed;
       el.scrollTop = scrollOffsetRef.current;
       raf = requestAnimationFrame(step);
     };
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [hovered, logsTailKey]);
+  }, [hovered, logsTailKey, loopSegment]);
 
-  const syncScrollOffset = () => {
-    const el = viewportRef.current;
-    if (el) scrollOffsetRef.current = el.scrollTop;
-  };
+  useEffect(() => {
+    const resetInteraction = () => {
+      setHovered(false);
+      syncScrollOffset();
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') {
+        resetInteraction();
+        return;
+      }
+      syncLoopMetrics();
+      window.requestAnimationFrame(() => syncScrollOffset());
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pagehide', resetInteraction);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pagehide', resetInteraction);
+    };
+  }, [syncLoopMetrics, syncScrollOffset]);
+
+  const renderLogRows = (idPrefix: string) =>
+    logs.map((log, index) => (
+      <RoomCardChatLogRow
+        key={`${idPrefix}-${log.id || index}`}
+        log={log}
+        index={index}
+        room={room}
+      />
+    ));
+
+  const renderLogTrack = (idPrefix: string) => (
+    <>
+      <RoomCardChatStreamMarker kind="start" />
+      {renderLogRows(idPrefix)}
+      <RoomCardChatStreamMarker kind="end" />
+    </>
+  );
 
   return (
     <div
-      className="relative flex min-h-[88px] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-muted/40 p-3 transition-colors group-hover:border-border"
+      className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-muted/40 p-3 transition-colors group-hover:border-border"
       onMouseEnter={() => {
         syncScrollOffset();
         setHovered(true);
@@ -616,7 +791,7 @@ const RoomCardChatStream = ({
       }}
     >
       <div className="mb-1 flex shrink-0 items-center gap-1 font-mono text-[9px] text-muted-foreground">
-        <Activity className="h-3 w-3" /> 协作会议流
+        <TrendingUp className="h-3 w-3" /> 会议进度
       </div>
       <div
         ref={viewportRef}
@@ -624,42 +799,18 @@ const RoomCardChatStream = ({
       >
         {logs.length === 0 ? (
           <div className="flex h-full items-center justify-center text-[10px] italic text-muted-foreground/60">
-            暂无协作消息
+            暂无会议进度
           </div>
         ) : (
           <div className="flex flex-col gap-2 pr-0.5">
-            {logs.map((log, index) => {
-              const agent =
-                resolveLogAgent(rosterAgents, log.agentId, log) ||
-                room.agents.find((a) => a.id === log.agentId);
-              const speaker = resolveChatSpeakerName(
-                log,
-                agent?.name || resolveSpeakerName(room, log.agentId),
-              );
-              const role = log.speakerRole || (log.agentId === 'system' ? 'system' : 'host');
-              return (
-                <div key={log.id || `card-log-${index}`} className="flex min-w-0 items-start gap-1.5">
-                  <div
-                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white opacity-80 ${
-                      agent?.avatarColor || 'bg-muted'
-                    }`}
-                  >
-                    {agent?.icon || <Bot className="h-2.5 w-2.5" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-0.5 flex items-center gap-1.5 text-[9px] leading-none">
-                      <span className={`truncate font-medium ${chatSpeakerAccentClass(role)}`}>
-                        {speaker}
-                      </span>
-                      <span className="shrink-0 font-mono text-muted-foreground/70">{log.timestamp}</span>
-                    </div>
-                    <p className="line-clamp-2 text-[11px] leading-snug text-foreground/85">
-                      {chatLogPreviewText(log)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+            <div ref={trackRef} className="flex flex-col gap-2">
+              {renderLogTrack('a')}
+            </div>
+            {loopSegment > 0 ? (
+              <div className="flex flex-col gap-2" aria-hidden>
+                {renderLogTrack('b')}
+              </div>
+            ) : null}
           </div>
         )}
       </div>
@@ -862,6 +1013,42 @@ const SOP_NODE_TYPE_ICON: Record<NodeType, LucideIcon> = {
 
 /** 主页面会议室列表自动刷新间隔（会中弹窗打开时不启用，由 live 轮询负责） */
 const LIST_AUTO_REFRESH_MS = 60_000;
+/** 主页面卡片会议进度 live 轮询（弹窗关闭时启用） */
+const LIST_LIVE_POLL_MS = 3_000;
+
+function roomCardLogsNeedHydrate(room: MeetingRoom): boolean {
+  const nodeId = (room.currentNode || '').trim();
+  if (!nodeId) return false;
+  const logs = filterLogsForNodeExact(room.allChatLogs ?? room.logs, nodeId);
+  if (!logs.length) return true;
+  if (logs.length === 1 && logs[0]?.id === 'boot') return true;
+  return false;
+}
+
+/** 列表刷新时保留卡片已累积的协作流，避免 silent reload 把会议进度打回占位文案 */
+function mergeListRoomWithExisting(fresh: MeetingRoom, existing?: MeetingRoom): MeetingRoom {
+  if (!existing || existing.id !== fresh.id) return fresh;
+  const allChatLogs = existing.allChatLogs?.length ? existing.allChatLogs : existing.logs;
+  const hasPreservableChat =
+    allChatLogs.length > 0 && !(allChatLogs.length === 1 && allChatLogs[0]?.id === 'boot');
+  if (!hasPreservableChat) return fresh;
+
+  const logs = filterLogsForNodeExact(allChatLogs, fresh.currentNode);
+  return {
+    ...fresh,
+    allChatLogs,
+    logs: logs.length > 0 ? logs : fresh.logs,
+    agents: existing.agents.length > 0 ? existing.agents : fresh.agents,
+    chatEpoch: existing.chatEpoch,
+  };
+}
+
+function mergeListRoomsWithExisting(freshRooms: MeetingRoom[], prevRooms: MeetingRoom[]): MeetingRoom[] {
+  const prevByScope = new Map(prevRooms.map((room) => [meetingRoomScopeKey(room), room]));
+  return dedupeMeetingRooms(
+    freshRooms.map((room) => mergeListRoomWithExisting(room, prevByScope.get(meetingRoomScopeKey(room)))),
+  );
+}
 
 function meetingRoomScopeKey(room: Pick<MeetingRoom, 'scopeType' | 'scopeId'>): string {
   return `${room.scopeType || 'demand'}:${room.scopeId}`;
@@ -1586,11 +1773,9 @@ const RoomCardStageProgress = ({ room }: { room: MeetingRoom }) => {
 
 const RoomCard = ({
   room,
-  rosterAgents,
   onClick,
 }: {
   room: MeetingRoom;
-  rosterAgents: RoomAgent[];
   onClick: (r: MeetingRoom) => void;
 }) => {
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -1614,11 +1799,9 @@ const RoomCard = ({
     'shadow-none';
 
   return (
-    <motion.div
-      whileHover={{ y: -4, scale: 1.01 }}
-      whileTap={{ scale: 0.98 }}
+    <div
       onClick={() => onClick(room)}
-      className={`cursor-pointer bg-card border ${borderColor} ${glowColor} rounded-2xl overflow-hidden flex flex-col h-[380px] transition-all duration-300 relative group`}
+      className={`cursor-pointer bg-card border ${borderColor} ${glowColor} rounded-2xl overflow-hidden flex flex-col h-[320px] transition-colors duration-300 relative group`}
     >
       <div className="shrink-0 border-b border-border/50 bg-muted/10 p-3 flex flex-col gap-2">
         <Tooltip title={`${room.ticketId} · ${room.ticketTitle}`}>
@@ -1671,36 +1854,8 @@ const RoomCard = ({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
-        <div className="shrink-0">
-          <span className="mb-1.5 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Users className="h-3 w-3" /> 参会代表 ({rosterAgents.length})
-          </span>
-          <div className="flex items-center gap-2 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {rosterAgents.map((agent) => (
-              <Tooltip
-                key={agent.id}
-                title={
-                  <div className="flex flex-col gap-1">
-                    <span className="font-medium text-white">
-                      {agent.name} · {agent.role}
-                    </span>
-                    <span className="text-xs text-foreground/90">状态: {agent.currentAction}</span>
-                  </div>
-                }
-              >
-                <div className="group/ag flex shrink-0 flex-col items-center gap-1">
-                  <MeetingAgentAvatar agent={agent} />
-                  <span className="max-w-[52px] truncate text-center text-[10px] text-muted-foreground transition-colors group-hover/ag:text-foreground">
-                    {agent.name}
-                  </span>
-                </div>
-              </Tooltip>
-            ))}
-          </div>
-        </div>
-
-        <RoomCardChatStream room={room} logs={room.logs} rosterAgents={rosterAgents} />
+      <div className="flex min-h-0 flex-1 flex-col p-3">
+        <RoomCardChatStream room={room} logs={room.logs} />
       </div>
 
       {/* Footer Action */}
@@ -1725,7 +1880,7 @@ const RoomCard = ({
           介入会议 <ChevronRight className="w-3 h-3" />
         </Button>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -2773,6 +2928,8 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     () => new Map(),
   );
   const configOpenPrev = useRef(false);
+  const roomsRef = useRef<MeetingRoom[]>([]);
+  roomsRef.current = rooms;
 
   const loadMeetingConfig = useCallback(async () => {
     const base = (synapseApiBase || '').trim();
@@ -2829,7 +2986,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     }
     try {
       const list = await fetchMeetingRooms(base);
-      setRooms(dedupeMeetingRooms(list.map(mapListItemToRoom)));
+      setRooms((prev) => mergeListRoomsWithExisting(list.map(mapListItemToRoom), prev));
       if (silent) setLoadError(null);
     } catch (e) {
       if (!silent) {
@@ -2840,6 +2997,64 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       if (!silent) setLoading(false);
     }
   }, [synapseApiBase]);
+
+  const hydrateBoardNodeChats = useCallback(async () => {
+    const base = (synapseApiBase || '').trim();
+    const snapshot = roomsRef.current;
+    if (!base || snapshot.length === 0) return;
+
+    await Promise.all(
+      snapshot.map(async (room) => {
+        const nodeId = (room.currentNode || '').trim();
+        if (!nodeId || !roomCardLogsNeedHydrate(room)) return;
+        try {
+          const payload = await fetchMeetingRoomNodeChat(base, room.id, nodeId);
+          const nodeLogs = (payload.chat_logs || []).map(mapChatWireToLog);
+          if (!nodeLogs.length) return;
+          setRooms((prev) =>
+            prev.map((item) => {
+              if (item.id !== room.id) return item;
+              const merged = replaceNodeChatLogs(item.allChatLogs ?? item.logs, nodeId, nodeLogs);
+              return {
+                ...item,
+                allChatLogs: merged,
+                logs: filterLogsForNodeExact(merged, item.currentNode),
+              };
+            }),
+          );
+        } catch {
+          /* 节点 chat 拉取失败时保留 live 增量 */
+        }
+      }),
+    );
+  }, [synapseApiBase]);
+
+  const pollBoardLive = useCallback(async () => {
+    const base = (synapseApiBase || '').trim();
+    const snapshot = roomsRef.current;
+    if (!base || snapshot.length === 0) return;
+
+    const patches = await Promise.all(
+      snapshot.map(async (room) => {
+        try {
+          const live = await fetchMeetingRoomLive(base, room.id);
+          return { id: room.id, live };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setRooms((prev) =>
+      prev.map((room) => {
+        const hit = patches.find((patch) => patch?.id === room.id);
+        return hit ? applyLivePatch(room, hit.live) : room;
+      }),
+    );
+    window.setTimeout(() => {
+      void hydrateBoardNodeChats();
+    }, 0);
+  }, [synapseApiBase, hydrateBoardNodeChats]);
 
   useEffect(() => {
     void reloadRooms();
@@ -2854,6 +3069,20 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
     }, LIST_AUTO_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [dialogOpen, synapseApiBase, reloadRooms]);
+
+  useEffect(() => {
+    if (dialogOpen) return;
+    const base = (synapseApiBase || '').trim();
+    if (!base || rooms.length === 0) return;
+
+    void pollBoardLive();
+    void hydrateBoardNodeChats();
+
+    const timer = window.setInterval(() => {
+      void pollBoardLive();
+    }, LIST_LIVE_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [dialogOpen, synapseApiBase, rooms.length, pollBoardLive, hydrateBoardNodeChats]);
 
   useEffect(() => {
     if (!dialogOpen || !activeRoom?.id) return;
@@ -3149,7 +3378,6 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
                 <RoomCard
                   key={meetingRoomScopeKey(room)}
                   room={room}
-                  rosterAgents={rosterForRoom(room)}
                   onClick={handleOpenRoom}
                 />
               ))}
