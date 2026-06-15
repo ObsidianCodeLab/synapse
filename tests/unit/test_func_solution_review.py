@@ -439,6 +439,53 @@ def test_sanitize_mermaid_diagrams_inplace_reports_change():
     assert sanitize_mermaid_diagrams(diagrams) is False
 
 
+def test_normalize_overview_accepts_type_and_content_aliases(tmp_path, monkeypatch):
+    """LLM 实际产出用 type/content 承载图类型与 mermaid 源，须被兼容而非丢弃。"""
+    scope_id = "fs-alias-1"
+    archive, patch = _archive_paths(tmp_path, scope_id)
+    archive.mkdir(parents=True)
+    patch(monkeypatch)
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    real_shape = {
+        "schema_version": "1",
+        "requirement_name": "定时备份",
+        "overview": {
+            "architecture_summary": "本需求在 mdbRep 进程内部新增定时备份能力，主链路复用既有同步通道。",
+            "diagrams": [
+                {"id": "diagram_1", "type": "flowchart", "title": "主流程", "content": VALID_FLOWCHART},
+                {"id": "diagram_2", "type": "sequenceDiagram", "title": "时序", "content": VALID_SEQUENCE},
+            ],
+        },
+        "consistency_analysis": {"summary": "无悖论", "contradiction_checks": []},
+        "transformation_plans": [
+            {
+                "id": "plan-1",
+                "module_name": "M-A",
+                "title": "配置加载",
+                "design_rationale": "复用既有解析",
+                "design_evidence": ["code/Config.cpp"],
+                "expected_effect": "可解析 BackupInfo",
+                "content_markdown": "**模块概要**\n说明",
+                "human_review": {"status": "pending", "comment": ""},
+            }
+        ],
+        "human_review": {"status": "pending", "comment": ""},
+    }
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(real_shape, ensure_ascii=False), encoding="utf-8"
+    )
+
+    payload = load_func_solution_review_payload(scope_id)
+    diagrams = payload["overview"]["diagrams"]
+    assert len(diagrams) == 2
+    assert diagrams[0]["mermaid"].startswith("flowchart")
+    assert diagrams[0]["kind"] == "flowchart"
+    assert diagrams[1]["kind"] == "sequenceDiagram"
+
+    ok, errors = validate_func_solution_review_json(scope_id)
+    assert ok, errors
+
+
 def test_autoheal_retries_on_structure_error(tmp_path, monkeypatch):
     """缺图等结构错误应触发主控重跑一次，而非直接抛给用户。"""
     import asyncio

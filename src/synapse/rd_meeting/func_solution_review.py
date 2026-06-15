@@ -414,14 +414,24 @@ def _normalize_overview(raw: Any) -> dict[str, Any]:
     for i, d in enumerate(diagrams):
         if not isinstance(d, dict):
             continue
-        mermaid = str(d.get("mermaid") or d.get("source") or "").strip()
+        # LLM 实际产出常用 content/code/diagram/definition 等别名承载 mermaid 源，
+        # type 承载图类型；此处统一兼容，避免有效图被静默丢弃导致「至少 2 张」误判。
+        mermaid = str(
+            d.get("mermaid")
+            or d.get("source")
+            or d.get("content")
+            or d.get("code")
+            or d.get("diagram")
+            or d.get("definition")
+            or ""
+        ).strip()
         if not mermaid:
             continue
         norm_diagrams.append(
             {
                 "id": str(d.get("id") or f"diagram-{i + 1}").strip(),
                 "title": str(d.get("title") or f"图 {i + 1}").strip(),
-                "kind": str(d.get("kind") or "flowchart").strip(),
+                "kind": str(d.get("kind") or d.get("type") or "flowchart").strip(),
                 "mermaid": mermaid,
             }
         )
