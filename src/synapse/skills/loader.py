@@ -7,11 +7,13 @@
 
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from ..core.log_health import record_health_event
 from .categories import (
@@ -41,6 +43,42 @@ class SkillLoadIssue:
             "path": self.path,
             "error": self.error,
         }
+
+
+def normalize_script_args(args: Any) -> tuple[list[str], str | None]:
+    """Normalize ``run_skill_script`` argv to a list of strings.
+
+    LLMs sometimes pass a shell-style string instead of a JSON string array;
+    split with :func:`shlex.split` when the value is a single string.
+    """
+    if args is None:
+        return [], None
+    if isinstance(args, str):
+        text = args.strip()
+        if not text:
+            return [], None
+        try:
+            return shlex.split(text, posix=(sys.platform != "win32")), None
+        except ValueError as exc:
+            return [], f"无法解析 args 字符串: {exc}"
+    if isinstance(args, list):
+        if not args:
+            return [], None
+        out: list[str] = []
+        for index, item in enumerate(args):
+            if isinstance(item, str):
+                out.append(item)
+            elif item is None:
+                out.append("")
+            elif isinstance(item, (int, float, bool)):
+                out.append(str(item))
+            else:
+                return [], f"args[{index}] 必须是字符串，实际为 {type(item).__name__}"
+        return out, None
+    return [], (
+        f"args 必须是字符串数组或单个命令行字符串，实际为 {type(args).__name__}。"
+        '示例: args=["--server_url", "http://host:10001", "--limit", "10"]'
+    )
 
 
 def _resolve_user_workspace_skills() -> Path:
@@ -780,7 +818,7 @@ class SkillLoader:
         self,
         name: str,
         script_name: str,
-        args: list[str] | None = None,
+        args: list[str] | str | None = None,
         cwd: Path | None = None,
         python_executable: str | None = None,
         env: dict[str, str] | None = None,
@@ -821,7 +859,16 @@ class SkillLoader:
                 )
 
         # 确定如何运行脚本
-        args = args or []
+        raw_args = args
+        args, args_err = normalize_script_args(args)
+        if args_err:
+            return False, args_err
+        if isinstance(raw_args, str):
+            logger.info(
+                "run_script: coerced string args to argv list for %s/%s",
+                name,
+                script_name,
+            )
 
         if script_path.suffix == ".py":
             # Prefer the caller-provided managed env. Fall back to the legacy

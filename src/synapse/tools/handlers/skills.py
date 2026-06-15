@@ -444,9 +444,17 @@ class SkillsHandler:
 
     def _run_skill_script(self, params: dict) -> str:
         """运行技能脚本"""
+        from ...skills.loader import normalize_script_args
+
         skill_name = params["skill_name"]
         script_name = params["script_name"]
-        args = params.get("args", [])
+        args, args_err = normalize_script_args(params.get("args", []))
+        if args_err:
+            return (
+                f"❌ 参数 args 格式错误: {args_err}\n\n"
+                "**正确用法**: `args` 必须是字符串数组，每个 flag/值单独一项，例如：\n"
+                '`args=["--server_url", "http://host:10001", "--limit", "10"]`'
+            )
         cwd_raw = params.get("cwd")
 
         resolved_cwd: Path | None = None

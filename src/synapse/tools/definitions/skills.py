@@ -118,7 +118,11 @@ SKILLS_TOOLS = [
             "properties": {
                 "skill_name": {"type": "string", "description": "技能名称"},
                 "script_name": {"type": "string", "description": "脚本文件名（如 get_time.py）"},
-                "args": {"type": "array", "items": {"type": "string"}, "description": "命令行参数"},
+                "args": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "命令行参数（推荐字符串数组；若误传为整条 shell 字符串，平台会自动 split）",
+                },
                 "cwd": {
                     "type": "string",
                     "description": "脚本执行的工作目录（可选，默认为技能目录。处理用户文件时建议传入文件所在目录）",

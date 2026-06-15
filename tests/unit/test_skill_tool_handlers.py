@@ -159,6 +159,55 @@ class TestSkillsHandlerLoad:
 
 
 class TestSkillsHandlerRunScriptDiagnostics:
+    def test_invalid_args_type_returns_friendly_error(self):
+        from synapse.tools.handlers.skills import SkillsHandler
+
+        handler = SkillsHandler(_make_agent_for_skills_handler())
+        out = handler._run_skill_script(
+            {
+                "skill_name": "whalecloud-dev-tool-base-scripts",
+                "script_name": "hybrid_query.py",
+                "args": {"query": "bad"},
+            }
+        )
+
+        assert "参数 args 格式错误" in out
+        assert "字符串数组" in out
+        handler.agent.skill_loader.run_script.assert_not_called()
+
+    def test_string_args_are_passed_through_to_loader(self):
+        from synapse.tools.handlers.skills import SkillsHandler
+
+        agent = _make_agent_for_skills_handler()
+        agent.skill_loader.run_script.return_value = (True, "ok")
+        handler = SkillsHandler(agent)
+        raw_args = (
+            "--server_url http://10.128.128.81:10001 --prod 分布式内存数据库 "
+            "--query MDB --limit 5"
+        )
+
+        out = handler._run_skill_script(
+            {
+                "skill_name": "whalecloud-dev-tool-base-scripts",
+                "script_name": "hybrid_query.py",
+                "args": raw_args,
+            }
+        )
+
+        assert out.startswith("✅")
+        agent.skill_loader.run_script.assert_called_once()
+        passed_args = agent.skill_loader.run_script.call_args.args[2]
+        assert passed_args == [
+            "--server_url",
+            "http://10.128.128.81:10001",
+            "--prod",
+            "分布式内存数据库",
+            "--query",
+            "MDB",
+            "--limit",
+            "5",
+        ]
+
     def test_missing_module_hint_points_to_skill_dir(self, tmp_path, monkeypatch):
         from synapse.config import settings as real_settings
         from synapse.tools.handlers.skills import SkillsHandler

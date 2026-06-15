@@ -106,6 +106,46 @@ class TestSkillLoader:
         assert "ok-from-skill-dir" in output
 
 
+class TestNormalizeScriptArgs:
+    def test_splits_shell_style_string(self):
+        from synapse.skills.loader import normalize_script_args
+
+        argv, err = normalize_script_args(
+            "--validate-only C:\\work\\21881451\\.tmp\\function_solution_context.json"
+        )
+
+        assert err is None
+        assert argv == [
+            "--validate-only",
+            "C:\\work\\21881451\\.tmp\\function_solution_context.json",
+        ]
+
+    def test_preserves_string_list(self):
+        from synapse.skills.loader import normalize_script_args
+
+        argv, err = normalize_script_args(["--limit", "10"])
+
+        assert err is None
+        assert argv == ["--limit", "10"]
+
+    def test_rejects_non_scalar_list_items(self):
+        from synapse.skills.loader import normalize_script_args
+
+        argv, err = normalize_script_args(["--limit", {"bad": True}])
+
+        assert argv == []
+        assert err is not None
+        assert "args[1]" in err
+
+    def test_coerces_numeric_list_items(self):
+        from synapse.skills.loader import normalize_script_args
+
+        argv, err = normalize_script_args(["--limit", 10])
+
+        assert err is None
+        assert argv == ["--limit", "10"]
+
+
 class TestSkillParser:
     def test_parse_skill_file(self, tmp_path):
         from synapse.skills.parser import parse_skill
