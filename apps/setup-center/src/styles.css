@@ -6738,6 +6738,14 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   box-shadow: none !important;
 }
 
+/* 任务执行 inline diff：隐藏原稿侧行号列，只保留改后行号（Monaco 默认双列） */
+.rd-task-exec-diff-inline .monaco-diff-editor .editor.original .margin-view-overlays {
+  display: none !important;
+}
+.rd-task-exec-diff-inline .monaco-diff-editor .editor.original .glyph-margin {
+  display: none !important;
+}
+
 /* 任务执行代码差异：单窗 inline diff，暗红删 / 淡绿增（辅助 CSS，主题色为主） */
 .rd-task-exec-diff-inline .monaco-diff-editor .line-delete,
 .rd-task-exec-diff-inline .monaco-diff-editor .char-delete,

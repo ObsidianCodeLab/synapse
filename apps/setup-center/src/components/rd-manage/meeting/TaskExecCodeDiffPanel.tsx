@@ -349,8 +349,15 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                       diffUpdateDisposableRef.current?.dispose?.();
 
                       const noWrap = { readOnly: true, wordWrap: 'off' as const };
-                      diffEditor.getOriginalEditor?.()?.updateOptions?.(noWrap);
-                      diffEditor.getModifiedEditor?.()?.updateOptions?.(noWrap);
+                      // inline diff 默认双列行号（原稿 / 改后）；评审只看改后文件，隐藏原稿行号
+                      diffEditor.getOriginalEditor?.()?.updateOptions?.({
+                        ...noWrap,
+                        lineNumbers: 'off',
+                      });
+                      diffEditor.getModifiedEditor?.()?.updateOptions?.({
+                        ...noWrap,
+                        lineNumbers: 'on',
+                      });
 
                       diffUpdateDisposableRef.current = bindDiffCenterScroll(diffEditor) ?? null;
                     }}

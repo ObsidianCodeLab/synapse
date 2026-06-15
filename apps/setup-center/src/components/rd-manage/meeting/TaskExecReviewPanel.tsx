@@ -17,7 +17,7 @@ import {
   Sparkles,
   Target,
   Terminal,
-  XCircle,
+  Wrench,
 } from 'lucide-react';
 import {
   fetchTaskExec,
@@ -296,11 +296,11 @@ export function TaskExecReviewPanel({
     Boolean(payload) &&
     String(payload?.status || '').toLowerCase() !== 'running';
 
-  const onDecision = async (decision: 'approve' | 'reject') => {
+  const onDecision = async (decision: 'approve') => {
     setSubmitting(true);
     try {
       await submitTaskExecDecision(synapseApiBase, roomId, { decision, comment });
-      message.success(decision === 'approve' ? '已通过，流程将推进' : '已驳回');
+      message.success('已通过，流程将推进');
       onDecided?.();
     } catch (e) {
       message.error(e instanceof Error ? e.message : '提交失败');
@@ -308,6 +308,27 @@ export function TaskExecReviewPanel({
       setSubmitting(false);
     }
   };
+
+  const onOptimize = async () => {
+    const text = comment.trim();
+    if (!text) {
+      message.warning('请填写优化处理意见');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await reprocessMeetingRoom(synapseApiBase, roomId, 'task_exec', text);
+      message.success('已触发任务执行重处理，请稍候刷新结果');
+      onDecided?.();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '优化处理失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const optimizeDisabled = blocked || submitting || !comment.trim();
+  const canOptimize = Boolean(comment.trim()) && !blocked && !submitting;
 
   const agentInstallHint =
     (payload?.agent_cli && typeof payload.agent_cli === 'object'
@@ -489,7 +510,7 @@ export function TaskExecReviewPanel({
       ) : null}
 
       {blocked ? (
-        <Alert type="error" showIcon message="任务执行已被驳回，需人工介入后重新处理" />
+        <Alert type="error" showIcon message="任务执行流程异常阻断，请通过重处理或优化处理恢复" />
       ) : null}
 
       <div className="space-y-3">
@@ -518,24 +539,29 @@ export function TaskExecReviewPanel({
       <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-6">
         <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5">
           <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
-          评审意见（可选）
+          评审意见
         </label>
         <TextArea
           rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="补充对 CLI 执行结果的评价、风险说明或后续建议…"
+          placeholder="优化处理时必填：说明 CLI 执行结果的问题、需调整的方向或后续研发要求…"
           disabled={blocked || submitting}
         />
         <div className="flex flex-wrap gap-4 justify-end pt-3">
           <Button
-            danger
-            icon={<XCircle className="h-4 w-4" />}
+            type={canOptimize ? 'primary' : 'default'}
+            icon={<Wrench className="h-4 w-4" />}
             loading={submitting}
-            disabled={blocked}
-            onClick={() => void onDecision('reject')}
+            disabled={optimizeDisabled}
+            className={
+              canOptimize
+                ? '!bg-orange-600 !border-orange-600 !text-white shadow-none hover:!bg-orange-500 hover:!border-orange-500 focus:!bg-orange-600 active:!bg-orange-700'
+                : undefined
+            }
+            onClick={() => void onOptimize()}
           >
-            不通过
+            优化处理
           </Button>
           <Button
             type="primary"
