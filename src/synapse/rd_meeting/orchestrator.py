@@ -1589,6 +1589,73 @@ class MeetingRoomOrchestrator:
             **out,
         }
 
+    async def _autoheal_func_solution_review(
+        self,
+        *,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        host_run_fn: Any | None,
+        host_run_prompt: str,
+        host_run_profile_id: str,
+    ) -> None:
+        """func_solution 门控前自愈：清洗（在 validate 内）后仍校验失败，带 mermaid 修复指引重跑一次。
+
+        覆盖 ai_human 协同（enter_node_review_gate）与 human_confirm 两条进门路径，
+        放在所有门控分派之前，避免结构/语法校验错误被原样抛给用户问卷。
+        """
+        from synapse.rd_meeting.func_solution_review import (
+            uses_func_solution_gate,
+            validate_func_solution_review_json,
+        )
+
+        if not uses_func_solution_gate(node_id):
+            return
+        if host_run_fn is None or not host_run_prompt:
+            return
+        fs_ok, fs_errs = validate_func_solution_review_json(scope_id)
+        if fs_ok:
+            return
+        append_history_event(
+            scope_id,
+            {
+                "event": "host_retry",
+                "room_id": room_id,
+                "node_id": node_id,
+                "reason": "函数级方案评审产物校验未通过，自动重跑一次（注入校验错误与 Mermaid 修复指引）",
+                "errors": fs_errs,
+                "log_type": "warning",
+                "agent_id": host_run_profile_id,
+            },
+        )
+        retry_prompt = (
+            f"{host_run_prompt}\n\n"
+            "## ⚠️ 系统提示：函数级方案评审产物未通过校验\n"
+            "上一次产出的 `func_solution_review.json` / `函数级方案.md` 校验未通过，"
+            "具体错误如下，请逐条修复后**重新落盘双文件**（doc-generate 写 .md，write_file 写 .json）：\n"
+            f"{chr(10).join('- ' + e for e in fs_errs)}\n\n"
+            "**常见修复要点**：\n"
+            "- `overview.diagrams[]` 至少 2 张：flowchart + (graph 或 sequenceDiagram)，缺则补齐；\n"
+            "- 节点标签含 `{ } ( ) / \\`、空格或中文标点时，**必须**用双引号包裹，"
+            '如 `J[/bake/{iNo}]` 应写成 `J["/bake/{iNo}"]`；\n'
+            "- 每张图首行须为合法声明（flowchart / graph / sequenceDiagram 等）；\n"
+            "- 禁止空图或占位符（TODO / TBD / placeholder）；\n"
+            "- `architecture_summary` 不少于 20 字；每条 plan 须含 module_name / design_rationale / expected_effect。\n"
+            "修复后立即停止，不要重复总结。"
+        )
+        retry_result = await host_run_fn(retry_prompt)
+        append_history_event(
+            scope_id,
+            {
+                "event": "host_retry_end",
+                "room_id": room_id,
+                "node_id": node_id,
+                "success": bool(getattr(retry_result, "success", False)),
+                "log_type": "info",
+                "agent_id": host_run_profile_id,
+            },
+        )
+
     async def enter_node_review_gate(
         self,
         *,
@@ -2859,6 +2926,16 @@ class MeetingRoomOrchestrator:
             hitl_gate = extract_hitl_from_agent_output(report_body)
             report_body = hitl_gate.clean_body
 
+        # func_solution 门控前自愈：所有门控分派之前统一重试一次（覆盖 human_confirm 与 ai_human 协同两条路径）
+        await self._autoheal_func_solution_review(
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            host_run_fn=host_run_fn,
+            host_run_prompt=host_run_prompt,
+            host_run_profile_id=host_run_profile_id,
+        )
+
         if need_human_confirm:
             validation = validate_node_archive_artifacts(sid, stage_name, node_id)
             if not validation.ok:
@@ -2908,11 +2985,9 @@ class MeetingRoomOrchestrator:
 
             from synapse.rd_meeting.func_solution_review import (
                 uses_func_solution_gate,
-                validate_func_solution_review_json,
             )
             from synapse.rd_meeting.solution_review import (
                 uses_solution_review_gate,
-                validate_solution_review_json,
             )
 
             if uses_solution_review_gate(node_id):
@@ -2929,47 +3004,6 @@ class MeetingRoomOrchestrator:
                     skipped_nodes=skipped_nodes or None,
                 )
             if uses_func_solution_gate(node_id):
-                # 门控前自愈：清洗（在 validate 内）后仍校验失败，则带 mermaid 修复指引重跑一次
-                fs_ok, fs_errs = validate_func_solution_review_json(sid)
-                if not fs_ok and host_run_fn is not None and host_run_prompt:
-                    append_history_event(
-                        sid,
-                        {
-                            "event": "host_retry",
-                            "room_id": room_id,
-                            "node_id": node_id,
-                            "reason": "函数级方案评审产物校验未通过，自动重跑一次（注入校验错误与 Mermaid 修复指引）",
-                            "errors": fs_errs,
-                            "log_type": "warning",
-                            "agent_id": host_run_profile_id,
-                        },
-                    )
-                    retry_prompt = (
-                        f"{host_run_prompt}\n\n"
-                        "## ⚠️ 系统提示：函数级方案评审产物未通过校验\n"
-                        "上一次产出的 `func_solution_review.json` / `函数级方案.md` 校验未通过，"
-                        "具体错误如下，请逐条修复后**重新落盘双文件**（doc-generate 写 .md，write_file 写 .json）：\n"
-                        f"{chr(10).join('- ' + e for e in fs_errs)}\n\n"
-                        "**Mermaid 修复要点（高频错误）**：\n"
-                        "- 节点标签含 `{ } ( ) / \\`、空格或中文标点时，**必须**用双引号包裹，"
-                        '如 `J[/bake/{iNo}]` 应写成 `J["/bake/{iNo}"]`；\n'
-                        "- 首行须为合法声明（flowchart / graph / sequenceDiagram 等）；\n"
-                        "- 禁止空图或占位符（TODO / TBD / placeholder）；\n"
-                        "- 至少 2 张图：flowchart + (graph 或 sequenceDiagram)。\n"
-                        "修复后立即停止，不要重复总结。"
-                    )
-                    retry_result = await host_run_fn(retry_prompt)
-                    append_history_event(
-                        sid,
-                        {
-                            "event": "host_retry_end",
-                            "room_id": room_id,
-                            "node_id": node_id,
-                            "success": bool(getattr(retry_result, "success", False)),
-                            "log_type": "info",
-                            "agent_id": host_run_profile_id,
-                        },
-                    )
                 return await self.enter_func_solution_review_gate(
                     scope_type=scope_type,
                     scope_id=sid,

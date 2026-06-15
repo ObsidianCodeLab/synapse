@@ -439,6 +439,89 @@ def test_sanitize_mermaid_diagrams_inplace_reports_change():
     assert sanitize_mermaid_diagrams(diagrams) is False
 
 
+def test_autoheal_retries_on_structure_error(tmp_path, monkeypatch):
+    """缺图等结构错误应触发主控重跑一次，而非直接抛给用户。"""
+    import asyncio
+
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+
+    scope_id = "fs-autoheal-1"
+    archive, patch = _archive_paths(tmp_path, scope_id)
+    archive.mkdir(parents=True)
+    patch(monkeypatch)
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    only_one_diagram = json.loads(json.dumps(SAMPLE_REVIEW))
+    only_one_diagram["overview"]["diagrams"] = only_one_diagram["overview"]["diagrams"][:1]
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(only_one_diagram, ensure_ascii=False), encoding="utf-8"
+    )
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.append_history_event",
+        lambda *a, **k: None,
+    )
+    calls: list[str] = []
+
+    class _Res:
+        success = True
+
+    async def _fake_host(msg: str):
+        calls.append(msg)
+        return _Res()
+
+    orch = MeetingRoomOrchestrator()
+    asyncio.run(
+        orch._autoheal_func_solution_review(
+            scope_id=scope_id,
+            room_id="room-1",
+            node_id="func_solution",
+            host_run_fn=_fake_host,
+            host_run_prompt="原始提示",
+            host_run_profile_id="default",
+        )
+    )
+    assert len(calls) == 1
+    assert "至少 2 张" in calls[0]
+
+
+def test_autoheal_skips_when_valid(tmp_path, monkeypatch):
+    """校验通过时不应重跑。"""
+    import asyncio
+
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+
+    scope_id = "fs-autoheal-2"
+    archive, patch = _archive_paths(tmp_path, scope_id)
+    archive.mkdir(parents=True)
+    patch(monkeypatch)
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(SAMPLE_REVIEW, ensure_ascii=False), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.append_history_event",
+        lambda *a, **k: None,
+    )
+    calls: list[str] = []
+
+    async def _fake_host(msg: str):
+        calls.append(msg)
+        return None
+
+    orch = MeetingRoomOrchestrator()
+    asyncio.run(
+        orch._autoheal_func_solution_review(
+            scope_id=scope_id,
+            room_id="room-1",
+            node_id="func_solution",
+            host_run_fn=_fake_host,
+            host_run_prompt="原始提示",
+            host_run_profile_id="default",
+        )
+    )
+    assert calls == []
+
+
 def test_mermaid_syntax_gate_skips_when_mmdc_missing(monkeypatch):
     """无 mmdc 时降级跳过语法门控，不得当硬错误导致节点必挂。"""
     monkeypatch.setattr(
