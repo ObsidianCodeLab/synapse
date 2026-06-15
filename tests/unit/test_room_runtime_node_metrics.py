@@ -19,8 +19,10 @@ from synapse.rd_meeting.room_runtime import (
     default_room_state,
     ensure_metrics_token_budget,
     finalize_node_metrics,
+    freeze_node_carry_tokens,
     load_room_state,
     refresh_node_metrics,
+    reset_node_metrics_for_rerun,
     resolve_node_seconds,
     resolve_node_token_budget,
     save_room_state,
@@ -180,6 +182,88 @@ def test_refresh_node_metrics_writes_node_tokens() -> None:
     assert int(after["node_metrics"][node_id]["tokens"]) == 3000
     assert DEFAULT_TOKEN_BUDGET == 20_000_000
     assert DEFAULT_NODE_TOKEN_BUDGET == 3_000_000
+
+
+def test_refresh_node_metrics_includes_carry_baseline() -> None:
+    scope_id = "nm_refresh_carry"
+    node_id = "func_solution"
+    _write_activity(
+        scope_id,
+        node_id,
+        "default",
+        [{"seq": 1, "ts": "2026-06-05T10:01:00", "category": "llm_usage", "total_tokens": 800}],
+    )
+    rs = default_room_state(
+        room_id="room-refresh-carry",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=2,
+        current_node_id=node_id,
+    )
+    rs["node_metrics"] = {
+        node_id: {"carry_tokens": 5000, "tokens": 5000, "started_at": "2026-06-05T10:00:00"},
+    }
+    save_room_state(scope_id, rs)
+
+    tokens = refresh_node_metrics(scope_id, node_id)
+    assert tokens == 5800
+    after = load_room_state(scope_id)
+    assert after is not None
+    assert int(after["node_metrics"][node_id]["tokens"]) == 5800
+    assert int(after["node_metrics"][node_id]["carry_tokens"]) == 5000
+
+
+def test_reset_node_metrics_for_rerun_drops_zero_carry() -> None:
+    nm = reset_node_metrics_for_rerun(
+        {"req_clarify": {"tokens": 0}, "boundary": {"tokens": 1200}},
+        ["req_clarify", "boundary"],
+        now="2026-06-05T13:00:00",
+    )
+    assert "req_clarify" not in nm
+    assert nm["boundary"]["carry_tokens"] == 1200
+    assert nm["boundary"]["started_at"] == "2026-06-05T13:00:00"
+
+
+def test_freeze_then_reset_preserves_cumulative_tokens() -> None:
+    scope_id = "nm_freeze_reset"
+    node_id = "func_solution"
+    _write_activity(
+        scope_id,
+        node_id,
+        "default",
+        [{"seq": 1, "ts": "2026-06-05T10:01:00", "category": "llm_usage", "total_tokens": 1500}],
+    )
+    rs = default_room_state(
+        room_id="room-freeze",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=2,
+        current_node_id=node_id,
+    )
+    rs["node_metrics"] = {
+        node_id: {
+            "carry_tokens": 2000,
+            "tokens": 3500,
+            "started_at": "2026-06-05T09:00:00",
+            "completed_at": "2026-06-05T10:00:00",
+        },
+    }
+    save_room_state(scope_id, rs)
+
+    carry = freeze_node_carry_tokens(scope_id, node_id)
+    assert carry == 3500
+
+    after_freeze = load_room_state(scope_id)
+    assert after_freeze is not None
+    nm = reset_node_metrics_for_rerun(
+        after_freeze["node_metrics"],
+        [node_id],
+        now="2026-06-05T10:05:00",
+    )
+    entry = nm[node_id]
+    assert entry["carry_tokens"] == 3500
+    assert entry["tokens"] == 3500
+    assert "completed_at" not in entry
 
 
 def test_build_meeting_summary_nodes_prefers_activity_over_legacy_256() -> None:

@@ -8,6 +8,7 @@ from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path, sc
 from synapse.rd_meeting.pipeline import (
     clear_current_node_reprocess_artifacts,
     clear_room_state_for_node_reprocess,
+    clear_room_state_for_revision_resume,
 )
 from synapse.rd_sop.nodes import stage_name_for_id
 
@@ -96,7 +97,10 @@ def test_clear_room_state_for_node_reprocess(monkeypatch):
     assert rs["status"] == "processing"
     assert rs["phase"] == "running"
     assert "host_prompt_cache" not in rs
-    assert node_id not in rs.get("node_metrics", {})
+    nm_entry = rs.get("node_metrics", {}).get(node_id, {})
+    assert nm_entry.get("carry_tokens") == 99
+    assert nm_entry.get("tokens") == 99
+    assert "completed_at" not in nm_entry
     assert "other" in rs.get("node_metrics", {})
     assert "participants" not in rs
     assert "stopped_at" not in rs
@@ -128,6 +132,76 @@ def test_clear_room_state_for_node_reprocess_keeps_other_node_work_plan(monkeypa
     clear_room_state_for_node_reprocess(scope, node_id)
 
     assert store[scope]["current_work_plan"] == other_plan
+
+
+def test_clear_room_state_for_node_reprocess_preserves_frozen_carry(monkeypatch):
+    store: dict[str, dict] = {}
+
+    def _load(sid: str):
+        return dict(store.get(sid, {}))
+
+    def _save(sid: str, rs: dict):
+        store[sid] = dict(rs)
+
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.save_room_state", _save)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.save_room_state", _save)
+
+    scope = "rs-carry"
+    node_id = "func_solution"
+    store[scope] = {
+        "node_metrics": {
+            node_id: {
+                "carry_tokens": 5000,
+                "tokens": 5000,
+                "started_at": "2026-06-05T10:00:00",
+                "completed_at": "2026-06-05T11:00:00",
+                "seconds": 3600,
+            }
+        },
+        "metrics": {"tokens": 5000},
+    }
+
+    clear_room_state_for_node_reprocess(scope, node_id)
+
+    entry = store[scope]["node_metrics"][node_id]
+    assert entry["carry_tokens"] == 5000
+    assert entry["tokens"] == 5000
+    assert "completed_at" not in entry
+    assert "seconds" not in entry
+    assert store[scope]["metrics"]["tokens"] == 5000
+
+
+def test_clear_room_state_for_revision_resume_preserves_carry(monkeypatch):
+    store: dict[str, dict] = {}
+
+    def _load(sid: str):
+        return dict(store.get(sid, {}))
+
+    def _save(sid: str, rs: dict):
+        store[sid] = dict(rs)
+
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.pipeline.save_room_state", _save)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.load_room_state", _load)
+    monkeypatch.setattr("synapse.rd_meeting.host_prompt_cache.save_room_state", _save)
+
+    scope = "rs-rev-carry"
+    node_id = "func_solution"
+    store[scope] = {
+        "node_metrics": {
+            node_id: {"carry_tokens": 3200, "tokens": 3200, "completed_at": "2026-06-05T12:00:00"},
+        },
+        "metrics": {"tokens": 3200},
+    }
+
+    clear_room_state_for_revision_resume(scope, node_id)
+
+    entry = store[scope]["node_metrics"][node_id]
+    assert entry["carry_tokens"] == 3200
+    assert entry["tokens"] == 3200
+    assert "completed_at" not in entry
 
 
 def test_clear_meeting_todo_sessions_on_reprocess(monkeypatch):

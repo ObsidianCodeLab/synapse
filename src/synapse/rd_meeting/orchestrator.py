@@ -369,9 +369,11 @@ class MeetingRoomOrchestrator:
             str(binding.get("host_llm_endpoint_key") or DEFAULT_LLM_ENDPOINT_KEY)
             if role == "host"
             else str(binding.get("worker_llm_endpoint_key") or DEFAULT_LLM_ENDPOINT_KEY)
-        )
-        if endpoint_key:
+        ).strip() or DEFAULT_LLM_ENDPOINT_KEY
+        if endpoint_key != DEFAULT_LLM_ENDPOINT_KEY:
             agent._preferred_endpoint = endpoint_key
+        else:
+            agent._preferred_endpoint = None
 
         ctx = make_context(
             role=role,  # type: ignore[arg-type]

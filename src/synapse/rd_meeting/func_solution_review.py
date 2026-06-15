@@ -654,7 +654,37 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
         )
         if overview_sec:
             out["overview"]["architecture_summary"] = overview_sec[:2000]
+    # 增量修订：marked plan 的 content_markdown 以 MD §1.7.N 为唯一真相源强制回灌，
+    # 消灭「JSON 面板旧正文 + MD §1.7 已改」两套并存（--patch-modules 已保证 §1.7 正确）。
+    _backfill_marked_plans_from_md(scope_id, out, md_plans)
     return out
+
+
+def _backfill_marked_plans_from_md(
+    scope_id: str,
+    payload: dict[str, Any],
+    md_plans: list[dict[str, Any]],
+) -> None:
+    """修订模式下，用 MD §1.7.N 正文强制覆盖 marked plan 的 content_markdown。"""
+    if not has_revision_context(scope_id) or not md_plans:
+        return
+    ctx = load_revision_context(scope_id)
+    if not isinstance(ctx, dict):
+        return
+    to_revise = ctx.get("plans_to_revise")
+    if not isinstance(to_revise, list) or not to_revise:
+        return
+    marked_ids = {str(r.get("id") or "").strip() for r in to_revise if isinstance(r, dict)}
+    md_by_key = {_plan_match_key(p): p for p in md_plans if _plan_match_key(p)}
+    for plan in payload.get("transformation_plans") or []:
+        if not isinstance(plan, dict):
+            continue
+        if str(plan.get("id") or "").strip() not in marked_ids:
+            continue
+        src = md_by_key.get(_plan_match_key(plan))
+        body = str((src or {}).get("content_markdown") or "").strip()
+        if body and _content_markdown_is_structured(body):
+            plan["content_markdown"] = src["content_markdown"]
 
 
 def load_func_solution_review_payload(scope_id: str) -> dict[str, Any] | None:
@@ -1012,6 +1042,46 @@ def validate_revision_frozen_plans(
         if _plan_content_snapshot(cur) != snap:
             errors.append(
                 f"已冻结方案 `{pid}` {title} 的内容被改动，本次仅允许修订 plans_to_revise 中的方案，请还原"
+            )
+    # 闸 3b：待修订（marked）方案的修订质量校验——确保改干净、与评审意见对齐。
+    errors.extend(_validate_marked_plans_revised(ctx, by_id))
+    return errors
+
+
+# 「增量修订要点 / 修订要点」类附录标记：禁止在已修订正文里叠一层 diff 说明而保留旧正文。
+_REVISION_APPENDIX_RE = re.compile(r"(?:增量)?修订要点|修订说明|本次修订|revision\s*note", re.IGNORECASE)
+
+
+def _validate_marked_plans_revised(
+    ctx: dict[str, Any],
+    by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    """闸 3b：plans_to_revise 必须改干净——状态已流转、无「修订要点」附录。"""
+    to_revise = ctx.get("plans_to_revise")
+    if not isinstance(to_revise, list) or not to_revise:
+        return []
+    errors: list[str] = []
+    for row in to_revise:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("id") or "").strip()
+        title = str(row.get("title") or row.get("module_name") or pid).strip()
+        if not pid:
+            continue
+        cur = by_id.get(pid)
+        if cur is None:
+            errors.append(f"待修订方案 `{pid}` {title} 缺失，必须在 func_solution_review.json 中保留并改干净")
+            continue
+        status = str((cur.get("human_review") or {}).get("status") or "").strip().lower()
+        if status == "needs_change":
+            errors.append(
+                f"待修订方案 `{pid}` {title} 的 `human_review.status` 仍为 needs_change，修订后须重置为 pending"
+            )
+        body = str(cur.get("content_markdown") or "")
+        if _REVISION_APPENDIX_RE.search(body):
+            errors.append(
+                f"待修订方案 `{pid}` {title} 含「修订要点」类附录：必须整段重写 content_markdown，"
+                "禁止保留旧正文再追加 diff 说明"
             )
     return errors
 

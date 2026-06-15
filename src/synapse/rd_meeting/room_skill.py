@@ -809,6 +809,11 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
         "再读 `func_solution_review.json` 与 `函数级方案.md`。",
         "- **仅改 marked**：只修订 `plans_to_revise` 中列出的 plan id；"
         "`approved_plans` 中条目内容与评审状态**禁止改动**。",
+        "- **改干净（强约束）**：被修订的 plan 必须**整段重写** `content_markdown`，"
+        "并同步改写 `title`/`design_rationale`/`design_evidence`/`expected_effect`；"
+        "**严禁**保留旧正文再追加「增量修订要点 / 修订说明」之类的附录段——同一方案禁止两套说法并存。",
+        "- **遵从评审意见**：修订后的全部字段必须与对应评审意见一致；"
+        "评审已否定的设计/通道/命名（见各条 comment）**不得**再出现在 `title`/`design_rationale`/`content_markdown` 中。",
     ]
     overall = str(ctx.get("overall_comment") or "").strip()
     if overall:
@@ -860,6 +865,14 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
     lines.append(
         "  其中 `CONTEXT_JSON.modules` 只需包含上述待修订模块；脚本只会替换命中的 §1.7.N 小节，"
         "其余章节字节级保留。`approved_plans` 对应模块严禁出现在 `--patch-modules` 参数中。"
+    )
+    lines.append(
+        "- **JSON 与 §1.7 一致**：marked plan 的 `content_markdown` 必须与 patch 后的 §1.7.N 小节**完全一致**"
+        "（系统会以 §1.7.N 为准回灌核对，不一致或残留「修订要点」附录会被门控打回）。"
+    )
+    lines.append(
+        "- **跨模块联动提醒**：若本次修订改变了跨模块调用/数据流/接口契约，必须一并更新受影响的"
+        "§1.6 数据设计、§1.8 跨模块交互、`overview.architecture_summary` 与 Mermaid 图，避免全局留旧表述。"
     )
     return "\n".join(lines)
 

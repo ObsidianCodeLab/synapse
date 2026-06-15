@@ -39,7 +39,9 @@ from synapse.rd_meeting.room_runtime import (
     append_history_event,
     load_room_state,
     read_json_file,
+    reset_node_metrics_for_rerun,
     save_room_state,
+    sync_metrics_tokens_from_node_metrics,
     sync_room_state_from_dev,
     save_meeting_pipeline,
     write_json_file,
@@ -1151,11 +1153,9 @@ def clear_room_state_for_node_reprocess(
             rs.pop("current_work_plan", None)
 
     node_metrics = rs.get("node_metrics")
-    if isinstance(node_metrics, dict):
-        nm = dict(node_metrics)
-        for mid in metric_ids:
-            nm.pop(mid, None)
-        rs["node_metrics"] = nm
+    if isinstance(node_metrics, dict) and metric_ids:
+        rs["node_metrics"] = reset_node_metrics_for_rerun(node_metrics, metric_ids)
+    sync_metrics_tokens_from_node_metrics(rs, sid)
 
     save_room_state(sid, rs)
     return rs
@@ -1206,9 +1206,8 @@ def clear_room_state_for_revision_resume(
 
     node_metrics = rs.get("node_metrics")
     if isinstance(node_metrics, dict) and nid:
-        nm = dict(node_metrics)
-        nm.pop(nid, None)
-        rs["node_metrics"] = nm
+        rs["node_metrics"] = reset_node_metrics_for_rerun(node_metrics, [nid])
+    sync_metrics_tokens_from_node_metrics(rs, sid)
 
     save_room_state(sid, rs)
     return rs

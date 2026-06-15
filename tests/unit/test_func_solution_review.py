@@ -20,6 +20,7 @@ from synapse.rd_meeting.func_solution_review import (
     revision_context_path,
     save_plan_reviews,
     validate_func_solution_review_json,
+    validate_revision_frozen_plans,
     write_revision_context,
     _parse_plans_from_markdown,
     _validate_func_solution_payload,
@@ -705,3 +706,92 @@ def test_write_and_clear_revision_context(tmp_path, monkeypatch):
     assert loaded["plans_to_revise"][0]["comment"] == "改接口"
     clear_revision_context(scope_id)
     assert not has_revision_context(scope_id)
+
+
+def _build_two_plan_review() -> dict:
+    review = json.loads(json.dumps(SAMPLE_REVIEW))
+    p1 = review["transformation_plans"][0]
+    p1["human_review"] = {"status": "needs_change", "comment": "改接口"}
+    p2 = json.loads(json.dumps(p1))
+    p2.update(
+        {
+            "id": "plan-2",
+            "module_name": "通知模块",
+            "title": "通知改造",
+            "design_rationale": "扩展 Notifier",
+            "expected_effect": "支持多渠道",
+            "content_markdown": "原始已通过内容",
+            "human_review": {"status": "approved", "comment": "ok"},
+        }
+    )
+    review["transformation_plans"].append(p2)
+    return review
+
+
+def test_revision_frozen_plans_pass_and_fail(tmp_path, monkeypatch):
+    scope_id = "fs-frozen"
+    _, patch = _archive_paths(tmp_path, scope_id)
+    patch(monkeypatch)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "rev.json",
+    )
+    review = _build_two_plan_review()
+    # 冻结 plan-2（approved），待修订 plan-1
+    write_revision_context(scope_id, review, "请修订")
+    assert has_revision_context(scope_id)
+
+    # approved 内容未变、marked plan 已流转为 pending → 校验通过
+    passing = json.loads(json.dumps(review))
+    passing["transformation_plans"][0]["human_review"]["status"] = "pending"
+    assert validate_revision_frozen_plans(scope_id, passing) == []
+
+    # 篡改 approved plan-2 内容 → 校验报错
+    tampered = json.loads(json.dumps(passing))
+    tampered["transformation_plans"][1]["content_markdown"] = "被偷偷改掉的内容"
+    errs = validate_revision_frozen_plans(scope_id, tampered)
+    assert errs and any("plan-2" in e for e in errs)
+
+    # 把 approved 状态改掉 → 校验报错
+    status_changed = json.loads(json.dumps(passing))
+    status_changed["transformation_plans"][1]["human_review"]["status"] = "needs_change"
+    errs2 = validate_revision_frozen_plans(scope_id, status_changed)
+    assert errs2 and any("plan-2" in e for e in errs2)
+
+
+def test_revision_frozen_plans_noop_without_context(tmp_path, monkeypatch):
+    scope_id = "fs-frozen-none"
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "rev.json",
+    )
+    # 无 revision_context（非修订模式）→ 不约束
+    assert validate_revision_frozen_plans(scope_id, _build_two_plan_review()) == []
+
+
+def test_revision_marked_plan_quality_checks(tmp_path, monkeypatch):
+    scope_id = "fs-marked"
+    _, patch = _archive_paths(tmp_path, scope_id)
+    patch(monkeypatch)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "rev.json",
+    )
+    review = _build_two_plan_review()  # plan-1 needs_change, plan-2 approved
+    write_revision_context(scope_id, review, "请修订")
+
+    # marked plan 状态仍是 needs_change → 报错
+    not_flowed = json.loads(json.dumps(review))
+    errs = validate_revision_frozen_plans(scope_id, not_flowed)
+    assert any("plan-1" in e and "needs_change" in e for e in errs)
+
+    # marked plan 流转为 pending 且无附录 → 通过
+    clean = json.loads(json.dumps(review))
+    clean["transformation_plans"][0]["human_review"]["status"] = "pending"
+    assert validate_revision_frozen_plans(scope_id, clean) == []
+
+    # marked plan 残留「增量修订要点」附录 → 报错
+    appendix = json.loads(json.dumps(clean))
+    appendix["transformation_plans"][0]["content_markdown"] += "\n\n**增量修订要点（plan-1）**：改了X"
+    errs2 = validate_revision_frozen_plans(scope_id, appendix)
+    assert any("plan-1" in e and "附录" in e for e in errs2)

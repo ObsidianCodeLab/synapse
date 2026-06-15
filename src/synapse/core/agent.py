@@ -3615,6 +3615,33 @@ class Agent:
         except Exception as exc:
             logger.debug("[ModelSwitch] Failed to persist effective model metadata: %s", exc)
 
+    def _apply_preferred_endpoint_for_execute_task(
+        self,
+        *,
+        conversation_id: str,
+        session_id: str | None,
+    ) -> None:
+        """Apply ``_preferred_endpoint`` before ``execute_task`` LLM calls (chat parity).
+
+        Meeting-room host runs through ``execute_task_from_message`` rather than
+        ``chat_with_session``; without this hook, ``host_llm_endpoint_key`` is stored
+        on the Agent but never forwarded to ``LLMClient.switch_model``.
+        """
+        endpoint = (self._preferred_endpoint or "").strip()
+        if not endpoint or endpoint == "default":
+            return
+        policy = (getattr(self, "_endpoint_policy", None) or "prefer").strip().lower()
+        if policy not in {"prefer", "require"}:
+            policy = "prefer"
+        self._apply_endpoint_override_for_turn(
+            endpoint_override=endpoint,
+            endpoint_policy=policy,
+            session=getattr(self, "_current_session", None),
+            conversation_id=conversation_id,
+            session_id=session_id,
+            reason=f"execute_task endpoint preference: {endpoint}",
+        )
+
     def _apply_endpoint_override_for_turn(
         self,
         *,
@@ -9337,6 +9364,12 @@ class Agent:
         if not self._initialized:
             await self.initialize()
 
+        conversation_id = task.session_id or f"task:{task.id}"
+        self._apply_preferred_endpoint_for_execute_task(
+            conversation_id=conversation_id,
+            session_id=task.session_id,
+        )
+
         logger.info(f"Executing task: {task.description}")
 
         # === 创建任务监控器 ===
@@ -9393,7 +9426,6 @@ class Agent:
         final_response = ""
         has_executed_tools = False
         current_model = self.brain.model
-        conversation_id = task.session_id or f"task:{task.id}"
 
         def _resolve_endpoint_name(model_or_endpoint: str) -> str | None:
             """将 'endpoint_name' 或 'model' 解析为 endpoint_name（任务循环专用，最小兼容）。"""

@@ -135,6 +135,38 @@ def freeze_node_carry_tokens(scope_id: str, node_id: str) -> int:
     return carry
 
 
+def reset_node_metrics_for_rerun(
+    node_metrics: dict[str, Any],
+    node_ids: list[str],
+    *,
+    now: str | None = None,
+) -> dict[str, Any]:
+    """重处理/增量修订清理 room_state 时：丢弃进行中字段，保留 ``carry_tokens`` 基线。
+
+    ``freeze_node_carry_tokens`` 在删 agents 目录前写入基线；本函数避免随后 ``pop`` 整段
+    ``node_metrics[node_id]`` 导致 token 统计归零。
+    """
+    nm = dict(node_metrics)
+    ts = now or _now_iso()
+    for raw_id in node_ids:
+        nid = str(raw_id or "").strip()
+        if not nid:
+            continue
+        prev = nm.get(nid) if isinstance(nm.get(nid), dict) else {}
+        carry = max(int(prev.get("carry_tokens") or 0), 0)
+        if carry <= 0:
+            carry = archived_node_tokens(prev)
+        if carry <= 0:
+            nm.pop(nid, None)
+            continue
+        nm[nid] = {
+            "carry_tokens": carry,
+            "tokens": carry,
+            "started_at": ts,
+        }
+    return nm
+
+
 def archived_node_tokens(nm: dict[str, Any]) -> int:
     """节点归档 token（``node_metrics[node_id].tokens``，剔除历史占位值）。"""
     raw = int(nm.get("tokens") or 0)
@@ -311,12 +343,16 @@ def refresh_node_metrics(
     if not is_processing:
         return archived_node_tokens(entry)
 
+    carry = max(int(entry.get("carry_tokens") or 0), 0)
     live_tokens = aggregate_node_activity_tokens(sid, nid)
-    tokens = live_tokens if live_tokens > 0 else archived_node_tokens(entry)
+    combined = carry + live_tokens
+    tokens = combined if combined > 0 else archived_node_tokens(entry)
 
     payload = dict(rs)
     nm = dict(nm)
     entry["tokens"] = tokens
+    if carry > 0:
+        entry["carry_tokens"] = carry
     if not entry.get("started_at") and tokens > 0:
         entry["started_at"] = _now_iso()
     nm[nid] = entry
