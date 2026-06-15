@@ -14,14 +14,13 @@ def _minimal_agent() -> Agent:
     agent = Agent.__new__(Agent)
     object.__setattr__(agent, "_preferred_endpoint", None)
     object.__setattr__(agent, "_endpoint_policy", "prefer")
-    object.__setattr__(agent, "_current_session", None)
     agent._apply_endpoint_override_for_turn = MagicMock(return_value={})
     return agent
 
 
 def test_apply_preferred_endpoint_for_execute_task_skips_default():
     agent = _minimal_agent()
-    agent._preferred_endpoint = "default"
+    object.__setattr__(agent, "_preferred_endpoint", "default")
 
     agent._apply_preferred_endpoint_for_execute_task(
         conversation_id="rd_meeting:room-1:host",
@@ -33,8 +32,8 @@ def test_apply_preferred_endpoint_for_execute_task_skips_default():
 
 def test_apply_preferred_endpoint_for_execute_task_applies_named_endpoint():
     agent = _minimal_agent()
-    agent._preferred_endpoint = "iwhalecloud-LOCAL-MiniMax-M2.7主"
-    agent._endpoint_policy = "require"
+    object.__setattr__(agent, "_preferred_endpoint", "iwhalecloud-LOCAL-MiniMax-M2.7主")
+    object.__setattr__(agent, "_endpoint_policy", "require")
 
     agent._apply_preferred_endpoint_for_execute_task(
         conversation_id="rd_meeting:room-1:host",
@@ -135,7 +134,6 @@ async def test_execute_task_invokes_preferred_endpoint_hook(monkeypatch):
 
     agent._cancellable_llm_call = _fake_llm
     agent._compress_context = AsyncMock(side_effect=lambda msgs, **_: msgs)
-    agent._effective_tools = []
 
     task = Task(id="t1", description="run node", session_id="rd_meeting:room-1:host")
     result = await agent.execute_task(task)

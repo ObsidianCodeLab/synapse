@@ -6692,6 +6692,13 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   color: rgb(212 212 216);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+.rd-task-exec-report__body {
+  max-height: min(40rem, 70vh);
+  white-space: normal;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+}
 
 .rd-cli-log-entry {
   border-radius: 0.625rem;

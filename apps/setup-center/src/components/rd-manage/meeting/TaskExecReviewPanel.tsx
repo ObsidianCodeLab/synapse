@@ -90,7 +90,7 @@ function PromptBlock({ title, content }: { title: string; content?: string }) {
     );
   }
   return (
-    <details className="rd-task-exec-prompt" open>
+    <details className="rd-task-exec-prompt">
       <summary className="rd-task-exec-field__label cursor-pointer select-none list-none">
         {title}
       </summary>
@@ -176,11 +176,23 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
           )}
         </div>
 
+        {task.report_markdown ? (
+          <details className="rd-task-exec-prompt" open>
+            <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
+              <FileCode2 className="h-3.5 w-3.5 text-amber-400" />
+              研发工作汇报
+            </summary>
+            <div className="rd-task-exec-prompt__body rd-task-exec-report__body custom-scrollbar overflow-y-auto">
+              <ReviewMarkdown content={String(task.report_markdown)} />
+            </div>
+          </details>
+        ) : null}
+
         <PromptBlock title="开发要求" content={task.develop_prompt} />
         <PromptBlock title="审计要求" content={task.verify_prompt} />
 
         {task.develop_agent_command ? (
-          <details className="rd-task-exec-prompt" open>
+          <details className="rd-task-exec-prompt">
             <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5 text-emerald-400" />
               开发轮 agent 命令
@@ -198,28 +210,16 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
           </details>
         ) : null}
 
-        <div className="rd-task-exec-field">
-          <div className="rd-task-exec-field__label">
+        <details className="rd-task-exec-prompt">
+          <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
             <FolderGit2 className="h-3.5 w-3.5 text-cyan-400" />
             工作路径
-          </div>
-          <code className="rd-task-exec-field__path">{task.sandbox_path || '—'}</code>
-        </div>
+          </summary>
+          <pre className="rd-task-exec-prompt__body custom-scrollbar">{task.sandbox_path || '—'}</pre>
+        </details>
 
         {task.error ? (
           <Alert type="error" showIcon message={String(task.error)} className="text-[11px]" />
-        ) : null}
-
-        {task.report_markdown ? (
-          <details className="rounded-lg border border-slate-700/60 bg-slate-950/50 px-3 py-2">
-            <summary className="cursor-pointer text-[11px] text-muted-foreground select-none list-none flex items-center gap-1.5">
-              <FileCode2 className="h-3.5 w-3.5" />
-              CLI 任务报告
-            </summary>
-            <div className="mt-2 max-h-48 overflow-y-auto custom-scrollbar">
-              <ReviewMarkdown content={String(task.report_markdown)} />
-            </div>
-          </details>
         ) : null}
       </div>
     </div>
@@ -430,7 +430,7 @@ export function TaskExecReviewPanel({
                 ? payload?.status === 'agent_cli_login_required'
                   ? '任务执行尚未开始：Cursor Agent CLI 已安装，请先完成账号登录。'
                   : '任务执行尚未开始：本机缺少 Cursor Agent CLI（agent），请先安装后再重新执行。'
-                : `CLI 已循环处理 ${total} 个研发子单 · 成功 ${ok} 个 · 请核对工作路径、提示词与任务报告后裁决`}
+                : `CLI 已循环处理 ${total} 个研发子单 · 成功 ${ok} 个 · 请核对研发工作汇报、工作路径与提示词后裁决`}
             </p>
           </div>
         </div>

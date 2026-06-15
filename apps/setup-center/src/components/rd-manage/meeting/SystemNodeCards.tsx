@@ -57,10 +57,31 @@ function StatusBadge({ status }: { status?: string }) {
   );
 }
 
-function CopyPath({ value, label, className = '' }: { value?: string; label?: string; className?: string }) {
+function CopyPath({
+  value,
+  label,
+  className = '',
+  multiline = false,
+  scrollable = false,
+  copyTitle = '复制路径',
+}: {
+  value?: string;
+  label?: string;
+  className?: string;
+  multiline?: boolean;
+  scrollable?: boolean;
+  copyTitle?: string;
+}) {
   const text = String(value || '').trim();
   const [copied, setCopied] = useState(false);
-  if (!text) return <span className="text-muted-foreground text-[11px]">—</span>;
+  if (!text) {
+    return (
+      <div className={`rd-system-path-row ${className}`.trim()}>
+        {label ? <span className="rd-system-path-row__label">{label}</span> : null}
+        <span className="text-muted-foreground text-[11px]">—</span>
+      </div>
+    );
+  }
 
   const onCopy = async () => {
     try {
@@ -72,18 +93,26 @@ function CopyPath({ value, label, className = '' }: { value?: string; label?: st
     }
   };
 
+  const textClass = [
+    'rd-system-path-row__text',
+    multiline ? 'rd-system-path-row__text--multiline' : '',
+    scrollable ? 'rd-system-path-row__text--scroll custom-scrollbar' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div className={`rd-system-path-row ${className}`.trim()}>
       {label ? <span className="rd-system-path-row__label">{label}</span> : null}
       <div className="rd-system-path-row__body">
-        <code className="rd-system-path-row__text" title={text}>
+        <code className={textClass} title={text}>
           {text}
         </code>
         <button
           type="button"
           className={`rd-system-path-row__btn${copied ? ' is-copied' : ''}`}
           onClick={() => void onCopy()}
-          title="复制路径"
+          title={copyTitle}
         >
           {copied ? (
             <>
@@ -965,58 +994,6 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
   );
 }
 
-function CommandScriptBlock({ label, value }: { label: string; value?: string }) {
-  const text = String(value || '').trim();
-  const [copied, setCopied] = useState(false);
-  if (!text) {
-    return (
-      <div className="mt-2">
-        <div className="text-[10px] font-medium text-muted-foreground mb-1">{label}</div>
-        <span className="text-muted-foreground text-[11px]">—</span>
-      </div>
-    );
-  }
-
-  const onCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return (
-    <div className="mt-2">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="text-[10px] font-medium text-muted-foreground">{label}</div>
-        <button
-          type="button"
-          className={`rd-system-path-row__btn${copied ? ' is-copied' : ''}`}
-          onClick={() => void onCopy()}
-          title="复制命令"
-        >
-          {copied ? (
-            <>
-              <CheckCircle2 className="h-3 w-3" />
-              已复制
-            </>
-          ) : (
-            <>
-              <Copy className="h-3 w-3" />
-              复制
-            </>
-          )}
-        </button>
-      </div>
-      <pre className="rd-task-exec-prompt__body custom-scrollbar max-h-48 text-[10px] leading-relaxed whitespace-pre-wrap break-all">
-        {text}
-      </pre>
-    </div>
-  );
-}
-
 const TASK_EXEC_PHASE_LABEL: Record<string, string> = {
   develop: '开发轮',
   verify: '完成检测轮',
@@ -1038,7 +1015,7 @@ export function SystemTaskExecCard({ payload }: { payload: Record<string, unknow
         gradient="rd-system-hero--split"
         icon={<Terminal className="h-6 w-6" />}
         title={`Cursor Agent · ${phaseLabel}`}
-        subtitle="Synapse 任务执行节点实际调用的 agent 命令（含完整 prompt）。"
+        subtitle="任务执行节点 Cursor Agent 开发轮启动信息。"
         stats={[
           { label: '工单', value: taskNo },
           { label: '进度', value: progress },
@@ -1057,13 +1034,6 @@ export function SystemTaskExecCard({ payload }: { payload: Record<string, unknow
           <CopyPath label="验收标准" value={String(payload.acceptance_doc)} />
         ) : null}
       </div>
-      <CommandScriptBlock label="agent 命令（完整）" value={String(payload.agent_command || '')} />
-      <details className="mt-2 rounded-lg border border-slate-700/50 bg-slate-950/40 px-3 py-2">
-        <summary className="cursor-pointer text-[10px] text-muted-foreground select-none list-none">
-          Synapse 包装命令（python cursor-operation.py）
-        </summary>
-        <CommandScriptBlock label="" value={String(payload.python_command || '')} />
-      </details>
     </div>
   );
 }

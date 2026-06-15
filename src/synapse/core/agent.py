@@ -3615,6 +3615,18 @@ class Agent:
         except Exception as exc:
             logger.debug("[ModelSwitch] Failed to persist effective model metadata: %s", exc)
 
+    def _resolve_session_for_endpoint_override(self) -> "Session | None":
+        """Return bound session without requiring a running asyncio task."""
+        tls = self.__dict__.get("_tls_session") or {}
+        if not tls:
+            return None
+        if len(tls) == 1:
+            return next(iter(tls.values()))
+        try:
+            return tls.get(self._task_key())
+        except RuntimeError:
+            return None
+
     def _apply_preferred_endpoint_for_execute_task(
         self,
         *,
@@ -3627,7 +3639,7 @@ class Agent:
         ``chat_with_session``; without this hook, ``host_llm_endpoint_key`` is stored
         on the Agent but never forwarded to ``LLMClient.switch_model``.
         """
-        endpoint = (self._preferred_endpoint or "").strip()
+        endpoint = (getattr(self, "_preferred_endpoint", None) or "").strip()
         if not endpoint or endpoint == "default":
             return
         policy = (getattr(self, "_endpoint_policy", None) or "prefer").strip().lower()
@@ -3636,7 +3648,7 @@ class Agent:
         self._apply_endpoint_override_for_turn(
             endpoint_override=endpoint,
             endpoint_policy=policy,
-            session=getattr(self, "_current_session", None),
+            session=self._resolve_session_for_endpoint_override(),
             conversation_id=conversation_id,
             session_id=session_id,
             reason=f"execute_task endpoint preference: {endpoint}",
