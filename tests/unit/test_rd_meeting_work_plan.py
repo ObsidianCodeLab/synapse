@@ -285,6 +285,45 @@ def test_archive_doc_pending_blocks_forward_until_doc_generate(meeting_scope: st
     assert check_host_forward_gate(session, "deliver_artifacts") is None
 
 
+def test_collab_node_skips_human_interactive_work_plan_gate(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ai_human 协同节点不走 work_plan / archive_doc_pending 的 human 门禁。"""
+    scope_id = "collab-scope"
+    work = tmp_path / scope_id
+    work.mkdir(parents=True)
+    (work / "dev.status").write_text(
+        json.dumps(
+            {
+                "meeting_room": {"room_id": "room-collab", "active": True},
+                "current_node_id": "func_solution",
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (work / "room_state.json").write_text("{}", encoding="utf-8")
+    (work / "room_history.jsonl").write_text("", encoding="utf-8")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.live.scope_id_for_room_id",
+        lambda rid: scope_id if rid == "room-collab" else None,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.work_plan.scope_id_for_room_id",
+        lambda rid: scope_id if rid == "room-collab" else None,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.room_runtime.room_state_path",
+        lambda s: work / "room_state.json",
+    )
+    session = "rd_meeting:room-collab:host"
+    mark_archive_doc_pending(scope_id)
+    sync_interactive_required_after_closure(scope_id, "further")
+    assert must_submit_interactive_questionnaire(scope_id, "func_solution") is False
+    assert check_host_forward_gate(session, "submit_hitl_questionnaire") is None
+    assert check_host_forward_gate(session, "deliver_artifacts") is None
+
+
 def test_further_closure_requires_interactive(meeting_scope: str) -> None:
     sync_interactive_required_after_closure(meeting_scope, "further")
     assert must_submit_interactive_questionnaire(meeting_scope, "req_clarify") is True

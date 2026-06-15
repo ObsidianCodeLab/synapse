@@ -181,6 +181,12 @@ def is_plan_batch_complete(plan: dict[str, Any]) -> bool:
 
 
 def plan_requires_hitl(plan: dict[str, Any], *, human_confirm: bool) -> bool:
+    node_id = str(plan.get("node_id") or "").strip()
+    if node_id:
+        from synapse.rd_meeting.binding import uses_human_interactive_hitl
+
+        if not uses_human_interactive_hitl(node_id):
+            return False
     return bool(human_confirm and isinstance(plan.get("closing_step"), dict))
 
 
@@ -248,6 +254,10 @@ def must_submit_interactive_questionnaire(scope_id: str, node_id: str = "") -> b
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     if not sid:
+        return False
+    from synapse.rd_meeting.binding import uses_human_interactive_hitl
+
+    if nid and not uses_human_interactive_hitl(nid):
         return False
     from synapse.rd_meeting.hitl_closure_guard import load_closure_intent
 
@@ -637,6 +647,11 @@ def check_host_forward_gate(
         return None
     scope_id = ctx["scope_id"]
     node_id = ctx.get("node_id") or ""
+
+    from synapse.rd_meeting.binding import uses_human_interactive_hitl
+
+    if not uses_human_interactive_hitl(node_id):
+        return None
 
     if _is_doc_generate_tool(tool_name, skill_name):
         return None

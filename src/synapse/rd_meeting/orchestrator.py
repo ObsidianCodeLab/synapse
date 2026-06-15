@@ -27,7 +27,7 @@ from synapse.rd_meeting.agent_session import (
 )
 from synapse.rd_meeting.agent_trace import append_event as trace_append_event
 from synapse.rd_meeting.agent_trace import write_agent_meta
-from synapse.rd_meeting.binding import resolve_node_binding
+from synapse.rd_meeting.binding import resolve_node_binding, uses_human_interactive_hitl
 from synapse.rd_meeting.bootstrap import build_node_init_message
 from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
 from synapse.rd_meeting.collaboration import has_collaboration_workers
@@ -2535,13 +2535,13 @@ class MeetingRoomOrchestrator:
                     },
                 )
 
-                # E：human_confirm 节点的「自动重跑一次」
+                # E：human 节点（非 ai_human 协同）的「自动重跑一次」
                 # 触发：未通过工具提交问卷 + 终稿无标记块 + 产出物文档校验失败
                 _retry_stage_name = stage_name_for_id(
                     int(dev.get("stage_id") or stage_id_for_node_id(node_id))
                 )
                 if (
-                    bool(binding.get("human_confirm"))
+                    uses_human_interactive_hitl(node_id, binding=binding)
                     and tool_questionnaire is None
                     and not extract_hitl_from_agent_output(report_body).explicit
                     and not validate_node_archive_artifacts(sid, _retry_stage_name, node_id).ok
@@ -2601,6 +2601,7 @@ class MeetingRoomOrchestrator:
         duration = max(1, int(time.monotonic() - started))
 
         need_human_confirm = bool(binding.get("human_confirm"))
+        need_interactive_hitl = uses_human_interactive_hitl(node_id, binding=binding)
         room_rs = load_room_state(sid) or {}
 
         from synapse.rd_meeting.func_solution_review import (
@@ -2611,34 +2612,40 @@ class MeetingRoomOrchestrator:
             SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG,
             uses_solution_review_gate,
         )
-        if need_human_confirm and tool_questionnaire and uses_solution_review_gate(node_id):
-            append_history_event(
-                sid,
-                {
-                    "event": "solution_review_questionnaire_rejected",
-                    "room_id": room_id,
-                    "node_id": node_id,
-                    "detail": SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG,
-                    "log_type": "warning",
-                    "agent_id": str(binding.get("host_profile_id") or "default"),
-                },
-            )
-            tool_questionnaire = None
-        if need_human_confirm and tool_questionnaire and uses_func_solution_gate(node_id):
-            append_history_event(
-                sid,
-                {
-                    "event": "func_solution_questionnaire_rejected",
-                    "room_id": room_id,
-                    "node_id": node_id,
-                    "detail": FUNC_SOLUTION_HITL_FORBIDDEN,
-                    "log_type": "warning",
-                    "agent_id": str(binding.get("host_profile_id") or "default"),
-                },
-            )
-            tool_questionnaire = None
+        from synapse.rd_sop.manifest import is_collaborative_node
 
-        if need_human_confirm:
+        if not need_interactive_hitl and tool_questionnaire:
+            t_kind = (tool_questionnaire.get("kind") or "interactive").strip().lower()
+            if t_kind in ("interactive", "result_confirm"):
+                detail = (
+                    FUNC_SOLUTION_HITL_FORBIDDEN
+                    if uses_func_solution_gate(node_id)
+                    else SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG
+                    if uses_solution_review_gate(node_id)
+                    else f"{node_display_name(node_id)} 协同节点禁止 submit_hitl_questionnaire"
+                    f"（kind={t_kind}）"
+                )
+                event = (
+                    "func_solution_questionnaire_rejected"
+                    if uses_func_solution_gate(node_id)
+                    else "solution_review_questionnaire_rejected"
+                    if uses_solution_review_gate(node_id)
+                    else "collab_questionnaire_rejected"
+                )
+                append_history_event(
+                    sid,
+                    {
+                        "event": event,
+                        "room_id": room_id,
+                        "node_id": node_id,
+                        "detail": detail,
+                        "log_type": "warning",
+                        "agent_id": str(binding.get("host_profile_id") or "default"),
+                    },
+                )
+                tool_questionnaire = None
+
+        if need_interactive_hitl:
             from synapse.rd_meeting.hitl_closure_guard import evaluate_host_run_guard
 
             pre_guard = evaluate_host_run_guard(
@@ -2661,9 +2668,9 @@ class MeetingRoomOrchestrator:
 
         # 本轮回主控 submit_hitl_questionnaire 优先于历史 hitl_locked / ready 标记，
         # 避免「用户已填过一轮 + 归档已就绪」时跳过新一轮 interactive 问卷直达 NodeReview。
-        if need_human_confirm and tool_questionnaire and tool_questionnaire.get("schema"):
+        if tool_questionnaire and tool_questionnaire.get("schema"):
             t_kind = (tool_questionnaire.get("kind") or "interactive").strip().lower()
-            if t_kind == "interactive":
+            if need_interactive_hitl and t_kind == "interactive":
                 return self._gate_from_tool_questionnaire(
                     scope_type=scope_type,
                     scope_id=sid,
@@ -2678,7 +2685,7 @@ class MeetingRoomOrchestrator:
                     ticket_title=ticket_title,
                     skipped_nodes=skipped_nodes or None,
                 )
-            if t_kind == "exception":
+            if need_human_confirm and t_kind == "exception":
                 return self._gate_from_tool_questionnaire(
                     scope_type=scope_type,
                     scope_id=sid,
@@ -2693,7 +2700,7 @@ class MeetingRoomOrchestrator:
                     ticket_title=ticket_title,
                     skipped_nodes=skipped_nodes or None,
                 )
-            if t_kind == "result_confirm":
+            if need_interactive_hitl and t_kind == "result_confirm":
                 return self._gate_from_tool_questionnaire(
                     scope_type=scope_type,
                     scope_id=sid,
@@ -2717,14 +2724,14 @@ class MeetingRoomOrchestrator:
                 must_submit_interactive_questionnaire,
             )
 
-            if need_human_confirm and is_archive_doc_pending(sid):
+            if need_interactive_hitl and is_archive_doc_pending(sid):
                 ready_for_review = False
-            if need_human_confirm and must_submit_interactive_questionnaire(sid, node_id):
+            if need_interactive_hitl and must_submit_interactive_questionnaire(sid, node_id):
                 ready_for_review = False
         except Exception:
             pass
 
-        if need_human_confirm:
+        if need_interactive_hitl:
             from synapse.rd_meeting.hitl_closure_guard import (
                 apply_ready_for_review_guard,
                 evaluate_host_run_guard,
@@ -2744,7 +2751,7 @@ class MeetingRoomOrchestrator:
                 ready_for_review = False
 
         if (
-            need_human_confirm
+            need_interactive_hitl
             and not tool_questionnaire
             and host_run_fn is not None
         ):
@@ -2776,7 +2783,7 @@ class MeetingRoomOrchestrator:
             except Exception:
                 pass
 
-        if need_human_confirm and not ready_for_review:
+        if need_interactive_hitl and not ready_for_review:
             hitl_gate = extract_hitl_from_agent_output(report_body)
             report_body = hitl_gate.clean_body
             if hitl_gate.explicit and hitl_gate.intervention_kind in ("interactive", "exception"):
@@ -2930,7 +2937,22 @@ class MeetingRoomOrchestrator:
                     agent_pool=agent_pool,
                     skipped_nodes=skipped_nodes or None,
                 )
-            if host_run_fn is not None:
+            if is_collaborative_node(node_id):
+                return await self.enter_node_review_gate(
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    node_id=node_id,
+                    binding=binding,
+                    report_body=report_body,
+                    tokens_used=tokens_used,
+                    duration_seconds=int(duration),
+                    stage_id=stage_id,
+                    ticket_title=ticket_title,
+                    agent_pool=agent_pool,
+                    skipped_nodes=skipped_nodes or None,
+                )
+            if need_interactive_hitl and host_run_fn is not None:
                 return await self._ensure_host_interactive_questionnaire(
                     scope_type=scope_type,
                     scope_id=sid,
@@ -2949,6 +2971,12 @@ class MeetingRoomOrchestrator:
                     host_id=host_id,
                     run_host=host_run_fn,
                 )
+            if not need_interactive_hitl:
+                return {
+                    "status": "processing",
+                    "node_id": node_id,
+                    "skipped_nodes": skipped_nodes or None,
+                }
             rs_wait = dict(load_room_state(sid) or {})
             rs_wait["status"] = "processing"
             rs_wait["rework_instruction"] = prompt_require_interactive_questionnaire()

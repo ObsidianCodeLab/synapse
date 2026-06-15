@@ -215,6 +215,25 @@ def resolve_node_binding(
     }
 
 
+def uses_human_interactive_hitl(
+    node_id: str,
+    *,
+    binding: dict[str, Any] | None = None,
+) -> bool:
+    """是否走 human 节点会中 interactive / work_plan HITL（``ai_human`` 协同节点为 False）。
+
+    ``human_confirm`` 对协同节点表示「需专用评审面板」，不等同于会中问卷流程。
+    """
+    from synapse.rd_sop.manifest import is_collaborative_node
+
+    nid = (node_id or "").strip()
+    if not nid or is_collaborative_node(nid):
+        return False
+    if binding is not None:
+        return bool(binding.get("human_confirm"))
+    return bool(resolve_node_binding(nid).get("human_confirm"))
+
+
 def list_resolved_bindings() -> list[dict[str, Any]]:
     from synapse.rd_sop.manifest import list_manifest_nodes
 
