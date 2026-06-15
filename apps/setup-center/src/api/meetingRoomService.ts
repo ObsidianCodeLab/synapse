@@ -692,10 +692,29 @@ export interface TaskExecPayload {
   human_review?: { status?: string; comment?: string; decided_at?: string | null };
 }
 
+export interface TaskExecReprocessRound {
+  round: number;
+  kind?: 'initial' | 'reprocess' | string;
+  reason?: string;
+  requested_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  status?: string;
+  summary?: {
+    total?: number;
+    ok?: number;
+    failed?: number;
+    total_tokens?: number;
+    total_duration_sec?: number;
+  };
+}
+
 export interface TaskExecGetResponse {
   room_id: string;
   scope_id: string;
   payload: TaskExecPayload;
+  reprocess_rounds?: TaskExecReprocessRound[];
+  current_round?: number;
   live_tail?: TaskExecLiveTail | null;
   intervention_kind?: string;
   blocked?: boolean;

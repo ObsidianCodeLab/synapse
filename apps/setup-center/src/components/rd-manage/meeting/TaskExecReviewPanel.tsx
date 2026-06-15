@@ -14,6 +14,7 @@ import {
   FolderGit2,
   ListTree,
   Loader2,
+  RotateCw,
   Sparkles,
   Target,
   Terminal,
@@ -24,6 +25,7 @@ import {
   reprocessMeetingRoom,
   submitTaskExecDecision,
   type TaskExecPayload,
+  type TaskExecReprocessRound,
   type TaskExecLiveTail,
   type TaskExecTaskRow,
 } from '../../../api/meetingRoomService';
@@ -98,6 +100,97 @@ function PromptBlock({ title, content }: { title: string; content?: string }) {
       </summary>
       <pre className="rd-task-exec-prompt__body custom-scrollbar">{text}</pre>
     </details>
+  );
+}
+
+function roundKindLabel(kind: string | undefined): string {
+  return kind === 'reprocess' ? '重新处理' : '首轮执行';
+}
+
+function roundStatusLabel(status: string | undefined): string {
+  const key = String(status || '').toLowerCase();
+  if (key === 'ok' || key === 'completed') return '成功';
+  if (key === 'partial') return '部分完成';
+  if (key === 'failed') return '失败';
+  if (key === 'running') return '执行中';
+  if (key === 'pending') return '待执行';
+  if (key === 'superseded') return '已被新一轮取代';
+  return status || '—';
+}
+
+function TaskExecRoundsPanel({
+  rounds,
+  currentRound,
+}: {
+  rounds: TaskExecReprocessRound[];
+  currentRound?: number;
+}) {
+  if (!rounds.length) return null;
+  const total = currentRound || rounds[rounds.length - 1]?.round || rounds.length;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-violet-950/20 p-4 shadow-[0_8px_32px_rgba(139,92,246,0.08)]">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
+          <RotateCw className="h-3.5 w-3.5 text-violet-400" />
+          执行轮次
+        </div>
+        <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-200">
+          共 {total} 轮
+        </span>
+      </div>
+      <div className="space-y-2">
+        {rounds.map((round) => {
+          const active = round.round === currentRound;
+          const reason = (round.reason || '').trim();
+          const summary = round.summary;
+          return (
+            <div
+              key={`round-${round.round}`}
+              className={`rounded-xl border px-3 py-2.5 ${
+                active
+                  ? 'border-violet-400/35 bg-violet-500/10'
+                  : 'border-white/10 bg-black/20'
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                <span className="font-semibold text-foreground">第 {round.round} 轮</span>
+                <span className="text-muted-foreground">{roundKindLabel(round.kind)}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] ${
+                    String(round.status).toLowerCase() === 'ok'
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : String(round.status).toLowerCase() === 'running'
+                        ? 'bg-blue-500/15 text-blue-300'
+                        : 'bg-white/10 text-muted-foreground'
+                  }`}
+                >
+                  {roundStatusLabel(round.status)}
+                </span>
+                {summary?.total_tokens ? (
+                  <span className="text-muted-foreground tabular-nums">
+                    {summary.total_tokens} tokens
+                  </span>
+                ) : null}
+                {summary?.total_duration_sec ? (
+                  <span className="text-muted-foreground tabular-nums">
+                    {formatDuration(Number(summary.total_duration_sec))}
+                  </span>
+                ) : null}
+              </div>
+              {reason ? (
+                <p className="mt-2 mb-0 text-[12px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                  <span className="text-muted-foreground">处理建议：</span>
+                  {reason}
+                </p>
+              ) : round.kind === 'initial' ? (
+                <p className="mt-2 mb-0 text-[12px] text-muted-foreground">首轮执行，无额外处理建议</p>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -237,6 +330,8 @@ export function TaskExecReviewPanel({
   onDecided,
 }: Props) {
   const [payload, setPayload] = useState<TaskExecPayload | null>(initialPayload ?? null);
+  const [reprocessRounds, setReprocessRounds] = useState<TaskExecReprocessRound[]>([]);
+  const [currentRound, setCurrentRound] = useState(0);
   const [loading, setLoading] = useState(!initialPayload);
   const [submitting, setSubmitting] = useState(false);
   const [comment, setComment] = useState('');
@@ -254,6 +349,8 @@ export function TaskExecReviewPanel({
     try {
       const res = await fetchTaskExec(synapseApiBase, roomId);
       setPayload(res.payload);
+      setReprocessRounds(Array.isArray(res.reprocess_rounds) ? res.reprocess_rounds : []);
+      setCurrentRound(Number(res.current_round) || 0);
       if (res.live_tail) setLiveTail(res.live_tail);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '加载失败';
@@ -452,6 +549,12 @@ export function TaskExecReviewPanel({
                     payload.cli_model_custom,
                   )}
               </span>
+              {(currentRound || reprocessRounds.length) > 0 ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-400/35 bg-fuchsia-500/15 px-2.5 py-0.5 text-[11px] font-medium text-fuchsia-200 shrink-0 whitespace-nowrap">
+                  <RotateCw className="h-3 w-3" />
+                  第 {currentRound || reprocessRounds.length} 轮
+                </span>
+              ) : null}
             </div>
             <p className="text-sm text-muted-foreground m-0 leading-relaxed">
               {isRunning
@@ -492,6 +595,8 @@ export function TaskExecReviewPanel({
           ))}
         </div>
       </div>
+
+      <TaskExecRoundsPanel rounds={reprocessRounds} currentRound={currentRound || undefined} />
 
       {agentCliMissing ? (
         <Alert

@@ -929,6 +929,7 @@ async def get_task_exec(room_id: str) -> dict:
         return error_response(404, "meeting_room_not_found")
     sid, _ = resolved
     from synapse.rd_meeting.task_exec import load_task_exec_payload, read_task_exec_live_tail
+    from synapse.rd_meeting.task_exec_rounds import current_task_exec_round, load_task_exec_rounds
 
     payload = load_task_exec_payload(sid)
     if payload is None:
@@ -938,11 +939,14 @@ async def get_task_exec(room_id: str) -> dict:
     live_tail = read_task_exec_live_tail(sid)
     if not live_tail.get("path"):
         live_tail = None
+    rounds = load_task_exec_rounds(sid)
     return success_response(
         {
             "room_id": room_id,
             "scope_id": sid,
             "payload": payload,
+            "reprocess_rounds": rounds,
+            "current_round": current_task_exec_round(sid),
             "live_tail": live_tail,
             "intervention_kind": room_state.get("intervention_kind"),
             "blocked": bool(room_state.get("task_exec_blocked")),

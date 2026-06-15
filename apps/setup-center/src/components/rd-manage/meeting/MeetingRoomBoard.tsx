@@ -2313,15 +2313,8 @@ const InterventionDialog = ({
                   <Button
                     type="primary"
                     disabled={Boolean(room.recoveringNodeId || room.reprocessingNodeId)}
-                    icon={
-                      <Undo2
-                        className={`w-4 h-4 ${
-                          room.recoveringNodeId === selectedNode?.id
-                            ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin'
-                            : ''
-                        }`}
-                      />
-                    }
+                    loading={room.recoveringNodeId === selectedNode?.id}
+                    icon={<Undo2 className="w-4 h-4" />}
                     onClick={() => onRecover?.(selectedNode!.id)}
                     className={MEETING_TAB_BAR_ANT_BTN}
                   >
@@ -2334,15 +2327,8 @@ const InterventionDialog = ({
                   type="primary"
                   danger={room.status === 'failed'}
                   disabled={Boolean(room.reprocessingNodeId || room.recoveringNodeId)}
-                  icon={
-                    <RotateCw
-                      className={`w-4 h-4 ${
-                        room.reprocessingNodeId === selectedNode?.id
-                          ? 'animate-spin app-loading-spin rd-meeting-reprocess-spin'
-                          : ''
-                      }`}
-                    />
-                  }
+                  loading={room.reprocessingNodeId === selectedNode?.id}
+                  icon={<RotateCw className="w-4 h-4" />}
                   onClick={() => selectedNode && openReprocessModal(selectedNode.id)}
                   className={MEETING_TAB_BAR_ANT_BTN}
                 >
