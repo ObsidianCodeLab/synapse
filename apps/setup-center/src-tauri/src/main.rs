@@ -7968,6 +7968,130 @@ fn emit_cursor_agent_install_line(app: &tauri::AppHandle, text: &str) {
     );
 }
 
+#[cfg(windows)]
+fn cursor_agent_base_dir() -> Option<PathBuf> {
+    let local = std::env::var("LOCALAPPDATA").ok()?;
+    let base = PathBuf::from(local).join("cursor-agent");
+    if base.is_dir() {
+        Some(base)
+    } else {
+        None
+    }
+}
+
+#[cfg(windows)]
+fn legacy_alias_for_timestamp_dir(name: &str) -> Option<String> {
+    let parts: Vec<&str> = name.split('-').collect();
+    if parts.len() != 5 {
+        return None;
+    }
+    if !parts[1].chars().all(|c| c.is_ascii_digit())
+        || !parts[2].chars().all(|c| c.is_ascii_digit())
+        || !parts[3].chars().all(|c| c.is_ascii_digit())
+    {
+        return None;
+    }
+    if !parts[4].chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let date_parts: Vec<&str> = parts[0].split('.').collect();
+    if date_parts.len() != 3 {
+        return None;
+    }
+    if !date_parts
+        .iter()
+        .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    {
+        return None;
+    }
+    Some(format!("{}-{}", parts[0], parts[4]))
+}
+
+#[cfg(windows)]
+fn version_dir_has_runtime(version_dir: &Path) -> bool {
+    version_dir.join("node.exe").is_file() && version_dir.join("index.js").is_file()
+}
+
+#[cfg(windows)]
+fn create_dir_junction(link: &Path, target: &Path) -> Result<(), String> {
+    if link.exists() {
+        return Ok(());
+    }
+    let mut c = Command::new("cmd");
+    c.args(["/c", "mklink", "/J"]);
+    c.arg(link);
+    c.arg(target);
+    apply_no_window(&mut c);
+    let o = c.output().map_err(|e| format!("mklink 启动失败: {e}"))?;
+    if o.status.success() {
+        Ok(())
+    } else {
+        let detail = String::from_utf8_lossy(&o.stderr);
+        let stdout = String::from_utf8_lossy(&o.stdout);
+        Err(format!(
+            "{}",
+            if !detail.trim().is_empty() {
+                detail.trim()
+            } else {
+                stdout.trim()
+            }
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn repair_cursor_agent_version_dirs_if_needed() -> Vec<String> {
+    let Some(base) = cursor_agent_base_dir() else {
+        return Vec::new();
+    };
+    let versions = base.join("versions");
+    if !versions.is_dir() {
+        return Vec::new();
+    }
+
+    if let Some(agent_path) = resolve_cursor_agent_executable() {
+        let mut c = Command::new(&agent_path);
+        c.arg("--version");
+        apply_no_window(&mut c);
+        if let Ok(o) = c.output() {
+            if o.status.success() && merged_stdout_stderr_version_line(&o).is_some() {
+                return Vec::new();
+            }
+        }
+    }
+
+    let mut created: Vec<String> = Vec::new();
+    let entries: Vec<PathBuf> = fs::read_dir(&versions)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok().map(|x| x.path()))
+        .filter(|p| p.is_dir())
+        .collect();
+
+    for child in entries {
+        let Some(name) = child.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Some(alias) = legacy_alias_for_timestamp_dir(name) else {
+            continue;
+        };
+        let link = versions.join(&alias);
+        if link.exists() || !version_dir_has_runtime(&child) {
+            continue;
+        }
+        if create_dir_junction(&link, &child).is_ok() {
+            created.push(alias);
+        }
+    }
+    created
+}
+
+#[cfg(not(windows))]
+fn repair_cursor_agent_version_dirs_if_needed() -> Vec<String> {
+    Vec::new()
+}
+
 fn cursor_agent_exe_candidates() -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = Vec::new();
     #[cfg(windows)]
@@ -8062,6 +8186,7 @@ fn cursor_agent_cli_auth_sync(agent_path: &Path) -> (bool, Option<String>) {
 }
 
 fn cursor_agent_cli_check_sync() -> CursorAgentCliCheckResult {
+    let _aliases = repair_cursor_agent_version_dirs_if_needed();
     let Some(agent_path) = resolve_cursor_agent_executable() else {
         return CursorAgentCliCheckResult {
             installed: false,

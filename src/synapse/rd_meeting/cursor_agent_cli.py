@@ -95,18 +95,172 @@ def validate_agent_executable(resolved: str) -> str | None:
     return format_agent_not_found_error(resolved)
 
 
-_VERSION_DIR_RE = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,2}-[a-f0-9]+$")
+_LEGACY_VERSION_DIR_RE = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,2}-[a-f0-9]+$")
+_TIMESTAMP_VERSION_DIR_RE = re.compile(
+    r"^\d{4}\.\d{1,2}\.\d{1,2}-\d{1,2}-\d{1,2}-\d{1,2}-[a-f0-9]+$"
+)
+_VERSION_DIR_RE = re.compile(
+    r"^\d{4}\.\d{1,2}\.\d{1,2}(?:-\d{1,2}-\d{1,2}-\d{1,2})?-[a-f0-9]+$"
+)
+NO_VERSION_DIRS_MARKER = "No version directories found"
+
+
+def cursor_agent_base_dir() -> Path | None:
+    """Windows 下 Cursor Agent CLI 安装根目录。"""
+    if sys.platform != "win32":
+        return None
+    local = os.environ.get("LOCALAPPDATA", "").strip()
+    if not local:
+        return None
+    base = Path(local) / "cursor-agent"
+    return base if base.is_dir() else None
+
+
+def legacy_alias_for_timestamp_dir(name: str) -> str | None:
+    """将 2026.06.12-19-59-36-f6aba9a 映射为 launcher 可识别的 2026.06.12-f6aba9a。"""
+    if not _TIMESTAMP_VERSION_DIR_RE.match(name):
+        return None
+    parts = name.split("-")
+    return f"{parts[0]}-{parts[-1]}"
+
+
+def _version_dir_has_runtime(version_dir: Path) -> bool:
+    return (version_dir / "node.exe").is_file() and (version_dir / "index.js").is_file()
 
 
 def _version_dir_sort_key(name: str) -> tuple[int, ...]:
-    date_part = name.split("-", 1)[0]
-    parts = date_part.split(".")
-    if len(parts) != 3:
-        return (0, 0, 0)
+    parts = name.split("-")
+    date_part = parts[0]
+    date_bits = date_part.split(".")
+    if len(date_bits) != 3:
+        return (0, 0, 0, 0, 0, 0)
     try:
-        return tuple(int(part) for part in parts)
+        date_nums = tuple(int(part) for part in date_bits)
     except ValueError:
-        return (0, 0, 0)
+        return (0, 0, 0, 0, 0, 0)
+    if len(parts) >= 5 and all(part.isdigit() for part in parts[1:4]):
+        return (*date_nums, int(parts[1]), int(parts[2]), int(parts[3]))
+    return (*date_nums, 0, 0, 0)
+
+
+def _create_dir_junction(link: Path, target: Path) -> None:
+    if link.exists():
+        return
+    proc = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "mklink failed").strip()
+        raise OSError(detail)
+
+
+def detect_cursor_agent_version_dir_issue(base: Path | None = None) -> dict[str, Any]:
+    """检测 Windows launcher 是否因版本目录命名规则不匹配而无法启动。"""
+    if sys.platform != "win32":
+        return {"needs_repair": False, "reason": "not_windows"}
+
+    install_base = base or cursor_agent_base_dir()
+    if install_base is None:
+        return {"needs_repair": False, "reason": "not_installed"}
+
+    resolved = resolve_agent_executable("agent")
+    if Path(resolved).is_file() and _query_agent_version(resolved) is not None:
+        return {"needs_repair": False, "reason": "agent_version_ok"}
+
+    versions = install_base / "versions"
+    if not versions.is_dir():
+        return {"needs_repair": False, "reason": "no_versions_dir"}
+
+    pending: list[dict[str, str]] = []
+    for child in versions.iterdir():
+        if not child.is_dir():
+            continue
+        alias = legacy_alias_for_timestamp_dir(child.name)
+        if not alias:
+            continue
+        if (versions / alias).exists():
+            continue
+        if not _version_dir_has_runtime(child):
+            continue
+        pending.append({"timestamp_dir": child.name, "alias": alias})
+
+    if not pending:
+        return {"needs_repair": False, "reason": "no_timestamp_dirs_without_alias"}
+
+    return {
+        "needs_repair": True,
+        "reason": "timestamp_dirs_without_legacy_alias",
+        "pending": pending,
+    }
+
+
+def repair_cursor_agent_version_dirs(base: Path | None = None) -> dict[str, Any]:
+    """为带时间戳的版本目录创建 launcher 可识别的兼容别名目录（Windows junction）。"""
+    issue = detect_cursor_agent_version_dir_issue(base)
+    if not issue.get("needs_repair"):
+        return {
+            "applied": False,
+            "aliases": [],
+            "errors": [],
+            "skipped": True,
+            "reason": issue.get("reason"),
+        }
+
+    install_base = base or cursor_agent_base_dir()
+    if install_base is None:
+        return {
+            "applied": False,
+            "aliases": [],
+            "errors": ["cursor-agent 未安装"],
+            "skipped": True,
+            "reason": "not_installed",
+        }
+
+    versions = install_base / "versions"
+    created: list[str] = []
+    errors: list[str] = []
+    for item in issue.get("pending", []):
+        alias = str(item["alias"])
+        target = versions / str(item["timestamp_dir"])
+        link = versions / alias
+        try:
+            _create_dir_junction(link, target)
+            created.append(alias)
+        except OSError as exc:
+            errors.append(f"{alias}: {exc}")
+
+    return {
+        "applied": bool(created),
+        "aliases": created,
+        "errors": errors,
+        "skipped": False,
+    }
+
+
+def ensure_cursor_agent_windows_layout(base: Path | None = None) -> dict[str, Any]:
+    """检测并在必要时修复 Windows 版 Cursor Agent 版本目录布局。"""
+    if sys.platform != "win32":
+        return {"needed": False, "applied": False, "reason": "not_windows"}
+
+    issue = detect_cursor_agent_version_dir_issue(base)
+    if not issue.get("needs_repair"):
+        return {"needed": False, "applied": False, "reason": issue.get("reason", "ok")}
+
+    repair = repair_cursor_agent_version_dirs(base)
+    resolved = resolve_agent_executable("agent")
+    agent_version_ok = Path(resolved).is_file() and _query_agent_version(resolved) is not None
+    return {
+        "needed": True,
+        "applied": repair.get("applied", False),
+        "aliases": repair.get("aliases", []),
+        "errors": repair.get("errors", []),
+        "agent_version_ok": agent_version_ok,
+    }
 
 
 def format_argv_as_shell(argv: list[str]) -> str:
@@ -144,7 +298,8 @@ def resolve_agent_launch_argv(agent_path: str = "agent") -> list[str]:
             (
                 child
                 for child in versions.iterdir()
-                if child.is_dir() and _VERSION_DIR_RE.match(child.name)
+                if child.is_dir()
+                and (_VERSION_DIR_RE.match(child.name) or _version_dir_has_runtime(child))
             ),
             key=lambda child: _version_dir_sort_key(child.name),
             reverse=True,
@@ -236,13 +391,17 @@ def _query_agent_auth(resolved: str) -> tuple[bool, str]:
 
 def check_cursor_agent_cli(agent_path: str = "agent") -> dict[str, Any]:
     """返回 agent 是否可用、是否已登录及安装提示。"""
+    layout_repair: dict[str, Any] | None = None
+    if sys.platform == "win32":
+        layout_repair = ensure_cursor_agent_windows_layout()
+
     resolved = resolve_agent_executable(agent_path)
     err = validate_agent_executable(resolved)
     logged_in = False
     auth_message = ""
     if err is None:
         logged_in, auth_message = _query_agent_auth(resolved)
-    return {
+    result: dict[str, Any] = {
         "installed": err is None,
         "logged_in": logged_in,
         "ready": err is None and logged_in,
@@ -253,3 +412,6 @@ def check_cursor_agent_cli(agent_path: str = "agent") -> dict[str, Any]:
         "install_hint": err or (auth_message if not logged_in else ""),
         "platform": sys.platform,
     }
+    if layout_repair is not None:
+        result["layout_repair"] = layout_repair
+    return result
