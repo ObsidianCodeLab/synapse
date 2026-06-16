@@ -118,8 +118,10 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
     >
       <summary className="rd-flight-build-result__summary">
         <ChevronDown className="rd-flight-build-result__chevron h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="font-medium text-slate-200">{item.resultType}</span>
-        {item.preview ? (
+        <span className="font-medium text-slate-200">
+          {item.buildKind === 'compile' ? '编译节点' : item.resultType}
+        </span>
+        {item.buildKind !== 'compile' && item.preview ? (
           <span className="text-[11px] text-muted-foreground truncate">{item.preview}</span>
         ) : null}
       </summary>

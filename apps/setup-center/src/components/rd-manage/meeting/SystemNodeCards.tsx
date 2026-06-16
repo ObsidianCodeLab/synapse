@@ -963,7 +963,7 @@ export function SystemCodeCommitCard({
 
       {variant === 'detail' ? (
         <div className="mt-4">
-          <CodeCommitFlightPanel display={display} hideArchives />
+          <CodeCommitFlightPanel display={display} />
         </div>
       ) : null}
     </div>

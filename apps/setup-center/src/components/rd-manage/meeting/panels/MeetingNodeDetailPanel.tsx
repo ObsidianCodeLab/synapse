@@ -1,5 +1,6 @@
 /**
- * MeetingNodeDetailPanel — 会议室节点详情（产出 / 消耗 / 流程）
+ * MeetingNodeDetailPanel — 会议室节点详情
+ * AI 节点：产出 / 消耗 / 流程 Tab；代码提交（exception_check）为独立面板，不共用 Tab 布局。
  * 节点 token/耗时取自 meeting-summary（room_state.node_metrics）；流程/产出等仍拉 agent-contexts 等。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,7 +53,6 @@ import {
   SimilarTicketsTab,
   similarTicketsTabLabel,
 } from './MeetingNodeReferenceTabs';
-import { collectCodeCommitArchives } from '../codeCommitDisplay';
 
 export type MeetingNodeVisualState =
   | 'pending'
@@ -582,58 +582,7 @@ export function MeetingNodeDetailPanel({
 
   const outputTab = (
     <div className="space-y-4">
-      {isCodeCommitNode ? (
-        mdArtifacts.length || otherArtifacts.length ? (
-          <div className="space-y-3">
-            {otherArtifacts.length ? (
-              <div className="flex flex-wrap gap-2">
-                {otherArtifacts.map((f) => (
-                  <span
-                    key={f.relative_path}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/20 px-2.5 py-1 text-[11px] text-muted-foreground"
-                    title={f.relative_path}
-                  >
-                    <FileCode2 className="h-3 w-3" />
-                    {f.name}
-                    <span className="font-mono text-[10px] opacity-70">{formatBytes(f.size)}</span>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {effectiveSystemDisplay ? (
-              <ul className="rd-code-commit-archive-list">
-                {collectCodeCommitArchives(effectiveSystemDisplay).map((art) => (
-                  <li key={art.name} className="rd-code-commit-archive-row">
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <code
-                      className="text-[10px] text-muted-foreground truncate min-w-0"
-                      title={art.path || art.name}
-                    >
-                      {art.path || art.name || '—'}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {mdArtifacts.length ? (
-              <MarkdownArtifactsPanel
-                files={mdArtifacts}
-                synapseApiBase={synapseApiBase}
-                roomId={roomId}
-                emptyMessage="本节点归档产物尚未生成"
-              />
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
-            <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">代码提交归档产物尚未生成</p>
-            {nodeState === 'processing' ? (
-              <p className="mt-1 text-xs text-primary/80">执行完成后将归档 代码提交日志.md / 试飞结果.md</p>
-            ) : null}
-          </div>
-        )
-      ) : isStructuredSystemNode && (loading || refreshing) && !effectiveSystemDisplay ? (
+      {isStructuredSystemNode && (loading || refreshing) && !effectiveSystemDisplay ? (
         <NodeDetailLoadingState nodeName={nodeName} />
       ) : isStructuredSystemNode && effectiveSystemDisplay ? (
         <SystemNodeDetailCard
@@ -648,11 +597,7 @@ export function MeetingNodeDetailPanel({
           <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">系统节点执行结果尚未就绪</p>
           {nodeState === 'processing' ? (
-            <p className="mt-1 text-xs text-primary/80">
-              {nodeId === 'exception_check'
-                ? '代码提交与试飞轮询中，完成后将展示结构化结果'
-                : '脚本执行中，完成后将展示拆单/沙箱结构化结果'}
-            </p>
+            <p className="mt-1 text-xs text-primary/80">脚本执行中，完成后将展示拆单/沙箱结构化结果</p>
           ) : null}
         </div>
       ) : mdArtifacts.length || otherArtifacts.length ? (
@@ -692,31 +637,6 @@ export function MeetingNodeDetailPanel({
       )}
     </div>
   );
-
-  const codeCommitPanel =
-    isCodeCommitNode && !isPending ? (
-      <div className="mb-4 max-h-[min(50vh,560px)] overflow-y-auto custom-scrollbar rounded-xl border border-border/50 bg-[color:var(--panel)]/30 p-1">
-        {(loading || refreshing) && !effectiveSystemDisplay ? (
-          <NodeDetailLoadingState nodeName={nodeName} />
-        ) : effectiveSystemDisplay ? (
-          <SystemNodeDetailCard
-            nodeId={nodeId}
-            display={effectiveSystemDisplay}
-            roomId={roomId}
-            scopeId={scopeId}
-            synapseApiBase={synapseApiBase}
-          />
-        ) : (
-          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
-            <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">代码提交与试飞结果尚未就绪</p>
-            {nodeState === 'processing' ? (
-              <p className="mt-1 text-xs text-primary/80">提交与 CI 轮询中，进度见下方步骤条</p>
-            ) : null}
-          </div>
-        )}
-      </div>
-    ) : null;
 
   const metricsTab = (
     <div className="space-y-5">
@@ -760,17 +680,11 @@ export function MeetingNodeDetailPanel({
         <span className="flex items-center gap-1.5 text-xs">
           <FileText className="h-3 w-3" /> 产出
           {!isPending &&
-          (isCodeCommitNode
-            ? mdArtifacts.length + otherArtifacts.length > 0
-            : isStructuredSystemNode && effectiveSystemDisplay
-              ? true
-              : artifacts.length > 0) ? (
+          (isStructuredSystemNode && effectiveSystemDisplay
+            ? true
+            : artifacts.length > 0) ? (
             <span className="rounded-full bg-primary/20 px-1.5 font-mono text-[10px] text-primary">
-              {isCodeCommitNode
-                ? mdArtifacts.length + otherArtifacts.length
-                : isStructuredSystemNode && effectiveSystemDisplay
-                  ? '✓'
-                  : artifacts.length}
+              {isStructuredSystemNode && effectiveSystemDisplay ? '✓' : artifacts.length}
             </span>
           ) : null}
         </span>
@@ -850,11 +764,50 @@ export function MeetingNodeDetailPanel({
     review || systemDisplay || processEntries.length || artifacts.length,
   );
 
+  // 代码提交节点：独立详情面板，不走 AI 节点的 产出/消耗/流程 Tab。
+  if (isCodeCommitNode) {
+    return (
+      <div ref={tabsRootRef} className="flex h-full min-h-0 flex-col">
+        {!isPending ? header : null}
+        {isPending ? (
+          <PendingLivePlaceholder />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {(loading || refreshing) && !effectiveSystemDisplay ? (
+              <NodeDetailLoadingState nodeName={nodeName} />
+            ) : error && !effectiveSystemDisplay ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                加载失败：{error}
+              </div>
+            ) : effectiveSystemDisplay ? (
+              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar rounded-xl border border-border/50 bg-[color:var(--panel)]/30 p-1">
+                <SystemNodeDetailCard
+                  nodeId={nodeId}
+                  display={effectiveSystemDisplay}
+                  roomId={roomId}
+                  scopeId={scopeId}
+                  synapseApiBase={synapseApiBase}
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
+                <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">代码提交与试飞结果尚未就绪</p>
+                {nodeState === 'processing' ? (
+                  <p className="mt-1 text-xs text-primary/80">提交与 CI 轮询中，进度见下方步骤条</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div ref={tabsRootRef} className="flex h-full min-h-0 flex-col">
       {!isPending ? header : null}
-      {codeCommitPanel}
-      {!isPending && loading && !isCodeCommitNode ? (
+      {!isPending && loading ? (
         <NodeDetailLoadingState nodeName={nodeName} />
       ) : !isPending && error && !hasLoadedContent ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
