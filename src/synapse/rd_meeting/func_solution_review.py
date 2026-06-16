@@ -24,6 +24,18 @@ REVISION_CONTEXT_NAME = "revision_context.json"
 MD_NAME = "函数级方案.md"
 SCHEMA_VERSION = 1
 REVISION_CONTEXT_SCHEMA_VERSION = 1
+
+
+def _coerce_schema_version(raw: Any) -> int:
+    """Accept model-emitted version strings like ``\"1\"`` or ``\"1.0\"``."""
+    if raw is None or raw == "":
+        return SCHEMA_VERSION
+    try:
+        return int(float(raw))
+    except (TypeError, ValueError):
+        return SCHEMA_VERSION
+
+
 _PLAN_SUMMARY_MAX_LEN = 240
 MIN_HUMAN_REVIEW_COMMENT_LEN = 20
 
@@ -606,7 +618,7 @@ def normalize_payload(data: dict[str, Any]) -> dict[str, Any]:
     if status not in ("pending", "approved", "rejected", "needs_revision"):
         status = "pending"
     return {
-        "schema_version": int(data.get("schema_version") or SCHEMA_VERSION),
+        "schema_version": _coerce_schema_version(data.get("schema_version")),
         "demand_no": str(data.get("demand_no") or "").strip(),
         "requirement_name": str(data.get("requirement_name") or "").strip(),
         "reviewed_at": str(data.get("reviewed_at") or "").strip() or None,

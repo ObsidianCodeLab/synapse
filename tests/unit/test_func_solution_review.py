@@ -115,6 +115,20 @@ def test_normalize_payload():
     assert out["overview"]["diagrams"][0]["mermaid"].startswith("flowchart")
 
 
+@pytest.mark.parametrize(
+    "schema_version",
+    ["1.0", "1", 1, 1.0, None, ""],
+)
+def test_normalize_payload_schema_version_coercion(schema_version):
+    payload = dict(SAMPLE_REVIEW)
+    if schema_version is None:
+        payload.pop("schema_version", None)
+    else:
+        payload["schema_version"] = schema_version
+    out = normalize_payload(payload)
+    assert out["schema_version"] == 1
+
+
 def test_validate_and_apply(tmp_path, monkeypatch):
     scope_id = "fs-review-1"
     archive = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
