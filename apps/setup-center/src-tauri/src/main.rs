@@ -8302,6 +8302,16 @@ fn cursor_agent_cli_install_sync(app: tauri::AppHandle) -> Result<String, String
                 stderr.trim()
             ));
         }
+        let aliases = repair_cursor_agent_version_dirs_if_needed();
+        if !aliases.is_empty() {
+            emit_cursor_agent_install_line(
+                &app,
+                &format!(
+                    "已自动修复 Cursor Agent 版本目录命名（{}）…\n",
+                    aliases.join(", ")
+                ),
+            );
+        }
         let check = cursor_agent_cli_check_sync();
         if !check.installed {
             return Err(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from synapse.rd_meeting.cursor_agent_cli import (
     check_cursor_agent_cli,
@@ -65,6 +66,115 @@ def test_resolve_agent_launch_argv_uses_version_node(tmp_path):
 
     argv = resolve_agent_launch_argv(str(agent))
     assert argv == [str(node.resolve()), str(index.resolve())]
+
+
+def test_resolve_agent_launch_argv_uses_timestamp_version_node(tmp_path):
+    from synapse.rd_meeting.cursor_agent_cli import resolve_agent_launch_argv
+
+    version_dir = tmp_path / "versions" / "2026.06.12-19-59-36-f6aba9a"
+    version_dir.mkdir(parents=True)
+    node = version_dir / "node.exe"
+    index = version_dir / "index.js"
+    node.write_text("", encoding="utf-8")
+    index.write_text("", encoding="utf-8")
+    agent = tmp_path / "agent.cmd"
+    agent.write_text("@echo off", encoding="utf-8")
+
+    argv = resolve_agent_launch_argv(str(agent))
+    assert argv == [str(node.resolve()), str(index.resolve())]
+
+
+def test_legacy_alias_for_timestamp_dir():
+    from synapse.rd_meeting.cursor_agent_cli import legacy_alias_for_timestamp_dir
+
+    assert legacy_alias_for_timestamp_dir("2026.06.12-19-59-36-f6aba9a") == "2026.06.12-f6aba9a"
+    assert legacy_alias_for_timestamp_dir("2026.06.04-abc123") is None
+
+
+def test_detect_cursor_agent_version_dir_issue_finds_pending_aliases(tmp_path, monkeypatch):
+    from synapse.rd_meeting.cursor_agent_cli import detect_cursor_agent_version_dir_issue
+
+    base = tmp_path / "cursor-agent"
+    version_dir = base / "versions" / "2026.06.12-19-59-36-f6aba9a"
+    version_dir.mkdir(parents=True)
+    (version_dir / "node.exe").write_text("", encoding="utf-8")
+    (version_dir / "index.js").write_text("", encoding="utf-8")
+    (base / "agent.cmd").write_text("@echo off\necho broken", encoding="utf-8")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(
+        "synapse.rd_meeting.cursor_agent_cli._query_agent_version",
+        lambda _resolved: None,
+    )
+
+    issue = detect_cursor_agent_version_dir_issue(base)
+    assert issue["needs_repair"] is True
+    assert issue["pending"] == [
+        {"timestamp_dir": "2026.06.12-19-59-36-f6aba9a", "alias": "2026.06.12-f6aba9a"}
+    ]
+
+
+def test_detect_cursor_agent_version_dir_issue_skips_when_version_ok(tmp_path, monkeypatch):
+    from synapse.rd_meeting.cursor_agent_cli import detect_cursor_agent_version_dir_issue
+
+    base = tmp_path / "cursor-agent"
+    version_dir = base / "versions" / "2026.06.12-19-59-36-f6aba9a"
+    version_dir.mkdir(parents=True)
+    (version_dir / "node.exe").write_text("", encoding="utf-8")
+    (version_dir / "index.js").write_text("", encoding="utf-8")
+    (base / "agent.cmd").write_text("@echo off", encoding="utf-8")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(
+        "synapse.rd_meeting.cursor_agent_cli._query_agent_version",
+        lambda _resolved: "agent 2026.06.12-f6aba9a",
+    )
+
+    issue = detect_cursor_agent_version_dir_issue(base)
+    assert issue["needs_repair"] is False
+    assert issue["reason"] == "agent_version_ok"
+
+
+def test_repair_cursor_agent_version_dirs_creates_alias(tmp_path, monkeypatch):
+    from synapse.rd_meeting.cursor_agent_cli import (
+        detect_cursor_agent_version_dir_issue,
+        repair_cursor_agent_version_dirs,
+    )
+
+    base = tmp_path / "cursor-agent"
+    version_dir = base / "versions" / "2026.06.12-19-59-36-f6aba9a"
+    version_dir.mkdir(parents=True)
+    (version_dir / "node.exe").write_text("", encoding="utf-8")
+    (version_dir / "index.js").write_text("", encoding="utf-8")
+    (base / "agent.cmd").write_text("@echo off", encoding="utf-8")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(
+        "synapse.rd_meeting.cursor_agent_cli._query_agent_version",
+        lambda _resolved: None,
+    )
+    created_dirs: list[tuple[str, str]] = []
+
+    def fake_mklink(link, target):
+        Path(link).mkdir()
+        created_dirs.append((str(link), str(target)))
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.cursor_agent_cli._create_dir_junction",
+        fake_mklink,
+    )
+
+    assert detect_cursor_agent_version_dir_issue(base)["needs_repair"] is True
+    result = repair_cursor_agent_version_dirs(base)
+    assert result["applied"] is True
+    assert result["aliases"] == ["2026.06.12-f6aba9a"]
+    assert created_dirs == [
+        (
+            str((base / "versions" / "2026.06.12-f6aba9a").resolve()),
+            str(version_dir.resolve()),
+        )
+    ]
+    assert detect_cursor_agent_version_dir_issue(base)["needs_repair"] is False
 
 
 def test_is_workspace_trust_error():
