@@ -152,6 +152,17 @@ def is_human_only_node(node_id: str) -> bool:
     return NODE_TYPES.get(node_id, "") == "human"
 
 
+# 节点完成后暂不推进下游（原因 → 展示/落盘）；用于下游 SOP 尚未就绪的临时门控
+NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {
+    "diff_analysis": "下游节点（任务检查、测试案例等）尚未设计开发，试飞优化完成后暂不推进流水线。",
+}
+
+
+def downstream_advance_block_reason(node_id: str) -> str:
+    """若该节点完成后应阻断 SOP 推进，返回原因文案；否则为空。"""
+    return NODE_DOWNSTREAM_ADVANCE_BLOCKED.get((node_id or "").strip(), "").strip()
+
+
 # 节点产出文档（只读展示；归档路径 archive/<stage_name>/<node_id>/）
 NODE_OUTPUTS: dict[str, list[str]] = {
     "pending": ["（系统节点，无归档产出）"],

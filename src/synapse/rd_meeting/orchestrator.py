@@ -88,6 +88,7 @@ from synapse.rd_meeting.validation import (
     validate_node_archive_artifacts,
 )
 from synapse.rd_sop.manifest import (
+    downstream_advance_block_reason,
     next_node_id,
     node_output_artifacts,
 )
@@ -536,6 +537,11 @@ class MeetingRoomOrchestrator:
 
         next_id: str | None = None
         prev_stage_id = stage_id_for_node_id(node_id)
+        requested_advance = advance
+        downstream_block_reason = downstream_advance_block_reason(node_id)
+        if downstream_block_reason and requested_advance:
+            advance = False
+
         if advance:
             next_id = next_node_id(node_id)
             if next_id:
@@ -560,6 +566,14 @@ class MeetingRoomOrchestrator:
         else:
             room_state["current_node_id"] = node_id
 
+        if downstream_block_reason and requested_advance:
+            room_state["status"] = "failed"
+            room_state["downstream_blocked"] = True
+            room_state["downstream_block_reason"] = downstream_block_reason
+            dev["local_process_state"] = "失败"
+            dev["current_node_id"] = node_id
+            dev["sop_node_display"] = node_display_name(node_id)
+
         if advance and next_id:
             room_state.pop(READY_FOR_NODE_REVIEW_KEY, None)
             room_state.pop(HITL_CLARIFY_ROUND_KEY, None)
@@ -577,8 +591,23 @@ class MeetingRoomOrchestrator:
                 "tokens_used": archived_tokens,
                 "duration_seconds": archived_seconds,
                 "next_node_id": next_id,
+                "downstream_blocked": bool(downstream_block_reason and requested_advance),
             },
         )
+
+        if downstream_block_reason and requested_advance:
+            append_history_event(
+                sid,
+                {
+                    "event": "node_failed",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "error": downstream_block_reason,
+                    "downstream_blocked": True,
+                    "log_type": "warning",
+                    "agent_id": "system",
+                },
+            )
 
         if sync_userwork:
             patch_userwork_summary(
@@ -587,7 +616,7 @@ class MeetingRoomOrchestrator:
                 sop_node=str(dev.get("sop_node_display") or node_display_name(str(dev.get("current_node_id")))),
                 local_process_state=str(dev.get("local_process_state") or "").strip() or None,
             )
-            if node_id == "diff_analysis" and scope_type == "task":
+            if node_id == "diff_analysis" and scope_type == "task" and requested_advance and next_id:
                 try:
                     from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_COMPLETED
                     from synapse.rd_meeting.auto_split_assets import _resolve_demand_no
