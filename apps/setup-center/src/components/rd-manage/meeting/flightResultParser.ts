@@ -72,6 +72,32 @@ const URL_RE = /^https?:\/\/\S+$/i;
 
 const GENERIC_BUILD_STATUS = new Set(['构建失败', '构建成功', '构建中']);
 
+const GENERIC_COMPILE_SUMMARY_MARKERS = [
+  '编译节点执行失败',
+  '脚本或者程序返回非0值',
+  '请检查脚本执行日志',
+] as const;
+
+export function isGenericCompileSummary(text: string | undefined | null): boolean {
+  const plain = stripHtmlToText(String(text || ''), 8000);
+  if (!plain) return true;
+  if (GENERIC_COMPILE_SUMMARY_MARKERS.some((marker) => plain.includes(marker))) {
+    const lowered = plain.toLowerCase();
+    return !lowered.includes('error:') && !lowered.includes('make:');
+  }
+  return false;
+}
+
+/** 编译节点展示用日志：过滤研发云通用失败摘要，保留 g++/make 等脚本输出 */
+export function resolveCompileLogText(text: string | undefined | null): string {
+  const raw = String(text || '').trim();
+  if (!raw || isGenericCompileSummary(raw)) return '';
+  if (/<\s*(html|table|li|div|span|p|br)\b/i.test(raw)) {
+    return stripHtmlToText(raw, 200_000);
+  }
+  return raw;
+}
+
 export function resolveFlightCardRunStateDesc(
   runStateDesc: string,
   parsedBuildResults: ParsedBuildResult[],
@@ -95,18 +121,12 @@ export function resolveBuildFailureReason(item: {
   alarms?: BuildResultAlarm[];
   tables?: ParsedBuildTable[];
 }): string {
+  if (item.buildKind === 'compile') {
+    return '';
+  }
+
   const desc = String(item.nodeStateDesc || '').trim();
   if (desc && !isGenericBuildStatus(desc)) return desc;
-
-  if (item.buildKind === 'compile') {
-    for (const candidate of [item.plainText, item.preview]) {
-      const text = String(candidate || '').trim();
-      if (text && !isGenericBuildStatus(text)) return text;
-    }
-    const desc = stripHtmlToText(String(item.nodeStateDesc || ''), 8000);
-    if (desc && !isGenericBuildStatus(desc)) return desc;
-    return item.plainText?.trim() || item.preview?.trim() || '';
-  }
 
   if (item.buildKind === 'code_check' && item.alarms?.length) return '';
 
@@ -400,6 +420,9 @@ export function parseBuildResultRow(row: BuildResultInput): ParsedBuildResult {
           ? `${compileParsed.plainText.slice(0, 160)}…`
           : compileParsed.plainText;
     }
+    const compileLog = resolveCompileLogText(compileParsed.plainText);
+    compileParsed.plainText = compileLog;
+    compileParsed.preview = compileLog.length > 160 ? `${compileLog.slice(0, 160)}…` : compileLog;
     return compileParsed;
   }
   return { ...parsed, buildKind: 'legacy' };

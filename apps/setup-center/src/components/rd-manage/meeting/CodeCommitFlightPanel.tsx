@@ -13,6 +13,7 @@ import {
   formatAlarmCcn,
   parseBuildResultRow,
   resolveBuildFailureReason,
+  resolveCompileLogText,
   resolveFlightCardRunStateDesc,
   type BuildResultAlarm,
   type ParsedBuildResult,
@@ -106,6 +107,8 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
     (item.kind === 'text' && item.plainText.length > item.preview.length) ||
     item.tables.length > 0;
   const failureReason = resolveBuildFailureReason(item);
+  const compileLogText =
+    item.buildKind === 'compile' ? resolveCompileLogText(item.plainText) : '';
 
   return (
     <details
@@ -149,11 +152,11 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
         {item.kind === 'html' && !item.tables.length ? (
           <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
         ) : null}
-        {item.kind === 'text' && hasExpand && item.buildKind !== 'code_check' ? (
+        {item.kind === 'text' && hasExpand && item.buildKind !== 'code_check' && item.buildKind !== 'compile' ? (
           <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
         ) : null}
-        {item.buildKind === 'compile' && item.kind === 'text' && !hasExpand && item.plainText ? (
-          <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
+        {compileLogText ? (
+          <pre className="rd-flight-build-result__pre">{compileLogText}</pre>
         ) : null}
         {item.kind === 'empty' ? (
           <p className="text-[11px] text-muted-foreground mb-0">无构建明细</p>
