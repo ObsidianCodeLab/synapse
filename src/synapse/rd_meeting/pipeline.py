@@ -1268,9 +1268,12 @@ def _step_reprocess_prep(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None
     pctx.pop("reprocess_reason", None)
     pctx.pop("reprocess_until_node_id", None)
 
-    if uses_task_exec_node(run_node):
-        from synapse.rd_meeting.task_exec_rounds import on_task_exec_reprocess_prep
+    from synapse.rd_meeting.task_exec_rounds import (
+        on_task_exec_reprocess_prep,
+        uses_task_exec_node,
+    )
 
+    if uses_task_exec_node(run_node):
         on_task_exec_reprocess_prep(pipe, reason=reason)
 
     extra = [n for n in range_ids if n != run_node] if historical else None
