@@ -1042,7 +1042,6 @@ def bootstrap_task_exec(
                 scope_type=scope_type,
                 scope_id=sid,
                 sop_node="任务执行",
-                local_process_state="human_intervention",
             )
             return result_doc
 
@@ -1408,7 +1407,6 @@ def bootstrap_task_exec(
         scope_type=scope_type,
         scope_id=sid,
         sop_node="任务执行",
-        local_process_state="human_intervention",
     )
 
     return result_doc

@@ -6,7 +6,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from synapse.rd_meeting.product_assets import _run_git, resolve_sandbox_path_for_product_module
@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 ScopeType = Literal["demand", "task"]
 
 _FLIGHT_POLL_INTERVAL_SEC = 15
-_FLIGHT_POLL_MAX_WAIT_SEC = 600
+_FLIGHT_POLL_MAX_WAIT_SEC = 1800
+_FLIGHT_FRESHNESS_GRACE_SEC = 120
 
 CodeCommitPhase = Literal["prepare", "commit", "flight_poll", "archive", "done"]
 
@@ -122,11 +123,53 @@ def _resolve_overall_status(
     if commit_errors and not all_commits_ok:
         return "failed"
     flight_st = str(flight_summary.get("status") or "").strip()
+    if flight_st in ("timeout", "pending"):
+        return "failed"
     if flight_st == "failed":
         return "partial" if commit_ok > 0 else "failed"
-    if flight_st in ("timeout", "pending"):
-        return "partial"
     return "ok"
+
+
+def _parse_portal_dt(raw: Any) -> datetime | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(text[:19], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _flight_result_is_fresh(flight_row: dict[str, Any], not_before: datetime | None) -> bool:
+    """提交后只接受 beginDate 不早于本次提交的构建记录，避免误用历史成功/失败。"""
+    if not_before is None:
+        return True
+    data = flight_row.get("data") if isinstance(flight_row.get("data"), dict) else {}
+    run_state = str(data.get("ciFlowInstRunState") or "").strip()
+    if run_state in ("-1", ""):
+        return True
+    begin = _parse_portal_dt(data.get("ciFlowInstBeginDate"))
+    if begin is None:
+        return False
+    grace = timedelta(seconds=_FLIGHT_FRESHNESS_GRACE_SEC)
+    return begin >= not_before - grace
+
+
+def _is_no_flight_history_response(resp: dict[str, Any]) -> bool:
+    if resp.get("errorcode") != 502:
+        return False
+    msg = str(resp.get("message") or resp.get("errormsg") or "")
+    return "构建历史" in msg or "history" in msg.lower()
+
+
+def _sandbox_commit_pending(local_path: str) -> tuple[bool, str, list[str]]:
+    """返回 (ok, detail, committable_paths)。"""
+    repo_root = _git_toplevel(local_path)
+    if not repo_root:
+        return False, "缺少沙箱本地路径", []
+    return collect_repo_commit_stage_paths(repo_root)
 
 
 def _git_toplevel(path: str) -> str:
@@ -143,6 +186,60 @@ def _build_commit_message(feature_id: str, summary: str) -> str:
     if branch and body:
         return f"{branch} {body}"
     return branch or body or "auto commit"
+
+
+def _commit_task_or_skip(
+    *,
+    local_path: str,
+    commit_message: str,
+    feature_branch: str,
+) -> dict[str, Any]:
+    """提交并推送；若沙箱无可提交变更（不含过滤项）则跳过提交环节。"""
+    ok_paths, path_detail, stage_paths = _sandbox_commit_pending(local_path)
+    repo_root = _git_toplevel(local_path)
+    if not ok_paths:
+        return {
+            "local_path": repo_root or local_path,
+            "status": "failed",
+            "commit_hash": "",
+            "commit_message": commit_message,
+            "push_detail": "",
+            "error": path_detail or "git status 失败",
+            "commit_skipped": False,
+            "commit_finished_at": None,
+        }
+
+    if not stage_paths:
+        entry: dict[str, Any] = {
+            "local_path": repo_root or local_path,
+            "status": "ok",
+            "commit_hash": "",
+            "commit_message": commit_message,
+            "push_detail": "无可提交变更，跳过 git commit/push",
+            "error": "",
+            "commit_skipped": True,
+            "commit_finished_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        if repo_root:
+            ok_hash, hash_detail = _run_git(
+                ["git", "-C", repo_root, "rev-parse", "HEAD"],
+                timeout=30.0,
+            )
+            if ok_hash:
+                entry["commit_hash"] = (hash_detail or "").strip()
+        return entry
+
+    commit_row = _commit_and_push(
+        local_path=local_path,
+        commit_message=commit_message,
+        feature_branch=feature_branch,
+    )
+    commit_row["commit_skipped"] = False
+    if commit_row.get("status") == "ok":
+        commit_row["commit_finished_at"] = datetime.now().isoformat(timespec="seconds")
+    else:
+        commit_row["commit_finished_at"] = None
+    return commit_row
 
 
 def _commit_and_push(
@@ -263,8 +360,14 @@ def _run_state_desc(state: str) -> str:
     return "构建中"
 
 
-def _normalize_flight_data(resp: dict[str, Any]) -> dict[str, Any]:
+def _normalize_flight_data(
+    resp: dict[str, Any],
+    *,
+    treat_no_history_as_pending: bool = False,
+) -> dict[str, Any]:
     if resp.get("errorcode") != 0:
+        if treat_no_history_as_pending and _is_no_flight_history_response(resp):
+            return {"status": "pending", "error": "", "data": {}}
         return {
             "status": "failed",
             "error": str(resp.get("message") or resp.get("errormsg") or "获取试飞结果失败"),
@@ -307,6 +410,7 @@ async def _wait_for_flight_result_async(
     portal_task_id: int,
     *,
     on_poll: Callable[[dict[str, Any]], None] | None = None,
+    not_before: datetime | None = None,
 ) -> dict[str, Any]:
     if not portal_task_id:
         return {"status": "skipped", "error": "缺少 portal taskId，跳过试飞轮询", "data": {}}
@@ -316,14 +420,15 @@ async def _wait_for_flight_result_async(
 
     while time.monotonic() < deadline:
         resp = await _fetch_flight_build_status(portal_task_id)
-        last = _normalize_flight_data(resp)
+        last = _normalize_flight_data(resp, treat_no_history_as_pending=True)
         if on_poll:
             on_poll(last)
-        if last.get("status") in ("ok", "failed"):
+        st = str(last.get("status") or "").strip()
+        if st in ("ok", "failed") and _flight_result_is_fresh(last, not_before):
             return last
         await asyncio.sleep(_FLIGHT_POLL_INTERVAL_SEC)
 
-    last.setdefault("error", "等待试飞结果超时")
+    last.setdefault("error", f"等待试飞结果超时（{_FLIGHT_POLL_MAX_WAIT_SEC} 秒）")
     last["status"] = "timeout"
     if on_poll:
         on_poll(last)
@@ -334,8 +439,15 @@ def _wait_for_flight_result(
     portal_task_id: int,
     *,
     on_poll: Callable[[dict[str, Any]], None] | None = None,
+    not_before: datetime | None = None,
 ) -> dict[str, Any]:
-    return asyncio.run(_wait_for_flight_result_async(portal_task_id, on_poll=on_poll))
+    return asyncio.run(
+        _wait_for_flight_result_async(
+            portal_task_id,
+            on_poll=on_poll,
+            not_before=not_before,
+        )
+    )
 
 
 def _int_portal_task_id(raw: Any) -> int | None:
@@ -676,13 +788,15 @@ def bootstrap_code_commit(
             commit_errors.append(f"{task_no}: 缺少 feature_id")
             continue
 
-        commit_row = _commit_and_push(
+        commit_row = _commit_task_or_skip(
             local_path=sandbox_path,
             commit_message=str(order.get("commit_message") or ""),
             feature_branch=feature_id,
         )
         row["commit_hash"] = commit_row.get("commit_hash") or ""
         row["local_path"] = commit_row.get("local_path") or sandbox_path
+        row["commit_skipped"] = bool(commit_row.get("commit_skipped"))
+        row["commit_finished_at"] = commit_row.get("commit_finished_at")
         if commit_row.get("status") == "ok":
             row["status"] = "ok"
         else:
@@ -810,7 +924,16 @@ def bootstrap_code_commit(
                     summary=poll_summary,
                 )
 
-            row["flight"] = _wait_for_flight_result(portal_task_id, on_poll=_on_flight_poll)
+            commit_not_before = (
+                None
+                if row.get("commit_skipped")
+                else _parse_portal_dt(row.get("commit_finished_at"))
+            )
+            row["flight"] = _wait_for_flight_result(
+                portal_task_id,
+                on_poll=_on_flight_poll,
+                not_before=commit_not_before,
+            )
 
             flight_summary = _aggregate_flight_status(task_results)
             summary["flight_ok"] = sum(
@@ -875,18 +998,36 @@ def bootstrap_code_commit(
         commit_ok=commit_ok,
         flight_summary=flight_summary,
     )
+    flight_errors = [
+        str(flight_summary.get("error") or "").strip(),
+        *[
+            f"{row.get('task_no')}: {row.get('flight', {}).get('error')}"
+            for row in task_results
+            if isinstance(row.get("flight"), dict)
+            and str(row["flight"].get("status") or "") in ("timeout", "pending")
+            and row["flight"].get("error")
+        ],
+    ]
+    overall_error = "; ".join(
+        part for part in ([*commit_errors, *[e for e in flight_errors if e]]) if part
+    )
 
+    done_message = (
+        "代码提交与试飞结果收集完成"
+        if status in ("ok", "partial")
+        else "代码提交或试飞等待失败"
+    )
     result_doc.update(
         {
             "status": status,
-            "error": "; ".join(commit_errors) or str(flight_summary.get("error") or ""),
+            "error": overall_error,
             "tasks": task_results,
             "flight": flight_summary,
             "summary": summary,
             "finished_at": datetime.now().isoformat(timespec="seconds"),
             "progress": _code_commit_progress_snapshot(
                 phase="done",
-                message="代码提交与试飞结果收集完成",
+                message=done_message,
                 task_index=task_total,
                 task_total=task_total,
             ),
