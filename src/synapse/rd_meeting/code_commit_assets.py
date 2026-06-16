@@ -306,8 +306,8 @@ def _commit_and_push(
     return entry
 
 
-def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
+def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
     for item in raw_items:
         if not isinstance(item, dict):
             continue
@@ -335,8 +335,13 @@ def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, str]]:
             or item.get("runResult")
             or ""
         ).strip()
-        if result_type or result_msg:
-            rows.append({"resultType": result_type, "resultMsg": result_msg})
+        if not (result_type or result_msg):
+            continue
+        row: dict[str, Any] = {"resultType": result_type, "resultMsg": result_msg}
+        for key in ("kind", "nodeState", "nodeStateDesc", "alarms"):
+            if key in item:
+                row[key] = item[key]
+        rows.append(row)
     return rows
 
 
@@ -628,10 +633,26 @@ def format_flight_result_report(assets: dict[str, Any], *, node_name: str = "试
                 for item in build_result:
                     if not isinstance(item, dict):
                         continue
+                    kind = str(item.get("kind") or "").strip()
                     lines.append(
                         f"  - {item.get('resultType') or '检查项'}："
                         f"{str(item.get('resultMsg') or '')[:500]}"
                     )
+                    if kind == "code_check":
+                        alarms = item.get("alarms") if isinstance(item.get("alarms"), list) else []
+                        for alarm in alarms:
+                            if not isinstance(alarm, dict):
+                                continue
+                            fn = alarm.get("functionName") or ""
+                            file_name = alarm.get("fileName") or ""
+                            ccn = alarm.get("ccnCount")
+                            bench = alarm.get("benchmarkCcnCount")
+                            ccn_text = (
+                                f"CCN({bench}↗{ccn})"
+                                if bench is not None and ccn is not None
+                                else f"CCN={ccn}"
+                            )
+                            lines.append(f"    · {file_name} {fn} {ccn_text}".strip())
         if task_flight.get("error"):
             lines.append(f"- 错误：{task_flight.get('error')}")
     return "\n".join(lines) + "\n"

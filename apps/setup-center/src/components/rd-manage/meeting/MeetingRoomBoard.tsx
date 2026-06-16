@@ -2031,7 +2031,18 @@ const InterventionDialog = ({
     room?.status === 'human_intervention' ||
     room?.status === 'stopped';
 
+  const canReprocessCodeCommitNode = (nodeId: string) => {
+    if (!room || nodeId !== 'exception_check') return false;
+    if (room.runInProgress || room.reprocessingNodeId) return false;
+    if (stageIdForNodeId(nodeId) !== stageIdForNodeId(room.currentNode)) return false;
+    if (!['processing', 'failed', 'stopped', 'human_intervention'].includes(room.status)) return false;
+    const nodeState = getNodeStateGlobal(room, nodeId, disabledSopNodeIds);
+    if (nodeId === room.currentNode) return true;
+    return nodeState === 'completed';
+  };
+
   const canReprocessHistoricalNode = (nodeId: string, nodeType: string) =>
+    canReprocessCodeCommitNode(nodeId) ||
     Boolean(
       room &&
       reprocessableRoomStatus &&
@@ -2045,10 +2056,11 @@ const InterventionDialog = ({
   const canReprocess = Boolean(
     room &&
     selectedNode &&
-    reprocessableRoomStatus &&
     !room.runInProgress &&
-    (selectedNode.id === room.currentNode ||
-      canReprocessHistoricalNode(selectedNode.id, selectedNode.type)),
+    (canReprocessCodeCommitNode(selectedNode.id) ||
+      (reprocessableRoomStatus &&
+        (selectedNode.id === room.currentNode ||
+          canReprocessHistoricalNode(selectedNode.id, selectedNode.type)))),
   );
 
   const canRecover = Boolean(
@@ -2423,7 +2435,13 @@ const InterventionDialog = ({
                     </Tooltip>
                   ) : null}
                   {canReprocessHistoricalNode(node.id, node.type) ? (
-                    <Tooltip title="跨节点重新处理（清理本节点至当前节点之间的过程数据后，从本节点重跑）">
+                    <Tooltip
+                      title={
+                        node.id === 'exception_check'
+                          ? '重新执行代码提交与试飞（清理本节点及后续产出）'
+                          : '跨节点重新处理（清理本节点至当前节点之间的过程数据后，从本节点重跑）'
+                      }
+                    >
                       <button
                         type="button"
                         disabled={Boolean(room.reprocessingNodeId)}
@@ -3257,8 +3275,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes('cross_stage_reprocess_forbidden')) {
           toast.error('不允许跨阶段重新处理');
-        } else if (msg.includes('system_node')) {
-          toast.error('系统节点不允许重新处理');
+        } else if (msg.includes('code_commit_reprocess_invalid')) {
+          toast.error('当前流程尚未到达代码提交节点，无法重处理');
+        } else if (msg.includes('system_node') && !msg.includes('code_commit')) {
+          toast.error('该系统节点不允许重新处理');
         } else if (msg.includes('invalid_reprocess_target')) {
           toast.error('只能重新处理当前阶段内已完成的历史节点');
         } else if (msg.includes('room_completed')) {

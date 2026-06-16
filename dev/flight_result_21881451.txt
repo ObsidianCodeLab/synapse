@@ -1,0 +1,193 @@
+========================================================================
+试飞总体
+========================================================================
+status: failed
+error:  11929917: 构建失败
+
+========================================================================
+子单 11929917 | commit=ok
+========================================================================
+flight.status: failed
+flight.error:  构建失败
+taskId: 1929917
+构建状态: 构建失败
+开始: 2026-06-16 20:54:05
+结束: 2026-06-16 20:58:04
+buildResult 条目数: 1
+
+------------------------------------------------------------------------
+[1] resultType: SOURCEMONITOR代码检查(新)
+    resultMsg 长度: 184885 字符
+    runResult: 
+
+    HTML 表格: 数据行 819
+      - 带 class=ccn 标红: 819
+      - 无标红: 0
+      - CCN 范围: 11 ~ 290
+      - CCN>15: 505
+      - CCN<=15: 314
+
+    【标红行 TOP 30（按 CCN 降序）】
+      CCN=290 NCSS=1041 | TZmdbConfig::LoadDsnCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfi
+      CCN=106 NCSS= 582 | TZmdbLocalQuery::Next() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbLocalQuery.cpp:2708
+      CCN=104 NCSS= 531 | TZmdbNodeDatabase::HandleCombine( EOpType eSqlType , TZmdbClientDatabase * pClientMdbActive , TZmdbClientDatabase * pClientMdbStdb
+      CCN=102 NCSS= 470 | TZmdbTableCtrl::CheckWhere( TZmdbPairTree * pWhereTree) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Contro
+      CCN= 91 NCSS= 407 | TZmdbConfig::LoadOneTable( int iTempTableID , bool bLoadAll , bool bCheckColumn , bool bCheckPKColumn) at /home/ZCIPClient/workpat
+      CCN= 87 NCSS= 533 | TZmdbTableCtrl::CheckJoinLayerWhere( TZmdbPairTree * pJoinWhereTree , map<string,int> & mapLayerTable , map<string,TZmdbJoinSQLPar
+      CCN= 87 NCSS= 315 | TZmdbConfig::Refresh( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.c
+      CCN= 85 NCSS= 398 | TZmdbLocalQuery::AdjustSQL( const char * sSqlStatement , ZmdbParseSqlStruct * pResult) at /home/ZCIPClient/workpath/73228/code/Bac
+      CCN= 85 NCSS= 409 | TZmdbClientQuery::PrepareNextData() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbClientQuery.
+      CCN= 85 NCSS= 311 | ZmdbMachineDeploy::TransferFiles( const char * pSrcPath , int iTransType , const char * pFileName) at /home/ZCIPClient/workpath/73
+      CCN= 83 NCSS= 431 | TZmdbCacheFlush::LoadCacheDataFromPdb( TZmdbCacheTableCfg & tCfg) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Z
+      CCN= 83 NCSS= 226 | TZmdbConfig::ValidateConfigRange( const char * key , const char * value , char * pszErrmsg) at /home/ZCIPClient/workpath/73228/cod
+      CCN= 79 NCSS= 488 | TZmdbConfig::CheckTableColumnInfo( TZmdbTable * pTable , char * pszCheckTableName) at /home/ZCIPClient/workpath/73228/code/BackSer
+      CCN= 79 NCSS= 430 | TZmdbUserOper::ModifyUser() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbUserOper.cpp:573
+      CCN= 78 NCSS= 411 | TZmdbTableCtrl::Commit( TZmdbDataDesc * pComData , int iDataUpdNum , map<int,ZTMdbRowID> & mapCacheRowID) at /home/ZCIPClient/work
+      CCN= 76 NCSS= 321 | TZmdbConfig::LoadMonitorCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:13693
+      CCN= 70 NCSS= 248 | XML_PARSER::ZCXmlParser::ParseXmlBuffer( std :: string & sReserveBuffer , const char * pszBuffer , ZCXmlNode * & pParentXmlNode) a
+      CCN= 69 NCSS= 381 | main( int argc , char * argv [ ]) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/QuickMDB.cpp:698
+      CCN= 69 NCSS= 385 | TZmdbTableCtrl::CommitWithVarchar( TZmdbDataDesc * pComData , int iDataUpdNum , map<int,ZTMdbRowID> & mapCacheRowID) at /home/ZCIP
+      CCN= 69 NCSS= 463 | ZmdbSqlMap::SqlMap( const TSyntaxTree & oTree , ZmdbParseSqlStruct & tResult , TZmdbOrderBy * pOrderBy , int & OrderByCounts , TZm
+      CCN= 67 NCSS= 357 | CmdbClusterAgentClientThread::SetParameter( int iSqlID , CZmdbDataBuffer & tSetParamData , int nNextDataPos , int nParamsDataLen ,
+      CCN= 66 NCSS= 332 | TZmdbDAOLoad::InitLoadMysql( char * sTableName , TZmdbLoadSQL * & pNewSql , TZmdbLoadSQL * & pFirstSql , TZmdbLoadSQL * & pLastSql
+      CCN= 65 NCSS= 290 | TZmdbLocalQuery::Execute( int iExecuteRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbLocalQ
+      CCN= 65 NCSS= 324 | TZmdbLoadFromOra::LoadTable( const char * pTableIN , int iNodeId , bool bReload) at /home/ZCIPClient/workpath/73228/code/BackServi
+      CCN= 61 NCSS= 255 | TZmdbLocalQuery::CheckSQLIndex( const char * sSqlStatement) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Co
+      CCN= 61 NCSS= 394 | TZmdbQuery::Open( int prefetchRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:56
+      CCN= 60 NCSS= 463 | TZmdbCompareThread::CompareData() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/mdbCacheTools.cpp:230
+      CCN= 59 NCSS= 285 | ReadMdbDataChangeCfg( char * pszProdServerName , char * pszProdUser , char * pszProdPwd , int & iProdType , char * pszCustServerNa
+      CCN= 59 NCSS= 361 | CommandParamCheck( int argc , char * argv [ ] , ZParamList & stParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/c
+      CCN= 59 NCSS= 293 | TZmdbQuery::HandleSetSQLReq( const char * sSqlStatement , int iPreFetchRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCp
+      ... 共 819 条标红行
+
+    【HTML 开头 800 字符】
+<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Lizard Analysis Report</title>
+<style type="text/css">
+                    table {
+                    border-collapse: collapse;
+                    width: 100%
+                    }
+                    table, th, td {
+                    border: 2px solid #FFFFFF;
+                    padding: 5px;
+                    }
+                    thead {
+                    background-color: #f2f2f2;
+                    }
+                    .average {
+                    font-weight: bold;
+                    }
+                    table tr td, tr th {
+                    font-size: 60%;
+                    }
+                    table.details tr th{
+                    font-weight: bold;
+                    
+
+========================================================================
+归档 试飞结果.md（完整，注意 resultMsg 可能被截断）
+========================================================================
+# 试飞结果
+
+- 总体试飞状态：failed
+- 报错：11929917: 构建失败
+
+## 11929917 · 11929917
+- 试飞状态：failed
+- taskId：1929917
+- 开始：2026-06-16 20:54:05
+- 结束：2026-06-16 20:58:04
+- 构建状态：构建失败
+- 构建明细：
+  - SOURCEMONITOR代码检查(新)：<html>
+<head>
+<META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Lizard Analysis Report</title>
+<style type="text/css">
+                    table {
+                    border-collapse: collapse;
+                    width: 100%
+                    }
+                    table, th, td {
+                    border: 2px solid #FFFFFF;
+                    padding: 5px;
+                    }
+                    thead {
+                    background-color: #f2f2f2;
+             
+- 错误：构建失败
+
+========================================================================
+buildResult 原始字段
+========================================================================
+{
+  "resultType": "SOURCEMONITOR代码检查(新)",
+  "resultMsg": "<html 184885 chars>"
+}
+
+========================================================================
+本次 commit 相关函数（ZmdbReadOraLog / LoadTableGroup / BackupInfo 等）
+========================================================================
+  CCN= 91 NCSS= 407 marked=True | TZmdbConfig::LoadOneTable( int iTempTableID , bool bLoadAll , bool bCheckColumn , bool bCheckPKColumn) at /home/ZCIPClient/workpath/73228/co
+  CCN= 87 NCSS= 315 marked=True | TZmdbConfig::Refresh( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:12416
+  CCN= 83 NCSS= 226 marked=True | TZmdbConfig::ValidateConfigRange( const char * key , const char * value , char * pszErrmsg) at /home/ZCIPClient/workpath/73228/code/BackServ
+  CCN= 79 NCSS= 488 marked=True | TZmdbConfig::CheckTableColumnInfo( TZmdbTable * pTable , char * pszCheckTableName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/sr
+  CCN= 76 NCSS= 321 marked=True | TZmdbConfig::LoadMonitorCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:13693
+  CCN= 48 NCSS= 231 marked=True | TZmdbConfig::LoadTableColumn( TZmdbTable * pTable , XML_PARSER :: ZCXmlParser & ZCXmlParser , bool bCheckColumn) at /home/ZCIPClient/workpat
+  CCN= 46 NCSS= 192 marked=True | TZmdbConfig::LoadOneSliceRange( const char * szSliceRangeCfg , int iSetGroupID , map<int,vector<TZmdbSliceRange>> & mapSliceRange) at /home/
+  CCN= 46 NCSS= 184 marked=True | TZmdbConfig::LoadTableGroup( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:
+  CCN= 46 NCSS= 193 marked=True | TZmdbConfig::RefreshMonitorCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:14484
+  CCN= 42 NCSS= 202 marked=True | TZmdbConfig::LoadOneAdviseTable( char * szFileName , int iTempTableID) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/H
+  CCN= 41 NCSS= 140 marked=True | TZmdbConfig::GetDsnCfg( char * pszDsn , char * key , char * pszOldValue) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb
+  CCN= 37 NCSS= 178 marked=True | TZmdbConfig::LoadHost( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:596
+  CCN= 35 NCSS= 169 marked=True | TZmdbConfig::GetNewHost( int iHostID , TZmdbHost * & pHost) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbC
+  CCN= 35 NCSS= 169 marked=True | TZmdbConfig::GetNewHostHeart( int iHostID , TZmdbHost * & pHost) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/
+  CCN= 34 NCSS= 195 marked=True | TZmdbConfig::CheckTablePK( TZmdbTable * pTable , int * iPDBPKCounts , char ** pTemp) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/
+  CCN= 32 NCSS= 169 marked=True | ZmdbReadOraLog::Start( int iCounts , int iPos) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbReadOraLo
+  CCN= 30 NCSS= 153 marked=True | TZmdbConfig::LoadOneAdviseSliceRange( const char * szSliceRangeCfg , int iSetGroupID , map<int,vector<TZmdbSliceRange>> & mapSliceRange) at 
+  CCN=290 NCSS=1041 marked=True | TZmdbConfig::LoadDsnCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:2683
+  CCN= 29 NCSS= 114 marked=True | TZmdbConfig::LoadClusterAgentCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:8876
+  CCN= 29 NCSS= 147 marked=True | TZmdbConfig::LoadCacheDsnCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp
+  CCN= 28 NCSS= 143 marked=True | TZmdbConfig::LoadPDBCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:3778
+  CCN= 28 NCSS= 140 marked=True | TZmdbConfig::LoadAdviseHost( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:
+  CCN= 27 NCSS= 105 marked=True | TZmdbConfig::GetLeakMachineConfig( vector<TZmdbHost> & vecZMdbHost) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Help
+  CCN= 26 NCSS= 131 marked=True | TZmdbConfig::LoadDataNode( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:10
+  CCN= 26 NCSS= 132 marked=True | TZmdbConfig::LoadUser( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:2327
+  CCN= 26 NCSS= 119 marked=True | TZmdbConfig::ReLoadOneTableCfg( const char * pszTableName , int iReloadItem) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/
+  CCN= 25 NCSS= 129 marked=True | TZmdbOraRepThread::svc() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbReadOraLog.cpp:1870
+  CCN= 24 NCSS= 114 marked=True | TZmdbConfig::LoadTableIndex( TZmdbTable * pTable , XML_PARSER :: ZCXmlParser & ZCXmlParser) at /home/ZCIPClient/workpath/73228/code/BackServ
+  CCN= 24 NCSS=  97 marked=True | ZmdbReadOraLog::ReleaseFileListMemory() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbReadOraLog.cpp:1
+  CCN= 23 NCSS= 163 marked=True | ZmdbReadOraLog::Init( const char * pszDSN , const char * pszNode , const char * pszName , const char * pszGroupName , int iProcMode , int iR
+  CCN= 22 NCSS= 112 marked=True | TZmdbConfig::LoadClient() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:793
+  CCN= 22 NCSS= 127 marked=True | TZmdbConfig::LoadTableSpaceCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.c
+  CCN= 22 NCSS= 114 marked=True | TZmdbConfig::LoadMachineConfig( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.c
+  CCN= 20 NCSS=  48 marked=True | TZmdbConfig::GetPgcolumnType( const char * pszDataTpye) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfi
+  CCN= 19 NCSS=  47 marked=True | TZmdbConfig::GetMsqColumnType( const char * pszDataTpye) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConf
+  CCN= 19 NCSS=  47 marked=True | TZmdbConfig::GetObColumnType( const char * pszDataTpye) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfi
+  CCN= 19 NCSS=  84 marked=True | TZmdbConfig::LoadCacheTableCfg( XML_PARSER :: ZCXmlParser & CXmlParser) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/
+  CCN= 18 NCSS=  88 marked=True | TZmdbConfig::~TZmdbConfig() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:252
+  CCN= 18 NCSS=  88 marked=True | TZmdbConfig::GetNewDataNode( int iNodeID , TZmdbDataNode * & pDataNode) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/
+  CCN= 18 NCSS=  88 marked=True | TZmdbConfig::GetNewDataNodeHeart( int iNodeID , TZmdbDataNode * & pDataNode) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/
+  CCN= 18 NCSS=  89 marked=True | TZmdbConfig::LoadAdviseDataNode( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.
+  CCN= 18 NCSS=  94 marked=True | TZmdbConfig::LoadSysTable() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:6149
+  CCN= 18 NCSS=  81 marked=True | ZmdbReadOraLog::BuildTransactionsRelation( TZmdbTransaction * pTransaction) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Z
+  CCN= 17 NCSS= 101 marked=True | TZmdbConfig::LoadCfg( const char * pszDsn , bool bQuickMDBCreate) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper
+  CCN= 17 NCSS=  78 marked=True | TZmdbConfig::LoadZmdbImageCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cp
+  CCN= 17 NCSS=  87 marked=True | TZmdbConfig::CheckUserAccess( const char * pszUser , const char * pszPwd , const char * pszDsn , char cAccess) at /home/ZCIPClient/workpath/
+  CCN= 17 NCSS=  93 marked=True | TZmdbConfig::LoadBalanceConfig( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.c
+  CCN= 15 NCSS=  33 marked=True | TZmdbConfig::CheckAdviseSliceRange( vector<TZmdbSliceRange> & vecSliceRange , int iTempCalcValue) at /home/ZCIPClient/workpath/73228/code/Ba
+  CCN= 15 NCSS=  33 marked=True | TZmdbConfig::CheckSliceRange( vector<TZmdbSliceRange> & vecSliceRange , int iTempCalcValue) at /home/ZCIPClient/workpath/73228/code/BackServ
+  CCN= 15 NCSS=  53 marked=True | TZmdbConfig::CheckParam( const char * pszUser , const char * pszPWD , const char * pszDsn , bool bQuickMDBCreate) at /home/ZCIPClient/workpa
+  CCN= 15 NCSS=  73 marked=True | TZmdbConfig::LoadRepCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:1402
+  CCN= 14 NCSS=  97 marked=True | TZmdbConfig::GetIPAndPort( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:20
+  CCN= 14 NCSS=  81 marked=True | TZmdbConfig::ReloadPDBCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:39
+  CCN= 13 NCSS=  70 marked=True | TZmdbConfig::LoadClusterCfg( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:
+  CCN= 13 NCSS=  62 marked=True | ZmdbReadOraLog::LoadOraToTransactionList( char * pszFileName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlus
+  CCN= 13 NCSS=  56 marked=True | ZmdbReadOraLog::ReleaseFileListMemory() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbReadOraLog.cpp:1
+  CCN= 12 NCSS=  58 marked=True | TZmdbConfig::GetTotalBaseIndexSize() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:9459
+  CCN= 12 NCSS=  85 marked=True | TZmdbConfig::ExportTableConfig( char * pszFilePath , vector<TZmdbTable> vecTables) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/sr
+  CCN= 11 NCSS=  48 marked=True | TZmdbConfig::CheckCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:9094
+  CCN= 11 NCSS=  33 marked=True | ZmdbReadOraLog::CheckPDBInfoChanged() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbReadOraLog.cpp:153

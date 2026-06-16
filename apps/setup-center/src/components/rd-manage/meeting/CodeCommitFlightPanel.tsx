@@ -1,53 +1,169 @@
 /**
  * 代码提交 · 试飞结果明细面板（节点详情）
  */
-import React from 'react';
-import { AlertTriangle, FileText, GitBranch, Plane } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ChevronDown, ExternalLink, FileText, GitBranch } from 'lucide-react';
 
 import {
   collectCodeCommitArchives,
   collectCodeCommitFlights,
   type CodeCommitFlightEntry,
 } from './codeCommitDisplay';
+import {
+  formatAlarmCcn,
+  parseBuildResultRow,
+  resolveBuildFailureReason,
+  type BuildResultAlarm,
+  type ParsedBuildResult,
+  type ParsedBuildTable,
+} from './flightResultParser';
 
-function StatusBadge({ status }: { status?: string }) {
-  const s = String(status || '—');
-  const ok = s === 'ok' || s === '成功';
-  const failed = s === 'failed' || s === 'timeout' || s === '失败';
-  const pending = s === 'pending' || s === 'running';
-  const label =
-    s === 'ok'
-      ? '成功'
-      : s === 'failed'
-        ? '失败'
-        : s === 'timeout'
-          ? '超时'
-          : s === 'pending'
-            ? '进行中'
-            : s === 'skipped'
-              ? '跳过'
-              : s;
-  const cls = ok
-    ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-    : failed
-      ? 'bg-red-500/15 text-red-400 border-red-500/30'
-      : pending
-        ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-        : 'bg-slate-500/15 text-slate-300 border-slate-500/30';
+function BuildResultTable({ table }: { table: ParsedBuildTable }) {
+  if (!table.headers.length && !table.rows.length) return null;
+  const headers = table.headers.length ? table.headers : table.rows[0] || [];
+  const rows = table.headers.length ? table.rows : table.rows.slice(1);
+  const highlightSet = new Set(
+    (table.highlightCells || []).map(([row, col]) => `${row}:${col}`),
+  );
+  const violationCount = table.violationRows?.filter(Boolean).length ?? rows.length;
+  const caption =
+    table.caption ||
+    (table.violationOnly ? `待整改项（${violationCount}）` : undefined);
+
   return (
-    <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
-      {label}
-    </span>
+    <div className="rd-flight-build-table-wrap">
+      {caption ? <p className="rd-flight-build-table__caption">{caption}</p> : null}
+      <div className="overflow-x-auto max-h-80 overflow-y-auto">
+        <table className="rd-flight-build-table">
+          <thead>
+            <tr>
+              {headers.map((h, i) => (
+                <th key={`h-${i}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr
+                key={`r-${ri}`}
+                className={table.violationRows?.[ri] ? 'rd-flight-build-table__row--violation' : undefined}
+              >
+                {headers.map((_, ci) => (
+                  <td
+                    key={`c-${ri}-${ci}`}
+                    className={
+                      highlightSet.has(`${ri}:${ci}`)
+                        ? 'rd-flight-build-table__cell--highlight'
+                        : undefined
+                    }
+                  >
+                    {row[ci] ?? ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CodeCheckAlarmList({ alarms }: { alarms: BuildResultAlarm[] }) {
+  if (!alarms.length) return null;
+  return (
+    <div className="rd-flight-build-table-wrap">
+      <p className="rd-flight-build-table__caption">待整改项（{alarms.length}）</p>
+      <div className="overflow-x-auto">
+        <table className="rd-flight-build-table">
+          <thead>
+            <tr>
+              <th>文件</th>
+              <th>函数</th>
+              <th>CCN</th>
+            </tr>
+          </thead>
+          <tbody>
+            {alarms.map((alarm, idx) => (
+              <tr key={`alarm-${idx}`} className="rd-flight-build-table__row--violation">
+                <td>{alarm.fileName ?? ''}</td>
+                <td>{alarm.functionName ?? ''}</td>
+                <td className="rd-flight-build-table__cell--highlight">{formatAlarmCcn(alarm)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
+  const hasExpand =
+    item.buildKind === 'code_check' ||
+    item.kind === 'html' ||
+    (item.kind === 'text' && item.plainText.length > item.preview.length) ||
+    item.tables.length > 0;
+  const failureReason = resolveBuildFailureReason(item);
+
+  return (
+    <details
+      className="rd-flight-build-result"
+      open={item.buildKind === 'code_check' || (item.kind === 'html' && item.tables.length > 0)}
+    >
+      <summary className="rd-flight-build-result__summary">
+        <ChevronDown className="rd-flight-build-result__chevron h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span className="font-medium text-slate-200">{item.resultType}</span>
+        <span className="text-[11px] text-muted-foreground truncate">{item.preview}</span>
+      </summary>
+      <div className="rd-flight-build-result__body">
+        {item.kind === 'url' && item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:underline break-all"
+          >
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            {item.url}
+          </a>
+        ) : null}
+        {failureReason ? (
+          <p className="text-[11px] text-red-300 mb-2 whitespace-pre-wrap">{failureReason}</p>
+        ) : null}
+        {item.buildKind === 'code_check' && item.alarms?.length ? (
+          <CodeCheckAlarmList alarms={item.alarms} />
+        ) : null}
+        {item.tables.map((table, idx) => (
+          <BuildResultTable key={`tbl-${idx}`} table={table} />
+        ))}
+        {item.kind === 'html' && !item.tables.length ? (
+          <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
+        ) : null}
+        {item.kind === 'text' && hasExpand && item.buildKind !== 'code_check' ? (
+          <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
+        ) : null}
+        {item.kind === 'empty' ? (
+          <p className="text-[11px] text-muted-foreground mb-0">无构建明细</p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
 function FlightTaskCard({ entry }: { entry: CodeCommitFlightEntry }) {
+  const parsedBuildResults = useMemo(
+    () => entry.buildResults.map((row) => parseBuildResultRow(row)),
+    [entry.buildResults],
+  );
+
   return (
     <article className="rd-code-commit-flight-card">
       <header className="rd-code-commit-flight-card__header">
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <StatusBadge status={entry.commitStatus} />
-          <span className="text-sm font-medium text-slate-200">{entry.taskNo}</span>
+          <span className="text-sm font-medium text-slate-200 line-clamp-2">
+            {entry.taskTitle || entry.taskNo || '—'}
+          </span>
           {entry.featureId ? (
             <span className="font-mono text-[10px] text-muted-foreground">{entry.featureId}</span>
           ) : null}
@@ -57,47 +173,36 @@ function FlightTaskCard({ entry }: { entry: CodeCommitFlightEntry }) {
             </span>
           ) : null}
         </div>
-        {entry.flightStatus ? (
-          <div className="flex items-center gap-2 shrink-0">
-            <Plane className="h-3.5 w-3.5 text-muted-foreground" />
-            <StatusBadge status={entry.flightStatus} />
-          </div>
-        ) : null}
       </header>
-
-      {entry.taskTitle ? (
-        <p className="text-[11px] text-muted-foreground mt-1 mb-0">{entry.taskTitle}</p>
-      ) : null}
-      {entry.commitMessage ? (
-        <p className="text-[11px] text-slate-400 mt-1 mb-0">{entry.commitMessage}</p>
-      ) : null}
 
       {entry.flightStatus ? (
         <div className="rd-code-commit-flight-card__flight mt-3">
-          {entry.runStateDesc ? (
-            <p className="text-[11px] text-slate-300 mb-1">{entry.runStateDesc}</p>
-          ) : null}
-          {entry.beginDate || entry.endDate ? (
-            <p className="text-[10px] text-muted-foreground mb-0">
-              {entry.beginDate || '—'} → {entry.endDate || '—'}
-            </p>
-          ) : null}
-          {entry.buildResults.length > 0 ? (
-            <ul className="mt-2 space-y-1 mb-0">
-              {entry.buildResults.map((item, idx) => (
-                <li key={`${entry.id}-br-${idx}`} className="text-[11px] text-red-300/90">
-                  <span className="font-medium">{item.resultType}：</span>
-                  <span className="whitespace-pre-wrap break-all">{item.resultMsg.slice(0, 800)}</span>
-                </li>
+          <dl className="rd-flight-meta-grid">
+            {entry.runStateDesc ? (
+              <>
+                <dt>构建状态</dt>
+                <dd>{entry.runStateDesc}</dd>
+              </>
+            ) : null}
+            {entry.beginDate || entry.endDate ? (
+              <>
+                <dt>时间</dt>
+                <dd>
+                  {entry.beginDate || '—'} → {entry.endDate || '—'}
+                </dd>
+              </>
+            ) : null}
+          </dl>
+
+          {parsedBuildResults.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-[10px] font-medium text-muted-foreground mb-1">构建明细</p>
+              {parsedBuildResults.map((item, idx) => (
+                <BuildResultDetail key={`${entry.id}-br-${idx}`} item={item} />
               ))}
-            </ul>
+            </div>
           ) : null}
-          {entry.flightError ? (
-            <p className="text-[11px] text-red-400 mt-2 mb-0 flex items-start gap-1">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-              {entry.flightError}
-            </p>
-          ) : null}
+
         </div>
       ) : null}
     </article>
@@ -131,13 +236,12 @@ export const CodeCommitFlightPanel: React.FC<{
             {archives.map((art) => (
               <li key={art.name} className="rd-code-commit-archive-row">
                 <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="font-mono text-[11px] text-slate-300">{art.name}</span>
-                <StatusBadge status={art.status === 'ok' ? 'ok' : art.status === 'pending' ? 'pending' : 'skipped'} />
-                {art.path ? (
-                  <code className="text-[10px] text-muted-foreground truncate" title={art.path}>
-                    {art.path}
-                  </code>
-                ) : null}
+                <code
+                  className="text-[10px] text-muted-foreground truncate min-w-0"
+                  title={art.path || art.name}
+                >
+                  {art.path || '—'}
+                </code>
               </li>
             ))}
           </ul>
@@ -147,8 +251,8 @@ export const CodeCommitFlightPanel: React.FC<{
       {flights.length > 0 ? (
         <section className="space-y-3">
           <h4 className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-            <Plane className="h-3.5 w-3.5" />
-            子单试飞明细
+            <GitBranch className="h-3.5 w-3.5" />
+            代码提交明细
           </h4>
           {flights.map((entry) => (
             <FlightTaskCard key={entry.id} entry={entry} />

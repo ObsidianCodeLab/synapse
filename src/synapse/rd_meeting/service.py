@@ -886,6 +886,108 @@ class MeetingRoomService:
                 pctx["reprocess_until_node_id"] = until
         pipe._data["context"] = pctx
 
+    def reprocess_code_commit(
+        self,
+        room_id: str,
+        *,
+        reason: str | None = None,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """代码提交节点重处理：回退到 exception_check 并调度 system_node_exec（不刷新产品资产）。"""
+        rid = (room_id or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        if str(detail.get("status") or "").strip() == "completed":
+            raise ValueError("room_completed")
+
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+
+        rs = load_room_state(sid) or {}
+        current = str(
+            rs.get("current_node_id") or detail.get("current_node_id") or "pending"
+        ).strip()
+
+        from synapse.rd_meeting.code_commit_reprocess import (
+            CODE_COMMIT_NODE_ID,
+            code_commit_reprocess_node_range,
+            prepare_code_commit_reprocess,
+        )
+        from synapse.rd_meeting.pipeline import (
+            STEP_NODE_INIT,
+            PipelineRunContext,
+            run_pipeline_until_waiting,
+        )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
+
+        try:
+            node_range = code_commit_reprocess_node_range(current)
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+
+        cancel_room_run(rid)
+
+        prep = prepare_code_commit_reprocess(
+            sid,
+            scope_type=scope_type,
+            node_range=node_range,
+            reason=(reason or "").strip(),
+        )
+
+        dev = load_dev_status(sid) or {}
+        ctx = PipelineRunContext(
+            scope_type=scope_type,
+            scope_id=sid,
+            sync_userwork=True,
+            promote_to_processing=False,
+            agent_pool=agent_pool,
+            dev_status=dev,
+            detail=dict(detail),
+        )
+
+        pipe = MeetingPipeline.load(sid)
+        if pipe is None:
+            raise ValueError("meeting_pipeline_not_found")
+        pipe.set_flow_step(STEP_NODE_INIT, reason="代码提交重处理：重新执行 system_node_exec")
+        pipe.save()
+
+        def _run_code_commit_reprocess() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_NODE_INIT, create=False)
+
+        schedule_pipeline_background(rid, _run_code_commit_reprocess, scope_id=sid)
+
+        append_history_event(
+            sid,
+            {
+                "event": "code_commit_reprocess",
+                "room_id": rid,
+                "node_id": CODE_COMMIT_NODE_ID,
+                "node_ids": node_range,
+                "reprocess_reason": (reason or "").strip(),
+                "text": "代码提交重处理：已清理归档并重新调度提交与试飞",
+                "flow_stage": "代码提交重处理",
+                "log_type": "info",
+                "agent_id": "system",
+                "system_node": True,
+            },
+        )
+
+        titles = build_title_index()
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        payload["code_commit_reprocess"] = prep
+        return payload
+
     def reprocess_node(
         self,
         room_id: str,
@@ -907,6 +1009,10 @@ class MeetingRoomService:
             rs.get("current_node_id") or detail.get("current_node_id") or "pending"
         ).strip()
         target = (node_id or current).strip() or current
+        from synapse.rd_meeting.code_commit_reprocess import is_code_commit_reprocess_target
+
+        if is_code_commit_reprocess_target(target):
+            return self.reprocess_code_commit(rid, reason=reason, agent_pool=agent_pool)
         if target == current:
             return self.reprocess_current_node(rid, reason=reason, agent_pool=agent_pool)
         if target == "auto_split" or is_system_node(target):

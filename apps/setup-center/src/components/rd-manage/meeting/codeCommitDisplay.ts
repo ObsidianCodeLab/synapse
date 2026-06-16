@@ -27,6 +27,20 @@ export interface CodeCommitArchiveEntry {
   status: 'ok' | 'pending' | 'missing';
 }
 
+export interface CodeCommitBuildResultRow {
+  resultType: string;
+  resultMsg: string;
+  kind?: string;
+  nodeStateDesc?: string;
+  alarms?: {
+    fileName?: string;
+    functionName?: string;
+    errorArrow?: string;
+    ccnCount?: number;
+    benchmarkCcnCount?: number;
+  }[];
+}
+
 export interface CodeCommitFlightEntry {
   id: string;
   taskNo: string;
@@ -41,7 +55,7 @@ export interface CodeCommitFlightEntry {
   runStateDesc: string;
   beginDate: string;
   endDate: string;
-  buildResults: { resultType: string; resultMsg: string }[];
+  buildResults: CodeCommitBuildResultRow[];
 }
 
 type RowRecord = Record<string, unknown>;
@@ -178,6 +192,18 @@ export function collectCodeCommitFlights(display: RowRecord): CodeCommitFlightEn
     const buildResult = asRows(flightData.buildResult).map((item) => ({
       resultType: String(item.resultType || '检查项'),
       resultMsg: String(item.resultMsg || ''),
+      kind: item.kind != null ? String(item.kind) : undefined,
+      nodeStateDesc: item.nodeStateDesc != null ? String(item.nodeStateDesc) : undefined,
+      alarms: Array.isArray(item.alarms)
+        ? item.alarms.filter((a): a is Record<string, unknown> => !!a && typeof a === 'object').map((a) => ({
+            fileName: a.fileName != null ? String(a.fileName) : undefined,
+            functionName: a.functionName != null ? String(a.functionName) : undefined,
+            errorArrow: a.errorArrow != null ? String(a.errorArrow) : undefined,
+            ccnCount: typeof a.ccnCount === 'number' ? a.ccnCount : undefined,
+            benchmarkCcnCount:
+              typeof a.benchmarkCcnCount === 'number' ? a.benchmarkCcnCount : undefined,
+          }))
+        : undefined,
     }));
     return {
       id: `flight-${idx}-${String(row.task_no || idx)}`,

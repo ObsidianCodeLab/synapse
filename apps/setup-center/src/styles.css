@@ -6711,7 +6711,7 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
 }
 .rd-code-commit-archive-row {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.65rem;
@@ -6734,6 +6734,109 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
 .rd-code-commit-flight-card__flight {
   border-top: 1px solid rgb(255 255 255 / 0.08);
   padding-top: 0.65rem;
+}
+
+.rd-flight-overview {
+  border-radius: 0.65rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(15 23 42 / 0.35);
+  padding: 0.75rem 0.85rem;
+}
+.rd-flight-overview--ok {
+  border-color: rgb(52 211 153 / 0.25);
+  background: rgb(6 78 59 / 0.15);
+}
+.rd-flight-overview--failed {
+  border-color: rgb(248 113 113 / 0.3);
+  background: rgb(127 29 29 / 0.12);
+}
+.rd-flight-meta-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  font-size: 11px;
+}
+.rd-flight-meta-grid dt {
+  margin: 0;
+  color: rgb(148 163 184);
+}
+.rd-flight-meta-grid dd {
+  margin: 0;
+  color: rgb(226 232 240);
+}
+.rd-flight-build-result {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(2 6 23 / 0.35);
+}
+.rd-flight-build-result__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.45rem 0.55rem;
+  font-size: 11px;
+}
+.rd-flight-build-result__summary::-webkit-details-marker {
+  display: none;
+}
+.rd-flight-build-result[open] .rd-flight-build-result__chevron {
+  transform: rotate(180deg);
+}
+.rd-flight-build-result__chevron {
+  transition: transform 0.15s ease;
+  color: rgb(148 163 184);
+}
+.rd-flight-build-result__body {
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+  padding: 0.5rem 0.55rem 0.65rem;
+}
+.rd-flight-build-result__pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgb(203 213 225);
+  max-height: 16rem;
+  overflow: auto;
+}
+.rd-flight-build-table-wrap + .rd-flight-build-table-wrap {
+  margin-top: 0.65rem;
+}
+.rd-flight-build-table__caption {
+  margin: 0 0 0.35rem;
+  font-size: 10px;
+  color: rgb(148 163 184);
+}
+.rd-flight-build-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.rd-flight-build-table th,
+.rd-flight-build-table td {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  padding: 0.25rem 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+.rd-flight-build-table th {
+  background: rgb(30 41 59 / 0.6);
+  color: rgb(226 232 240);
+  font-weight: 600;
+}
+.rd-flight-build-table td {
+  color: rgb(203 213 225);
+}
+.rd-flight-build-table__row--violation td {
+  background: rgb(127 29 29 / 0.12);
+}
+.rd-flight-build-table__cell--highlight {
+  color: rgb(248 113 113) !important;
+  font-weight: 700;
 }
 
 /* 任务执行评审 */

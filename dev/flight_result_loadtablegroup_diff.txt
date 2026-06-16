@@ -1,0 +1,234 @@
+========================================================================
+Pattern counts in full HTML
+========================================================================
+  'LoadTableGroup': 1
+  '↗': 0
+  '&#8599;': 0
+  '&#8593;': 0
+  '↑': 0
+  '->': 0
+  '→': 0
+  'delta': 0
+  'increase': 0
+  '新增': 0
+  '整改': 0
+  '超标': 0
+  '37': 38
+  '46': 42
+  'background': 3
+  'color:red': 1
+  'class=': 820
+
+========================================================================
+LoadTableGroup row (raw HTML)
+========================================================================
+<tr>
+<th>NCSS</th><th>CCN</th><th>Function Name and Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>407</td><td class="ccn">91</td><td>TZmdbConfig::LoadOneTable( int iTempTableID , bool bLoadAll , bool bCheckColumn , bool bCheckPKColumn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:4254</td>
+</tr>
+<tr>
+<td>533</td><td class="ccn">87</td><td>TZmdbTableCtrl::CheckJoinLayerWhere( TZmdbPairTree * pJoinWhereTree , map&lt;string,int&gt; &amp; mapLayerTable , map&lt;string,TZmdbJoinSQLParseItem*&gt; &amp; mapLayerDriver , int iCurLevel) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbTableCtrl.cpp:12345</td>
+</tr>
+<tr>
+<td>315</td><td class="ccn">87</td><td>TZmdbConfig::Refresh( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:12416</td>
+</tr>
+<tr>
+<td>398</td><td class="ccn">85</td><td>TZmdbLocalQuery::AdjustSQL( const char * sSqlStatement , ZmdbParseSqlStruct * pResult) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbLocalQuery.cpp:1038</td>
+</tr>
+<tr>
+<td>409</td><td class="ccn">85</td><td>TZmdbClientQuery::PrepareNextData() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbClientQuery.cpp:2327</td>
+</tr>
+<tr>
+<td>311</td><td class="ccn">85</td><td>ZmdbMachineDeploy::TransferFiles( const char * pSrcPath , int iTransType , const char * pFileName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbMachineDeploy.cpp:297</td>
+</tr>
+<tr>
+<td>431</td><td class="ccn">83</td><td>TZmdbCacheFlush::LoadCacheDataFromPdb( TZmdbCacheTableCfg &amp; tCfg) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Cache/ZmdbCacheFlush.cpp:2020</td>
+</tr>
+<tr>
+<td>226</td><td class="ccn">83</td><td>TZmdbConfig::ValidateConfigRange( const char * key , const char * value , char * pszErrmsg) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:14166</td>
+</tr>
+<tr>
+<td>488</td><td class="ccn">79</td><td>TZmdbConfig::CheckTableColumnInfo( TZmdbTable * pTable , char * pszCheckTableName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:10761</td>
+</tr>
+<tr>
+<td>430</td><td class="ccn">79</td><td>TZmdbUserOper::ModifyUser() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbUserOper.cpp:573</td>
+</tr>
+<tr>
+<td>411</td><td class="ccn">78</td><td>TZmdbTableCtrl::Commit( TZmdbDataDesc * pComData , int iDataUpdNum , map&lt;int,ZTMdbRowID&gt; &amp; mapCacheRowID) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbTableCtrl.cpp:1011</td>
+</tr>
+<tr>
+<td>321</td><td class="ccn">76</td><td>TZmdbConfig::LoadMonitorCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:13693</td>
+</tr>
+<tr>
+<td>248</td><td class="ccn">70</td><td>XML_PARSER::ZCXmlParser::ParseXmlBuffer( std :: string &amp; sReserveBuffer , const char * pszBuffer , ZCXmlNode * &amp; pParentXmlNode) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/InfCommon/ZXmlParser.cpp:566</td>
+</tr>
+<tr>
+<td>381</td><td class="ccn">69</td><td>main( int argc , char * argv [ ]) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/QuickMDB.cpp:698</td>
+</tr>
+<tr>
+<td>385</td><td class="ccn">69</td><td>TZmdbTableCtrl::CommitWithVarchar( TZmdbDataDesc * pComData , int iDataUpdNum , map&lt;int,ZTMdbRowID&gt; &amp; mapCacheRowID) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbTableCtrl.cpp:1513</td>
+</tr>
+<tr>
+<td>463</td><td class="ccn">69</td><td>ZmdbSqlMap::SqlMap( const TSyntaxTree &amp; oTree , ZmdbParseSqlStruct &amp; tResult , TZmdbOrderBy * pOrderBy , int &amp; OrderByCounts , TZmdbLimit * pLimit , TZmdbGroupBy * pGroupBy , string &amp; sErrMsg) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/SqlParse/ZmdbSQLMap.cpp:2220</td>
+</tr>
+<tr>
+<td>357</td><td class="ccn">67</td><td>CmdbClusterAgentClientThread::SetParameter( int iSqlID , CZmdbDataBuffer &amp; tSetParamData , int nNextDataPos , int nParamsDataLen , bool bJdbc) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Agent/ClusterAgentClientThread.cpp:776</td>
+</tr>
+<tr>
+<td>332</td><td class="ccn">66</td><td>TZmdbDAOLoad::InitLoadMysql( char * sTableName , TZmdbLoadSQL * &amp; pNewSql , TZmdbLoadSQL * &amp; pFirstSql , TZmdbLoadSQL * &amp; pLastSql , TZmdbLoadSQL * pSqlList , TZmdbTable * pTable , int iLoadSrc) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbDAOLoad.cpp:518</td>
+</tr>
+<tr>
+<td>290</td><td class="ccn">65</td><td>TZmdbLocalQuery::Execute( int iExecuteRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbLocalQuery.cpp:3434</td>
+</tr>
+<tr>
+<td>324</td><td class="ccn">65</td><td>TZmdbLoadFromOra::LoadTable( const char * pTableIN , int iNodeId , bool bReload) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbLoadFromOra.cpp:748</td>
+</tr>
+<tr>
+<td>255</td><td class="ccn">61</td><td>TZmdbLocalQuery::CheckSQLIndex( const char * sSqlStatement) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbLocalQuery.cpp:1499</td>
+</tr>
+<tr>
+<td>394</td><td class="ccn">61</td><td>TZmdbQuery::Open( int prefetchRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:561</td>
+</tr>
+<tr>
+<td>463</td><td class="ccn">60</td><td>TZmdbCompareThread::CompareData() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/mdbCacheTools.cpp:230</td>
+</tr>
+<tr>
+<td>285</td><td class="ccn">59</td><td>ReadMdbDataChangeCfg( char * pszProdServerName , char * pszProdUser , char * pszProdPwd , int &amp; iProdType , char * pszCustServerName , char * pszCustUser , char * pszCustPwd , int &amp; iCustType , map&lt;TDnsName,map&lt;TTableName,TTableName&gt;&gt; &amp; maptDsnTableInstance , bool &amp; bIsBakHisByMonth , int &amp; iGetTableInterval) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/DataChange.cpp:290</td>
+</tr>
+<tr>
+<td>361</td><td class="ccn">59</td><td>CommandParamCheck( int argc , char * argv [ ] , ZParamList &amp; stParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/mdbShow.cpp:237</td>
+</tr>
+<tr>
+<td>293</td><td class="ccn">59</td><td>TZmdbQuery::HandleSetSQLReq( const char * sSqlStatement , int iPreFetchRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:5709</td>
+</tr>
+<tr>
+<td>316</td><td class="ccn">59</td><td>TZmdbOraLog::Log( const char * pszName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbOraLog.cpp:547</td>
+</tr>
+<tr>
+<td>362</td><td class="ccn">56</td><td>DealWithCacheTools( ZParamList &amp; stParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/App/mdbCacheTools.cpp:1874</td>
+</tr>
+<tr>
+<td>271</td><td class="ccn">56</td><td>TZmdbSqlPlus::CompareRecord2MDB( char * pDataBuffer , int &amp; iCounts , int &amp; iPos1 , char * pszTableName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbSqlPlus.cpp:884</td>
+</tr>
+<tr>
+<td>389</td><td class="ccn">55</td><td>TZmdbChangeNotifyThread::UpdateData( const char * pszTableName , const char * pszKeyInfo , const char * pszSliceInfo) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbChangeNotify.cpp:2353</td>
+</tr>
+<tr>
+<td>294</td><td class="ccn">55</td><td>TZmdbInfo::PrintMem( const char * pszShmID) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbInfo.cpp:542</td>
+</tr>
+<tr>
+<td>270</td><td class="ccn">54</td><td>TZMdbCtrl::Start( const char * pStartMode) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbCtrl.cpp:273</td>
+</tr>
+<tr>
+<td>271</td><td class="ccn">54</td><td>TZmdbTableCtrl::DoNext( bool &amp; bFindFlag) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbTableCtrl.cpp:7212</td>
+</tr>
+<tr>
+<td>281</td><td class="ccn">54</td><td>TZmdbQuery::Next() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:1061</td>
+</tr>
+<tr>
+<td>352</td><td class="ccn">53</td><td>TZmdbDAOLoad::LoadData( TZmdbLoadSQL * pLoadSql , TZmdbTable * pTable) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbDAOLoad.cpp:2483</td>
+</tr>
+<tr>
+<td>243</td><td class="ccn">53</td><td>TZmdbSqlPlus::CompareRecord2MDBFromTxtFile( char * pDataBuffer , int &amp; iCounts , bool &amp; bFirst , char * pszTableName) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbSqlPlus.cpp:1286</td>
+</tr>
+<tr>
+<td>305</td><td class="ccn">52</td><td>TZmdbNodeTableAlter::Handle( ZTAlterThreadParams * pAlterParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbNodeTableAlter.cpp:237</td>
+</tr>
+<tr>
+<td>222</td><td class="ccn">51</td><td>TZmdbQuery::SetSQL( const char * sSqlStatement , int iPreFetchRows) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:271</td>
+</tr>
+<tr>
+<td>278</td><td class="ccn">50</td><td>CZmdbServiceProcessThread::CreateTableXML( int iTableId , ZmdbParseSqlStruct * pResult , char * pszErrMsg , ConnInfo * pConnInfo) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/SystemMgr/ZServiceProcessThread.cpp:2307</td>
+</tr>
+<tr>
+<td>251</td><td class="ccn">49</td><td>TZmdbDAOBase::Execute( TZMDBInterface * pDBLink) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/OracleFlush/ZmdbDAOBase.cpp:270</td>
+</tr>
+<tr>
+<td>301</td><td class="ccn">49</td><td>ZmdbSqlMap::GenWhere( TExpr * pWhere , int &amp; level , ZmdbParseSqlStruct &amp; tResult , string &amp; sErrMsg) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/SqlParse/ZmdbSQLMap.cpp:1062</td>
+</tr>
+<tr>
+<td>262</td><td class="ccn">48</td><td>TZMdbCtrl::Stop( bool bForceStop , bool bDestroy) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbCtrl.cpp:889</td>
+</tr>
+<tr>
+<td>204</td><td class="ccn">48</td><td>TZmdbShmDSN::Attach( const char * pszDSN , TZmdbConfig &amp; config , bool bQuickMDBCreate) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbMgrShm.cpp:357</td>
+</tr>
+<tr>
+<td>195</td><td class="ccn">48</td><td>TZmdbMutexMgr::RestoreSessPage( TZmdbShmDSN * pShmDSN , TZMdbLocalLink * pSession) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Control/ZmdbMutex.cpp:586</td>
+</tr>
+<tr>
+<td>231</td><td class="ccn">48</td><td>TZmdbConfig::LoadTableColumn( TZmdbTable * pTable , XML_PARSER :: ZCXmlParser &amp; ZCXmlParser , bool bCheckColumn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:7778</td>
+</tr>
+<tr>
+<td>277</td><td class="ccn">48</td><td>TZmdbQuery::NextSort() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Interface/ZmdbQuery.cpp:2395</td>
+</tr>
+<tr>
+<td>246</td><td class="ccn">48</td><td>TZmdbDataExport::Export2PDB( const char * pszTableName , const char * pszObjTable , const char * szZCondition , int iPdbId) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbDataExport.cpp:183</td>
+</tr>
+<tr>
+<td>319</td><td class="ccn">47</td><td>TZmdbLoadOnline::LoadSvr( TZmdbLoadOnlineThreadParams * pLoadParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbLoadOnline.cpp:930</td>
+</tr>
+<tr>
+<td>192</td><td class="ccn">46</td><td>TZmdbConfig::LoadOneSliceRange( const char * szSliceRangeCfg , int iSetGroupID , map&lt;int,vector&lt;TZmdbSliceRange&gt;&gt; &amp; mapSliceRange) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:5747</td>
+</tr>
+<tr>
+<td>184</td><td class="ccn">46</td><td>TZmdbConfig::LoadTableGroup( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:13484</td>
+</tr>
+
+========================================================================
+LoadTableGroup parsed
+========================================================================
+  NCSS=184 CCN=46
+  has_ccn_class=True has_arrow=False
+  td_attrs=['', ' class="ccn"', '']
+  fn=TZmdbConfig::LoadTableGroup( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServic
+  CCN cell raw: <td class="ccn">46</td>
+
+========================================================================
+ZmdbReadOraLog::Start (also in commit, CCN=32)
+========================================================================
+  NCSS=169 CCN=32
+  has_ccn_class=True has_arrow=False
+  CCN cell raw: <td class="ccn">32</td>
+
+========================================================================
+Sample other rows
+========================================================================
+  CCN=91 arrow=False | TZmdbConfig::LoadOneTable( int iTempTableID , bool bLoadAll , bool bCheckColumn , bool bCheckPKColum
+  CCN=87 arrow=False | TZmdbTableCtrl::CheckJoinLayerWhere( TZmdbPairTree * pJoinWhereTree , map<string,int> &amp; mapLayer
+  CCN=87 arrow=False | TZmdbConfig::Refresh( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/sr
+
+========================================================================
+Rows with arrow in CCN or tr (0)
+========================================================================
+
+========================================================================
+Non-numeric CCN cell values (0)
+========================================================================
+
+========================================================================
+Context around LoadTableGroup (±500 chars)
+========================================================================
+bLoadOnlineThreadParams * pLoadParam) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Tools/ZmdbLoadOnline.cpp:930</td>
+</tr>
+<tr>
+<td>192</td><td class="ccn">46</td><td>TZmdbConfig::LoadOneSliceRange( const char * szSliceRangeCfg , int iSetGroupID , map&lt;int,vector&lt;TZmdbSliceRange&gt;&gt; &amp; mapSliceRange) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:5747</td>
+</tr>
+<tr>
+<td>184</td><td class="ccn">46</td><td>TZmdbConfig::LoadTableGroup( const char * pszDsn) at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:13484</td>
+</tr>
+<tr>
+<td>193</td><td class="ccn">46</td><td>TZmdbConfig::RefreshMonitorCfg() at /home/ZCIPClient/workpath/73228/code/BackServiceCpp/src/cpp/Zmdb/Helper/ZmdbConfig.cpp:14484</td>
+</tr>
+<tr>
+<td>278</td><td class="ccn">46</td><td>ZmdbSqlMap::SelectColumnMap( TExprList * pColList , TExprList * pGroupbyExprList , ZmdbParseSqlStruct &amp; tResult , string &am
+
+========================================================================
+All tables/sections in HTML
+========================================================================
+  H: Lizard Analysis Report
+  H: Function Metrics
+  TABLE:  class="details"

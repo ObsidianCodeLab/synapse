@@ -947,7 +947,7 @@ export function SystemCodeCommitCard({
         <p className="mt-2 mb-0 text-[11px] text-primary/80">{String(progress.message)}</p>
       ) : null}
 
-      {errors.length > 0 ? (
+      {errors.length > 0 && variant === 'summary' ? (
         <ul className="mt-2 space-y-1 text-[11px] text-red-400">
           {errors.map((err) => (
             <li key={err}>{err}</li>

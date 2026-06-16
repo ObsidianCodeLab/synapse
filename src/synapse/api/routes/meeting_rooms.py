@@ -212,7 +212,7 @@ async def reprocess_meeting_room(
     request: Request,
     body: ReprocessBody | None = None,
 ) -> dict:
-    """重新处理 SOP 节点：当前节点清理过程数据并从 node_init 重跑。"""
+    """重新处理 SOP 节点：当前节点或同阶段历史节点；``exception_check``（代码提交）走专用重处理并自动调度提交。"""
     pool = getattr(request.app.state, "agent_pool", None)
     node_id = (body.node_id if body else None) or None
     reason = (body.reason if body else None) or None

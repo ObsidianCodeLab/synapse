@@ -1822,7 +1822,11 @@ async def _get_task_build_history(body: GetTaskBuildHistoryRequest) -> dict:
                     if isinstance(build_result_resp, dict) and build_result_resp.get("errorcode") == 0:
                         br_data = build_result_resp.get("data") or []
                         if isinstance(br_data, list):
-                            node_results.extend(br_data)
+                            raw_nodes = [x for x in br_data if isinstance(x, dict)]
+                            node_results = await _format_ci_build_result_entries(
+                                raw_nodes,
+                                ci_flow_inst_id=inst_id_str,
+                            )
                     build_result_cache[inst_id_str] = node_results
                     item["buildResult"] = node_results
         simplified.append(item)
@@ -1832,6 +1836,11 @@ async def _get_task_build_history(body: GetTaskBuildHistoryRequest) -> dict:
 
 class GetCiFlowBuildResultRequest(BaseModel):
     ciFlowInstId: str = Field(..., description="构建实例ID（ciFlowInstId）")
+
+
+class GetNodeInstanceDetailByStepZcmIdRequest(BaseModel):
+    stepZcmId: str = Field(..., description="步骤 ZCM ID（stepZcmId）")
+    ciFlowInstId: str = Field(..., description="构建实例 ID（ciFlowInstId）")
 
 def _build_get_ci_flow_build_result_headers(body: GetCiFlowBuildResultRequest, csrf: str, cookies: str) -> dict:
     return {
@@ -1893,10 +1902,16 @@ def _simplify_ci_flow_build_nodes(raw_items: list) -> list[dict]:
         nodes.append(
             {
                 "nodeName": it.get("nodeName"),
+                "nodeNameEn": it.get("nodeNameEn"),
+                "nodeTypeId": it.get("nodeTypeId"),
                 "stepId": it.get("stepId"),
+                "stepZcmId": it.get("stepZcmId"),
+                "nodeState": it.get("nodeState"),
+                "nodeStateDesc": it.get("nodeStateDesc"),
                 "runResult": it.get("runResult"),
                 "url": it.get("url"),
                 "attachments": it.get("attachments") or [],
+                "modifyFileAlarmDetailList": it.get("modifyFileAlarmDetailList"),
             }
         )
     return nodes
@@ -2029,23 +2044,238 @@ async def _fetch_url_text(url: str, *, timeout: float = 30) -> str:
         return ""
 
 
-async def _format_ci_build_result_entries(nodes: list[dict]) -> list[dict]:
-    """将失败节点转为 {resultType, resultMsg}；resultMsg 取自首个 attachment.fullPath 文件内容。"""
-    entries: list[dict] = []
+def _ci_node_state_failed(node_state: object) -> bool:
+    return str(node_state or "").strip() == "3"
+
+
+def _is_compile_ci_node(node: dict) -> bool:
+    name_en = str(node.get("nodeNameEn") or "").strip().upper()
+    if name_en == "COMPILE":
+        return True
+    return str(node.get("nodeTypeId") or "").strip() == "22"
+
+
+def _is_skipped_ci_overview_node(node: dict) -> bool:
+    name_en = str(node.get("nodeNameEn") or "").strip()
+    if name_en in {"Initial State", "EXPORT"}:
+        return True
+    return str(node.get("nodeTypeId") or "").strip() in {"0", "21"}
+
+
+def _collect_code_check_step_zcm_ids(nodes: list[dict]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
     for node in nodes:
         if not isinstance(node, dict):
             continue
-        attachments = node.get("attachments") or []
-        full_path = ""
-        if attachments and isinstance(attachments[0], dict):
-            full_path = str(attachments[0].get("fullPath") or "").strip()
-        result_msg = await _fetch_url_text(full_path) if full_path else ""
-        entries.append(
+        if _is_compile_ci_node(node) or _is_skipped_ci_overview_node(node):
+            continue
+        step_zcm_id = str(node.get("stepZcmId") or "").strip()
+        if not step_zcm_id or step_zcm_id == "0" or step_zcm_id in seen:
+            continue
+        seen.add(step_zcm_id)
+        ordered.append(step_zcm_id)
+    return ordered
+
+
+def _filter_up_alarm_details(raw_list: object) -> list[dict]:
+    if not isinstance(raw_list, list):
+        return []
+    alarms: list[dict] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("errorArrow") or "").strip().upper() != "UP":
+            continue
+        alarms.append(
             {
-                "resultType": str(node.get("nodeName") or "").strip(),
-                "resultMsg": result_msg,
+                "fileName": item.get("fileName"),
+                "functionName": item.get("functionName"),
+                "errorArrow": item.get("errorArrow"),
+                "ccnCount": item.get("ccnCount"),
+                "benchmarkCcnCount": item.get("benchmarkCcnCount"),
+                "isAlarm": item.get("isAlarm"),
+                "errorResult": item.get("errorResult"),
+                "isNewFunction": item.get("isNewFunction"),
             }
         )
+    return alarms
+
+
+def _format_alarm_ccn_text(alarm: dict) -> str:
+    ccn = alarm.get("ccnCount")
+    bench = alarm.get("benchmarkCcnCount")
+    if ccn is not None and bench is not None:
+        return f"CCN({bench}↗{ccn})"
+    if ccn is not None:
+        return f"CCN={ccn}"
+    return ""
+
+
+def _format_code_check_result_msg(node_state_desc: object, alarms: list[dict]) -> str:
+    lines = [str(node_state_desc).strip()]
+    for alarm in alarms:
+        file_name = str(alarm.get("fileName") or "").strip()
+        function_name = str(alarm.get("functionName") or "").strip()
+        ccn_text = _format_alarm_ccn_text(alarm)
+        detail = " ".join(part for part in (file_name, f"function: {function_name}" if function_name else "", ccn_text) if part)
+        if detail:
+            lines.append(detail)
+    return "\n".join(line for line in lines if line)
+
+
+def _format_code_check_build_entry(node: dict) -> dict | None:
+    """代码检查失败：nodeState=3 且 nodeStateDesc 非 null；明细取 errorArrow=UP。"""
+    if not _ci_node_state_failed(node.get("nodeState")):
+        return None
+    node_state_desc = node.get("nodeStateDesc")
+    if node_state_desc is None:
+        return None
+    alarms = _filter_up_alarm_details(node.get("modifyFileAlarmDetailList"))
+    node_name = str(node.get("nodeName") or "代码检查").strip() or "代码检查"
+    return {
+        "resultType": node_name,
+        "resultMsg": _format_code_check_result_msg(node_state_desc, alarms),
+        "kind": "code_check",
+        "nodeState": node.get("nodeState"),
+        "nodeStateDesc": node_state_desc,
+        "alarms": alarms,
+    }
+
+
+async def _format_compile_build_entry(node: dict) -> dict | None:
+    """编译失败：沿用 attachment / nodeStateDesc 文本。"""
+    if not _is_compile_ci_node(node):
+        return None
+    if not _ci_node_state_failed(node.get("nodeState")) and str(node.get("runResult") or "").strip() != "F":
+        return None
+    attachments = node.get("attachments") or []
+    full_path = ""
+    if attachments and isinstance(attachments[0], dict):
+        full_path = str(attachments[0].get("fullPath") or "").strip()
+    result_msg = str(node.get("nodeStateDesc") or "").strip()
+    if full_path:
+        attachment_text = await _fetch_url_text(full_path)
+        if attachment_text:
+            result_msg = attachment_text if not result_msg else f"{result_msg}\n\n{attachment_text}"
+    if not result_msg:
+        result_msg = str(node.get("url") or node.get("runResult") or "").strip()
+    if not result_msg:
+        return None
+    return {
+        "resultType": str(node.get("nodeName") or "编译").strip() or "编译",
+        "resultMsg": result_msg,
+        "kind": "compile",
+        "nodeState": node.get("nodeState"),
+        "nodeStateDesc": node.get("nodeStateDesc"),
+    }
+
+
+async def _get_node_instance_detail_by_step_zcm_id(
+    step_zcm_id: str,
+    ci_flow_inst_id: str,
+    *,
+    csrf: str,
+    cookies: str,
+) -> list[dict]:
+    step_id = str(step_zcm_id or "").strip()
+    inst_id = str(ci_flow_inst_id or "").strip()
+    if not step_id or not inst_id:
+        return []
+
+    url = (
+        f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-cicd/ci/flow/history/"
+        f"getNodeInstanceDetailByStepZcmId/{step_id}/{inst_id}"
+    )
+    params = {"_": int(datetime.now().timestamp() * 1000)}
+    headers = _build_get_ci_flow_build_result_headers(
+        GetCiFlowBuildResultRequest(ciFlowInstId=inst_id),
+        csrf,
+        cookies,
+    )
+    logger.debug("get_node_instance_detail_by_step_zcm_id url:%s params:%s", url, params)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=headers, params=params)
+            _log_httpx_response("get_node_instance_detail_by_step_zcm_id", resp)
+    except httpx.RequestError as exc:
+        logger.exception("调用研发云 getNodeInstanceDetailByStepZcmId 异常: %s", exc)
+        return []
+
+    try:
+        raw = resp.json()
+        if not _is_portal_success_code(raw.get("code")):
+            logger.warning(
+                "getNodeInstanceDetailByStepZcmId 失败 stepZcmId=%s ciFlowInstId=%s: %s",
+                step_id,
+                inst_id,
+                raw,
+            )
+            return []
+        data = raw.get("data")
+        if not isinstance(data, list):
+            return []
+        return [item for item in data if isinstance(item, dict)]
+    except ValueError:
+        logger.warning("getNodeInstanceDetailByStepZcmId 返回非 JSON stepZcmId=%s", step_id)
+        return []
+
+
+@router.post("/api/dev/iwhalecloud/get_node_instance_detail_by_step_zcm_id")
+async def get_node_instance_detail_by_step_zcm_id(body: GetNodeInstanceDetailByStepZcmIdRequest) -> dict:
+    """按 stepZcmId + ciFlowInstId 获取代码走查节点明细（含 modifyFileAlarmDetailList）。"""
+    try:
+        csrf, cookies = await _ensure_valid_creds_async()
+    except ValueError as e:
+        return error_response(400, str(e))
+    if not body.stepZcmId or not body.ciFlowInstId:
+        return error_response(400, "stepZcmId 与 ciFlowInstId 不能为空")
+    items = await _get_node_instance_detail_by_step_zcm_id(
+        body.stepZcmId,
+        body.ciFlowInstId,
+        csrf=csrf,
+        cookies=cookies,
+    )
+    return success_response(items)
+
+
+async def _format_ci_build_result_entries(nodes: list[dict], *, ci_flow_inst_id: str) -> list[dict]:
+    """构建失败明细：编译失败 + 代码检查失败（后者走 getNodeInstanceDetailByStepZcmId）。"""
+    entries: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _append(entry: dict | None) -> None:
+        if not entry:
+            return
+        key = (str(entry.get("resultType") or ""), str(entry.get("kind") or ""))
+        if key in seen:
+            return
+        seen.add(key)
+        entries.append(entry)
+
+    for node in nodes:
+        if isinstance(node, dict) and _is_compile_ci_node(node):
+            _append(await _format_compile_build_entry(node))
+
+    if not ci_flow_inst_id:
+        return entries
+
+    try:
+        csrf, cookies = await _ensure_valid_creds_async()
+    except ValueError:
+        logger.warning("format_ci_build_result_entries: 研发云未登录，跳过代码检查明细")
+        return entries
+
+    for step_zcm_id in _collect_code_check_step_zcm_ids(nodes):
+        detail_nodes = await _get_node_instance_detail_by_step_zcm_id(
+            step_zcm_id,
+            ci_flow_inst_id,
+            csrf=csrf,
+            cookies=cookies,
+        )
+        for node in detail_nodes:
+            _append(_format_code_check_build_entry(node))
+
     return entries
 
 
@@ -2102,7 +2332,7 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
     根据任务构建历史合并各 flowId 的最新状态，并补充构建各环节结果。
     1) 调 _get_task_build_history 取 featureBuildHisList
     2) 按 ciFlowId 分组，按 ciFlowInstBeginDate 取最新一条
-    3) 失败 flow 调用 _get_ci_flow_build_result(ciFlowInstId) 并下载首个 attachment 内容
+    3) 失败 flow 调用 _get_ci_flow_build_result(ciFlowInstId)，编译失败取日志；代码检查失败走 getNodeInstanceDetailByStepZcmId
     4) 合并多个 flow 的状态为单一结果（失败优先；有构建中则构建中；否则成功）
     5) 返回数据格式：
     {
@@ -2113,8 +2343,11 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
         "ciFlowInstRunStateDesc": "构建状态中文描述",
         "buildResult": [
             {
-                "resultType": "节点名称（nodeName）",
-                "resultMsg": "首个 attachment.fullPath 文件文本内容"
+                "resultType": "节点名称（nodeName，如 SOURCEMONITOR代码检查(新)）",
+                "resultMsg": "失败摘要 + 待整改函数列表",
+                "kind": "compile | code_check",
+                "nodeStateDesc": "失败原因（代码检查）",
+                "alarms": [{"fileName": "...", "functionName": "...", "errorArrow": "UP", ...}]
             }
         ]
     }
@@ -2176,7 +2409,10 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
                         raw_data = build_result_resp.get("data") or []
                         if isinstance(raw_data, list):
                             br_data = [x for x in raw_data if isinstance(x, dict)]
-                    node_results = await _format_ci_build_result_entries(br_data)
+                    node_results = await _format_ci_build_result_entries(
+                        br_data,
+                        ci_flow_inst_id=inst_id_str,
+                    )
                     build_result_cache[inst_id_str] = node_results
 
             per_flow_items.append(
