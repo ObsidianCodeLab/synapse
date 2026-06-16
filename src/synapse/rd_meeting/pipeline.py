@@ -801,14 +801,10 @@ def _schedule_prewarm_for_init(
     """节点 INIT 阶段调度后台 prewarm，让前端立刻看到 Agent 卡片，不阻塞 pipeline。"""
     if agent_pool is None or not room_id:
         return
-    try:
-        import asyncio
-
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        return  # 非 async 上下文（如纯同步测试），跳过
-
-    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+    from synapse.rd_meeting.orchestrator import (
+        MeetingRoomOrchestrator,
+        _schedule_on_coordinator_loop,
+    )
     from synapse.rd_meeting.prewarm_coordinator import (
         bump_meeting_prewarm_generation,
         is_meeting_prewarm_generation_current,
@@ -836,7 +832,7 @@ def _schedule_prewarm_for_init(
             logger.warning("prewarm at node_init failed scope=%s: %s", scope_id, exc)
 
     try:
-        loop.create_task(_runner())
+        _schedule_on_coordinator_loop(_runner)
     except Exception as exc:  # pragma: no cover
         logger.debug("schedule prewarm task failed: %s", exc)
 
@@ -1877,13 +1873,6 @@ def schedule_node_finish(
     sid = (scope_id or "").strip()
     if not sid:
         return
-    try:
-        import asyncio
-
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
     def _do_advance() -> None:
         try:
             pipe = MeetingPipeline.load(sid)
@@ -1918,24 +1907,19 @@ def schedule_node_finish(
         except Exception as exc:  # pragma: no cover
             logger.exception("schedule_node_finish failed scope=%s: %s", sid, exc)
 
-    if loop is not None:
-        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+    from synapse.rd_meeting.orchestrator import _schedule_on_coordinator_loop
 
-        _remember_scheduler_loop(loop)
-        try:
-            loop.create_task(
-                _run_node_finish_coro(
-                    _do_advance,
-                    scope_id=sid,
-                    scope_type=scope_type,
-                    agent_pool=agent_pool,
-                )
-            )
-        except Exception as exc:  # pragma: no cover
-            logger.debug("schedule_node_finish create_task failed: %s", exc)
-            _do_advance()
-    else:
-        # 非 async 上下文（同步测试 / 命令行），直接执行
+    async def _runner() -> None:
+        await _run_node_finish_coro(
+            _do_advance,
+            scope_id=sid,
+            scope_type=scope_type,
+            agent_pool=agent_pool,
+        )
+
+    try:
+        _schedule_on_coordinator_loop(_runner)
+    except RuntimeError:
         _do_advance()
 
 

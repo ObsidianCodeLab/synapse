@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Coroutine
 from typing import Any, Literal
@@ -191,31 +190,23 @@ async def run_sop_stage_transition_hook(
 
 def _dispatch_sop_stage_hook_task(coro: Coroutine[Any, Any, None]) -> bool:
     """把跨阶段钩子协程调度到会议室主事件循环（兼容 pipeline 后台线程调用）。"""
-    coordinator_loop: asyncio.AbstractEventLoop | None = None
-    on_coordinator_thread = False
-    try:
-        coordinator_loop = asyncio.get_running_loop()
-        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
+    from synapse.rd_meeting.orchestrator import (
+        _resolve_meeting_coordinator_loop,
+        _schedule_on_coordinator_loop,
+    )
 
-        _remember_scheduler_loop(coordinator_loop)
-        on_coordinator_thread = True
-    except RuntimeError:
-        from synapse.rd_meeting.orchestrator import _meeting_scheduler_loop
-
-        coordinator_loop = _meeting_scheduler_loop
-
+    coordinator_loop = _resolve_meeting_coordinator_loop()
     if coordinator_loop is None or coordinator_loop.is_closed():
         return False
 
-    if on_coordinator_thread:
-        coordinator_loop.create_task(coro)
+    async def _runner() -> None:
+        await coro
+
+    try:
+        _schedule_on_coordinator_loop(_runner)
         return True
-
-    def _start_from_worker_thread() -> None:
-        coordinator_loop.create_task(coro)
-
-    coordinator_loop.call_soon_threadsafe(_start_from_worker_thread)
-    return True
+    except RuntimeError:
+        return False
 
 
 def schedule_sop_stage_transition_hook(

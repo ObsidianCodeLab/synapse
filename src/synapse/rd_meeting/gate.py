@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from synapse.rd_meeting.binding import resolve_node_binding
@@ -68,8 +67,9 @@ def schedule_delegation_failure_gate(
         except Exception as exc:
             logger.warning("delegation failure gate failed: %s", exc)
 
+    from synapse.rd_meeting.orchestrator import _schedule_on_coordinator_loop
+
     try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_run())
+        _schedule_on_coordinator_loop(_run)
     except RuntimeError:
         logger.debug("no event loop for delegation failure gate")

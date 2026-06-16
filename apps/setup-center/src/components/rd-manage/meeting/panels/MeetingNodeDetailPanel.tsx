@@ -286,25 +286,31 @@ export function MeetingNodeDetailPanel({
     async (refresh = false) => {
       if (!roomId || !nodeId) return;
       const seq = ++loadSeqRef.current;
-      if (refresh) setRefreshing(true);
+      const processing = nodeState === 'processing';
+      if (refresh || processing) setRefreshing(true);
       else setLoading(true);
       setError(null);
       try {
         const sid = (scopeId || '').trim();
         const skipNodeReview =
-          nodeId === 'solution_review' || isStructuredSystemNode;
-        const isTaskExecLive = nodeId === 'task_exec' && nodeState === 'processing';
-        const isCodeCommitLive = nodeId === 'exception_check' && nodeState === 'processing';
+          nodeId === 'solution_review' || isStructuredSystemNode || processing;
+        const skipHeavySummary = processing;
+        const isTaskExecLive = nodeId === 'task_exec' && processing;
+        const isCodeCommitLive = nodeId === 'exception_check' && processing;
+        const agentContextLimit = processing ? 8_000 : 0;
         const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
             : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh }),
           isStructuredSystemNode
             ? Promise.resolve(null)
-            : fetchMeetingAgentContexts(synapseApiBase, roomId, { messageCharLimit: 0, nodeId }),
-          sid
+            : fetchMeetingAgentContexts(synapseApiBase, roomId, {
+                messageCharLimit: agentContextLimit,
+                nodeId,
+              }),
+          sid && !skipHeavySummary
             ? fetchMeetingSummary(synapseApiBase, scopeType, sid)
-            : Promise.reject(new Error('missing_scope')),
+            : Promise.resolve(null),
           isStructuredSystemNode
             ? fetchSystemNodeDisplay(synapseApiBase, roomId, nodeId)
             : Promise.resolve(null),
@@ -389,7 +395,7 @@ export function MeetingNodeDetailPanel({
           }
         }
 
-        if (summaryRes.status === 'fulfilled') {
+        if (summaryRes.status === 'fulfilled' && summaryRes.value) {
           const sn = summaryRes.value.nodes?.find((n) => n.node_id === nodeId) ?? null;
           setSummaryNode(sn);
           const archiveFiles =
@@ -404,7 +410,7 @@ export function MeetingNodeDetailPanel({
                 })),
               ) ?? [];
           setFallbackArtifacts(archiveFiles);
-        } else {
+        } else if (!processing) {
           setFallbackArtifacts([]);
         }
       } catch (e) {
@@ -413,7 +419,7 @@ export function MeetingNodeDetailPanel({
         }
       } finally {
         if (seq !== loadSeqRef.current) return;
-        if (refresh) setRefreshing(false);
+        if (refresh || processing) setRefreshing(false);
         else setLoading(false);
       }
     },
@@ -773,7 +779,7 @@ export function MeetingNodeDetailPanel({
           <PendingLivePlaceholder />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            {(loading || refreshing) && !effectiveSystemDisplay ? (
+            {(loading || refreshing) && !effectiveSystemDisplay && !liveSystemDisplay ? (
               <NodeDetailLoadingState nodeName={nodeName} />
             ) : error && !effectiveSystemDisplay ? (
               <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
@@ -807,7 +813,7 @@ export function MeetingNodeDetailPanel({
   return (
     <div ref={tabsRootRef} className="flex h-full min-h-0 flex-col">
       {!isPending ? header : null}
-      {!isPending && loading ? (
+      {!isPending && loading && nodeState !== 'processing' && !hasLoadedContent ? (
         <NodeDetailLoadingState nodeName={nodeName} />
       ) : !isPending && error && !hasLoadedContent ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">

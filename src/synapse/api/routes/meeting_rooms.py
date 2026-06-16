@@ -32,6 +32,11 @@ router = APIRouter(tags=["研发会议室"])
 _service = MeetingRoomService()
 
 
+async def _service_call(fn, /, *args, **kwargs):
+    """同步 Service 方法放到线程池，避免阻塞 FastAPI 事件循环。"""
+    return await asyncio.to_thread(fn, *args, **kwargs)
+
+
 class OpenMeetingBody(BaseModel):
     scope_type: Literal["demand", "task"] = Field(..., description="demand 或 task")
     scope_id: str = Field(..., description="需求单号或研发单号")
@@ -90,7 +95,7 @@ class PutDevStatusBody(BaseModel):
 async def list_meeting_rooms() -> dict:
     """扫描 work/<scope_id>/ 子目录，读取各目录 dev.status 生成会议室列表。"""
     try:
-        items = _service.list_meeting_rooms()
+        items = await _service_call(_service.list_meeting_rooms)
         return success_response({"list": items, "count": len(items)})
     except Exception as exc:
         logger.exception("list_meeting_rooms failed: %s", exc)
@@ -100,14 +105,14 @@ async def list_meeting_rooms() -> dict:
 @router.get("/api/dev/meeting-rooms/pending/human-intervention")
 async def list_pending_human_intervention() -> dict:
     """待人工介入的会议室列表（room_state + dev.status）。"""
-    items = _service.list_pending_human_intervention()
+    items = await _service_call(_service.list_pending_human_intervention)
     return success_response({"list": items, "count": len(items)})
 
 
 @router.get("/api/dev/meeting-rooms/{room_id}")
 async def get_meeting_room(room_id: str) -> dict:
     """返回列表项字段 + room_state + history + archive_index。"""
-    item = _service.get_room_detail(room_id)
+    item = await _service_call(_service.get_room_detail, room_id)
     if item is None:
         return error_response(404, "meeting_room_not_found")
     return success_response(item)
@@ -118,11 +123,16 @@ async def get_meeting_room_live(room_id: str, request: Request, node_id: str = "
     """会议室 live 快照：委派进度、子 Agent、phase、近期聊天事件（轮询）。"""
     pool = getattr(request.app.state, "agent_pool", None)
     nid = (node_id or "").strip()
-    item = _service.get_room_live(room_id, agent_pool=pool, view_node_id=nid)
+    item = await _service_call(
+        _service.get_room_live,
+        room_id,
+        agent_pool=pool,
+        view_node_id=nid,
+    )
     if item is None:
         return error_response(404, "meeting_room_not_found")
     if nid:
-        chat = _service.get_room_node_chat(room_id, nid)
+        chat = await _service_call(_service.get_room_node_chat, room_id, nid)
         if chat is not None:
             item = dict(item)
             item["recent_history"] = chat.get("history")
@@ -135,11 +145,11 @@ async def get_meeting_room_chat(room_id: str, node_id: str = "") -> dict:
     """按 SOP 节点读取协作会议流 chat_logs。"""
     nid = (node_id or "").strip()
     if not nid:
-        detail = _service.get_room_detail(room_id)
+        detail = await _service_call(_service.get_room_detail, room_id)
         if detail is None:
             return error_response(404, "meeting_room_not_found")
         nid = str(detail.get("current_node_id") or "pending")
-    item = _service.get_room_node_chat(room_id, nid)
+    item = await _service_call(_service.get_room_node_chat, room_id, nid)
     if item is None:
         return error_response(404, "meeting_room_not_found")
     return success_response(item)
@@ -156,7 +166,8 @@ async def get_meeting_agent_contexts(
     """临时探测各参会 Agent 的 system prompt / messages（调试用；dump=true 写入工单 debug 目录）。"""
     pool = getattr(request.app.state, "agent_pool", None)
     try:
-        item = _service.get_agent_contexts(
+        item = await _service_call(
+            _service.get_agent_contexts,
             room_id,
             agent_pool=pool,
             dump=dump,
@@ -416,7 +427,8 @@ async def put_dev_status(
 @router.get("/api/dev/work-orders/{scope_type}/{scope_id}/meeting-summary")
 async def meeting_summary(scope_type: Literal["demand", "task"], scope_id: str) -> dict:
     """工单侧只读：dev.status + room_state + 节点 metrics + archive 索引。"""
-    return success_response(_service.meeting_summary(scope_type, scope_id))
+    data = await _service_call(_service.meeting_summary, scope_type, scope_id)
+    return success_response(data)
 
 
 @router.get("/api/dev/meeting-room-config")
@@ -554,6 +566,19 @@ async def get_node_review(
         inline = pending.get("review_payload") if isinstance(pending, dict) else None
         if isinstance(inline, dict) and pending_matches and not _summaries_all_fallback(inline):
             return success_response(inline)
+        room_status = str(room_state.get("status") or "")
+        if room_status == "processing" and target_node == current_node:
+            return success_response(
+                {
+                    "node_id": target_node,
+                    "scope_id": sid,
+                    "room_id": room_id,
+                    "report_body": "",
+                    "metrics": {},
+                    "artifacts": [],
+                    "summaries": [],
+                }
+            )
 
     try:
         from synapse.rd_meeting.agent_session import resolve_meeting_orchestrator
@@ -647,7 +672,7 @@ async def get_system_node_display(
     if not is_system_node(nid):
         return error_response(400, "not_system_node", f"节点 {nid} 非 system 类型")
 
-    display = resolve_system_node_display(sid, nid)
+    display = await asyncio.to_thread(resolve_system_node_display, sid, nid)
     if display is None:
         return error_response(404, "system_node_display_not_found", "暂无该节点的结构化执行结果")
     return success_response(

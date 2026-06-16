@@ -115,6 +115,58 @@ def _remember_scheduler_loop(loop: asyncio.AbstractEventLoop) -> None:
         _meeting_scheduler_loop = loop
 
 
+def _resolve_meeting_coordinator_loop() -> asyncio.AbstractEventLoop | None:
+    """会议室 AI 节点 / 门控协程优先在 engine loop 上调度，避免占满 API loop。"""
+    try:
+        from synapse.core.engine_bridge import get_engine_loop
+
+        engine = get_engine_loop()
+    except ImportError:
+        engine = None
+    if engine is not None and not engine.is_closed():
+        _remember_scheduler_loop(engine)
+        return engine
+    if _meeting_scheduler_loop is not None and not _meeting_scheduler_loop.is_closed():
+        return _meeting_scheduler_loop
+    try:
+        current = asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+    _remember_scheduler_loop(current)
+    return current
+
+
+def _schedule_on_coordinator_loop(
+    runner: Callable[[], Any],
+    *,
+    key: str = "",
+    bucket: dict[str, asyncio.Task[None]] | None = None,
+) -> None:
+    """在协调 loop（优先 engine）上创建后台 task；可从 API / worker / engine 线程调用。"""
+    coordinator_loop = _resolve_meeting_coordinator_loop()
+    if coordinator_loop is None or coordinator_loop.is_closed():
+        raise RuntimeError("no meeting coordinator event loop")
+
+    def _start() -> None:
+        if bucket is not None and key:
+            existing = bucket.get(key)
+            if existing is not None and not existing.done():
+                return
+            bucket[key] = coordinator_loop.create_task(runner())
+        else:
+            coordinator_loop.create_task(runner())
+
+    try:
+        current = asyncio.get_running_loop()
+    except RuntimeError:
+        current = None
+
+    if current is coordinator_loop:
+        _start()
+    else:
+        coordinator_loop.call_soon_threadsafe(_start)
+
+
 def _room_task_key(room_id: str, scope_id: str = "") -> str:
     return (room_id or scope_id or "").strip()
 
@@ -161,14 +213,9 @@ def schedule_pipeline_background(
             _pipeline_tasks.pop(key, None)
 
     try:
-        loop = asyncio.get_running_loop()
+        _schedule_on_coordinator_loop(_runner, key=key, bucket=_pipeline_tasks)
     except RuntimeError:
         fn()
-        return key
-
-    _remember_scheduler_loop(loop)
-    task = loop.create_task(_runner())
-    _pipeline_tasks[key] = task
     return key
 
 
@@ -499,6 +546,7 @@ class MeetingRoomOrchestrator:
         schedule_pipeline_advance: bool = True,
         ticket_title: str = "",
         agent_pool: Any | None = None,
+        bypass_downstream_gate: bool = False,
     ) -> dict[str, Any]:
         sid = scope_id.strip()
         dev = load_dev_status(sid)
@@ -538,7 +586,9 @@ class MeetingRoomOrchestrator:
         next_id: str | None = None
         prev_stage_id = stage_id_for_node_id(node_id)
         requested_advance = advance
-        downstream_block_reason = downstream_advance_block_reason(node_id)
+        downstream_block_reason = (
+            "" if bypass_downstream_gate else downstream_advance_block_reason(node_id)
+        )
         if downstream_block_reason and requested_advance:
             advance = False
 
@@ -567,12 +617,38 @@ class MeetingRoomOrchestrator:
             room_state["current_node_id"] = node_id
 
         if downstream_block_reason and requested_advance:
-            room_state["status"] = "failed"
+            room_state["status"] = "human_intervention"
+            room_state["intervention_kind"] = "result_confirm"
             room_state["downstream_blocked"] = True
             room_state["downstream_block_reason"] = downstream_block_reason
-            dev["local_process_state"] = "失败"
+            dev["local_process_state"] = "待人工"
             dev["current_node_id"] = node_id
             dev["sop_node_display"] = node_display_name(node_id)
+            set_phase(sid, "result_gate")
+            pending = room_state.get("pending_delivery")
+            if not isinstance(pending, dict):
+                pending = {}
+            else:
+                pending = dict(pending)
+            pending.setdefault("node_id", node_id)
+            pending["await_confirm"] = True
+            pending.setdefault("stage_id", stage_id_for_node_id(node_id))
+            pending.setdefault("tokens_used", archived_tokens)
+            pending.setdefault("duration_seconds", archived_seconds)
+            if not pending.get("review_payload"):
+                from synapse.rd_meeting.node_review import load_node_review
+
+                review_payload = load_node_review(sid, node_id)
+                if isinstance(review_payload, dict):
+                    pending["review_payload"] = review_payload
+            room_state["pending_delivery"] = pending
+            schedule_human_intervention_notify(
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                ticket_title=ticket_title,
+                reason=downstream_block_reason,
+            )
 
         if advance and next_id:
             room_state.pop(READY_FOR_NODE_REVIEW_KEY, None)
@@ -599,12 +675,26 @@ class MeetingRoomOrchestrator:
             append_history_event(
                 sid,
                 {
-                    "event": "node_failed",
+                    "event": "human_gate",
                     "room_id": room_id,
                     "node_id": node_id,
-                    "error": downstream_block_reason,
+                    "text": downstream_block_reason,
+                    "intervention_kind": "result_confirm",
                     "downstream_blocked": True,
                     "log_type": "warning",
+                    "agent_id": "system",
+                },
+            )
+            append_history_event(
+                sid,
+                {
+                    "event": "node_pending_confirm",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "tokens_used": archived_tokens,
+                    "duration_seconds": archived_seconds,
+                    "downstream_blocked": True,
+                    "log_type": "info",
                     "agent_id": "system",
                 },
             )
@@ -2128,7 +2218,11 @@ class MeetingRoomOrchestrator:
         sid = scope_id.strip()
         room_state = load_room_state(sid) or {}
         pending = room_state.get("pending_delivery")
-        if not isinstance(pending, dict) or not pending.get("report_body"):
+        if not isinstance(pending, dict):
+            raise ValueError("no_pending_delivery")
+        has_report = bool(str(pending.get("report_body") or "").strip())
+        has_review = isinstance(pending.get("review_payload"), dict) and bool(pending.get("review_payload"))
+        if not has_report and not has_review:
             raise ValueError("no_pending_delivery")
 
         node_id = str(pending.get("node_id") or room_state.get("current_node_id") or "")
@@ -2229,6 +2323,7 @@ class MeetingRoomOrchestrator:
             advance=True,
             ticket_title=ticket_title,
             agent_pool=agent_pool,
+            bypass_downstream_gate=True,
         )
 
         rs = load_room_state(sid) or {}
@@ -3334,15 +3429,7 @@ def schedule_run_node(
         finally:
             _running_tasks.pop(key, None)
 
-    coordinator_loop: asyncio.AbstractEventLoop | None = None
-    on_coordinator_thread = False
-    try:
-        coordinator_loop = asyncio.get_running_loop()
-        _remember_scheduler_loop(coordinator_loop)
-        on_coordinator_thread = True
-    except RuntimeError:
-        coordinator_loop = _meeting_scheduler_loop
-
+    coordinator_loop = _resolve_meeting_coordinator_loop()
     if coordinator_loop is None or coordinator_loop.is_closed():
         logger.warning(
             "schedule_run_node: no event loop available, deferred pending_host_llm_begin_kind key=%s",
@@ -3350,19 +3437,13 @@ def schedule_run_node(
         )
         return key
 
-    if on_coordinator_thread:
-        task = coordinator_loop.create_task(_runner())
-        _running_tasks[key] = task
-        return key
-
-    def _start_from_worker_thread() -> None:
-        ex = _running_tasks.get(key)
-        if ex is not None and not ex.done():
-            return
-        task = coordinator_loop.create_task(_runner())
-        _running_tasks[key] = task
-
-    coordinator_loop.call_soon_threadsafe(_start_from_worker_thread)
+    try:
+        _schedule_on_coordinator_loop(_runner, key=key, bucket=_running_tasks)
+    except RuntimeError:
+        logger.warning(
+            "schedule_run_node: no event loop available, deferred pending_host_llm_begin_kind key=%s",
+            key,
+        )
     return key
 
 
@@ -3431,11 +3512,9 @@ def schedule_enter_node_review(
             logger.exception("schedule_enter_node_review failed scope=%s: %s", sid, exc)
 
     try:
-        loop = asyncio.get_running_loop()
+        _schedule_on_coordinator_loop(_runner)
     except RuntimeError:
         logger.debug("schedule_enter_node_review: no event loop scope=%s", sid)
-        return key
-    loop.create_task(_runner())
     return key
 
 

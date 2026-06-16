@@ -107,11 +107,10 @@ def test_task_check_flight_fail_redirects_to_task_feedback(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     ("node_id", "reason_snippet", "next_id"),
     [
-        ("exception_check", "试飞结果待确认", "task_feedback"),
         ("task_feedback", "试飞优化方案待人工评估", "diff_analysis"),
     ],
 )
-def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet, next_id):
+def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet, next_id, monkeypatch):
     from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
     from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
     from synapse.rd_meeting.room_runtime import default_room_state, load_room_state, save_room_state
@@ -144,6 +143,12 @@ def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet
         ),
     )
 
+    monkeypatch.setattr("synapse.rd_meeting.orchestrator.set_phase", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.schedule_human_intervention_notify",
+        lambda **_k: None,
+    )
+
     orch = MeetingRoomOrchestrator()
     out = orch.on_node_complete(
         scope_type="demand",
@@ -158,8 +163,12 @@ def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet
     assert out["next_node_id"] is None
     dev = load_dev_status(scope_id) or {}
     assert dev.get("current_node_id") == node_id
-    assert dev.get("local_process_state") == "失败"
+    assert dev.get("local_process_state") == "待人工"
     rs = load_room_state(scope_id) or {}
-    assert rs.get("status") == "failed"
+    assert rs.get("status") == "human_intervention"
+    assert rs.get("intervention_kind") == "result_confirm"
     assert rs.get("downstream_blocked") is True
     assert reason_snippet in str(rs.get("downstream_block_reason") or "")
+    pending = rs.get("pending_delivery")
+    assert isinstance(pending, dict)
+    assert pending.get("await_confirm") is True

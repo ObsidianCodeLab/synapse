@@ -645,7 +645,7 @@ class MeetingRoomService:
 
     def schedule_open_meeting_async_tail(
         self,
-        loop: asyncio.AbstractEventLoop,
+        loop: asyncio.AbstractEventLoop | None,
         *,
         scope_type: ScopeType,
         scope_id: str,
@@ -653,19 +653,21 @@ class MeetingRoomService:
         sync_userwork: bool,
         agent_pool: Any | None,
     ) -> None:
-        """在 API 事件循环上调度开门 tail（去重；重活在线程池执行）。"""
+        """调度开门 tail（去重；重活在 engine / 协调 loop 上执行，不占 API loop）。"""
         sid = (scope_id or "").strip()
-        if not sid or loop.is_closed():
+        from synapse.rd_meeting.orchestrator import (
+            _resolve_meeting_coordinator_loop,
+            _schedule_on_coordinator_loop,
+        )
+
+        coordinator_loop = _resolve_meeting_coordinator_loop()
+        if not sid or coordinator_loop is None or coordinator_loop.is_closed():
             return
 
         existing = _open_meeting_tail_tasks.get(sid)
         if existing is not None and not existing.done():
             logger.info("open_meeting async tail already running scope=%s", sid)
             return
-
-        from synapse.rd_meeting.orchestrator import _remember_scheduler_loop
-
-        _remember_scheduler_loop(loop)
 
         async def _runner() -> None:
             try:
@@ -679,8 +681,10 @@ class MeetingRoomService:
             finally:
                 _open_meeting_tail_tasks.pop(sid, None)
 
-        task = loop.create_task(_runner())
-        _open_meeting_tail_tasks[sid] = task
+        try:
+            _schedule_on_coordinator_loop(_runner, key=sid, bucket=_open_meeting_tail_tasks)
+        except RuntimeError:
+            logger.warning("open_meeting async tail: no coordinator loop scope=%s", sid)
 
     def submit_meeting_prod(
         self,
