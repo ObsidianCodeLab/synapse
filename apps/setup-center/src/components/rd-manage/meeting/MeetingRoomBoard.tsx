@@ -2112,7 +2112,6 @@ const InterventionDialog = ({
 
   const canStopNodeRun = Boolean(
     room &&
-    selectedNode?.id === room.currentNode &&
     room.status === 'processing' &&
     room.runInProgress &&
     !room.stoppingRun &&
@@ -2472,7 +2471,7 @@ const InterventionDialog = ({
                                   : 'bg-muted/40 border-border/50 hover:border-border'
                   }`}
                 >
-                  {canStopNodeRun ? (
+                  {canStopNodeRun && isCurrentNode ? (
                     <Tooltip title={room.stoppingRun ? '正在终止…' : '终止本节点运行'}>
                       <button
                         type="button"
