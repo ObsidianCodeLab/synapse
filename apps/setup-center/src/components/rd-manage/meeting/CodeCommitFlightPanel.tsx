@@ -13,6 +13,7 @@ import {
   formatAlarmCcn,
   parseBuildResultRow,
   resolveBuildFailureReason,
+  resolveFlightCardRunStateDesc,
   type BuildResultAlarm,
   type ParsedBuildResult,
   type ParsedBuildTable,
@@ -118,7 +119,9 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
       <summary className="rd-flight-build-result__summary">
         <ChevronDown className="rd-flight-build-result__chevron h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="font-medium text-slate-200">{item.resultType}</span>
-        <span className="text-[11px] text-muted-foreground truncate">{item.preview}</span>
+        {item.preview ? (
+          <span className="text-[11px] text-muted-foreground truncate">{item.preview}</span>
+        ) : null}
       </summary>
       <div className="rd-flight-build-result__body">
         {item.kind === 'url' && item.url ? (
@@ -163,6 +166,10 @@ function FlightTaskCard({ entry }: { entry: CodeCommitFlightEntry }) {
     () => entry.buildResults.map((row) => parseBuildResultRow(row)),
     [entry.buildResults],
   );
+  const runStateDesc = useMemo(
+    () => resolveFlightCardRunStateDesc(entry.runStateDesc, parsedBuildResults),
+    [entry.runStateDesc, parsedBuildResults],
+  );
 
   return (
     <article className="rd-code-commit-flight-card">
@@ -185,10 +192,10 @@ function FlightTaskCard({ entry }: { entry: CodeCommitFlightEntry }) {
       {entry.flightStatus ? (
         <div className="rd-code-commit-flight-card__flight mt-3">
           <dl className="rd-flight-meta-grid">
-            {entry.runStateDesc ? (
+            {runStateDesc ? (
               <>
                 <dt>构建状态</dt>
-                <dd>{entry.runStateDesc}</dd>
+                <dd>{runStateDesc}</dd>
               </>
             ) : null}
             {entry.beginDate || entry.endDate ? (

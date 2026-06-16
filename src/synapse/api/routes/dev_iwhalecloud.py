@@ -2175,15 +2175,6 @@ def _ci_step_state_from_nodes(nodes: list[dict]) -> str:
     return "pending"
 
 
-def enforce_ci_step_cascade(steps: dict[str, str]) -> dict[str, str]:
-    """编译未通过时，下游试飞检查不可能成功（跳过/未执行节点不应显示为 ok）。"""
-    compile_st = str(steps.get("compile") or "pending").strip() or "pending"
-    flight_st = str(steps.get("flight") or "pending").strip() or "pending"
-    if compile_st != "ok" and flight_st in ("ok", "active"):
-        flight_st = "pending"
-    return {"compile": compile_st, "flight": flight_st}
-
-
 def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
     compile_nodes = [node for node in nodes if _is_compile_ci_node(node)]
     flight_nodes = [
@@ -2191,12 +2182,10 @@ def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
         for node in nodes
         if not _is_compile_ci_node(node) and not _is_skipped_ci_overview_node(node)
     ]
-    return enforce_ci_step_cascade(
-        {
-            "compile": _ci_step_state_from_nodes(compile_nodes),
-            "flight": _ci_step_state_from_nodes(flight_nodes),
-        }
-    )
+    return {
+        "compile": _ci_step_state_from_nodes(compile_nodes),
+        "flight": _ci_step_state_from_nodes(flight_nodes),
+    }
 
 
 async def _fetch_ci_flow_node_instances(ci_flow_inst_id: str) -> list[dict]:

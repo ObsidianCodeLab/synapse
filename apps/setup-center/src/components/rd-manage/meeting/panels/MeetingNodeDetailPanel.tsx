@@ -44,8 +44,6 @@ import {
   SYSTEM_STRUCTURED_NODE_IDS,
   SystemNodeDetailCard,
 } from '../SystemNodeCards';
-import { CodeCommitProgressSteps } from '../CodeCommitProgressSteps';
-import { collectCodeCommitArchives, resolveCodeCommitStepStates } from '../codeCommitDisplay';
 import {
   KnowledgeBaseTab,
   KnowledgeGraphTab,
@@ -54,6 +52,7 @@ import {
   SimilarTicketsTab,
   similarTicketsTabLabel,
 } from './MeetingNodeReferenceTabs';
+import { collectCodeCommitArchives } from '../codeCommitDisplay';
 
 export type MeetingNodeVisualState =
   | 'pending'
@@ -488,55 +487,33 @@ export function MeetingNodeDetailPanel({
   const isCodeCommitNode = nodeId === 'exception_check';
 
   const effectiveSystemDisplay = liveSystemDisplay ?? systemDisplay;
-  const codeCommitStepStates = useMemo(
-    () =>
-      nodeId === 'exception_check' && effectiveSystemDisplay
-        ? resolveCodeCommitStepStates(effectiveSystemDisplay)
-        : null,
-    [effectiveSystemDisplay, nodeId],
-  );
-  const codeCommitProgressMessage = useMemo(() => {
-    if (nodeId !== 'exception_check' || !effectiveSystemDisplay) return '';
-    const progress = (effectiveSystemDisplay.progress as Record<string, unknown>) || {};
-    return String(progress.message || '').trim();
-  }, [effectiveSystemDisplay, nodeId]);
 
   const header = (
-    <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Zap className="h-3 w-3 text-indigo-400" />
-            节点实况
-            {nodeState === 'processing' ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
-                <Loader2 className="h-3 w-3 animate-spin" /> 进行中
-              </span>
-            ) : nodeState === 'completed' ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
-                <CheckCircle2 className="h-3 w-3" /> 已完成
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <Tooltip title="刷新指标与流程">
-          <Button
-            size="small"
-            icon={<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />}
-            loading={refreshing}
-            onClick={() => void load(true)}
-          />
-        </Tooltip>
-      </div>
-      {codeCommitStepStates ? (
-        <div className="mb-4 rounded-xl border border-border/50 bg-muted/10 px-4 py-3">
-          <CodeCommitProgressSteps stepStates={codeCommitStepStates} />
-          {codeCommitProgressMessage ? (
-            <p className="mb-0 mt-2 text-[11px] text-primary/80">{codeCommitProgressMessage}</p>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Zap className="h-3 w-3 text-indigo-400" />
+          节点实况
+          {nodeState === 'processing' ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+              <Loader2 className="h-3 w-3 animate-spin" /> 进行中
+            </span>
+          ) : nodeState === 'completed' ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
+              <CheckCircle2 className="h-3 w-3" /> 已完成
+            </span>
           ) : null}
         </div>
-      ) : null}
-    </>
+      </div>
+      <Tooltip title="刷新指标与流程">
+        <Button
+          size="small"
+          icon={<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />}
+          loading={refreshing}
+          onClick={() => void load(true)}
+        />
+      </Tooltip>
+    </div>
   );
 
   const metricsGrid = (
@@ -734,7 +711,7 @@ export function MeetingNodeDetailPanel({
             <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
             <p className="text-sm text-muted-foreground">代码提交与试飞结果尚未就绪</p>
             {nodeState === 'processing' ? (
-              <p className="mt-1 text-xs text-primary/80">提交与 CI 轮询中，进度见上方步骤条</p>
+              <p className="mt-1 text-xs text-primary/80">提交与 CI 轮询中，进度见下方步骤条</p>
             ) : null}
           </div>
         )}

@@ -72,6 +72,16 @@ const URL_RE = /^https?:\/\/\S+$/i;
 
 const GENERIC_BUILD_STATUS = new Set(['构建失败', '构建成功', '构建中']);
 
+export function resolveFlightCardRunStateDesc(
+  runStateDesc: string,
+  parsedBuildResults: ParsedBuildResult[],
+): string {
+  if (parsedBuildResults.some((item) => item.buildKind === 'compile')) {
+    return '编译失败';
+  }
+  return String(runStateDesc || '').trim();
+}
+
 export function isGenericBuildStatus(text: string | undefined | null): boolean {
   const t = String(text || '').trim();
   return !t || GENERIC_BUILD_STATUS.has(t);
@@ -93,8 +103,8 @@ export function resolveBuildFailureReason(item: {
       const text = String(candidate || '').trim();
       if (text && !isGenericBuildStatus(text)) return text;
     }
-    const desc = String(item.nodeStateDesc || '').trim();
-    if (desc && !isGenericBuildStatus(desc)) return stripHtmlToText(desc, 8000);
+    const desc = stripHtmlToText(String(item.nodeStateDesc || ''), 8000);
+    if (desc && !isGenericBuildStatus(desc)) return desc;
     return item.plainText?.trim() || item.preview?.trim() || '';
   }
 
@@ -373,10 +383,18 @@ export function parseBuildResultRow(row: BuildResultInput): ParsedBuildResult {
 
   const parsed = parseBuildResult(resultType, resultMsg);
   if (rowKind === 'compile') {
-    const compileParsed = { ...parsed, buildKind: 'compile' as const, nodeStateDesc: row.nodeStateDesc };
-    if (compileParsed.kind === 'html' && compileParsed.plainText && !compileParsed.plainText.includes('error:')) {
+    const compileParsed = {
+      ...parsed,
+      buildKind: 'compile' as const,
+      nodeStateDesc: row.nodeStateDesc,
+    };
+    if (compileParsed.kind === 'html') {
       compileParsed.kind = 'text';
-      compileParsed.plainText = compileParsed.plainText.trim() || resultMsg;
+      compileParsed.plainText =
+        stripHtmlToText(resultMsg, 200_000) ||
+        stripHtmlToText(String(row.nodeStateDesc || ''), 200_000) ||
+        compileParsed.plainText ||
+        resultMsg;
       compileParsed.preview =
         compileParsed.plainText.length > 160
           ? `${compileParsed.plainText.slice(0, 160)}…`

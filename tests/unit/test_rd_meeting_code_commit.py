@@ -256,31 +256,6 @@ def test_resolve_code_commit_pipeline_steps_three_phase_flow():
     assert steps["flight"] == "active"
 
 
-def test_resolve_pipeline_steps_compile_failed_flight_not_ok():
-    doc = {
-        "status": "partial",
-        "progress": {"phase": "done"},
-        "tasks": [
-            {
-                "status": "ok",
-                "flight": {
-                    "status": "failed",
-                    "data": {
-                        "ciFlowInstRunState": "1",
-                        "pipelineSteps": {"compile": "failed", "flight": "ok"},
-                        "buildResult": [{"kind": "compile", "resultType": "编译节点", "resultMsg": "error:"}],
-                    },
-                },
-            }
-        ],
-        "summary": {"total": 1, "commit_ok": 1, "commit_failed": 0},
-        "flight": {"status": "failed"},
-    }
-    steps = _resolve_code_commit_pipeline_steps(doc)
-    assert steps["compile"] == "failed"
-    assert steps["flight"] == "pending"
-
-
 def test_collect_task_rows_includes_portal_task_id():
     rows = collect_task_rows(
         {

@@ -58,14 +58,7 @@ def test_summarize_ci_pipeline_steps_compile_failed_check_pending():
     ]
     steps = diw.summarize_ci_pipeline_steps(nodes)
     assert steps["compile"] == "failed"
-    assert steps["flight"] == "pending"
-
-
-def test_enforce_ci_step_cascade_blocks_flight_ok_when_compile_failed():
-    assert diw.enforce_ci_step_cascade({"compile": "failed", "flight": "ok"}) == {
-        "compile": "failed",
-        "flight": "pending",
-    }
+    assert steps["flight"] == "active"
 
 
 def test_summarize_ci_pipeline_steps_all_ok():
