@@ -51,6 +51,37 @@ def test_task_exec_rounds_first_run_and_reprocess(tmp_path, monkeypatch):
     assert active["status"] == "running"
 
 
+def test_reprocess_prep_rounds_survive_caller_save(tmp_path, monkeypatch):
+    """重处理轮次须写入调用方 pipe，避免 reload 后外层 save 覆盖 pending 轮次。"""
+    scope_id = "te-rounds-stale-save"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    (tmp_path / "work" / scope_id).mkdir(parents=True)
+    MeetingPipeline.create(scope_id, scope_type="demand")
+
+    on_task_exec_cli_starting(scope_id, reason="")
+    on_task_exec_cli_finished(
+        scope_id,
+        {
+            "status": "ok",
+            "started_at": "2026-06-16T10:00:00",
+            "finished_at": "2026-06-16T10:12:00",
+            "summary": {"total": 1, "ok": 1, "total_tokens": 100, "total_duration_sec": 60},
+        },
+    )
+
+    pipe = MeetingPipeline.load(scope_id)
+    assert len(load_task_exec_rounds(scope_id)) == 1
+
+    on_task_exec_reprocess_prep(pipe, reason="补测")
+    pipe.save()
+
+    rounds = load_task_exec_rounds(scope_id)
+    assert len(rounds) == 2
+    assert rounds[1]["round"] == 2
+    assert rounds[1]["reason"] == "补测"
+    assert rounds[1]["status"] == "pending"
+
+
 def test_load_task_exec_rounds_synthetic_from_payload(tmp_path, monkeypatch):
     scope_id = "te-rounds-legacy"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")

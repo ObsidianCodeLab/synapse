@@ -238,7 +238,6 @@ def _finalize_open_round(rounds: list[dict[str, Any]], *, status: str = "superse
 def on_task_exec_reprocess_prep(pipe: MeetingPipeline, *, reason: str) -> dict[str, Any]:
     """重处理准备：追加新一轮并记录用户建议。"""
     sid = pipe.scope_id
-    pipe = MeetingPipeline.load(sid)
     ctx = pipe._data.get("context")
     if not isinstance(ctx, dict):
         ctx = {}
