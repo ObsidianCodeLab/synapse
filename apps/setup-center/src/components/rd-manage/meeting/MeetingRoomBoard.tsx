@@ -186,8 +186,10 @@ interface MeetingRoom {
   /** 当前对话绑定的 SOP 作用域（stage:node） */
   chatSopKey?: string;
   skippedNodeIds?: string[];
-  /** 正在发起重新处理的节点 ID；仅该节点卡片/按钮显示 loading */
+  /** 正在发起重新处理的节点 ID；全屏遮罩展示重新处理中 */
   reprocessingNodeId?: string | null;
+  /** 正在终止当前节点运行 */
+  stoppingRun?: boolean;
   /** 正在发起处理恢复的节点 ID */
   recoveringNodeId?: string | null;
   /** 服务重启后是否可恢复人工门控（后端 node_recovery） */
@@ -517,6 +519,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       ? live.skipped_node_ids
       : room.skippedNodeIds,
     reprocessingNodeId: room.reprocessingNodeId ?? null,
+    stoppingRun: room.stoppingRun ?? false,
     recoveringNodeId: room.recoveringNodeId ?? null,
     nodeRecovery:
       (live.node_recovery as MeetingNodeRecovery | undefined) ?? room.nodeRecovery ?? null,
@@ -1049,6 +1052,9 @@ function mergeListRoomWithExisting(fresh: MeetingRoom, existing?: MeetingRoom): 
     logs: logs.length > 0 ? logs : fresh.logs,
     agents: existing.agents.length > 0 ? existing.agents : fresh.agents,
     chatEpoch: existing.chatEpoch,
+    reprocessingNodeId: existing.reprocessingNodeId ?? fresh.reprocessingNodeId ?? null,
+    stoppingRun: existing.stoppingRun ?? fresh.stoppingRun ?? false,
+    recoveringNodeId: existing.recoveringNodeId ?? fresh.recoveringNodeId ?? null,
   };
 }
 
@@ -1368,6 +1374,23 @@ function formatTokenConsumed(consumed: number, budget: number): string {
 /** 与中栏 Tab（人工确认等）同高 */
 const MEETING_TAB_BAR_HEIGHT = 'inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm';
 const MEETING_TAB_BAR_ANT_BTN = '!inline-flex !h-9 !items-center !gap-2 !rounded-lg !px-4 !text-sm';
+
+/** 终止运行 / 重处理等长耗时操作：遮罩阻断交互并提示状态 */
+function MeetingBusyOverlay({ label }: { label: string }) {
+  return (
+    <div
+      className="absolute inset-0 z-30 flex items-center justify-center bg-background/75 backdrop-blur-[2px]"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="flex max-w-[min(20rem,90vw)] flex-col items-center gap-2.5 rounded-xl border border-border/60 bg-[color:var(--panel)]/95 px-6 py-5 shadow-lg">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+        <p className="text-center text-sm text-foreground/90">{label}</p>
+      </div>
+    </div>
+  );
+}
 
 function meetingStatusTagColor(status: MeetingRoom['status']): string {
   switch (status) {
@@ -2042,7 +2065,7 @@ const InterventionDialog = ({
 
   const canReprocessCodeCommitNode = (nodeId: string) => {
     if (!room || nodeId !== 'exception_check') return false;
-    if (room.runInProgress || room.reprocessingNodeId) return false;
+    if (room.runInProgress || room.reprocessingNodeId || room.stoppingRun) return false;
     if (stageIdForNodeId(nodeId) !== stageIdForNodeId(room.currentNode)) return false;
     if (!['processing', 'failed', 'stopped', 'human_intervention'].includes(room.status)) return false;
     const nodeState = getNodeStateGlobal(room, nodeId, disabledSopNodeIds);
@@ -2056,6 +2079,8 @@ const InterventionDialog = ({
       room &&
       reprocessableRoomStatus &&
       !room.runInProgress &&
+      !room.reprocessingNodeId &&
+      !room.stoppingRun &&
       nodeId !== room.currentNode &&
       nodeType !== 'system' &&
       stageIdForNodeId(nodeId) === stageIdForNodeId(room.currentNode) &&
@@ -2066,6 +2091,8 @@ const InterventionDialog = ({
     room &&
     selectedNode &&
     !room.runInProgress &&
+    !room.reprocessingNodeId &&
+    !room.stoppingRun &&
     (canReprocessCodeCommitNode(selectedNode.id) ||
       (reprocessableRoomStatus &&
         (selectedNode.id === room.currentNode ||
@@ -2079,6 +2106,7 @@ const InterventionDialog = ({
     room.status === 'stopped' &&
     !room.runInProgress &&
     !room.reprocessingNodeId &&
+    !room.stoppingRun &&
     room.nodeRecovery?.recoverable,
   );
 
@@ -2086,8 +2114,17 @@ const InterventionDialog = ({
     room &&
     selectedNode?.id === room.currentNode &&
     room.status === 'processing' &&
-    room.runInProgress,
+    room.runInProgress &&
+    !room.stoppingRun &&
+    !room.reprocessingNodeId,
   );
+
+  const roomBusyOverlayLabel = room?.stoppingRun
+    ? '正在终止当前节点运行…'
+    : room?.reprocessingNodeId
+      ? `正在重新处理「${resolveSopNodeName(room.reprocessingNodeId)}」…`
+      : '';
+  const showRoomBusyOverlay = Boolean(roomBusyOverlayLabel);
 
   const displayAgents = useMemo((): RoomAgent[] => {
     if (!room) return [];
@@ -2299,6 +2336,11 @@ const InterventionDialog = ({
   }, [open, centerTab, isViewingHitlNode]);
 
   useEffect(() => {
+    if (!open || !room?.reprocessingNodeId) return;
+    selectSopNode(room.reprocessingNodeId);
+  }, [open, room?.reprocessingNodeId, selectSopNode]);
+
+  useEffect(() => {
     if (!open) return;
     lastLogKeyRef.current = '';
     const pane = logsEndRef.current?.parentElement;
@@ -2360,7 +2402,8 @@ const InterventionDialog = ({
           synapseApiBase={synapseApiBase}
         />
 
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
+        {showRoomBusyOverlay ? <MeetingBusyOverlay label={roomBusyOverlayLabel} /> : null}
         {/* 左栏：SOP 阶段 + 议题清单 */}
         <div className="w-[320px] bg-[color:var(--panel)] flex flex-col shrink-0 min-h-0 border-r border-border/60">
           {/* SOP Stage Navigator */}
@@ -2429,21 +2472,28 @@ const InterventionDialog = ({
                                   : 'bg-muted/40 border-border/50 hover:border-border'
                   }`}
                 >
-                  {canStopNodeRun && isCurrentNode ? (
-                    <Tooltip title="终止本节点运行">
+                  {canStopNodeRun ? (
+                    <Tooltip title={room.stoppingRun ? '正在终止…' : '终止本节点运行'}>
                       <button
                         type="button"
-                        className="rd-meeting-node-stop-btn absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-red-400"
+                        disabled={Boolean(room.stoppingRun)}
+                        aria-busy={room.stoppingRun}
+                        className="rd-meeting-node-stop-btn absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (room.stoppingRun) return;
                           onStopRun?.();
                         }}
                       >
-                        <StopNodeRunIcon className="h-5 w-5" />
+                        {room.stoppingRun ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <StopNodeRunIcon className="h-5 w-5" />
+                        )}
                       </button>
                     </Tooltip>
                   ) : null}
-                  {canReprocessHistoricalNode(node.id, node.type) ? (
+                  {canReprocessHistoricalNode(node.id, node.type) && !room.reprocessingNodeId ? (
                     <Tooltip
                       title={
                         node.id === 'exception_check'
@@ -2453,17 +2503,13 @@ const InterventionDialog = ({
                     >
                       <button
                         type="button"
-                        disabled={Boolean(room.reprocessingNodeId)}
-                        className="rd-meeting-node-reprocess-btn absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="rd-meeting-node-reprocess-btn absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-amber-400"
                         onClick={(e) => {
                           e.stopPropagation();
                           openReprocessModal(node.id);
                         }}
                       >
-                        <CrossNodeReprocessIcon
-                          className="h-5 w-5"
-                          spinning={room.reprocessingNodeId === node.id}
-                        />
+                        <CrossNodeReprocessIcon className="h-5 w-5" />
                       </button>
                     </Tooltip>
                   ) : null}
@@ -2583,7 +2629,7 @@ const InterventionDialog = ({
                 <Tooltip title="恢复服务重启前的人工门控状态，不清理已产出内容">
                   <Button
                     type="primary"
-                    disabled={Boolean(room.recoveringNodeId || room.reprocessingNodeId)}
+                    disabled={Boolean(room.recoveringNodeId || room.reprocessingNodeId || room.stoppingRun)}
                     loading={room.recoveringNodeId === selectedNode?.id}
                     icon={<Undo2 className="w-4 h-4" />}
                     onClick={() => onRecover?.(selectedNode!.id)}
@@ -2597,7 +2643,7 @@ const InterventionDialog = ({
                 <Button
                   type="primary"
                   danger={room.status === 'failed'}
-                  disabled={Boolean(room.reprocessingNodeId || room.recoveringNodeId)}
+                  disabled={Boolean(room.reprocessingNodeId || room.recoveringNodeId || room.stoppingRun)}
                   loading={room.reprocessingNodeId === selectedNode?.id}
                   icon={<RotateCw className="w-4 h-4" />}
                   onClick={() => selectedNode && openReprocessModal(selectedNode.id)}
@@ -2934,7 +2980,7 @@ const InterventionDialog = ({
         onOk={confirmReprocess}
         okText="开始重新处理"
         cancelText="取消"
-        okButtonProps={{ disabled: Boolean(room.reprocessingNodeId) }}
+        okButtonProps={{ disabled: Boolean(room.reprocessingNodeId || room.stoppingRun) }}
         destroyOnClose
         centered
         width={520}
@@ -2947,7 +2993,7 @@ const InterventionDialog = ({
           onChange={(e) => setReprocessReason(e.target.value)}
           placeholder="例如：上次遗漏了 XX 模块边界，请重新梳理并补充接口契约…（可选）"
           autoSize={{ minRows: 4, maxRows: 10 }}
-          disabled={Boolean(room.reprocessingNodeId)}
+          disabled={Boolean(room.reprocessingNodeId || room.stoppingRun)}
           className="!bg-black/30 !text-foreground !border-border/60"
         />
       </Modal>
@@ -3182,6 +3228,11 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
   const humanCount = rooms.filter((r) => r.status === 'human_intervention').length;
   const processingCount = rooms.filter((r) => r.status === 'processing').length;
 
+  const patchMeetingRoomState = useCallback((roomId: string, patch: Partial<MeetingRoom>) => {
+    setActiveRoom((prev) => (prev && prev.id === roomId ? { ...prev, ...patch } : prev));
+    setRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, ...patch } : r)));
+  }, []);
+
   const handleOpenRoom = (room: MeetingRoom) => {
     const base = (synapseApiBase || '').trim();
     setActiveRoom(room);
@@ -3249,50 +3300,57 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
   }, []);
 
   const handleReprocess = (nodeId: string, reason?: string) => {
-    if (!activeRoom) return;
+    if (!activeRoom || activeRoom.reprocessingNodeId || activeRoom.stoppingRun) return;
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
+    const roomId = activeRoom.id;
     const chatEpoch = Date.now();
-    setActiveRoom((prev) => {
-      if (!prev) return prev;
-      const cleared = replaceNodeChatLogs(prev.allChatLogs ?? prev.logs, nodeId, []);
-      return {
-        ...prev,
-        reprocessingNodeId: nodeId,
-        status: 'processing',
-        runInProgress: true,
-        interventionKind: null,
-        interventionPanel: null,
-        hitlFormSchema: null,
-        hitlLocked: false,
-        hitlSubmission: null,
-        hitlPendingSummary: null,
-        reviewPayload: null,
-        allChatLogs: cleared,
-        logs: filterLogsForNodeExact(cleared, prev.currentNode),
-        chatEpoch,
-      };
+    const cleared = replaceNodeChatLogs(activeRoom.allChatLogs ?? activeRoom.logs, nodeId, []);
+    patchMeetingRoomState(roomId, {
+      reprocessingNodeId: nodeId,
+      status: 'processing',
+      runInProgress: true,
+      interventionKind: null,
+      interventionPanel: null,
+      hitlFormSchema: null,
+      hitlLocked: false,
+      hitlSubmission: null,
+      hitlPendingSummary: null,
+      reviewPayload: null,
+      allChatLogs: cleared,
+      logs: filterLogsForNodeExact(cleared, activeRoom.currentNode),
+      chatEpoch,
     });
-    void reprocessMeetingRoom(base, activeRoom.id, nodeId, reason)
-      .then((detail) => {
+    void reprocessMeetingRoom(base, roomId, nodeId, reason)
+      .then(async (detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '正在重新处理节点…';
-        updatedRoom.reprocessingNodeId = null;
         updatedRoom.chatEpoch = Date.now();
-        const fresh = (detail.chat_logs || []).map(mapChatWireToLog);
-        updatedRoom.allChatLogs = replaceNodeChatLogs(
-          updatedRoom.allChatLogs ?? updatedRoom.logs,
-          nodeId,
-          fresh.filter((l) => (l.nodeId || '').trim() === nodeId),
-        );
-        updatedRoom.logs = filterLogsForNodeExact(updatedRoom.allChatLogs, updatedRoom.currentNode);
+        try {
+          const payload = await fetchMeetingRoomNodeChat(base, roomId, nodeId);
+          const nodeLogs = (payload.chat_logs || []).map(mapChatWireToLog);
+          if (nodeLogs.length) {
+            updatedRoom.allChatLogs = replaceNodeChatLogs(
+              updatedRoom.allChatLogs ?? updatedRoom.logs,
+              nodeId,
+              nodeLogs,
+            );
+            updatedRoom.logs = filterLogsForNodeExact(
+              updatedRoom.allChatLogs,
+              updatedRoom.currentNode,
+            );
+          }
+        } catch {
+          /* 协作流稍后由 live 轮询补齐 */
+        }
+        updatedRoom.reprocessingNodeId = null;
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
         toast.success('已清理过程数据，正在从节点初始化重跑');
       })
       .catch((e) => {
-        setActiveRoom((prev) => (prev ? { ...prev, reprocessingNodeId: null } : prev));
+        patchMeetingRoomState(roomId, { reprocessingNodeId: null });
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes('cross_stage_reprocess_forbidden')) {
           toast.error('不允许跨阶段重新处理');
@@ -3355,18 +3413,22 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
   );
 
   const handleStopRun = () => {
-    if (!activeRoom) return;
+    if (!activeRoom || activeRoom.stoppingRun || activeRoom.reprocessingNodeId) return;
     const base = (synapseApiBase || '').trim();
     if (!base) return;
-    void stopMeetingRoom(base, activeRoom.id)
+    const roomId = activeRoom.id;
+    patchMeetingRoomState(roomId, { stoppingRun: true });
+    void stopMeetingRoom(base, roomId)
       .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '已终止当前节点运行';
+        updatedRoom.stoppingRun = false;
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
         toast.success('已终止当前节点运行');
       })
       .catch((e) => {
+        patchMeetingRoomState(roomId, { stoppingRun: false });
         toast.error(e instanceof Error ? e.message : String(e));
       });
   };

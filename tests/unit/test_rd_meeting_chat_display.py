@@ -325,3 +325,37 @@ def test_code_commit_history_merge_deduplicates_cards() -> None:
     assert len(cc_cards) == 3
     assert len({c["id"] for c in cc_cards}) == 1
     assert cc_cards[0]["id"] == "exception_check:system-code-commit"
+    assert not [l for l in logs if l.get("displayKind") == "pipeline"]
+
+
+def test_code_commit_milestones_emit_card_only_no_pipeline() -> None:
+    display = {
+        "status": "running",
+        "progress": {"message": "准备提交", "phase": "prepare"},
+        "tasks": [],
+        "flight": {"status": "pending"},
+        "summary": {"total": 1},
+    }
+    milestone_events = [
+        ("code_commit_started", "准备提交 1 个研发子单"),
+        ("code_commit_task_done", "子单 11929917 提交成功"),
+        ("code_commit_phase_done", "全部 1/1 个子单提交完成，开始轮询试飞结果"),
+        ("code_commit_flight_done", "子单 11929917 试飞结果已落盘"),
+        ("code_commit_finished", "代码提交与试飞结果收集完成"),
+    ]
+    logs = history_to_chat_logs(
+        [
+            {
+                "event": event,
+                "node_id": "exception_check",
+                "message": message,
+                "display": display,
+                "ts": f"2026-06-16T10:00:{idx:02d}",
+            }
+            for idx, (event, message) in enumerate(milestone_events)
+        ]
+    )
+    assert not [l for l in logs if l.get("displayKind") == "pipeline"]
+    cc_cards = [l for l in logs if l.get("displayKind") == "system_code_commit"]
+    assert len(cc_cards) == len(milestone_events)
+    assert len({c["id"] for c in cc_cards}) == 1

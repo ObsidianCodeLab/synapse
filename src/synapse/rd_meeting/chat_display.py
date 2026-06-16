@@ -416,20 +416,7 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
     if et.startswith("code_commit_"):
         display = ev.get("display") if isinstance(ev.get("display"), dict) else {}
         out_cc: list[dict[str, Any]] = []
-        summary = format_event_chat_display(ev)
-        # 轮询进度事件只更新结构化卡片，避免会议流刷屏
-        if summary and et != "code_commit_progress":
-            out_cc.append(
-                _row(
-                    ev,
-                    index,
-                    text=summary,
-                    agent_id=SPEAKER_SYSTEM,
-                    speaker_role=SPEAKER_SYSTEM,
-                    display_kind="pipeline",
-                    suffix="-pipe",
-                )
-            )
+        # 所有 code_commit_* 只更新结构化卡片，不出 pipeline 文本（进度见卡片内 progress.message）
         if display:
             card = _row(
                 ev,
