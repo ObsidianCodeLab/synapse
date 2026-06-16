@@ -1531,7 +1531,7 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
         pipe.set_flow_step(STEP_WAITING, reason="系统节点执行失败")
         return
 
-    orch.on_node_complete(
+    completion = orch.on_node_complete(
         scope_type=scope_type,
         scope_id=sid,
         room_id=room_id,
@@ -1547,6 +1547,13 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     )
 
     pipe.mark_step_completed(STEP_SYSTEM_NODE_EXEC)
+    rs_after = completion.get("room_state") if isinstance(completion.get("room_state"), dict) else {}
+    if rs_after.get("downstream_blocked"):
+        ctx.room_state = rs_after
+        block_reason = str(rs_after.get("downstream_block_reason") or "下游门控，等待人工确认")
+        pipe.set_flow_step(STEP_WAITING, reason=block_reason)
+        return
+
     pipe.set_flow_step(STEP_NODE_FINISH, reason=f"系统节点 {run_node} 执行完成，进入收尾")
 
 
@@ -1783,6 +1790,13 @@ def _step_node_finish(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             return
         pctx_after.pop("pending_finish_node_ids", None)
         pipe._data["context"] = pctx_after
+
+    rs_gate = load_room_state(sid) or {}
+    if rs_gate.get("downstream_blocked"):
+        ctx.room_state = dict(rs_gate)
+        block_reason = str(rs_gate.get("downstream_block_reason") or "下游门控，等待人工确认")
+        pipe.set_flow_step(STEP_WAITING, reason=block_reason)
+        return
 
     # 若没有下一个节点（next_node 为空 / "pending"），收尾后置 DONE，不再 INIT
     if not next_node or next_node == "pending":
