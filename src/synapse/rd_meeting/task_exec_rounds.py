@@ -243,6 +243,10 @@ def on_task_exec_reprocess_prep(pipe: MeetingPipeline, *, reason: str) -> dict[s
         ctx = {}
     rounds = _rounds_from_ctx(ctx)
     if not rounds:
+        # CLI 回调独立 load/save，外层 pipe 内存 context 可能滞后于磁盘
+        _, disk_ctx = _pipeline_context(sid)
+        rounds = _rounds_from_ctx(disk_ctx)
+    if not rounds:
         payload = load_task_exec_payload(sid)
         if isinstance(payload, dict):
             prev = _synthetic_round_from_payload(payload, round_num=1)
