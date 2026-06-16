@@ -391,8 +391,8 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                   <div className="flex shrink-0 items-center gap-2">
                     {activeEditable ? (
                       <Button
-                        type="primary"
                         size="small"
+                        className="rd-task-exec-save-btn"
                         icon={<Save className="h-3 w-3" />}
                         loading={saving}
                         disabled={saving}

@@ -251,7 +251,17 @@ def build_task_develop_prompt(
     cov_text = "、".join(str(x) for x in coverage if str(x).strip()) or "见函数级方案"
     lines: list[str] = []
     reason = (reprocess_reason or "").strip()
-    if reason:
+    if (scope_id or "").strip():
+        from synapse.rd_meeting.task_exec_rounds import format_task_exec_reprocess_prompt_block
+
+        reprocess_block = format_task_exec_reprocess_prompt_block(
+            scope_id,
+            current_reason=reason,
+            mode="develop",
+        )
+        if reprocess_block:
+            lines.extend([reprocess_block, ""])
+    elif reason:
         lines.extend(
             [
                 "【用户重处理要求 · 最高优先级】",
@@ -301,7 +311,17 @@ def build_task_verify_prompt(
     cov_text = "、".join(str(x) for x in coverage if str(x).strip()) or "见函数级方案"
     lines: list[str] = []
     reason = (reprocess_reason or "").strip()
-    if reason:
+    if (scope_id or "").strip():
+        from synapse.rd_meeting.task_exec_rounds import format_task_exec_reprocess_prompt_block
+
+        reprocess_block = format_task_exec_reprocess_prompt_block(
+            scope_id,
+            current_reason=reason,
+            mode="verify",
+        )
+        if reprocess_block:
+            lines.extend([reprocess_block, ""])
+    elif reason:
         lines.extend(
             [
                 "【用户重处理要求 · 最高优先级】",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from synapse.rd_meeting.pipeline import MeetingPipeline
 from synapse.rd_meeting.paths import agent_sop_node_dir
@@ -358,3 +358,75 @@ def on_task_exec_cli_finished(scope_id: str, result: dict[str, Any]) -> dict[str
 
 def uses_task_exec_node(node_id: str) -> bool:
     return (node_id or "").strip() == NODE_ID
+
+
+def format_task_exec_reprocess_prompt_block(
+    scope_id: str,
+    *,
+    current_reason: str = "",
+    mode: Literal["develop", "verify"] = "develop",
+) -> str:
+    """汇总多轮重处理历史要求 + 本轮最高优先级要求，供 CLI 开发/检测 prompt 注入。"""
+    sid = (scope_id or "").strip()
+    current = (current_reason or "").strip()
+    rounds = load_task_exec_rounds(sid) if sid else []
+
+    if not rounds and not current:
+        return ""
+
+    current_round_no = int(rounds[-1].get("round") or len(rounds)) if rounds else 1
+    is_reprocess_round = bool(
+        current
+        or len(rounds) > 1
+        or (rounds and str(rounds[-1].get("kind") or "") == "reprocess")
+    )
+    if not is_reprocess_round:
+        return ""
+
+    if not current and rounds:
+        last = rounds[-1]
+        last_status = str(last.get("status") or "").strip().lower()
+        if last_status in ("pending", "running", ""):
+            current = str(last.get("reason") or "").strip()
+
+    history_lines: list[str] = []
+    if len(rounds) > 1:
+        for item in rounds[:-1]:
+            reason = str(item.get("reason") or "").strip()
+            if not reason:
+                continue
+            round_no = int(item.get("round") or 0)
+            kind = str(item.get("kind") or "initial")
+            label = "首轮" if kind == "initial" else "重处理"
+            history_lines.append(f"- 第{round_no}轮（{label}）：{reason}")
+
+    if not history_lines and not current:
+        return ""
+
+    lines: list[str] = []
+    if history_lines:
+        lines.extend(
+            [
+                "【任务执行 · 历史轮次用户要求（须一并遵循）】",
+                *history_lines,
+                "以上各轮要求均须满足；若与本轮最高优先级要求冲突，以本轮要求为准。",
+                "",
+            ]
+        )
+
+    if current:
+        priority_tail = (
+            "本条优先级高于函数级方案、验收标准及一切历史结论；冲突时以用户重处理要求为准。"
+            if mode == "develop"
+            else "完成检测时须以用户重处理要求为准；若与函数级方案冲突，以用户重处理要求优先。"
+        )
+        round_suffix = f"（第{current_round_no}轮）" if len(rounds) > 1 else ""
+        lines.extend(
+            [
+                "【用户重处理要求 · 最高优先级】",
+                f"用户重处理要求{round_suffix}：{current}",
+                priority_tail,
+            ]
+        )
+
+    return "\n".join(lines).strip()

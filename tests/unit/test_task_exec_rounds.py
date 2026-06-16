@@ -5,6 +5,7 @@ from __future__ import annotations
 from synapse.rd_meeting.pipeline import MeetingPipeline
 from synapse.rd_meeting.task_exec import RESULT_JSON
 from synapse.rd_meeting.task_exec_rounds import (
+    format_task_exec_reprocess_prompt_block,
     load_task_exec_rounds,
     on_task_exec_cli_finished,
     on_task_exec_cli_starting,
@@ -123,3 +124,57 @@ def test_backfill_rounds_from_task_exec_history(tmp_path, monkeypatch):
     assert rounds[1]["kind"] == "reprocess"
     assert rounds[1]["reason"] == "需补单测"
     assert rounds[1]["summary"]["total_tokens"] == 99
+
+
+def test_format_task_exec_reprocess_prompt_block_includes_history(tmp_path, monkeypatch):
+    scope_id = "te-rounds-prompt"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    (tmp_path / "work" / scope_id).mkdir(parents=True)
+    MeetingPipeline.create(scope_id, scope_type="demand")
+    pipe = MeetingPipeline.load(scope_id)
+
+    on_task_exec_cli_starting(scope_id, reason="")
+    on_task_exec_cli_finished(
+        scope_id,
+        {
+            "status": "ok",
+            "started_at": "2026-06-16T10:00:00",
+            "finished_at": "2026-06-16T10:12:00",
+            "summary": {"total": 1, "ok": 1, "total_tokens": 100, "total_duration_sec": 60},
+        },
+    )
+    on_task_exec_reprocess_prep(pipe, reason="需补单测与边界校验")
+    on_task_exec_cli_starting(scope_id, reason="需补单测与边界校验")
+    on_task_exec_cli_finished(
+        scope_id,
+        {
+            "status": "ok",
+            "started_at": "2026-06-16T11:00:00",
+            "finished_at": "2026-06-16T11:12:00",
+            "summary": {"total": 1, "ok": 1, "total_tokens": 80, "total_duration_sec": 50},
+        },
+    )
+    on_task_exec_reprocess_prep(pipe, reason="再加集成测试")
+    on_task_exec_cli_starting(scope_id, reason="再加集成测试")
+
+    block = format_task_exec_reprocess_prompt_block(
+        scope_id,
+        current_reason="再加集成测试",
+        mode="develop",
+    )
+    assert "历史轮次用户要求" in block
+    assert "第2轮（重处理）：需补单测与边界校验" in block
+    assert "用户重处理要求（第3轮）：再加集成测试" in block
+
+    from synapse.rd_meeting.task_exec import build_task_develop_prompt
+
+    prompt = build_task_develop_prompt(
+        scope_id=scope_id,
+        order={"task_no": "T-1", "task_title": "demo", "goal": "改接口", "coverage": []},
+        func_doc="",
+        accept_doc="",
+        human_suggestions="",
+        reprocess_reason="再加集成测试",
+    )
+    assert "需补单测与边界校验" in prompt
+    assert "再加集成测试" in prompt

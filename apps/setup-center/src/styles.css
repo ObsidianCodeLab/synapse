@@ -6738,6 +6738,39 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   box-shadow: none !important;
 }
 
+/* 代码差异 · 保存按钮（边框与字符集 Segmented 一致） */
+.rd-task-exec-save-btn.ant-btn {
+  min-height: 22px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 10px;
+  line-height: 20px;
+  border: 1px solid rgb(255 255 255 / 0.12) !important;
+  border-radius: 9999px !important;
+  background: rgb(0 0 0 / 0.22) !important;
+  color: rgb(161 161 170) !important;
+  box-shadow: none !important;
+}
+.rd-task-exec-save-btn.ant-btn .ant-btn-icon {
+  font-size: 10px;
+}
+.rd-task-exec-save-btn.ant-btn:not(:disabled):hover {
+  color: rgb(244 244 245) !important;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  background: rgb(34 211 238 / 0.18) !important;
+}
+.rd-task-exec-save-btn.ant-btn:not(:disabled):active {
+  color: rgb(244 244 245) !important;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  background: rgb(34 211 238 / 0.24) !important;
+}
+.rd-task-exec-save-btn.ant-btn:disabled {
+  opacity: 0.45;
+  border-color: rgb(255 255 255 / 0.12) !important;
+  background: rgb(0 0 0 / 0.22) !important;
+  color: rgb(161 161 170) !important;
+}
+
 /* 任务执行 inline diff：隐藏原稿侧行号列，只保留改后行号（Monaco 默认双列） */
 .rd-task-exec-diff-inline .monaco-diff-editor .editor.original .margin-view-overlays {
   display: none !important;

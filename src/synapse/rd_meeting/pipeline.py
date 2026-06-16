@@ -1034,12 +1034,14 @@ def clear_current_node_reprocess_artifacts(
     save_meeting_pipeline(sid, raw)
 
 
-def _remove_agent_sop_node_dir(scope_id: str, node_id: str) -> None:
+def _remove_agent_sop_node_dir(scope_id: str, node_id: str, *, freeze: bool = True) -> None:
     # 删目录前先冻结本轮已统计 token 为 carry 基线：activity.jsonl 是 token 唯一真相源，
     # 随目录一起删除后无法回溯，必须先落基线，否则重处理/增量修订后整场 token 会变少失真。
-    from synapse.rd_meeting.room_runtime import freeze_node_carry_tokens
+    # 整节点重处理时由 ``_clear_node_for_reprocess`` 在删归档前统一 freeze，此处 ``freeze=False`` 避免重复累加。
+    if freeze:
+        from synapse.rd_meeting.room_runtime import freeze_node_carry_tokens
 
-    freeze_node_carry_tokens(scope_id, node_id)
+        freeze_node_carry_tokens(scope_id, node_id)
     node_dir = agent_sop_node_dir(scope_id, node_id)
     if node_dir.is_dir():
         try:
@@ -1049,6 +1051,26 @@ def _remove_agent_sop_node_dir(scope_id: str, node_id: str) -> None:
             logger.warning("reprocess_prep: failed to remove %s: %s", node_dir, exc)
 
 
+def _clear_node_for_reprocess(
+    scope_id: str,
+    node_id: str,
+    *,
+    stage_id: int | None = None,
+    clear_scope_root_files: bool = True,
+) -> None:
+    """重处理单节点清理：先冻结 token 基线（含 task_exec 归档 JSON），再删归档与 agents 过程目录。"""
+    from synapse.rd_meeting.room_runtime import freeze_node_carry_tokens
+
+    freeze_node_carry_tokens(scope_id, node_id)
+    clear_current_node_reprocess_artifacts(
+        scope_id,
+        node_id,
+        stage_id=stage_id,
+        clear_scope_root_files=clear_scope_root_files,
+    )
+    _remove_agent_sop_node_dir(scope_id, node_id, freeze=False)
+
+
 def clear_nodes_for_historical_reprocess(scope_id: str, node_ids: list[str]) -> None:
     """历史重处理：按 current→target 逆序清理索引区间内各节点产物与 agents 目录。"""
     ordered = [str(n).strip() for n in node_ids if str(n).strip() and str(n).strip() != "pending"]
@@ -1056,13 +1078,12 @@ def clear_nodes_for_historical_reprocess(scope_id: str, node_ids: list[str]) -> 
         return
     for idx, nid in enumerate(reversed(ordered)):
         stg = stage_id_for_node_id(nid)
-        clear_current_node_reprocess_artifacts(
+        _clear_node_for_reprocess(
             scope_id,
             nid,
             stage_id=stg,
             clear_scope_root_files=(idx == 0),
         )
-        _remove_agent_sop_node_dir(scope_id, nid)
 
 
 def _clear_meeting_todo_sessions(scope_id: str) -> None:
@@ -1254,8 +1275,7 @@ def _step_reprocess_prep(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None
         clear_nodes_for_historical_reprocess(sid, range_ids)
     else:
         stage_id = int(data.get("stage_id") or stage_id_for_node_id(run_node))
-        clear_current_node_reprocess_artifacts(sid, run_node, stage_id=stage_id)
-        _remove_agent_sop_node_dir(sid, run_node)
+        _clear_node_for_reprocess(sid, run_node, stage_id=stage_id)
 
     from synapse.rd_meeting.hitl_lifecycle import reset_human_confirm_lifecycle
     from synapse.rd_meeting.hitl_submit import clear_pending_questionnaire
