@@ -241,6 +241,15 @@ function PendingLivePlaceholder() {
   );
 }
 
+function NodeDetailLoadingState({ nodeName }: { nodeName: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
+      <Spin indicator={<Loader2 className="h-5 w-5 animate-spin text-primary" />} />
+      <span className="text-sm">加载 {nodeName} 实况…</span>
+    </div>
+  );
+}
+
 export function MeetingNodeDetailPanel({
   synapseApiBase,
   roomId,
@@ -253,6 +262,7 @@ export function MeetingNodeDetailPanel({
   variant = 'default',
 }: Props) {
   const tabsRootRef = useRef<HTMLDivElement>(null);
+  const loadSeqRef = useRef(0);
   const [activeTab, setActiveTab] = useState('output');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -271,18 +281,22 @@ export function MeetingNodeDetailPanel({
   const load = useCallback(
     async (refresh = false) => {
       if (!roomId || !nodeId) return;
+      const seq = ++loadSeqRef.current;
       if (refresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
       try {
         const sid = (scopeId || '').trim();
-        const skipNodeReview = nodeId === 'solution_review';
+        const skipNodeReview =
+          nodeId === 'solution_review' || isStructuredSystemNode;
         const isTaskExecLive = nodeId === 'task_exec' && nodeState === 'processing';
         const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
             : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh }),
-          fetchMeetingAgentContexts(synapseApiBase, roomId, { messageCharLimit: 0, nodeId }),
+          isStructuredSystemNode
+            ? Promise.resolve(null)
+            : fetchMeetingAgentContexts(synapseApiBase, roomId, { messageCharLimit: 0, nodeId }),
           sid
             ? fetchMeetingSummary(synapseApiBase, scopeType, sid)
             : Promise.reject(new Error('missing_scope')),
@@ -337,12 +351,21 @@ export function MeetingNodeDetailPanel({
         }
         setProcessEntries(entries);
 
+        if (seq !== loadSeqRef.current) return;
+
         if (systemRes.status === 'fulfilled' && systemRes.value?.display) {
           setSystemDisplay(systemRes.value.display);
         } else if (!isStructuredSystemNode) {
           setSystemDisplay(null);
         } else {
           setSystemDisplay(null);
+          if (systemRes.status === 'rejected') {
+            const msg =
+              systemRes.reason instanceof Error
+                ? systemRes.reason.message
+                : String(systemRes.reason || 'system_node_display_failed');
+            setError(msg);
+          }
         }
 
         if (summaryRes.status === 'fulfilled') {
@@ -364,8 +387,11 @@ export function MeetingNodeDetailPanel({
           setFallbackArtifacts([]);
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        if (seq === loadSeqRef.current) {
+          setError(e instanceof Error ? e.message : String(e));
+        }
       } finally {
+        if (seq !== loadSeqRef.current) return;
         if (refresh) setRefreshing(false);
         else setLoading(false);
       }
@@ -377,6 +403,15 @@ export function MeetingNodeDetailPanel({
     if (nodeState === 'pending') return;
     void load(false);
   }, [load, nodeState, nodeId, roomId]);
+
+  useEffect(() => {
+    setReview(null);
+    setSystemDisplay(null);
+    setProcessEntries([]);
+    setSummaryNode(null);
+    setFallbackArtifacts([]);
+    setError(null);
+  }, [nodeId, roomId]);
 
   useEffect(() => {
     if (nodeState !== 'processing') return;
@@ -523,7 +558,9 @@ export function MeetingNodeDetailPanel({
 
   const outputTab = (
     <div className="space-y-4">
-      {isStructuredSystemNode && systemDisplay ? (
+      {isStructuredSystemNode && (loading || refreshing) && !systemDisplay ? (
+        <NodeDetailLoadingState nodeName={nodeName} />
+      ) : isStructuredSystemNode && systemDisplay ? (
         <SystemNodeDetailCard
           nodeId={nodeId}
           display={systemDisplay}
@@ -696,15 +733,16 @@ export function MeetingNodeDetailPanel({
       ? 'meeting-node-detail-tabs meeting-node-detail-tabs--drawer req-analysis-tabs flex-1 min-h-0'
       : 'meeting-node-detail-tabs req-analysis-tabs flex-1 min-h-0';
 
+  const hasLoadedContent = Boolean(
+    review || systemDisplay || processEntries.length || artifacts.length,
+  );
+
   return (
     <div ref={tabsRootRef} className="flex h-full min-h-0 flex-col">
       {!isPending ? header : null}
-      {!isPending && loading && !review ? (
-        <div className="flex flex-1 items-center justify-center gap-2 py-16 text-muted-foreground">
-          <Spin indicator={<Loader2 className="h-5 w-5 animate-spin text-primary" />} />
-          <span className="text-sm">加载 {nodeName} 实况…</span>
-        </div>
-      ) : !isPending && error && !review && !processEntries.length ? (
+      {!isPending && loading ? (
+        <NodeDetailLoadingState nodeName={nodeName} />
+      ) : !isPending && error && !hasLoadedContent ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           加载失败：{error}
         </div>

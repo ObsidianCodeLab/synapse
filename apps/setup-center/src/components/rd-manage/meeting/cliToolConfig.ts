@@ -31,6 +31,8 @@ export const CLI_TOOL_OPTIONS: CliToolOption[] = [
 ];
 
 export const DEFAULT_CLI_TOOL: CliToolId = 'cursor_cli';
+/** 与后端 binding.DEFAULT_CLI_TIMEOUT_SECONDS 对齐 */
+export const DEFAULT_CLI_TIMEOUT_SECONDS = 1800;
 
 export function normalizeCliTool(value: string | undefined | null): CliToolId {
   const v = (value || '').trim() as CliToolId;

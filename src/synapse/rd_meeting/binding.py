@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from synapse.rd_meeting.cli_models import DEFAULT_CURSOR_CLI_MODEL, normalize_cursor_cli_model
-from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, normalize_cli_tool
+from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TOOL, DEFAULT_CLI_TIMEOUT_SECONDS, normalize_cli_tool
 from synapse.rd_meeting.config_store import (
     DEFAULT_LLM_ENDPOINT_KEY,
     load_meeting_room_config,
@@ -50,6 +50,16 @@ def _human_confirm_for_node_type(node_type: str, *, node_id: str) -> bool | None
     return None
 
 
+def _coerce_cli_timeout_seconds(value: Any, *, default: int = DEFAULT_CLI_TIMEOUT_SECONDS) -> int:
+    try:
+        val = int(value)
+        if val > 0:
+            return val
+    except (TypeError, ValueError):
+        pass
+    return default
+
+
 def _coerce_human_confirm(value: Any, *, node_id: str, node_type: str = "") -> bool:
     fixed = _human_confirm_for_node_type(node_type, node_id=node_id)
     if fixed is not None:
@@ -89,6 +99,8 @@ def _merge_binding(base: dict[str, Any], override: dict[str, Any], *, node_id: s
         out["cli_model"] = normalize_cursor_cli_model(str(override.get("cli_model") or ""))
     if override.get("cli_model_custom") is not None:
         out["cli_model_custom"] = str(override.get("cli_model_custom") or "").strip()
+    if node_id == "task_exec" and override.get("cli_timeout_seconds") is not None:
+        out["cli_timeout_seconds"] = _coerce_cli_timeout_seconds(override.get("cli_timeout_seconds"))
     if override.get("token_budget") is not None and not is_system_node(node_id):
         try:
             val = int(override["token_budget"])
@@ -191,6 +203,12 @@ def resolve_node_binding(
     merged["cli_tool"] = cli_tool
     merged["cli_model"] = cli_model
     merged["cli_model_custom"] = cli_model_custom
+    if node_id == "task_exec":
+        merged["cli_timeout_seconds"] = _coerce_cli_timeout_seconds(
+            merged.get("cli_timeout_seconds")
+            if merged.get("cli_timeout_seconds") is not None
+            else override.get("cli_timeout_seconds")
+        )
 
     node_budget = resolve_node_token_budget(node_id)
     return {

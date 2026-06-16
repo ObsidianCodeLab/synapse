@@ -20,6 +20,7 @@ from synapse.rd_meeting.cli_models import (
 )
 from synapse.rd_meeting.cli_tools import (
     DEFAULT_CLI_TOOL,
+    DEFAULT_CLI_TIMEOUT_SECONDS,
     is_cli_tool_implemented,
     normalize_cli_tool,
 )
@@ -73,6 +74,18 @@ def resolve_cli_model_for_node(node_id: str = NODE_ID) -> tuple[str, str]:
     return preset, custom
 
 
+def resolve_cli_timeout_for_node(node_id: str = NODE_ID) -> int:
+    """返回任务执行 CLI 单轮超时（秒），来自阵容配置 node_overrides。"""
+    from synapse.rd_meeting.binding import resolve_node_binding
+
+    binding = resolve_node_binding(node_id)
+    try:
+        val = int(binding.get("cli_timeout_seconds") or DEFAULT_CLI_TIMEOUT_SECONDS)
+        return val if val > 0 else DEFAULT_CLI_TIMEOUT_SECONDS
+    except (TypeError, ValueError):
+        return DEFAULT_CLI_TIMEOUT_SECONDS
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -111,7 +124,7 @@ def build_cursor_round_commands(
     continue_session: bool = False,
     model: str | None = None,
     log_path: str = "",
-    timeout: int = 900,
+    timeout: int = DEFAULT_CLI_TIMEOUT_SECONDS,
 ) -> dict[str, str]:
     """生成任务执行轮次的完整 agent 命令与 Synapse 包装命令。"""
     mod = _load_cursor_operation_module()
@@ -493,7 +506,7 @@ def _run_cursor_cli_round(
     func_doc: str,
     accept_doc: str,
     log_path: Path,
-    timeout: int = 900,
+    timeout: int = DEFAULT_CLI_TIMEOUT_SECONDS,
     continue_session: bool = False,
     model: str | None = None,
 ) -> dict[str, Any]:
@@ -958,6 +971,7 @@ def bootstrap_task_exec(
     cli_tool: str | None = None,
     cli_model: str | None = None,
     cli_model_custom: str | None = None,
+    cli_timeout_seconds: int | None = None,
     human_suggestions: str = "",
     reprocess_reason: str | None = None,
 ) -> dict[str, Any]:
@@ -978,6 +992,14 @@ def bootstrap_task_exec(
         custom = str(cli_model_custom or "").strip()
     model_arg = resolve_cli_model_arg(tool, preset, custom)
     model_label = display_cli_model_label(tool, preset, custom)
+    cli_timeout = resolve_cli_timeout_for_node(NODE_ID)
+    if cli_timeout_seconds is not None:
+        try:
+            parsed_timeout = int(cli_timeout_seconds)
+            if parsed_timeout > 0:
+                cli_timeout = parsed_timeout
+        except (TypeError, ValueError):
+            pass
     if not is_cli_tool_implemented(tool):
         return {
             "status": "failed",
@@ -1056,6 +1078,7 @@ def bootstrap_task_exec(
         "cli_model": preset,
         "cli_model_custom": custom if preset == "custom" else "",
         "cli_model_label": model_label,
+        "cli_timeout_seconds": cli_timeout,
         "demand_no": demand_no,
         "started_at": started_at,
         "finished_at": None,
@@ -1166,6 +1189,7 @@ def bootstrap_task_exec(
             continue_session=False,
             model=model_arg,
             log_path=str(dev_log),
+            timeout=cli_timeout,
         )
         verify_cmds = build_cursor_round_commands(
             code_path=sandbox_path,
@@ -1175,6 +1199,7 @@ def bootstrap_task_exec(
             continue_session=True,
             model=model_arg,
             log_path=str(verify_log),
+            timeout=cli_timeout,
         )
         running_row = {
             **row_base,
@@ -1232,6 +1257,7 @@ def bootstrap_task_exec(
             accept_doc=accept_doc,
             log_path=dev_log,
             model=model_arg,
+            timeout=cli_timeout,
         )
         _emit_task_exec_progress(
             sid,
@@ -1286,6 +1312,7 @@ def bootstrap_task_exec(
             log_path=verify_log,
             continue_session=True,
             model=model_arg,
+            timeout=cli_timeout,
         )
 
         report_md = _extract_report_from_log(str(verify_result.get("log_path") or verify_log))

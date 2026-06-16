@@ -2185,6 +2185,8 @@ const InterventionDialog = ({
       .then((payload) => {
         if (cancelled) return;
         const logs = (payload.chat_logs || []).map(mapChatWireToLog);
+        // 空响应不覆盖已合并的全量 history，避免历史系统节点卡片被误清空
+        if (!logs.length) return;
         onMergeNodeChat(chatNodeId, logs);
       })
       .catch(() => {

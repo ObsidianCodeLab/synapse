@@ -162,6 +162,7 @@
       "worker_profile_ids": [],
       "cli_tool": "cursor_cli",
       "cli_model": "composer-2.5",
+      "cli_timeout_seconds": 1800,
       "node_intent": "基于函数级方案和工单进行功能点的自动化开发。"
     },
     "exception_check": {

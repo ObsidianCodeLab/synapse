@@ -197,6 +197,8 @@ export interface MeetingRoomNodeOverride {
   cli_model?: string;
   /** 任务执行节点：custom 模式下的模型名称 */
   cli_model_custom?: string;
+  /** 任务执行节点：CLI 单轮执行超时（秒） */
+  cli_timeout_seconds?: number;
   /** 节点 Token 预算（非系统节点；默认 3M） */
   token_budget?: number;
 }
@@ -237,6 +239,8 @@ export interface MeetingRoomNodeBinding {
   cli_tool?: string;
   cli_model?: string;
   cli_model_custom?: string;
+  /** 任务执行节点：CLI 单轮执行超时（秒，默认 1800） */
+  cli_timeout_seconds?: number;
   /** 节点 Token 预算（系统节点为 null/undefined） */
   token_budget?: number | null;
   /** 默认节点 Token 预算（3M） */

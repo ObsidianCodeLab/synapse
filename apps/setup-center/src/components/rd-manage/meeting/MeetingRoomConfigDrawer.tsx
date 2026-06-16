@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Terminal,
   Coins,
+  Timer,
   type LucideIcon,
 } from 'lucide-react';
 import type { MeetingRoomNodeBinding } from '../../../api/meetingRoomService';
@@ -50,7 +51,7 @@ import {
   type MeetingRoomConfigPayload,
   type MeetingRoomNodeOverride,
 } from '../../../api/meetingRoomService';
-import { CLI_TOOL_OPTIONS, DEFAULT_CLI_TOOL, normalizeCliTool } from './cliToolConfig';
+import { CLI_TOOL_OPTIONS, DEFAULT_CLI_TIMEOUT_SECONDS, DEFAULT_CLI_TOOL, normalizeCliTool } from './cliToolConfig';
 import {
   DEFAULT_CURSOR_CLI_MODEL,
   cliModelOptionsForTool,
@@ -303,6 +304,9 @@ function normalizeOverridesForSave(
     } else if (typeof ov.token_budget === 'number' && ov.token_budget > 0) {
       entry.token_budget = ov.token_budget;
     }
+    if (typeof ov.cli_timeout_seconds === 'number' && ov.cli_timeout_seconds > 0) {
+      entry.cli_timeout_seconds = ov.cli_timeout_seconds;
+    }
     out[nodeId] = entry;
   }
   return out;
@@ -460,6 +464,9 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const cliModelCustom = String(
     override.cli_model_custom ?? binding?.cli_model_custom ?? '',
   ).trim();
+  const effectiveCliTimeout =
+    override.cli_timeout_seconds ?? binding?.cli_timeout_seconds ?? DEFAULT_CLI_TIMEOUT_SECONDS;
+  const defaultCliTimeout = binding?.cli_timeout_seconds ?? DEFAULT_CLI_TIMEOUT_SECONDS;
   const cliModelOptions = cliModelOptionsForTool(cliTool);
   const nodeOutputs = binding?.node_outputs ?? [];
   const effectiveTokenBudget =
@@ -1172,6 +1179,37 @@ export const MeetingRoomConfigDrawer: React.FC<{
                           </p>
                         </div>
                       ) : null}
+
+                      <div className="mt-5">
+                        <label className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-foreground/80">
+                          <Timer className="w-3.5 h-3.5 text-amber-400" />
+                          执行脚本超时
+                        </label>
+                        <ConfigFieldBox className="border-amber-500/20 bg-amber-500/[0.04]">
+                          <Input
+                            type="number"
+                            min={60}
+                            step={60}
+                            value={effectiveCliTimeout}
+                            onChange={(e) => {
+                              const raw = e.target.value.trim();
+                              if (!raw) {
+                                patchOverride({ cli_timeout_seconds: undefined });
+                                return;
+                              }
+                              const parsed = Number.parseInt(raw, 10);
+                              if (Number.isFinite(parsed) && parsed > 0) {
+                                patchOverride({ cli_timeout_seconds: parsed });
+                              }
+                            }}
+                            className="font-mono"
+                            addonAfter="秒"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-2 mb-0 leading-relaxed">
+                            每个研发子单的开发轮与完成检测轮各自独立计时；默认 {defaultCliTimeout} 秒（30 分钟）。
+                          </p>
+                        </ConfigFieldBox>
+                      </div>
                     </div>
                   ) : null}
 

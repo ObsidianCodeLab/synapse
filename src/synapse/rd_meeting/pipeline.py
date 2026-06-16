@@ -1585,6 +1585,15 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     cli_tool = str(binding.get("cli_tool") or "").strip()
     cli_model = str(binding.get("cli_model") or "").strip()
     cli_model_custom = str(binding.get("cli_model_custom") or "").strip()
+    cli_timeout_seconds = binding.get("cli_timeout_seconds")
+    cli_timeout_arg: int | None = None
+    if cli_timeout_seconds is not None:
+        try:
+            parsed_timeout = int(cli_timeout_seconds)
+            if parsed_timeout > 0:
+                cli_timeout_arg = parsed_timeout
+        except (TypeError, ValueError):
+            pass
 
     append_history_event(
         sid,
@@ -1648,6 +1657,7 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         cli_tool=cli_tool or None,
         cli_model=cli_model or None,
         cli_model_custom=cli_model_custom or None,
+        cli_timeout_seconds=cli_timeout_arg,
         human_suggestions=human_suggestions,
         reprocess_reason=reprocess_reason,
     )

@@ -22,6 +22,7 @@ from typing import Any
 from filelock import FileLock
 
 from synapse.config import settings
+from synapse.rd_meeting.cli_tools import DEFAULT_CLI_TIMEOUT_SECONDS
 from synapse.rd_sop.manifest import is_collaborative_node, is_system_node
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ _SAVABLE_OVERRIDE_KEYS = (
     "cli_tool",
     "cli_model",
     "cli_model_custom",
+    "cli_timeout_seconds",
     "token_budget",
 )
 
@@ -144,6 +146,18 @@ def _normalize_overrides(value: Any) -> dict[str, Any]:
                         val = int(ov[key])
                         if val > 0:
                             entry[key] = val
+                    except (TypeError, ValueError):
+                        pass
+                    continue
+                if key == "cli_timeout_seconds":
+                    if str(node_id) != "task_exec":
+                        continue
+                    try:
+                        val = int(ov[key])
+                        if val > 0:
+                            entry[key] = val
+                        else:
+                            entry[key] = DEFAULT_CLI_TIMEOUT_SECONDS
                     except (TypeError, ValueError):
                         pass
                     continue

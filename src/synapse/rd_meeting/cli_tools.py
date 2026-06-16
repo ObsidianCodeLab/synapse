@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 DEFAULT_CLI_TOOL = "cursor_cli"
+DEFAULT_CLI_TIMEOUT_SECONDS = 1800
 
 CLI_TOOL_OPTIONS: list[dict[str, Any]] = [
     {

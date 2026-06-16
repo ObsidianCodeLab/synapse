@@ -43,6 +43,7 @@ def test_task_exec_binding_exposes_cli_tool_and_model(monkeypatch):
                     "cli_tool": "cursor_cli",
                     "cli_model": "auto",
                     "cli_model_custom": "",
+                    "cli_timeout_seconds": 1800,
                 }
             }
         },
@@ -50,6 +51,7 @@ def test_task_exec_binding_exposes_cli_tool_and_model(monkeypatch):
     binding = resolve_node_binding("task_exec")
     assert binding["cli_tool"] == "cursor_cli"
     assert binding["cli_model"] == "auto"
+    assert binding["cli_timeout_seconds"] == 1800
     assert binding["worker_profile_ids"] == []
 
 
@@ -114,6 +116,55 @@ def test_bootstrap_task_exec_passes_model_to_cli(tmp_path, monkeypatch):
     assert seen_models == ["composer-2.5-fast", "composer-2.5-fast"]
     assert result["cli_model"] == "custom"
     assert result["cli_model_custom"] == "composer-2.5-fast"
+
+
+def test_bootstrap_task_exec_passes_timeout_to_cli(tmp_path, monkeypatch):
+    scope_id = "te-timeout"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec._collect_work_orders",
+        lambda _st, _sid: [
+            {
+                "task_no": "T1",
+                "task_title": "子单",
+                "goal": "实现功能点",
+                "coverage": ["功能A"],
+                "sandbox_path": str(sandbox),
+                "product_module": "ZMDB",
+            }
+        ],
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
+
+    seen_timeouts: list[int] = []
+
+    def fake_cli_round(**kwargs):
+        seen_timeouts.append(int(kwargs.get("timeout") or 0))
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        return {
+            "status": "ok",
+            "tokens_used": 1,
+            "duration_seconds": 1,
+            "log_path": str(log_path),
+            "error": "",
+        }
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._run_cursor_cli_round", fake_cli_round)
+
+    result = bootstrap_task_exec("demand", scope_id, cli_timeout_seconds=2400)
+    assert seen_timeouts == [2400, 2400]
+    assert result["cli_timeout_seconds"] == 2400
 
 
 def test_build_task_prompts_cover_goal_scheme_and_human_notes():
