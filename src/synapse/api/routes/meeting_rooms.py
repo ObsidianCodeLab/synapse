@@ -921,6 +921,12 @@ class TaskExecDecisionBody(BaseModel):
     comment: str = Field("", description="人工评审意见")
 
 
+class TaskExecCodeDiffSaveBody(BaseModel):
+    file_id: str = Field(..., description="代码差异文件 id（task_no:path 或 path）")
+    content: str = Field(..., description="编辑后的变更后文件全文")
+    encoding: str = Field("utf-8", description="保存编码：utf-8 | gbk")
+
+
 @router.get("/api/dev/meeting-rooms/{room_id}/task-exec")
 async def get_task_exec(room_id: str) -> dict:
     """读取任务执行结构化 payload（task_exec_result.json）。"""
@@ -975,6 +981,48 @@ async def get_task_exec_code_diffs(room_id: str) -> dict:
             "room_id": room_id,
             "scope_id": sid,
             **collect_task_exec_code_diffs(sid),
+        }
+    )
+
+
+@router.put("/api/dev/meeting-rooms/{room_id}/task-exec/code-diffs")
+async def save_task_exec_code_diff(room_id: str, body: TaskExecCodeDiffSaveBody) -> dict:
+    """任务执行评审：保存人工编辑后的变更后代码到沙箱工作区。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.task_exec import load_task_exec_payload
+    from synapse.rd_meeting.task_exec_code_diff import save_task_exec_code_diff_file
+
+    payload = load_task_exec_payload(sid)
+    if payload is None:
+        return error_response(404, "task_exec_not_found")
+    if str(payload.get("status") or "").lower() == "running":
+        return error_response(409, "task_exec_still_running")
+
+    file_id = str(body.file_id or "").strip()
+    if not file_id:
+        return error_response(400, "code_diff_file_id_required")
+
+    try:
+        file_entry = save_task_exec_code_diff_file(
+            sid,
+            file_id,
+            body.content,
+            encoding=body.encoding or "utf-8",
+        )
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("save_task_exec_code_diff failed: %s", exc)
+        return error_response(500, "code_diff_save_failed", str(exc))
+
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "file": file_entry,
         }
     )
 

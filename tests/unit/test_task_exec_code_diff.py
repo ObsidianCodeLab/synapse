@@ -14,6 +14,7 @@ from synapse.rd_meeting.task_exec_code_diff import (
     collect_task_exec_code_diffs,
     decode_text_bytes,
     is_test_file,
+    save_task_exec_code_diff_file,
     should_include_commit_file,
     should_include_diff_file,
 )
@@ -218,3 +219,75 @@ def test_collect_repo_commit_stage_paths(tmp_path: Path) -> None:
     ok, _detail, paths = collect_repo_commit_stage_paths(str(repo))
     assert ok is True
     assert paths == ["src/Main.java"]
+
+
+def test_save_task_exec_code_diff_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scope_id = "te-save-scope"
+    repo = tmp_path / "sandbox"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "test")
+    (repo / "App.py").write_text("v1\n", encoding="utf-8")
+    _git(repo, "add", "App.py")
+    _git(repo, "commit", "-m", "init")
+    (repo / "App.py").write_text("v2\n", encoding="utf-8")
+
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / "task_exec"
+    archive.mkdir(parents=True)
+    payload = {
+        "status": "partial",
+        "tasks": [
+            {
+                "task_no": "T-1",
+                "status": "ok",
+                "sandbox_path": str(repo),
+            }
+        ],
+    }
+    import json
+
+    (archive / "task_exec_result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.archive_node_dir",
+        lambda sid, stage, nid: archive,
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.stage_name_for_id", lambda _s: "开发中")
+
+    saved = save_task_exec_code_diff_file(scope_id, "T-1:App.py", "v3-edited\n", encoding="utf-8")
+    assert saved["path"] == "App.py"
+    assert saved["modified"].startswith("v3-edited")
+    assert (repo / "App.py").read_text(encoding="utf-8").startswith("v3-edited")
+
+
+def test_save_task_exec_code_diff_file_rejects_deleted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scope_id = "te-save-del"
+    repo = tmp_path / "sandbox"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "test")
+    (repo / "App.py").write_text("v1\n", encoding="utf-8")
+    _git(repo, "add", "App.py")
+    _git(repo, "commit", "-m", "init")
+    _git(repo, "rm", "App.py")
+
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / "task_exec"
+    archive.mkdir(parents=True)
+    payload = {
+        "status": "partial",
+        "tasks": [{"task_no": "T-1", "status": "ok", "sandbox_path": str(repo)}],
+    }
+    import json
+
+    (archive / "task_exec_result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.archive_node_dir",
+        lambda sid, stage, nid: archive,
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.stage_name_for_id", lambda _s: "开发中")
+
+    with pytest.raises(ValueError, match="code_diff_deleted_not_editable"):
+        save_task_exec_code_diff_file(scope_id, "T-1:App.py", "noop\n")

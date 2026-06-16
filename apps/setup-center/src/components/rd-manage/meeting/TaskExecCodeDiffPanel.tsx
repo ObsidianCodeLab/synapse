@@ -2,11 +2,12 @@
  * 任务执行评审 · 代码差异（Monaco 单窗 inline diff：全量文件 + 红删绿增高亮）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Segmented } from 'antd';
+import { Alert, Button, Segmented, message } from 'antd';
 import { DiffEditor } from '@monaco-editor/react';
-import { GitBranch, Loader2, Plus, Minus } from 'lucide-react';
+import { GitBranch, Loader2, Plus, Minus, Save } from 'lucide-react';
 import {
   fetchTaskExecCodeDiffs,
+  saveTaskExecCodeDiff,
   type TaskExecCodeDiffFile,
 } from '../../../api/meetingRoomService';
 import { useAntThemeDark } from '../../rd-view/useAntThemeDark';
@@ -27,7 +28,6 @@ function registerTaskExecDiffThemes(monaco: MonacoModule) {
   if (diffThemesRegistered) return;
   diffThemesRegistered = true;
 
-  // 暗红删、淡绿增 — 通过 Monaco 主题色定义，避免 CSS 类名覆盖搞反
   monaco.editor.defineTheme(TASK_EXEC_DIFF_THEME_DARK, {
     base: 'vs-dark',
     inherit: true,
@@ -76,6 +76,8 @@ type DiffEditorInstance = {
   getModifiedEditor?: () => {
     revealLinesInCenter?: (start: number, end: number) => void;
     updateOptions?: (opts: Record<string, unknown>) => void;
+    getValue?: () => string;
+    onDidChangeModelContent?: (listener: () => void) => { dispose?: () => void };
   };
   getOriginalEditor?: () => {
     updateOptions?: (opts: Record<string, unknown>) => void;
@@ -125,18 +127,25 @@ function centerOnFirstChange(editor: DiffEditorInstance) {
 }
 
 function bindDiffCenterScroll(editor: DiffEditorInstance) {
-  const scroll = () => {
+  let initialScrollDone = false;
+  const scrollToFirstDiff = () => {
+    if (initialScrollDone) return;
+    initialScrollDone = true;
     requestAnimationFrame(() => centerOnFirstChange(editor));
   };
-  scroll();
-  return editor.onDidUpdateDiff?.(scroll);
+  scrollToFirstDiff();
+  return editor.onDidUpdateDiff?.(scrollToFirstDiff);
+}
+
+function isDeletedFile(file: TaskExecCodeDiffFile | null | undefined): boolean {
+  return String(file?.status || '').toLowerCase() === 'deleted';
 }
 
 const EDITOR_HEIGHT = 460;
 
 const DIFF_EDITOR_OPTIONS = {
   renderSideBySide: false,
-  readOnly: true,
+  readOnly: false,
   originalEditable: false,
   wordWrap: 'off' as const,
   diffWordWrap: 'off' as const,
@@ -163,8 +172,33 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
   );
   const [activeId, setActiveId] = useState('');
   const [textEncoding, setTextEncoding] = useState<DiffTextEncoding>('utf-8');
+  const [saving, setSaving] = useState(false);
+  const editedByIdRef = useRef<Record<string, string>>({});
   const diffEditorRef = useRef<DiffEditorInstance | null>(null);
   const diffUpdateDisposableRef = useRef<{ dispose?: () => void } | null>(null);
+  const modifiedChangeDisposableRef = useRef<{ dispose?: () => void } | null>(null);
+
+  const getBaselineModified = useCallback(
+    (file: TaskExecCodeDiffFile) => decodeDiffFileText(file, textEncoding).modified,
+    [textEncoding],
+  );
+
+  const getEditedContent = useCallback(
+    (file: TaskExecCodeDiffFile) => {
+      const cached = editedByIdRef.current[file.id];
+      if (cached !== undefined) return cached;
+      if (file.id === activeId) {
+        return diffEditorRef.current?.getModifiedEditor?.()?.getValue?.() ?? getBaselineModified(file);
+      }
+      return getBaselineModified(file);
+    },
+    [activeId, getBaselineModified],
+  );
+
+  const isFileDirty = useCallback(
+    (file: TaskExecCodeDiffFile) => getEditedContent(file) !== getBaselineModified(file),
+    [getBaselineModified, getEditedContent],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -196,6 +230,8 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
     () => () => {
       diffUpdateDisposableRef.current?.dispose?.();
       diffUpdateDisposableRef.current = null;
+      modifiedChangeDisposableRef.current?.dispose?.();
+      modifiedChangeDisposableRef.current = null;
     },
     [],
   );
@@ -210,9 +246,74 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
     return decodeDiffFileText(activeFile, textEncoding);
   }, [activeFile, textEncoding]);
 
+  const activeEditable = Boolean(activeFile) && !isDeletedFile(activeFile);
+
+  const onModifiedChange = useCallback((value: string | undefined) => {
+    if (!activeFile) return;
+    editedByIdRef.current[activeFile.id] = value ?? '';
+  }, [activeFile]);
+
+  const onSaveActive = useCallback(async () => {
+    if (!activeFile || !activeEditable) return;
+    const content = getEditedContent(activeFile);
+    if (content === getBaselineModified(activeFile)) {
+      message.info('内容无变更');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await saveTaskExecCodeDiff(synapseApiBase, roomId, {
+        file_id: activeFile.id,
+        content,
+        encoding: textEncoding,
+      });
+      const saved = res.file;
+      setFiles((prev) => prev.map((f) => (f.id === saved.id ? saved : f)));
+      delete editedByIdRef.current[activeFile.id];
+      message.success('已保存到沙箱工作区');
+      void refresh();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '保存失败');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    activeEditable,
+    activeFile,
+    getBaselineModified,
+    getEditedContent,
+    refresh,
+    roomId,
+    synapseApiBase,
+    textEncoding,
+  ]);
+
+  const onSelectFile = useCallback(
+    (fileId: string) => {
+      if (fileId === activeId) return;
+      if (activeFile && isFileDirty(activeFile)) {
+        message.warning('当前文件有未保存的编辑，请先保存后再切换');
+        return;
+      }
+      setActiveId(fileId);
+    },
+    [activeFile, activeId, isFileDirty],
+  );
+
+  const onEncodingChange = useCallback(
+    (value: DiffTextEncoding) => {
+      if (activeFile && isFileDirty(activeFile)) {
+        message.warning('当前文件有未保存的编辑，请先保存后再切换字符集');
+        return;
+      }
+      setTextEncoding(value);
+    },
+    [activeFile, isFileDirty],
+  );
+
   const modifiedMissing =
     Boolean(activeFile) &&
-    String(activeFile?.status || '').toLowerCase() !== 'deleted' &&
+    !isDeletedFile(activeFile) &&
     !activeDiffText.modified.trim();
 
   return (
@@ -220,7 +321,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
       <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-cyan-400/10 blur-2xl" />
       <div className="relative mb-3 flex items-center justify-between gap-3">
         <p className="mb-0 text-[11px] text-muted-foreground">
-          基于 git diff（相对 HEAD），已过滤测试文件、synapse_archive 与 AGENTS.md
+          基于 git diff（相对 HEAD），已过滤测试文件、synapse_archive 与 AGENTS.md；绿色区域（新代码）可直接编辑并保存到沙箱
         </p>
         <div className="flex shrink-0 items-center gap-3 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
@@ -253,6 +354,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
             <div className="flex min-w-max items-center gap-1.5">
               {files.map((file) => {
                 const active = file.id === activeFile?.id;
+                const dirty = isFileDirty(file);
                 const name = fileBaseName(file.path);
                 return (
                   <button
@@ -264,10 +366,11 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                         ? 'border-cyan-400/35 bg-cyan-500/15'
                         : 'border-white/10 bg-black/20 hover:bg-white/5'
                     }`}
-                    onClick={() => setActiveId(file.id)}
+                    onClick={() => onSelectFile(file.id)}
                   >
                     <span className="max-w-[12rem] truncate text-[11px] font-medium text-foreground">
                       {name}
+                      {dirty ? ' *' : ''}
                     </span>
                     <span className="text-[10px] text-muted-foreground">{statusLabel(file.status)}</span>
                     <span className="text-[10px] text-emerald-300/90">+{file.additions ?? 0}</span>
@@ -286,6 +389,18 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                     {activeFile.path}
                   </code>
                   <div className="flex shrink-0 items-center gap-2">
+                    {activeEditable ? (
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<Save className="h-3 w-3" />}
+                        loading={saving}
+                        disabled={saving}
+                        onClick={() => void onSaveActive()}
+                      >
+                        保存
+                      </Button>
+                    ) : null}
                     <div className="inline-flex items-center gap-1.5">
                       <span className="text-[10px] text-muted-foreground">字符集</span>
                       <Segmented
@@ -296,7 +411,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                           label: item.label,
                           value: item.value,
                         }))}
-                        onChange={(value) => setTextEncoding(value as DiffTextEncoding)}
+                        onChange={(value) => onEncodingChange(value as DiffTextEncoding)}
                       />
                     </div>
                     <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-muted-foreground">
@@ -317,11 +432,11 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                 <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-black/20 px-3 py-1.5 text-[10px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#8b3030]/80" />
-                    红色 = 删除
+                    红色 = 删除（只读）
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#3d6b45]/70" />
-                    绿色 = 新增 / 变更
+                    绿色 = 新增 / 变更（可编辑）
                   </span>
                 </div>
 
@@ -332,7 +447,6 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                     modified={activeDiffText.modified}
                     language={activeFile.language || 'plaintext'}
                     theme={taskExecDiffTheme(isDark)}
-                    originalEditable={false}
                     beforeMount={registerTaskExecDiffThemes}
                     loading={
                       <div
@@ -347,21 +461,32 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                       const diffEditor = editor as DiffEditorInstance;
                       diffEditorRef.current = diffEditor;
                       diffUpdateDisposableRef.current?.dispose?.();
+                      modifiedChangeDisposableRef.current?.dispose?.();
 
-                      const noWrap = { readOnly: true, wordWrap: 'off' as const };
-                      // inline diff 默认双列行号（原稿 / 改后）；评审只看改后文件，隐藏原稿行号
+                      const wrapOff = { wordWrap: 'off' as const };
                       diffEditor.getOriginalEditor?.()?.updateOptions?.({
-                        ...noWrap,
+                        ...wrapOff,
+                        readOnly: true,
                         lineNumbers: 'off',
                       });
-                      diffEditor.getModifiedEditor?.()?.updateOptions?.({
-                        ...noWrap,
+                      const modifiedEditor = diffEditor.getModifiedEditor?.();
+                      modifiedEditor?.updateOptions?.({
+                        ...wrapOff,
+                        readOnly: !activeEditable,
                         lineNumbers: 'on',
                       });
 
+                      modifiedChangeDisposableRef.current =
+                        modifiedEditor?.onDidChangeModelContent?.(() => {
+                          onModifiedChange(modifiedEditor.getValue?.());
+                        }) ?? null;
+
                       diffUpdateDisposableRef.current = bindDiffCenterScroll(diffEditor) ?? null;
                     }}
-                    options={DIFF_EDITOR_OPTIONS}
+                    options={{
+                      ...DIFF_EDITOR_OPTIONS,
+                      readOnly: !activeEditable,
+                    }}
                     height={`${EDITOR_HEIGHT}px`}
                   />
                 </div>

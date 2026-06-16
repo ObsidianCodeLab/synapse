@@ -7830,12 +7830,42 @@ fn opencode_cli_check() -> ClaudeCodeCheckResult {
     }
 }
 
+/// 引导页 / 门禁：检测 Cursor Agent CLI（`agent`），必要时修复 Windows 版本目录命名。
+fn cursor_cli_check() -> ClaudeCodeCheckResult {
+    let _aliases = repair_cursor_agent_version_dirs_if_needed();
+    if let Some(agent_path) = resolve_cursor_agent_executable() {
+        let mut c = Command::new(&agent_path);
+        c.arg("--version");
+        apply_no_window(&mut c);
+        if let Ok(o) = c.output() {
+            if let Some(ver) = merged_stdout_stderr_version_line(&o) {
+                return ClaudeCodeCheckResult {
+                    installed: true,
+                    version: Some(ver),
+                };
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        generic_cli_check("agent")
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let agent = generic_cli_check("agent");
+        if agent.installed {
+            return agent;
+        }
+        generic_cli_check("cursor")
+    }
+}
+
 /// 汇总检测 Claude Code、Cursor CLI、OpenCode（任装其一即可继续引导）。
 #[tauri::command]
 fn dev_tools_check() -> DevToolsCheckResult {
     DevToolsCheckResult {
         claude: claude_code_check(),
-        cursor: generic_cli_check("cursor"),
+        cursor: cursor_cli_check(),
         opencode: opencode_cli_check(),
     }
 }

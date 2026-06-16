@@ -637,7 +637,7 @@ export function App() {
   };
   const [obDevTools, setObDevTools] = useState<ObDevToolsCheck | null>(null);
   const [obClaudeChecking, setObClaudeChecking] = useState(false);
-  const [obClaudeInstalling, setObClaudeInstalling] = useState<false | "claude" | "opencode">(false);
+  const [obClaudeInstalling, setObClaudeInstalling] = useState<false | "claude" | "cursor" | "opencode">(false);
   const [obClaudeError, setObClaudeError] = useState<string | null>(null);
   const [obClaudeCompanyToken, setObClaudeCompanyToken] = useState("");
   const [obClaudeShowLlmVideo, setObClaudeShowLlmVideo] = useState(false);
@@ -5472,6 +5472,19 @@ export function App() {
           }
         }
 
+        async function runObCursorInstall() {
+          setObClaudeInstalling("cursor");
+          setObClaudeError(null);
+          try {
+            await invoke<string>("cursor_agent_cli_install");
+            await obClaudeRecheck({ afterInstall: true });
+          } catch (e) {
+            setObClaudeError(String(e));
+          } finally {
+            setObClaudeInstalling(false);
+          }
+        }
+
         async function runObClaudeUserConfig() {
           const tok = obClaudeCompanyToken.trim();
           if (!tok) {
@@ -5549,9 +5562,9 @@ export function App() {
                         key: "cursor" as const,
                         nameKey: "onboarding.claudeCode.toolCursor",
                         hintKey: "onboarding.claudeCode.cursorInstallHint",
-                        installKey: "",
-                        installingKey: "",
-                        runInstall: null,
+                        installKey: "onboarding.claudeCode.installCursor",
+                        installingKey: "onboarding.claudeCode.installingCursor",
+                        runInstall: () => { void runObCursorInstall(); },
                       },
                       {
                         key: "opencode" as const,

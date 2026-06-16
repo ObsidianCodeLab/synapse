@@ -358,6 +358,89 @@ def infer_diff_language(rel_path: str) -> str:
     }.get(ext, "plaintext")
 
 
+def _encode_text_content(content: str, *, encoding: str = "utf-8") -> bytes:
+    enc = str(encoding or "utf-8").lower().replace("_", "-")
+    if enc in {"gbk", "gb2312", "gb18030"}:
+        return content.encode("gbk", errors="replace")
+    return content.encode("utf-8")
+
+
+def _assert_path_within_repo(repo_root: Path, target: Path) -> None:
+    try:
+        target.resolve().relative_to(repo_root.resolve())
+    except ValueError as exc:
+        raise ValueError("invalid_file_path") from exc
+
+
+def find_task_exec_code_diff_file(scope_id: str, file_id: str) -> dict[str, Any] | None:
+    needle = str(file_id or "").strip()
+    if not needle:
+        return None
+    for entry in collect_task_exec_code_diffs(scope_id).get("files") or []:
+        if str(entry.get("id") or "") == needle:
+            return entry
+    return None
+
+
+def save_task_exec_code_diff_file(
+    scope_id: str,
+    file_id: str,
+    content: str,
+    *,
+    encoding: str = "utf-8",
+) -> dict[str, Any]:
+    """将评审中编辑的变更后内容写回子单沙箱工作区。"""
+    entry = find_task_exec_code_diff_file(scope_id, file_id)
+    if entry is None:
+        raise ValueError("code_diff_file_not_found")
+
+    status = str(entry.get("status") or "").lower()
+    if status == "deleted":
+        raise ValueError("code_diff_deleted_not_editable")
+
+    sandbox = str(entry.get("sandbox_path") or "").strip()
+    rel_path = str(entry.get("path") or "").strip()
+    if not sandbox or not rel_path:
+        raise ValueError("code_diff_file_not_found")
+
+    declared = Path(sandbox)
+    if not declared.is_dir():
+        raise ValueError("sandbox_not_found")
+
+    repo_root = _resolve_git_repo_root(declared) or declared
+    if not should_include_diff_file(rel_path):
+        raise ValueError("code_diff_file_not_allowed")
+
+    target = _repo_file_path(repo_root, rel_path)
+    _assert_path_within_repo(repo_root, target)
+
+    data = _encode_text_content(content, encoding=encoding)
+    if len(data) > MAX_DIFF_FILE_BYTES:
+        raise ValueError("code_diff_file_too_large")
+    if b"\x00" in data[:4096]:
+        raise ValueError("code_diff_binary_not_supported")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.write_bytes(data)
+    except OSError as exc:
+        logger.warning("save task exec code diff failed %s: %s", target, exc)
+        raise ValueError("code_diff_write_failed") from exc
+
+    task_no = str(entry.get("task_no") or "").strip()
+    for fresh in collect_repo_code_diff_files(sandbox):
+        if str(fresh.get("path") or "") != rel_path:
+            continue
+        out_id = f"{task_no}:{rel_path}" if task_no else rel_path
+        return {
+            **fresh,
+            "id": out_id,
+            "task_no": task_no,
+            "sandbox_path": sandbox,
+        }
+    raise ValueError("code_diff_refresh_failed")
+
+
 def collect_task_exec_code_diffs(scope_id: str) -> dict[str, Any]:
     """汇总任务执行各子单沙箱的未提交 git diff。"""
     payload = load_task_exec_payload(scope_id) or {}

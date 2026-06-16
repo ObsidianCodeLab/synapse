@@ -783,6 +783,19 @@ export async function fetchTaskExecCodeDiffs(
   );
 }
 
+export async function saveTaskExecCodeDiff(
+  synapseApiBase: string,
+  roomId: string,
+  body: { file_id: string; content: string; encoding?: string },
+): Promise<{ file: TaskExecCodeDiffFile }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPut<{ file: TaskExecCodeDiffFile }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/code-diffs`,
+    body,
+  );
+}
+
 export async function saveSolutionReviewTasks(
   synapseApiBase: string,
   roomId: string,
