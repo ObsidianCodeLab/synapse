@@ -123,9 +123,8 @@ def test_bootstrap_code_commit_per_task(tmp_path, monkeypatch):
             "error": "",
         },
     )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.code_commit_assets._wait_for_flight_result",
-        lambda portal_task_id: {
+    def _mock_wait(portal_task_id, *, on_poll=None):
+        result = {
             "status": "failed",
             "error": "构建失败",
             "data": {
@@ -134,10 +133,21 @@ def test_bootstrap_code_commit_per_task(tmp_path, monkeypatch):
                 "ciFlowInstRunStateDesc": "构建失败",
                 "buildResult": [{"resultType": "CheckStyle", "resultMsg": "格式错误"}],
             },
-        },
+        }
+        if on_poll:
+            on_poll(result)
+        return result
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._wait_for_flight_result",
+        _mock_wait,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._persist_code_commit_state",
+        lambda *args, **kwargs: None,
     )
 
-    assets = bootstrap_code_commit(scope_id, scope_type="demand")
+    assets = bootstrap_code_commit(scope_id, scope_type="demand", stage_name="开发中")
     assert len(assets["tasks"]) == 1
     task = assets["tasks"][0]
     assert task["commit_message"] == "11923497 实现计费模块改造"
@@ -148,6 +158,8 @@ def test_bootstrap_code_commit_per_task(tmp_path, monkeypatch):
 
     display = build_code_commit_display(assets)
     assert display["tasks"][0]["flight_data"]["ciFlowInstRunState"] == "1"
+    assert display["progress"]["phase"] == "done"
+    assert any(a.get("name") == "试飞结果.md" for a in display.get("archives") or [])
 
 
 def test_collect_task_rows_includes_portal_task_id():

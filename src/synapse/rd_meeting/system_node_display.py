@@ -633,6 +633,10 @@ def build_code_commit_display(result: dict[str, Any]) -> dict[str, Any]:
         "tasks": display_tasks,
         "flight": flight,
         "summary": summary,
+        "progress": result.get("progress") if isinstance(result.get("progress"), dict) else {},
+        "archives": result.get("archives") if isinstance(result.get("archives"), list) else [],
+        "started_at": result.get("started_at"),
+        "finished_at": result.get("finished_at"),
     }
 
 

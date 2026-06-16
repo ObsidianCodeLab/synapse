@@ -20,6 +20,13 @@ import {
 
 import { EnvPregenDocsPanel } from './EnvPregenDocsPanel';
 import { collectEnvPregenDocs } from './envPregenDocs';
+import { CodeCommitFlightPanel } from './CodeCommitFlightPanel';
+import { CodeCommitProgressSteps } from './CodeCommitProgressSteps';
+import {
+  codeCommitSummaryLine,
+  collectCodeCommitFlights,
+  resolveCodeCommitStepStates,
+} from './codeCommitDisplay';
 
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -898,12 +905,27 @@ export function SystemEnvPregenCard({
   );
 }
 
-export function SystemCodeCommitCard({ payload }: { payload: Record<string, unknown> }) {
+export function SystemCodeCommitCard({
+  payload,
+  variant = 'summary',
+}: {
+  payload: Record<string, unknown>;
+  /** summary：协作会议流仅展示摘要；detail：节点详情展示进度与试飞明细 */
+  variant?: 'summary' | 'detail';
+}) {
   const display = (payload.display as Record<string, unknown>) || payload;
   const tasks = asRows(display.tasks);
   const flight = (display.flight as RowRecord) || {};
   const summary = (display.summary as RowRecord) || {};
   const errors = (display.errors as string[]) || [];
+  const progress = (display.progress as RowRecord) || {};
+  const stepStates = useMemo(() => resolveCodeCommitStepStates(display), [display]);
+  const summaryLine = useMemo(() => codeCommitSummaryLine(display), [display]);
+  const status = String(display.status || '—');
+  const flights = useMemo(() => collectCodeCommitFlights(display), [display]);
+  const flightDoneCount = flights.filter((f) =>
+    ['ok', 'failed', 'timeout', 'skipped'].includes(f.flightStatus),
+  ).length;
 
   return (
     <div className="rd-chat-card rd-chat-card--meta">
@@ -911,13 +933,20 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
         gradient="rd-system-hero--sandbox"
         icon={<GitBranch className="h-6 w-6" />}
         title="代码提交"
-        subtitle="按研发子单提交特性分支，并收集试飞构建结果。"
+        subtitle={summaryLine}
         stats={[
           { label: '子单', value: String(summary.total ?? tasks.length) },
           { label: '提交', value: String(summary.commit_ok ?? '—') },
-          { label: '试飞', value: String(flight.status || display.status || '—') },
+          { label: '试飞', value: String(flight.status || status || '—') },
         ]}
       />
+
+      <CodeCommitProgressSteps stepStates={stepStates} />
+
+      {progress.message && variant === 'summary' ? (
+        <p className="mt-2 mb-0 text-[11px] text-primary/80">{String(progress.message)}</p>
+      ) : null}
+
       {errors.length > 0 ? (
         <ul className="mt-2 space-y-1 text-[11px] text-red-400">
           {errors.map((err) => (
@@ -925,70 +954,17 @@ export function SystemCodeCommitCard({ payload }: { payload: Record<string, unkn
           ))}
         </ul>
       ) : null}
-      {tasks.length > 0 ? (
-        <ul className="space-y-3 mt-3 mb-0">
-          {tasks.map((row, idx) => {
-            const flightData = (row.flight_data as RowRecord) || {};
-            const buildResult = asRows(flightData.buildResult);
-            return (
-              <li
-                key={`commit-${idx}`}
-                className="rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-[11px]"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={String(row.status || '')} />
-                  <span className="text-slate-300 font-medium">{String(row.task_no || '—')}</span>
-                  {row.feature_id ? (
-                    <span className="text-muted-foreground font-mono">{String(row.feature_id)}</span>
-                  ) : null}
-                  {row.commit_hash ? (
-                    <span className="text-muted-foreground font-mono">
-                      {String(row.commit_hash).slice(0, 8)}
-                    </span>
-                  ) : null}
-                </div>
-                {row.commit_message ? (
-                  <p className="text-muted-foreground mt-1 mb-0">{String(row.commit_message)}</p>
-                ) : null}
-                <CopyPath value={String(row.sandbox_path || '')} />
-                {row.flight_status ? (
-                  <div className="mt-2 pt-2 border-t border-slate-700/50">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">试飞</span>
-                      <StatusBadge status={String(row.flight_status)} />
-                      {flightData.ciFlowInstRunStateDesc ? (
-                        <span className="text-slate-400">{String(flightData.ciFlowInstRunStateDesc)}</span>
-                      ) : null}
-                    </div>
-                    {flightData.ciFlowInstBeginDate || flightData.ciFlowInstEndDate ? (
-                      <p className="text-muted-foreground mt-1 mb-0">
-                        {flightData.ciFlowInstBeginDate ? String(flightData.ciFlowInstBeginDate) : '—'}
-                        {' → '}
-                        {flightData.ciFlowInstEndDate ? String(flightData.ciFlowInstEndDate) : '—'}
-                      </p>
-                    ) : null}
-                    {buildResult.length > 0 ? (
-                      <ul className="mt-2 space-y-1 mb-0">
-                        {buildResult.map((item, brIdx) => (
-                          <li key={`br-${idx}-${brIdx}`} className="text-red-300/90">
-                            <span className="font-medium">{String(item.resultType || '检查项')}：</span>
-                            <span className="whitespace-pre-wrap break-all">
-                              {String(item.resultMsg || '').slice(0, 800)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {row.flight_error ? (
-                      <p className="text-red-400 mt-1 mb-0">{String(row.flight_error)}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {row.error ? <p className="text-red-400 mt-1 mb-0">{String(row.error)}</p> : null}
-              </li>
-            );
-          })}
-        </ul>
+
+      {variant === 'summary' && tasks.length > 0 ? (
+        <p className="mt-2 mb-0 text-[10px] text-muted-foreground">
+          试飞进度 {flightDoneCount}/{flights.length || tasks.length} · 明细见节点详情
+        </p>
+      ) : null}
+
+      {variant === 'detail' ? (
+        <div className="mt-4">
+          <CodeCommitFlightPanel display={display} />
+        </div>
       ) : null}
     </div>
   );
@@ -1159,7 +1135,7 @@ export function SystemNodeDetailCard({
         />
       );
     case 'exception_check':
-      return <SystemCodeCommitCard payload={payload} />;
+      return <SystemCodeCommitCard payload={payload} variant="detail" />;
     case 'env_start':
       return <SystemTaskCheckCard payload={payload} />;
     default:

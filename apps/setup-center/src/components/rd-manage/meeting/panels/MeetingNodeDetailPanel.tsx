@@ -290,6 +290,7 @@ export function MeetingNodeDetailPanel({
         const skipNodeReview =
           nodeId === 'solution_review' || isStructuredSystemNode;
         const isTaskExecLive = nodeId === 'task_exec' && nodeState === 'processing';
+        const isCodeCommitLive = nodeId === 'exception_check' && nodeState === 'processing';
         const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
@@ -344,6 +345,22 @@ export function MeetingNodeDetailPanel({
               category: 'tool',
               display_title: `${task.task_no || '工单'} · ${task.phase === 'verify' ? '完成检测' : '开发轮'}`,
               summary: task.task_title || task.goal || '执行中',
+              node_id: nodeId,
+            });
+          }
+          entries.sort((a, b) => String(a.ts || '').localeCompare(String(b.ts || '')));
+        }
+
+        if (isCodeCommitLive && systemRes.status === 'fulfilled' && systemRes.value?.display) {
+          const ccDisplay = systemRes.value.display as Record<string, unknown>;
+          const progress = (ccDisplay.progress as Record<string, unknown>) || {};
+          if (progress.message) {
+            entries.push({
+              id: `code-commit-${progress.updated_at || progress.phase || 'live'}`,
+              ts: String(progress.updated_at || ''),
+              category: 'tool',
+              display_title: '代码提交',
+              summary: String(progress.message),
               node_id: nodeId,
             });
           }
@@ -573,7 +590,11 @@ export function MeetingNodeDetailPanel({
           <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
           <p className="text-sm text-muted-foreground">系统节点执行结果尚未就绪</p>
           {nodeState === 'processing' ? (
-            <p className="mt-1 text-xs text-primary/80">脚本执行中，完成后将展示拆单/沙箱结构化结果</p>
+            <p className="mt-1 text-xs text-primary/80">
+              {nodeId === 'exception_check'
+                ? '代码提交与试飞轮询中，完成后将展示结构化结果'
+                : '脚本执行中，完成后将展示拆单/沙箱结构化结果'}
+            </p>
           ) : null}
         </div>
       ) : mdArtifacts.length || otherArtifacts.length ? (

@@ -333,13 +333,21 @@ def handle_code_commit(
         format_code_commit_log_report,
         write_code_commit_archives,
     )
+    from synapse.rd_meeting.task_exec import _resolve_room_id
 
-    assets = bootstrap_code_commit(sid, scope_type=scope_type)
+    stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
+    room_id = _resolve_room_id(sid)
+    assets = bootstrap_code_commit(
+        sid,
+        scope_type=scope_type,
+        room_id=room_id,
+        pipe=pipe,
+        stage_name=stage_name,
+    )
     _save_pipeline_context_assets(sid, "code_commit_assets", assets, pipe=pipe)
 
     node_name = node_display_name(node_id)
     report_body = format_code_commit_log_report(assets, node_name=node_name)
-    stage_name = stage_name_for_id(int(dev.get("stage_id") or 0))
     artifacts = write_code_commit_archives(sid, stage_name, assets)
 
     from synapse.api.routes.dev_iwhalecloud import OWNED_WORK_ITEM_STATE_COMMIT_DONE

@@ -6611,6 +6611,131 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   min-height: 0;
 }
 
+/* 代码提交 · 进度步骤 */
+.rd-code-commit-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 720px) {
+  .rd-code-commit-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.rd-code-commit-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 0.4rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(15 23 42 / 0.35);
+  text-align: center;
+}
+.rd-code-commit-step__connector {
+  display: none;
+}
+.rd-code-commit-step__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  color: rgb(148 163 184);
+}
+.rd-code-commit-step__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.rd-code-commit-step__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(226 232 240);
+}
+.rd-code-commit-step__subtitle {
+  font-size: 10px;
+  color: rgb(148 163 184);
+  line-height: 1.3;
+}
+.rd-code-commit-step--active {
+  border-color: rgb(56 189 248 / 0.35);
+  background: rgb(56 189 248 / 0.08);
+}
+.rd-code-commit-step--active .rd-code-commit-step__icon {
+  border-color: rgb(56 189 248 / 0.45);
+  color: rgb(125 211 252);
+}
+.rd-code-commit-step--ok .rd-code-commit-step__icon {
+  border-color: rgb(52 211 153 / 0.4);
+  color: rgb(110 231 183);
+  background: rgb(52 211 153 / 0.1);
+}
+.rd-code-commit-step--failed .rd-code-commit-step__icon {
+  border-color: rgb(248 113 113 / 0.4);
+  color: rgb(252 165 165);
+  background: rgb(248 113 113 / 0.08);
+}
+.rd-code-commit-step--partial .rd-code-commit-step__icon {
+  border-color: rgb(251 191 36 / 0.4);
+  color: rgb(253 224 71);
+  background: rgb(251 191 36 / 0.08);
+}
+.rd-code-commit-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px dashed rgb(255 255 255 / 0.12);
+  color: rgb(148 163 184);
+  font-size: 12px;
+  text-align: center;
+}
+.rd-code-commit-archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rd-code-commit-archive-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(15 23 42 / 0.4);
+}
+.rd-code-commit-flight-card {
+  border-radius: 0.65rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(15 23 42 / 0.45);
+  padding: 0.75rem 0.85rem;
+}
+.rd-code-commit-flight-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.rd-code-commit-flight-card__flight {
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  padding-top: 0.65rem;
+}
+
 /* 任务执行评审 */
 .rd-task-exec-status {
   display: inline-flex;

@@ -759,6 +759,7 @@ SYSTEM_PRESETS: list[AgentProfile] = [
             "whalecloud-dev-tool-base-scripts",
             "whalecloud-dev-tool-c-code-access",
             "whalecloud-dev-tool-module-function",
+            "whalecloud-dev-tool-flight-optimize-plan",
         ],
         skills_mode=SkillsMode.INCLUSIVE,
         custom_prompt="你是浩鲸产品研发专家。擅长代码编写与系统实现。",

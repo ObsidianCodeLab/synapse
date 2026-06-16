@@ -45,6 +45,11 @@ EVENT_FLOW_STAGE: dict[str, str] = {
     "task_exec_cli_started": "任务执行 CLI 开始",
     "task_exec_cli_finished": "任务执行 CLI 结束",
     "task_exec_gate": "任务执行评审门控",
+    "code_commit_started": "代码提交开始",
+    "code_commit_task_done": "代码提交 · 子单",
+    "code_commit_phase_done": "代码提交阶段",
+    "code_commit_flight_done": "试飞结果落盘",
+    "code_commit_finished": "代码提交完成",
 }
 
 CHAT_VISIBLE_EVENTS = frozenset(

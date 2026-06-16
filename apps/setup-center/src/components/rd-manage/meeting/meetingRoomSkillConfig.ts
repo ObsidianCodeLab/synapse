@@ -49,6 +49,7 @@ export const WORKER_REQUIRED_SKILLS_BY_PROFILE: Record<string, RequiredSkillRule
   ],
   'whalecloud-rd-expert': [
     { displayName: '模块功能技能', skillIds: ['whalecloud-dev-tool-module-function'] },
+    { displayName: '试飞优化方案', skillIds: ['whalecloud-dev-tool-flight-optimize-plan'] },
     { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },
     { displayName: '代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
   ],

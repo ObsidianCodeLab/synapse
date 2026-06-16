@@ -5,15 +5,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any, Literal
 
 from synapse.rd_meeting.product_assets import _run_git, resolve_sandbox_path_for_product_module
-from synapse.rd_meeting.task_exec_code_diff import collect_repo_commit_stage_paths
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
+    build_code_commit_display,
     collect_task_rows,
 )
 from synapse.rd_meeting.task_exec import load_task_exec_payload
+from synapse.rd_meeting.task_exec_code_diff import collect_repo_commit_stage_paths
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,109 @@ ScopeType = Literal["demand", "task"]
 
 _FLIGHT_POLL_INTERVAL_SEC = 15
 _FLIGHT_POLL_MAX_WAIT_SEC = 600
+
+CodeCommitPhase = Literal["prepare", "commit", "flight_poll", "archive", "done"]
+
+
+def _code_commit_progress_snapshot(
+    *,
+    phase: CodeCommitPhase,
+    message: str,
+    task_index: int = 0,
+    task_total: int = 0,
+    task_no: str = "",
+) -> dict[str, Any]:
+    snap: dict[str, Any] = {
+        "phase": phase,
+        "message": message,
+        "task_index": task_index,
+        "task_total": task_total,
+        "task_no": task_no,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    return snap
+
+
+def _persist_code_commit_state(
+    scope_id: str,
+    assets: dict[str, Any],
+    *,
+    pipe: Any = None,
+) -> None:
+    from synapse.rd_meeting.paths import meeting_pipeline_path
+    from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+
+    sid = (scope_id or "").strip()
+    if not sid:
+        return
+    path = meeting_pipeline_path(sid)
+    raw = read_json_file(path)
+    if not isinstance(raw, dict):
+        return
+    ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
+    ctx["code_commit_assets"] = assets
+    raw["context"] = ctx
+    raw["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    save_meeting_pipeline(sid, raw)
+    if pipe is not None:
+        pctx = pipe._data.get("context")
+        if not isinstance(pctx, dict):
+            pctx = {}
+        pctx["code_commit_assets"] = assets
+        pipe._data["context"] = pctx
+
+
+def _emit_code_commit_progress(
+    scope_id: str,
+    *,
+    event: str,
+    message: str,
+    room_id: str,
+    log_type: str = "info",
+    display: dict[str, Any] | None = None,
+    task_no: str = "",
+    phase: CodeCommitPhase = "prepare",
+    task_index: int = 0,
+    task_total: int = 0,
+) -> None:
+    from synapse.rd_meeting.room_runtime import append_history_event
+
+    payload: dict[str, Any] = {
+        "event": event,
+        "room_id": room_id,
+        "node_id": "exception_check",
+        "message": message,
+        "flow_stage": "代码提交",
+        "log_type": log_type,
+        "agent_id": "system",
+        "system_node": True,
+        "phase": phase,
+    }
+    if task_no:
+        payload["task_no"] = task_no
+    if task_total:
+        payload["task_index"] = task_index
+        payload["task_total"] = task_total
+    if isinstance(display, dict) and display:
+        payload["display"] = display
+    append_history_event(scope_id, payload)
+
+
+def _resolve_overall_status(
+    *,
+    commit_errors: list[str],
+    all_commits_ok: bool,
+    commit_ok: int,
+    flight_summary: dict[str, Any],
+) -> str:
+    if commit_errors and not all_commits_ok:
+        return "failed"
+    flight_st = str(flight_summary.get("status") or "").strip()
+    if flight_st == "failed":
+        return "partial" if commit_ok > 0 else "failed"
+    if flight_st in ("timeout", "pending"):
+        return "partial"
+    return "ok"
 
 
 def _git_toplevel(path: str) -> str:
@@ -197,7 +303,11 @@ async def _fetch_flight_build_status(portal_task_id: int) -> dict[str, Any]:
         return {"errorcode": -1, "message": str(exc)}
 
 
-async def _wait_for_flight_result_async(portal_task_id: int) -> dict[str, Any]:
+async def _wait_for_flight_result_async(
+    portal_task_id: int,
+    *,
+    on_poll: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     if not portal_task_id:
         return {"status": "skipped", "error": "缺少 portal taskId，跳过试飞轮询", "data": {}}
 
@@ -207,17 +317,25 @@ async def _wait_for_flight_result_async(portal_task_id: int) -> dict[str, Any]:
     while time.monotonic() < deadline:
         resp = await _fetch_flight_build_status(portal_task_id)
         last = _normalize_flight_data(resp)
+        if on_poll:
+            on_poll(last)
         if last.get("status") in ("ok", "failed"):
             return last
         await asyncio.sleep(_FLIGHT_POLL_INTERVAL_SEC)
 
     last.setdefault("error", "等待试飞结果超时")
     last["status"] = "timeout"
+    if on_poll:
+        on_poll(last)
     return last
 
 
-def _wait_for_flight_result(portal_task_id: int) -> dict[str, Any]:
-    return asyncio.run(_wait_for_flight_result_async(portal_task_id))
+def _wait_for_flight_result(
+    portal_task_id: int,
+    *,
+    on_poll: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
+    return asyncio.run(_wait_for_flight_result_async(portal_task_id, on_poll=on_poll))
 
 
 def _int_portal_task_id(raw: Any) -> int | None:
@@ -411,7 +529,42 @@ def format_code_commit_report(assets: dict[str, Any], *, node_name: str = "代�
     return format_code_commit_log_report(assets, node_name=node_name)
 
 
-def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, Any]:
+def write_code_commit_log_archive(
+    scope_id: str,
+    stage_name: str,
+    assets: dict[str, Any],
+) -> dict[str, Any] | None:
+    from synapse.rd_meeting.paths import archive_node_dir
+
+    dest = archive_node_dir(scope_id, stage_name, "exception_check")
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / "代码提交日志.md"
+    path.write_text(format_code_commit_log_report(assets), encoding="utf-8")
+    return {"name": "代码提交日志.md", "path": str(path)}
+
+
+def write_flight_result_archive(
+    scope_id: str,
+    stage_name: str,
+    assets: dict[str, Any],
+) -> dict[str, Any] | None:
+    from synapse.rd_meeting.paths import archive_node_dir
+
+    dest = archive_node_dir(scope_id, stage_name, "exception_check")
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / "试飞结果.md"
+    path.write_text(format_flight_result_report(assets), encoding="utf-8")
+    return {"name": "试飞结果.md", "path": str(path)}
+
+
+def bootstrap_code_commit(
+    scope_id: str,
+    *,
+    scope_type: ScopeType,
+    room_id: str = "",
+    pipe: Any = None,
+    stage_name: str = "",
+) -> dict[str, Any]:
     """按研发子单提交特性分支代码，并在全部提交成功后轮询试飞结果。"""
     sid = (scope_id or "").strip()
     orders = _collect_commit_orders(scope_type, sid)
@@ -422,12 +575,77 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
             "tasks": [],
             "flight": {"status": "skipped", "error": "", "data": {}},
             "summary": {"total": 0, "commit_ok": 0, "commit_failed": 0, "flight_ok": 0},
+            "progress": _code_commit_progress_snapshot(
+                phase="done",
+                message="无可提交的研发子单",
+            ),
+            "archives": [],
         }
 
+    task_total = len(orders)
     task_results: list[dict[str, Any]] = []
     commit_errors: list[str] = []
+    archives: list[dict[str, Any]] = []
+    rid = (room_id or "").strip()
 
-    for order in orders:
+    result_doc: dict[str, Any] = {
+        "status": "running",
+        "error": "",
+        "tasks": task_results,
+        "flight": {"status": "pending", "error": "", "data": {}},
+        "summary": {"total": task_total, "commit_ok": 0, "commit_failed": 0, "flight_ok": 0},
+        "progress": _code_commit_progress_snapshot(
+            phase="prepare",
+            message=f"准备提交 {task_total} 个研发子单",
+            task_total=task_total,
+        ),
+        "archives": archives,
+        "started_at": datetime.now().isoformat(timespec="seconds"),
+        "finished_at": None,
+    }
+    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+    if rid:
+        _emit_code_commit_progress(
+            sid,
+            event="code_commit_started",
+            message=result_doc["progress"]["message"],
+            room_id=rid,
+            phase="prepare",
+            task_total=task_total,
+            display=build_code_commit_display(result_doc),
+        )
+
+    def _sync_running(
+        *,
+        phase: CodeCommitPhase,
+        message: str,
+        task_index: int = 0,
+        task_no: str = "",
+        tasks: list[dict[str, Any]] | None = None,
+        flight: dict[str, Any] | None = None,
+        summary: dict[str, Any] | None = None,
+        status: str | None = None,
+    ) -> None:
+        result_doc["progress"] = _code_commit_progress_snapshot(
+            phase=phase,
+            message=message,
+            task_index=task_index,
+            task_total=task_total,
+            task_no=task_no,
+        )
+        if tasks is not None:
+            result_doc["tasks"] = tasks
+        if flight is not None:
+            result_doc["flight"] = flight
+        if summary is not None:
+            result_doc["summary"] = summary
+        if status is not None:
+            result_doc["status"] = status
+        _persist_code_commit_state(sid, result_doc, pipe=pipe)
+
+    for order_index, order in enumerate(orders):
+        task_index = order_index + 1
+        task_no = str(order.get("task_no") or "").strip()
         row: dict[str, Any] = {
             **order,
             "status": "pending",
@@ -435,19 +653,27 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
             "error": "",
             "flight": {"status": "pending", "error": "", "data": {}},
         }
+        _sync_running(
+            phase="commit",
+            message=f"正在提交 {task_no}（{task_index}/{task_total}）",
+            task_index=task_index,
+            task_no=task_no,
+            tasks=[*task_results, row],
+        )
+
         sandbox_path = str(order.get("sandbox_path") or "").strip()
         feature_id = str(order.get("feature_id") or "").strip()
         if not sandbox_path:
             row["status"] = "skipped"
             row["error"] = "未匹配沙箱工程路径"
             task_results.append(row)
-            commit_errors.append(f"{order.get('task_no')}: 未匹配沙箱工程路径")
+            commit_errors.append(f"{task_no}: 未匹配沙箱工程路径")
             continue
         if not feature_id:
             row["status"] = "skipped"
             row["error"] = "缺少 feature_id"
             task_results.append(row)
-            commit_errors.append(f"{order.get('task_no')}: 缺少 feature_id")
+            commit_errors.append(f"{task_no}: 缺少 feature_id")
             continue
 
         commit_row = _commit_and_push(
@@ -462,15 +688,79 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
         else:
             row["status"] = "failed"
             row["error"] = commit_row.get("error") or "git 提交失败"
-            commit_errors.append(f"{order.get('task_no')}: {row['error']}")
+            commit_errors.append(f"{task_no}: {row['error']}")
         task_results.append(row)
+
+        commit_ok = sum(1 for t in task_results if t.get("status") == "ok")
+        summary = {
+            "total": task_total,
+            "commit_ok": commit_ok,
+            "commit_failed": sum(1 for t in task_results if t.get("status") == "failed"),
+            "flight_ok": 0,
+        }
+        _sync_running(
+            phase="commit",
+            message=f"子单 {task_no} 提交{'成功' if row.get('status') == 'ok' else '失败'}",
+            task_index=task_index,
+            task_no=task_no,
+            tasks=task_results,
+            summary=summary,
+        )
+        if rid:
+            _emit_code_commit_progress(
+                sid,
+                event="code_commit_task_done",
+                message=f"子单 {task_no} 提交{'成功' if row.get('status') == 'ok' else '失败'}",
+                room_id=rid,
+                log_type="info" if row.get("status") == "ok" else "warning",
+                phase="commit",
+                task_index=task_index,
+                task_total=task_total,
+                task_no=task_no,
+                display=build_code_commit_display(result_doc),
+            )
 
     commit_ok = sum(1 for t in task_results if t.get("status") == "ok")
     all_commits_ok = commit_ok == len(task_results) and commit_ok > 0
+    summary = {
+        "total": task_total,
+        "commit_ok": commit_ok,
+        "commit_failed": sum(1 for t in task_results if t.get("status") == "failed"),
+        "flight_ok": 0,
+    }
+
+    if stage_name:
+        commit_art = write_code_commit_log_archive(sid, stage_name, result_doc)
+        if commit_art:
+            archives.append(commit_art)
+            result_doc["archives"] = archives
+
+    _sync_running(
+        phase="flight_poll" if all_commits_ok else "archive",
+        message=(
+            f"全部 {commit_ok}/{task_total} 个子单提交完成，开始轮询试飞结果"
+            if all_commits_ok
+            else f"提交阶段结束（成功 {commit_ok}/{task_total}），跳过试飞"
+        ),
+        task_index=task_total if all_commits_ok else commit_ok,
+        summary=summary,
+        tasks=task_results,
+    )
+    if rid:
+        _emit_code_commit_progress(
+            sid,
+            event="code_commit_phase_done",
+            message=result_doc["progress"]["message"],
+            room_id=rid,
+            phase=result_doc["progress"]["phase"],
+            task_total=task_total,
+            display=build_code_commit_display(result_doc),
+        )
 
     if all_commits_ok:
-        for row in task_results:
+        for poll_index, row in enumerate(task_results, start=1):
             portal_task_id = _int_portal_task_id(row.get("portal_task_id"))
+            task_no = str(row.get("task_no") or "").strip()
             if not portal_task_id:
                 row["flight"] = {
                     "status": "skipped",
@@ -478,7 +768,87 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
                     "data": {},
                 }
                 continue
-            row["flight"] = _wait_for_flight_result(portal_task_id)
+
+            _sync_running(
+                phase="flight_poll",
+                message=f"试飞轮询中：{task_no}（{poll_index}/{task_total}）",
+                task_index=poll_index,
+                task_no=task_no,
+                tasks=task_results,
+            )
+
+            def _on_flight_poll(
+                flight_row: dict[str, Any],
+                *,
+                target_row: dict[str, Any] = row,
+                idx: int = poll_index,
+                tno: str = task_no,
+            ) -> None:
+                target_row["flight"] = flight_row
+                flight_summary = _aggregate_flight_status(task_results)
+                flight_ok = sum(
+                    1
+                    for t in task_results
+                    if isinstance(t.get("flight"), dict) and t["flight"].get("status") == "ok"
+                )
+                poll_summary = {
+                    **summary,
+                    "flight_ok": flight_ok,
+                }
+                poll_phase: CodeCommitPhase = "flight_poll"
+                poll_message = f"试飞轮询中：{tno}"
+                flight_st = str(flight_row.get("status") or "").strip()
+                if flight_st in ("ok", "failed", "timeout", "skipped"):
+                    poll_message = f"子单 {tno} 试飞{'成功' if flight_st == 'ok' else '结束'}"
+                _sync_running(
+                    phase=poll_phase,
+                    message=poll_message,
+                    task_index=idx,
+                    task_no=tno,
+                    tasks=task_results,
+                    flight=flight_summary,
+                    summary=poll_summary,
+                )
+
+            row["flight"] = _wait_for_flight_result(portal_task_id, on_poll=_on_flight_poll)
+
+            flight_summary = _aggregate_flight_status(task_results)
+            summary["flight_ok"] = sum(
+                1
+                for t in task_results
+                if isinstance(t.get("flight"), dict) and t["flight"].get("status") == "ok"
+            )
+            _sync_running(
+                phase="archive",
+                message=f"子单 {task_no} 试飞结果已收集",
+                task_index=poll_index,
+                task_no=task_no,
+                tasks=task_results,
+                flight=flight_summary,
+                summary=summary,
+            )
+            if stage_name:
+                flight_art = write_flight_result_archive(sid, stage_name, result_doc)
+                if flight_art:
+                    archives = [a for a in archives if a.get("name") != flight_art.get("name")]
+                    archives.append(flight_art)
+                    result_doc["archives"] = archives
+                    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+            if rid:
+                _emit_code_commit_progress(
+                    sid,
+                    event="code_commit_flight_done",
+                    message=f"子单 {task_no} 试飞结果已落盘",
+                    room_id=rid,
+                    log_type="info"
+                    if row["flight"].get("status") == "ok"
+                    else "warning",
+                    phase="archive",
+                    task_index=poll_index,
+                    task_total=task_total,
+                    task_no=task_no,
+                    display=build_code_commit_display(result_doc),
+                )
     else:
         for row in task_results:
             if row.get("status") != "ok":
@@ -490,7 +860,7 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
 
     flight_summary = _aggregate_flight_status(task_results)
     summary = {
-        "total": len(task_results),
+        "total": task_total,
         "commit_ok": commit_ok,
         "commit_failed": sum(1 for t in task_results if t.get("status") == "failed"),
         "flight_ok": sum(
@@ -499,22 +869,44 @@ def bootstrap_code_commit(scope_id: str, *, scope_type: ScopeType) -> dict[str, 
             if isinstance(t.get("flight"), dict) and t["flight"].get("status") == "ok"
         ),
     }
+    status = _resolve_overall_status(
+        commit_errors=commit_errors,
+        all_commits_ok=all_commits_ok,
+        commit_ok=commit_ok,
+        flight_summary=flight_summary,
+    )
 
-    status = "ok"
-    if commit_errors and not all_commits_ok:
-        status = "failed"
-    elif flight_summary.get("status") == "failed":
-        status = "partial" if commit_ok > 0 else "failed"
-    elif flight_summary.get("status") in ("timeout", "pending"):
-        status = "partial"
+    result_doc.update(
+        {
+            "status": status,
+            "error": "; ".join(commit_errors) or str(flight_summary.get("error") or ""),
+            "tasks": task_results,
+            "flight": flight_summary,
+            "summary": summary,
+            "finished_at": datetime.now().isoformat(timespec="seconds"),
+            "progress": _code_commit_progress_snapshot(
+                phase="done",
+                message="代码提交与试飞结果收集完成",
+                task_index=task_total,
+                task_total=task_total,
+            ),
+            "archives": archives,
+        }
+    )
+    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+    if rid:
+        _emit_code_commit_progress(
+            sid,
+            event="code_commit_finished",
+            message=result_doc["progress"]["message"],
+            room_id=rid,
+            log_type="info" if status in ("ok", "partial") else "error",
+            phase="done",
+            task_total=task_total,
+            display=build_code_commit_display(result_doc),
+        )
 
-    return {
-        "status": status,
-        "error": "; ".join(commit_errors) or str(flight_summary.get("error") or ""),
-        "tasks": task_results,
-        "flight": flight_summary,
-        "summary": summary,
-    }
+    return result_doc
 
 
 def write_code_commit_archives(
@@ -522,19 +914,11 @@ def write_code_commit_archives(
     stage_name: str,
     assets: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    from synapse.rd_meeting.paths import archive_node_dir
-
-    dest = archive_node_dir(scope_id, stage_name, "exception_check")
-    dest.mkdir(parents=True, exist_ok=True)
-    commit_body = format_code_commit_log_report(assets)
-    flight_body = format_flight_result_report(assets)
-    files = {
-        "代码提交日志.md": commit_body,
-        "试飞结果.md": flight_body,
-    }
     artifacts: list[dict[str, Any]] = []
-    for name, body in files.items():
-        path = dest / name
-        path.write_text(body, encoding="utf-8")
-        artifacts.append({"name": name, "path": str(path)})
+    commit_art = write_code_commit_log_archive(scope_id, stage_name, assets)
+    flight_art = write_flight_result_archive(scope_id, stage_name, assets)
+    if commit_art:
+        artifacts.append(commit_art)
+    if flight_art:
+        artifacts.append(flight_art)
     return artifacts

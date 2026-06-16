@@ -60,7 +60,7 @@ NODE_INTENTS: dict[str, str] = {
     "env_pregen": "拉取文档与控熵文件，预生成开发环境（系统脚本）。",
     "task_exec": "基于函数级方案和工单进行功能点的自动化开发。",
     "exception_check": "自动触发特性分支代码提交并等待和收集试飞结果。",
-    "task_feedback": "基于特性分支试飞结果生成试飞优化方案，并与研发人员一起评估方案可靠性。",
+    "task_feedback": "基于特性分支试飞结果生成试飞优化方案，确保不引入新的试飞问题，同时解决所有已识别问题。",
     "diff_analysis": "根据试飞优化方案执行并提交代码。",
     "env_start": "对试飞优化节点与任务执行节点的产出进行试飞级、需求方案级分析；试飞未通过时覆盖代码提交输出并引导至试飞方案，功能不完整时引导至任务执行；同一子单连续三次未通过则禁止 AI 继续处理。",
     "unit_test": "说明本次研发任务涉及的功能测试案例、单元测试文件路径与测试结果，辅助后续自动化测试。",
@@ -281,8 +281,14 @@ NODE_PRIOR_OUTPUT_RULES: dict[str, list[dict[str, Any]]] = {
         {
             "source_node_id": "exception_check",
             "artifacts": ["试飞结果.md"],
-            "use_mode": "flow_required",
-            "note": "试飞方案须基于代码提交节点的试飞结果",
+            "use_mode": "skill_required",
+            "note": "whalecloud-dev-tool-flight-optimize-plan 须基于代码提交试飞结果",
+        },
+        {
+            "source_node_id": "exception_check",
+            "artifacts": ["代码提交日志.md"],
+            "use_mode": "llm_judge",
+            "note": "可选：对照提交记录定位子单与分支",
         },
     ],
     "diff_analysis": [
