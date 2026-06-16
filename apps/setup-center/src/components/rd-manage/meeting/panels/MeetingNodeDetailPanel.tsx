@@ -44,6 +44,8 @@ import {
   SYSTEM_STRUCTURED_NODE_IDS,
   SystemNodeDetailCard,
 } from '../SystemNodeCards';
+import { CodeCommitProgressSteps } from '../CodeCommitProgressSteps';
+import { collectCodeCommitArchives, resolveCodeCommitStepStates } from '../codeCommitDisplay';
 import {
   KnowledgeBaseTab,
   KnowledgeGraphTab,
@@ -70,6 +72,8 @@ interface Props {
   nodeState: MeetingNodeVisualState;
   /** 轮询间隔（处理中节点），0 表示不轮询 */
   pollMs?: number;
+  /** live 轮询注入的结构化展示（优先于 system-node-display API） */
+  liveSystemDisplay?: Record<string, unknown> | null;
   /** 工单管理抽屉：可横向滚轮切换 Tab，隐藏 Ant Design「…」溢出菜单 */
   variant?: 'default' | 'orderDrawer';
 }
@@ -259,6 +263,7 @@ export function MeetingNodeDetailPanel({
   nodeName,
   nodeState,
   pollMs = 0,
+  liveSystemDisplay = null,
   variant = 'default',
 }: Props) {
   const tabsRootRef = useRef<HTMLDivElement>(null);
@@ -374,7 +379,7 @@ export function MeetingNodeDetailPanel({
           setSystemDisplay(systemRes.value.display);
         } else if (!isStructuredSystemNode) {
           setSystemDisplay(null);
-        } else {
+        } else if (!refresh) {
           setSystemDisplay(null);
           if (systemRes.status === 'rejected') {
             const msg =
@@ -480,33 +485,58 @@ export function MeetingNodeDetailPanel({
   const delegationTotal = metrics?.delegation_total ?? 0;
 
   const isPending = nodeState === 'pending';
+  const isCodeCommitNode = nodeId === 'exception_check';
+
+  const effectiveSystemDisplay = liveSystemDisplay ?? systemDisplay;
+  const codeCommitStepStates = useMemo(
+    () =>
+      nodeId === 'exception_check' && effectiveSystemDisplay
+        ? resolveCodeCommitStepStates(effectiveSystemDisplay)
+        : null,
+    [effectiveSystemDisplay, nodeId],
+  );
+  const codeCommitProgressMessage = useMemo(() => {
+    if (nodeId !== 'exception_check' || !effectiveSystemDisplay) return '';
+    const progress = (effectiveSystemDisplay.progress as Record<string, unknown>) || {};
+    return String(progress.message || '').trim();
+  }, [effectiveSystemDisplay, nodeId]);
 
   const header = (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
-          <Zap className="h-3 w-3 text-indigo-400" />
-          节点实况
-          {nodeState === 'processing' ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
-              <Loader2 className="h-3 w-3 animate-spin" /> 进行中
-            </span>
-          ) : nodeState === 'completed' ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
-              <CheckCircle2 className="h-3 w-3" /> 已完成
-            </span>
+    <>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <Zap className="h-3 w-3 text-indigo-400" />
+            节点实况
+            {nodeState === 'processing' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary">
+                <Loader2 className="h-3 w-3 animate-spin" /> 进行中
+              </span>
+            ) : nodeState === 'completed' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-400">
+                <CheckCircle2 className="h-3 w-3" /> 已完成
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <Tooltip title="刷新指标与流程">
+          <Button
+            size="small"
+            icon={<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />}
+            loading={refreshing}
+            onClick={() => void load(true)}
+          />
+        </Tooltip>
+      </div>
+      {codeCommitStepStates ? (
+        <div className="mb-4 rounded-xl border border-border/50 bg-muted/10 px-4 py-3">
+          <CodeCommitProgressSteps stepStates={codeCommitStepStates} />
+          {codeCommitProgressMessage ? (
+            <p className="mb-0 mt-2 text-[11px] text-primary/80">{codeCommitProgressMessage}</p>
           ) : null}
         </div>
-      </div>
-      <Tooltip title="刷新指标与流程">
-        <Button
-          size="small"
-          icon={<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />}
-          loading={refreshing}
-          onClick={() => void load(true)}
-        />
-      </Tooltip>
-    </div>
+      ) : null}
+    </>
   );
 
   const metricsGrid = (
@@ -575,12 +605,63 @@ export function MeetingNodeDetailPanel({
 
   const outputTab = (
     <div className="space-y-4">
-      {isStructuredSystemNode && (loading || refreshing) && !systemDisplay ? (
+      {isCodeCommitNode ? (
+        mdArtifacts.length || otherArtifacts.length ? (
+          <div className="space-y-3">
+            {otherArtifacts.length ? (
+              <div className="flex flex-wrap gap-2">
+                {otherArtifacts.map((f) => (
+                  <span
+                    key={f.relative_path}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/20 px-2.5 py-1 text-[11px] text-muted-foreground"
+                    title={f.relative_path}
+                  >
+                    <FileCode2 className="h-3 w-3" />
+                    {f.name}
+                    <span className="font-mono text-[10px] opacity-70">{formatBytes(f.size)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {effectiveSystemDisplay ? (
+              <ul className="rd-code-commit-archive-list">
+                {collectCodeCommitArchives(effectiveSystemDisplay).map((art) => (
+                  <li key={art.name} className="rd-code-commit-archive-row">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <code
+                      className="text-[10px] text-muted-foreground truncate min-w-0"
+                      title={art.path || art.name}
+                    >
+                      {art.path || art.name || '—'}
+                    </code>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {mdArtifacts.length ? (
+              <MarkdownArtifactsPanel
+                files={mdArtifacts}
+                synapseApiBase={synapseApiBase}
+                roomId={roomId}
+                emptyMessage="本节点归档产物尚未生成"
+              />
+            ) : null}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
+            <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">代码提交归档产物尚未生成</p>
+            {nodeState === 'processing' ? (
+              <p className="mt-1 text-xs text-primary/80">执行完成后将归档 代码提交日志.md / 试飞结果.md</p>
+            ) : null}
+          </div>
+        )
+      ) : isStructuredSystemNode && (loading || refreshing) && !effectiveSystemDisplay ? (
         <NodeDetailLoadingState nodeName={nodeName} />
-      ) : isStructuredSystemNode && systemDisplay ? (
+      ) : isStructuredSystemNode && effectiveSystemDisplay ? (
         <SystemNodeDetailCard
           nodeId={nodeId}
-          display={systemDisplay}
+          display={effectiveSystemDisplay}
           roomId={roomId}
           scopeId={scopeId}
           synapseApiBase={synapseApiBase}
@@ -635,6 +716,31 @@ export function MeetingNodeDetailPanel({
     </div>
   );
 
+  const codeCommitPanel =
+    isCodeCommitNode && !isPending ? (
+      <div className="mb-4 max-h-[min(50vh,560px)] overflow-y-auto custom-scrollbar rounded-xl border border-border/50 bg-[color:var(--panel)]/30 p-1">
+        {(loading || refreshing) && !effectiveSystemDisplay ? (
+          <NodeDetailLoadingState nodeName={nodeName} />
+        ) : effectiveSystemDisplay ? (
+          <SystemNodeDetailCard
+            nodeId={nodeId}
+            display={effectiveSystemDisplay}
+            roomId={roomId}
+            scopeId={scopeId}
+            synapseApiBase={synapseApiBase}
+          />
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
+            <Server className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">代码提交与试飞结果尚未就绪</p>
+            {nodeState === 'processing' ? (
+              <p className="mt-1 text-xs text-primary/80">提交与 CI 轮询中，进度见上方步骤条</p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    ) : null;
+
   const metricsTab = (
     <div className="space-y-5">
       {metricsGrid}
@@ -676,9 +782,18 @@ export function MeetingNodeDetailPanel({
       label: (
         <span className="flex items-center gap-1.5 text-xs">
           <FileText className="h-3 w-3" /> 产出
-          {!isPending && (isStructuredSystemNode && systemDisplay ? true : artifacts.length > 0) ? (
+          {!isPending &&
+          (isCodeCommitNode
+            ? mdArtifacts.length + otherArtifacts.length > 0
+            : isStructuredSystemNode && effectiveSystemDisplay
+              ? true
+              : artifacts.length > 0) ? (
             <span className="rounded-full bg-primary/20 px-1.5 font-mono text-[10px] text-primary">
-              {isStructuredSystemNode && systemDisplay ? '✓' : artifacts.length}
+              {isCodeCommitNode
+                ? mdArtifacts.length + otherArtifacts.length
+                : isStructuredSystemNode && effectiveSystemDisplay
+                  ? '✓'
+                  : artifacts.length}
             </span>
           ) : null}
         </span>
@@ -761,7 +876,8 @@ export function MeetingNodeDetailPanel({
   return (
     <div ref={tabsRootRef} className="flex h-full min-h-0 flex-col">
       {!isPending ? header : null}
-      {!isPending && loading ? (
+      {codeCommitPanel}
+      {!isPending && loading && !isCodeCommitNode ? (
         <NodeDetailLoadingState nodeName={nodeName} />
       ) : !isPending && error && !hasLoadedContent ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">

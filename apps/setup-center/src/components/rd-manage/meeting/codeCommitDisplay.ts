@@ -119,11 +119,11 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
   const progress = (display.progress as RowRecord) || {};
   const backendSteps = (progress.steps as RowRecord) || {};
   if (backendSteps.commit || backendSteps.compile || backendSteps.flight) {
-    return {
+    return enforceCiStepCascade({
       commit: normalizeStepState(backendSteps.commit),
       compile: normalizeStepState(backendSteps.compile),
       flight: normalizeStepState(backendSteps.flight),
-    };
+    });
   }
 
   const phase = String(progress.phase || '') as CodeCommitPhase;
@@ -136,6 +136,7 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
   const nodeStatus = String(display.status || '');
   const tasks = asRows(display.tasks);
   const ciSteps = aggregateCiPipelineSteps(tasks);
+  const compileFailed = ciSteps.compile === 'failed' || compileFailedInTasks(tasks);
 
   const allCommitsTerminal =
     total > 0 &&
@@ -178,19 +179,24 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
     if (states.compile === 'ok' && states.flight === 'pending') {
       states.flight = 'active';
     }
-    return states;
+    return enforceCiStepCascade(states);
   }
 
   if (flightStatus === 'ok') {
     states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
     states.flight = ciSteps.flight === 'pending' ? 'ok' : ciSteps.flight;
-    return states;
+    return enforceCiStepCascade(states);
   }
 
   if (flightStatus === 'failed' || flightStatus === 'timeout') {
-    states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
-    states.flight = ciSteps.flight === 'pending' ? 'failed' : ciSteps.flight;
-    return states;
+    states.compile =
+      ciSteps.compile === 'pending'
+        ? compileFailed
+          ? 'failed'
+          : 'ok'
+        : ciSteps.compile;
+    states.flight = states.compile === 'failed' ? 'pending' : ciSteps.flight === 'pending' ? 'failed' : ciSteps.flight;
+    return enforceCiStepCascade(states);
   }
 
   if (flightStatus === 'skipped') {
@@ -200,11 +206,40 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
   }
 
   if (phase === 'archive' || phase === 'done' || nodeStatus !== 'running') {
-    states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
-    states.flight = ciSteps.flight === 'pending' ? 'ok' : ciSteps.flight;
+    if (compileFailed) {
+      states.compile = ciSteps.compile === 'pending' ? 'failed' : ciSteps.compile;
+      states.flight = 'pending';
+    } else if (flightStatus === 'ok') {
+      states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
+      states.flight = ciSteps.flight === 'pending' ? 'ok' : ciSteps.flight;
+    } else {
+      states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
+      states.flight = ciSteps.flight === 'pending' ? 'failed' : ciSteps.flight;
+    }
   }
 
+  return enforceCiStepCascade(states);
+}
+
+function enforceCiStepCascade(
+  states: Record<CodeCommitStepId, StepVisualState>,
+): Record<CodeCommitStepId, StepVisualState> {
+  if (states.compile !== 'ok' && (states.flight === 'ok' || states.flight === 'active')) {
+    return { ...states, flight: 'pending' };
+  }
   return states;
+}
+
+function compileFailedInTasks(tasks: RowRecord[]): boolean {
+  for (const row of tasks) {
+    const flightData = (row.flight_data as RowRecord) || {};
+    const pipeline = (flightData.pipelineSteps as RowRecord) || {};
+    if (String(pipeline.compile || '') === 'failed') return true;
+    for (const item of asRows(flightData.buildResult)) {
+      if (String(item.kind || '') === 'compile') return true;
+    }
+  }
+  return false;
 }
 
 export function collectCodeCommitArchives(display: RowRecord): CodeCommitArchiveEntry[] {

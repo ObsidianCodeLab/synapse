@@ -941,7 +941,7 @@ export function SystemCodeCommitCard({
         ]}
       />
 
-      <CodeCommitProgressSteps stepStates={stepStates} />
+      {variant === 'summary' ? <CodeCommitProgressSteps stepStates={stepStates} /> : null}
 
       {progress.message ? (
         <p className="mt-2 mb-0 text-[11px] text-primary/80">{String(progress.message)}</p>
@@ -963,7 +963,7 @@ export function SystemCodeCommitCard({
 
       {variant === 'detail' ? (
         <div className="mt-4">
-          <CodeCommitFlightPanel display={display} />
+          <CodeCommitFlightPanel display={display} hideArchives />
         </div>
       ) : null}
     </div>

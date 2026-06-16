@@ -253,3 +253,75 @@ def test_chat_log_ids_are_scoped_by_node_id() -> None:
     assert a[0]["id"] == "boundary:hist-0"
     assert b[0]["id"] == "module_func:hist-0"
     assert a[0]["id"] != b[0]["id"]
+
+
+def test_code_commit_progress_uses_stable_card_id() -> None:
+    display = {
+        "status": "running",
+        "progress": {"message": "试飞轮询中", "phase": "flight"},
+        "tasks": [],
+        "flight": {"status": "pending"},
+        "summary": {"total": 1},
+    }
+    rows_a = expand_history_event_to_chat(
+        {
+            "event": "code_commit_progress",
+            "node_id": "exception_check",
+            "display": display,
+            "ts": "2026-06-16T10:00:00",
+        },
+        0,
+    )
+    rows_b = expand_history_event_to_chat(
+        {
+            "event": "code_commit_progress",
+            "node_id": "exception_check",
+            "display": {**display, "progress": {"message": "试飞完成", "phase": "flight"}},
+            "ts": "2026-06-16T10:00:05",
+        },
+        1,
+    )
+    cards_a = [r for r in rows_a if r["displayKind"] == "system_code_commit"]
+    cards_b = [r for r in rows_b if r["displayKind"] == "system_code_commit"]
+    assert len(cards_a) == 1
+    assert len(cards_b) == 1
+    assert cards_a[0]["id"] == "exception_check:system-code-commit"
+    assert cards_b[0]["id"] == cards_a[0]["id"]
+    assert all(r["displayKind"] != "pipeline" for r in rows_a)
+    assert all(r["displayKind"] != "pipeline" for r in rows_b)
+
+
+def test_code_commit_history_merge_deduplicates_cards() -> None:
+    display = {
+        "status": "running",
+        "progress": {"message": "准备提交", "phase": "prepare"},
+        "tasks": [],
+        "flight": {"status": "pending"},
+        "summary": {"total": 2},
+    }
+    logs = history_to_chat_logs(
+        [
+            {
+                "event": "code_commit_started",
+                "node_id": "exception_check",
+                "display": display,
+                "ts": "2026-06-16T10:00:00",
+            },
+            {
+                "event": "code_commit_progress",
+                "node_id": "exception_check",
+                "display": {**display, "progress": {"message": "编译中", "phase": "compile"}},
+                "ts": "2026-06-16T10:00:10",
+            },
+            {
+                "event": "code_commit_progress",
+                "node_id": "exception_check",
+                "display": {**display, "progress": {"message": "试飞轮询", "phase": "flight"}},
+                "ts": "2026-06-16T10:00:20",
+            },
+        ]
+    )
+    cc_cards = [l for l in logs if l.get("displayKind") == "system_code_commit"]
+    assert len(cc_cards) == 3
+    assert len({c["id"] for c in cc_cards}) == 1
+    assert cc_cards[0]["id"] == "exception_check:system-code-commit"

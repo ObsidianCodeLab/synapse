@@ -109,7 +109,11 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
   return (
     <details
       className="rd-flight-build-result"
-      open={item.buildKind === 'code_check' || (item.kind === 'html' && item.tables.length > 0)}
+      open={
+        item.buildKind === 'code_check' ||
+        item.buildKind === 'compile' ||
+        (item.kind === 'html' && item.tables.length > 0)
+      }
     >
       <summary className="rd-flight-build-result__summary">
         <ChevronDown className="rd-flight-build-result__chevron h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -141,6 +145,9 @@ function BuildResultDetail({ item }: { item: ParsedBuildResult }) {
           <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
         ) : null}
         {item.kind === 'text' && hasExpand && item.buildKind !== 'code_check' ? (
+          <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
+        ) : null}
+        {item.buildKind === 'compile' && item.kind === 'text' && !hasExpand && item.plainText ? (
           <pre className="rd-flight-build-result__pre">{item.plainText}</pre>
         ) : null}
         {item.kind === 'empty' ? (
@@ -211,11 +218,14 @@ function FlightTaskCard({ entry }: { entry: CodeCommitFlightEntry }) {
 
 export const CodeCommitFlightPanel: React.FC<{
   display: Record<string, unknown>;
-}> = ({ display }) => {
+  /** 节点详情独立区展示明细；归档 md 放「产出」Tab */
+  hideArchives?: boolean;
+}> = ({ display, hideArchives = false }) => {
   const flights = collectCodeCommitFlights(display);
   const archives = collectCodeCommitArchives(display);
+  const hasArchives = archives.some((a) => a.status === 'ok');
 
-  if (!flights.length && !archives.some((a) => a.status === 'ok')) {
+  if (!flights.length && (hideArchives || !hasArchives)) {
     return (
       <div className="rd-code-commit-empty">
         <GitBranch className="h-5 w-5 text-muted-foreground/60" />
@@ -226,7 +236,7 @@ export const CodeCommitFlightPanel: React.FC<{
 
   return (
     <div className="space-y-4">
-      {archives.length > 0 ? (
+      {!hideArchives && archives.length > 0 ? (
         <section>
           <h4 className="text-[11px] font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5" />

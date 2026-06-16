@@ -104,17 +104,24 @@ def test_task_check_flight_fail_redirects_to_task_feedback(tmp_path, monkeypatch
     assert "编译失败" in commit_archive.read_text(encoding="utf-8")
 
 
-def test_diff_analysis_completion_blocks_downstream_advance():
+@pytest.mark.parametrize(
+    ("node_id", "reason_snippet", "next_id"),
+    [
+        ("exception_check", "试飞结果待确认", "task_feedback"),
+        ("task_feedback", "试飞优化方案待人工评估", "diff_analysis"),
+    ],
+)
+def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet, next_id):
     from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
     from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
     from synapse.rd_meeting.room_runtime import default_room_state, load_room_state, save_room_state
     from synapse.rd_sop.manifest import downstream_advance_block_reason, next_node_id
 
-    assert downstream_advance_block_reason("diff_analysis")
-    assert next_node_id("diff_analysis") == "env_start"
+    assert reason_snippet in downstream_advance_block_reason(node_id)
+    assert next_node_id(node_id) == next_id
+    assert not downstream_advance_block_reason("diff_analysis")
 
-    scope_id = "diff-block-1"
-    node_id = "diff_analysis"
+    scope_id = f"block-{node_id}"
     save_dev_status(
         scope_id,
         {
@@ -128,7 +135,7 @@ def test_diff_analysis_completion_blocks_downstream_advance():
     save_room_state(
         scope_id,
         default_room_state(
-            room_id="room-diff-block",
+            room_id=f"room-{node_id}",
             scope_type="demand",
             scope_id=scope_id,
             stage_id=4,
@@ -141,7 +148,7 @@ def test_diff_analysis_completion_blocks_downstream_advance():
     out = orch.on_node_complete(
         scope_type="demand",
         scope_id=scope_id,
-        room_id="room-diff-block",
+        room_id=f"room-{node_id}",
         node_id=node_id,
         advance=True,
         schedule_pipeline_advance=False,
@@ -155,4 +162,4 @@ def test_diff_analysis_completion_blocks_downstream_advance():
     rs = load_room_state(scope_id) or {}
     assert rs.get("status") == "failed"
     assert rs.get("downstream_blocked") is True
-    assert "尚未设计开发" in str(rs.get("downstream_block_reason") or "")
+    assert reason_snippet in str(rs.get("downstream_block_reason") or "")

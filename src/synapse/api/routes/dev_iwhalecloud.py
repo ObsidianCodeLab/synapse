@@ -2028,14 +2028,30 @@ def _pick_date_extreme(values: list[object], *, earliest: bool) -> str | None:
     return max(candidates, key=lambda item: item[1])[0]
 
 
-async def _fetch_url_text(url: str, *, timeout: float = 30) -> str:
+async def _fetch_url_text(
+    url: str,
+    *,
+    timeout: float = 30,
+    csrf: str = "",
+    cookies: str = "",
+) -> str:
     """GET 远程 URL 并返回文本内容；失败时记录 warning 并返回空字符串。"""
     text = (url or "").strip()
     if not text:
         return ""
+    if text.startswith("/"):
+        text = f"{DEV_IWHALECLOUD_BASE_URL}{text}"
+    headers: dict[str, str] = {
+        "accept": "*/*",
+        "x-requested-with": "XMLHttpRequest",
+    }
+    if csrf:
+        headers["x-csrf-token"] = csrf
+    if cookies:
+        headers["cookie"] = cookies
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.get(text)
+            resp = await client.get(text, headers=headers)
         if resp.status_code >= 400:
             logger.warning("下载附件失败 status=%s url=%s", resp.status_code, text)
             return ""
@@ -2043,6 +2059,65 @@ async def _fetch_url_text(url: str, *, timeout: float = 30) -> str:
     except httpx.RequestError as exc:
         logger.warning("下载附件异常 url=%s: %s", text, exc)
         return ""
+
+
+_GENERIC_COMPILE_SUMMARY_MARKERS = (
+    "编译节点执行失败",
+    "脚本或者程序返回非0值",
+    "请检查脚本执行日志",
+)
+
+
+def _strip_html_to_plain(text: str) -> str:
+    plain = re.sub(r"<[^>]+>", " ", text or "")
+    plain = re.sub(r"\s+", " ", plain).strip()
+    return plain
+
+
+def _is_generic_compile_summary(text: str) -> bool:
+    plain = _strip_html_to_plain(text)
+    if not plain:
+        return True
+    if any(marker in plain for marker in _GENERIC_COMPILE_SUMMARY_MARKERS):
+        return "error:" not in plain.lower() and "make:" not in plain.lower()
+    return False
+
+
+def _looks_like_compile_log(text: str) -> bool:
+    sample = (text or "").strip()
+    if len(sample) < 40:
+        return False
+    lowered = sample.lower()
+    if "error:" in lowered or "make:" in lowered or "g++" in lowered or "cc1plus:" in lowered:
+        return True
+    return not _is_generic_compile_summary(sample)
+
+
+async def _fetch_compile_log_text(node: dict, *, csrf: str = "", cookies: str = "") -> str:
+    """从编译节点 attachments / url 拉取脚本日志（需研发云 cookie）。"""
+    chunks: list[str] = []
+    attachments = node.get("attachments") or []
+    if isinstance(attachments, list):
+        for att in attachments:
+            if not isinstance(att, dict):
+                continue
+            for key in ("fullPath", "path"):
+                candidate = str(att.get(key) or "").strip()
+                if not candidate:
+                    continue
+                attachment_text = await _fetch_url_text(candidate, csrf=csrf, cookies=cookies)
+                if attachment_text and _looks_like_compile_log(attachment_text):
+                    chunks.append(attachment_text.strip())
+                    break
+            if chunks:
+                break
+    if not chunks:
+        url = str(node.get("url") or "").strip()
+        if url:
+            url_text = await _fetch_url_text(url, csrf=csrf, cookies=cookies)
+            if url_text and _looks_like_compile_log(url_text):
+                chunks.append(url_text.strip())
+    return "\n\n".join(chunks).strip()
 
 
 def _ci_node_state_failed(node_state: object) -> bool:
@@ -2100,6 +2175,15 @@ def _ci_step_state_from_nodes(nodes: list[dict]) -> str:
     return "pending"
 
 
+def enforce_ci_step_cascade(steps: dict[str, str]) -> dict[str, str]:
+    """编译未通过时，下游试飞检查不可能成功（跳过/未执行节点不应显示为 ok）。"""
+    compile_st = str(steps.get("compile") or "pending").strip() or "pending"
+    flight_st = str(steps.get("flight") or "pending").strip() or "pending"
+    if compile_st != "ok" and flight_st in ("ok", "active"):
+        flight_st = "pending"
+    return {"compile": compile_st, "flight": flight_st}
+
+
 def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
     compile_nodes = [node for node in nodes if _is_compile_ci_node(node)]
     flight_nodes = [
@@ -2107,10 +2191,12 @@ def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
         for node in nodes
         if not _is_compile_ci_node(node) and not _is_skipped_ci_overview_node(node)
     ]
-    return {
-        "compile": _ci_step_state_from_nodes(compile_nodes),
-        "flight": _ci_step_state_from_nodes(flight_nodes),
-    }
+    return enforce_ci_step_cascade(
+        {
+            "compile": _ci_step_state_from_nodes(compile_nodes),
+            "flight": _ci_step_state_from_nodes(flight_nodes),
+        }
+    )
 
 
 async def _fetch_ci_flow_node_instances(ci_flow_inst_id: str) -> list[dict]:
@@ -2241,21 +2327,22 @@ def _format_code_check_build_entry(node: dict) -> dict | None:
     }
 
 
-async def _format_compile_build_entry(node: dict) -> dict | None:
-    """编译失败：沿用 attachment / nodeStateDesc 文本。"""
+async def _format_compile_build_entry(
+    node: dict,
+    *,
+    csrf: str = "",
+    cookies: str = "",
+) -> dict | None:
+    """编译失败：优先 attachment 脚本日志，其次 nodeStateDesc。"""
     if not _is_compile_ci_node(node):
         return None
     if not _ci_node_state_failed(node.get("nodeState")) and str(node.get("runResult") or "").strip() != "F":
         return None
-    attachments = node.get("attachments") or []
-    full_path = ""
-    if attachments and isinstance(attachments[0], dict):
-        full_path = str(attachments[0].get("fullPath") or "").strip()
-    result_msg = str(node.get("nodeStateDesc") or "").strip()
-    if full_path:
-        attachment_text = await _fetch_url_text(full_path)
-        if attachment_text:
-            result_msg = attachment_text if not result_msg else f"{result_msg}\n\n{attachment_text}"
+
+    compile_log = await _fetch_compile_log_text(node, csrf=csrf, cookies=cookies)
+    result_msg = compile_log
+    if not result_msg:
+        result_msg = str(node.get("nodeStateDesc") or "").strip()
     if not result_msg:
         result_msg = str(node.get("url") or node.get("runResult") or "").strip()
     if not result_msg:
@@ -2351,18 +2438,48 @@ async def _format_ci_build_result_entries(nodes: list[dict], *, ci_flow_inst_id:
         seen.add(key)
         entries.append(entry)
 
+    csrf = ""
+    cookies = ""
+    if ci_flow_inst_id:
+        try:
+            csrf, cookies = await _ensure_valid_creds_async()
+        except ValueError:
+            logger.warning("format_ci_build_result_entries: 研发云未登录，编译日志可能不完整")
+
     for node in nodes:
         if isinstance(node, dict) and _is_compile_ci_node(node):
-            _append(await _format_compile_build_entry(node))
+            entry = await _format_compile_build_entry(node, csrf=csrf, cookies=cookies)
+            if entry and _is_generic_compile_summary(str(entry.get("resultMsg") or "")):
+                step_zcm_id = str(node.get("stepZcmId") or "").strip()
+                if step_zcm_id and ci_flow_inst_id and csrf and cookies:
+                    detail_nodes = await _get_node_instance_detail_by_step_zcm_id(
+                        step_zcm_id,
+                        ci_flow_inst_id,
+                        csrf=csrf,
+                        cookies=cookies,
+                    )
+                    for detail_node in detail_nodes:
+                        detail_entry = await _format_compile_build_entry(
+                            detail_node,
+                            csrf=csrf,
+                            cookies=cookies,
+                        )
+                        if detail_entry and not _is_generic_compile_summary(
+                            str(detail_entry.get("resultMsg") or "")
+                        ):
+                            entry = detail_entry
+                            break
+            _append(entry)
 
     if not ci_flow_inst_id:
         return entries
 
-    try:
-        csrf, cookies = await _ensure_valid_creds_async()
-    except ValueError:
-        logger.warning("format_ci_build_result_entries: 研发云未登录，跳过代码检查明细")
-        return entries
+    if not csrf or not cookies:
+        try:
+            csrf, cookies = await _ensure_valid_creds_async()
+        except ValueError:
+            logger.warning("format_ci_build_result_entries: 研发云未登录，跳过代码检查明细")
+            return entries
 
     for step_zcm_id in _collect_code_check_step_zcm_ids(nodes):
         detail_nodes = await _get_node_instance_detail_by_step_zcm_id(

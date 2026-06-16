@@ -95,6 +95,8 @@ export interface MeetingRoomDetail extends MeetingRoomListItem {
   current_node_binding?: Record<string, unknown>;
   skipped_node_ids?: string[];
   node_recovery?: MeetingNodeRecovery;
+  /** 当前浏览/执行节点的结构化展示（如代码提交进度） */
+  system_node_display?: Record<string, unknown> | null;
 }
 
 export interface MeetingRoomArchiveEntry {
@@ -419,6 +421,8 @@ export interface MeetingRoomLivePayload {
   };
   solution_review_blocked?: boolean;
   node_recovery?: MeetingNodeRecovery;
+  /** 当前浏览/执行节点的结构化展示（如代码提交进度） */
+  system_node_display?: Record<string, unknown> | null;
 }
 
 // ─── 方案评审面板 ──────────────────────────────────────

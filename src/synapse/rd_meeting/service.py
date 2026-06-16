@@ -332,6 +332,16 @@ class MeetingRoomService:
         if not room_token_budget:
             room_token_budget = int(room_metrics.get("token_budget") or 0)
 
+        system_node_display: dict[str, Any] | None = None
+        if scope_id and node_id:
+            from synapse.rd_meeting.system_node_display import (
+                STRUCTURED_SYSTEM_NODES,
+                resolve_system_node_display,
+            )
+
+            if node_id in STRUCTURED_SYSTEM_NODES:
+                system_node_display = resolve_system_node_display(scope_id, node_id)
+
         return {
             "room_id": room_id,
             "scope_id": scope_id,
@@ -381,6 +391,7 @@ class MeetingRoomService:
             "solution_review_blocked": bool(room_state.get("solution_review_blocked")),
             "func_solution_blocked": bool(room_state.get("func_solution_blocked")),
             "skipped_node_ids": extract_skipped_node_ids(all_history),
+            "system_node_display": system_node_display,
             **(
                 {
                     "node_recovery": self.assess_node_recovery(

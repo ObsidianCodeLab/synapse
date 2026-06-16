@@ -96,6 +96,20 @@ def _history_chat_id(ev: dict[str, Any], index: int) -> str:
     return f"{prefix}{raw}"
 
 
+# 系统节点结构化卡片：同一 SOP 节点在会议流中只保留一张可更新卡片（mergeChatLogs 按 id 覆盖）
+_STABLE_SYSTEM_NODE_CARD_KEYS: dict[str, str] = {
+    "exception_check": "system-code-commit",
+}
+
+
+def _stable_system_node_card_id(ev: dict[str, Any], node_id: str) -> str | None:
+    key = _STABLE_SYSTEM_NODE_CARD_KEYS.get((node_id or "").strip())
+    if not key:
+        return None
+    nid = str(ev.get("node_id") or node_id or "").strip() or "pending"
+    return f"{nid}:{key}"
+
+
 def _base_row(ev: dict[str, Any], index: int) -> dict[str, Any]:
     et = str(ev.get("event") or "")
     node_id = str(ev.get("node_id") or "").strip() or None
@@ -403,7 +417,8 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
         display = ev.get("display") if isinstance(ev.get("display"), dict) else {}
         out_cc: list[dict[str, Any]] = []
         summary = format_event_chat_display(ev)
-        if summary:
+        # 轮询进度事件只更新结构化卡片，避免会议流刷屏
+        if summary and et != "code_commit_progress":
             out_cc.append(
                 _row(
                     ev,
@@ -416,18 +431,20 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
                 )
             )
         if display:
-            out_cc.append(
-                _row(
-                    ev,
-                    index,
-                    text="代码提交进度",
-                    agent_id=SPEAKER_SYSTEM,
-                    speaker_role=SPEAKER_SYSTEM,
-                    display_kind="system_code_commit",
-                    payload=display,
-                    suffix="-cc",
-                )
+            card = _row(
+                ev,
+                index,
+                text="代码提交进度",
+                agent_id=SPEAKER_SYSTEM,
+                speaker_role=SPEAKER_SYSTEM,
+                display_kind="system_code_commit",
+                payload=display,
+                suffix="-cc",
             )
+            stable_id = _stable_system_node_card_id(ev, "exception_check")
+            if stable_id:
+                card["id"] = stable_id
+            out_cc.append(card)
         return out_cc
 
     if et == "system_node_executed":
@@ -482,18 +499,20 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
                 )
             )
         if payload:
-            out.append(
-                _row(
-                    ev,
-                    index,
-                    text=card_title,
-                    agent_id=SPEAKER_SYSTEM,
-                    speaker_role=SPEAKER_SYSTEM,
-                    display_kind=display_kind,
-                    payload=payload,
-                    suffix="-exec",
-                )
+            exec_row = _row(
+                ev,
+                index,
+                text=card_title,
+                agent_id=SPEAKER_SYSTEM,
+                speaker_role=SPEAKER_SYSTEM,
+                display_kind=display_kind,
+                payload=payload,
+                suffix="-exec",
             )
+            stable_id = _stable_system_node_card_id(ev, node_id)
+            if stable_id:
+                exec_row["id"] = stable_id
+            out.append(exec_row)
         return out
 
     if et == "node_started":

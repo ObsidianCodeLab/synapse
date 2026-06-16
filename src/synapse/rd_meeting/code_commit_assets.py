@@ -44,6 +44,32 @@ def _ci_step_or_default(raw: object, default: str) -> str:
     return default
 
 
+def _enforce_ci_step_cascade(steps: dict[str, str]) -> dict[str, str]:
+    out = dict(steps)
+    compile_st = str(out.get("compile") or "pending").strip() or "pending"
+    flight_st = str(out.get("flight") or "pending").strip() or "pending"
+    if compile_st != "ok" and flight_st in ("ok", "active"):
+        flight_st = "pending"
+    out["compile"] = compile_st
+    out["flight"] = flight_st
+    return out
+
+
+def _compile_failed_in_tasks(tasks: list[dict[str, Any]]) -> bool:
+    for row in tasks:
+        if not isinstance(row, dict):
+            continue
+        flight = row.get("flight") if isinstance(row.get("flight"), dict) else {}
+        data = flight.get("data") if isinstance(flight.get("data"), dict) else {}
+        pipeline = data.get("pipelineSteps") if isinstance(data.get("pipelineSteps"), dict) else {}
+        if str(pipeline.get("compile") or "").strip() == "failed":
+            return True
+        for item in data.get("buildResult") or []:
+            if isinstance(item, dict) and str(item.get("kind") or "").strip() == "compile":
+                return True
+    return False
+
+
 def _aggregate_ci_pipeline_steps(tasks: list[dict[str, Any]]) -> dict[str, str]:
     merged = {"compile": "pending", "flight": "pending"}
     for row in tasks:
@@ -107,7 +133,7 @@ def _resolve_code_commit_pipeline_steps(result_doc: dict[str, Any]) -> dict[str,
         steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "pending")
         if steps["compile"] == "ok" and steps["flight"] == "pending":
             steps["flight"] = "active"
-        return steps
+        return _enforce_ci_step_cascade(steps)
 
     if flight_status == "skipped":
         steps["compile"] = "failed"
@@ -117,20 +143,35 @@ def _resolve_code_commit_pipeline_steps(result_doc: dict[str, Any]) -> dict[str,
     if flight_status == "ok":
         steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), "ok")
         steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "ok")
-        return steps
+        return _enforce_ci_step_cascade(steps)
 
     if flight_status in ("failed", "timeout"):
-        steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), "ok")
-        steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "failed")
-        return steps
+        compile_failed = ci_steps.get("compile") == "failed" or _compile_failed_in_tasks(tasks)
+        steps["compile"] = _ci_step_or_default(
+            ci_steps.get("compile"),
+            "failed" if compile_failed else "ok",
+        )
+        if steps["compile"] == "failed":
+            steps["flight"] = "pending"
+        else:
+            steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "failed")
+        return _enforce_ci_step_cascade(steps)
 
     if phase in ("archive", "done") or status in ("ok", "partial", "failed"):
-        default_compile = "ok" if flight_status == "ok" else "failed"
-        default_flight = "ok" if flight_status == "ok" else "failed"
+        compile_failed = ci_steps.get("compile") == "failed" or _compile_failed_in_tasks(tasks)
+        if flight_status == "ok":
+            default_compile, default_flight = "ok", "ok"
+        elif compile_failed:
+            default_compile, default_flight = "failed", "pending"
+        elif flight_status in ("failed", "timeout"):
+            default_compile, default_flight = "ok", "failed"
+        else:
+            default_compile = "failed" if compile_failed else "ok"
+            default_flight = "failed" if flight_status in ("failed", "timeout") else "ok"
         steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), default_compile)
         steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), default_flight)
 
-    return steps
+    return _enforce_ci_step_cascade(steps)
 
 
 def _code_commit_progress_snapshot(
@@ -420,6 +461,17 @@ def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in raw_items:
         if not isinstance(item, dict):
+            continue
+        if str(item.get("kind") or "").strip() in {"compile", "code_check"} and item.get("resultMsg"):
+            row = {
+                "resultType": str(item.get("resultType") or item.get("nodeName") or "检查项").strip(),
+                "resultMsg": str(item.get("resultMsg") or "").strip(),
+            }
+            for key in ("kind", "nodeState", "nodeStateDesc", "alarms"):
+                if key in item:
+                    row[key] = item[key]
+            if row["resultType"] or row["resultMsg"]:
+                rows.append(row)
             continue
         attachments = item.get("attachments")
         if isinstance(attachments, list) and attachments:

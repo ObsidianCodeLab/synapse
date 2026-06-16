@@ -192,6 +192,8 @@ interface MeetingRoom {
   recoveringNodeId?: string | null;
   /** 服务重启后是否可恢复人工门控（后端 node_recovery） */
   nodeRecovery?: MeetingNodeRecovery | null;
+  /** live 轮询：当前节点结构化展示（代码提交进度等） */
+  systemNodeDisplay?: Record<string, unknown> | null;
   /** 协作流全量刷新世代（重处理后递增，触发按节点 re-fetch） */
   chatEpoch?: number;
 }
@@ -384,6 +386,12 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     ? `${localState} · ${live.current_node_name}`
     : room.brief;
   const displayLogs = filterLogsForNodeExact(allChatLogs, nextNodeId);
+  const nextSystemNodeDisplay =
+    live.system_node_display !== undefined
+      ? live.system_node_display
+      : nodeChanged
+        ? null
+        : room.systemNodeDisplay;
   const pendingDelivery = live.pending_delivery as
     | {
         node_id?: string;
@@ -512,6 +520,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     recoveringNodeId: room.recoveringNodeId ?? null,
     nodeRecovery:
       (live.node_recovery as MeetingNodeRecovery | undefined) ?? room.nodeRecovery ?? null,
+    systemNodeDisplay: nextSystemNodeDisplay ?? null,
   };
 }
 
@@ -2803,8 +2812,14 @@ const InterventionDialog = ({
                           nodeId={selectedNode.id}
                           nodeName={selectedNode.name}
                           nodeState={toMeetingNodeVisualState(selectedNodeState)}
+                          liveSystemDisplay={
+                            selectedNode.id === 'exception_check' ? room.systemNodeDisplay ?? null : null
+                          }
                           pollMs={
-                            selectedNodeState === 'processing'
+                            selectedNodeState === 'processing' ||
+                            (room.runInProgress &&
+                              selectedNode.id === 'exception_check' &&
+                              selectedNode.id === room.currentNode)
                               ? selectedNode.id === 'exception_check'
                                 ? 2500
                                 : 4000

@@ -88,7 +88,15 @@ export function resolveBuildFailureReason(item: {
   const desc = String(item.nodeStateDesc || '').trim();
   if (desc && !isGenericBuildStatus(desc)) return desc;
 
-  if (item.buildKind === 'compile') return '';
+  if (item.buildKind === 'compile') {
+    for (const candidate of [item.plainText, item.preview]) {
+      const text = String(candidate || '').trim();
+      if (text && !isGenericBuildStatus(text)) return text;
+    }
+    const desc = String(item.nodeStateDesc || '').trim();
+    if (desc && !isGenericBuildStatus(desc)) return stripHtmlToText(desc, 8000);
+    return item.plainText?.trim() || item.preview?.trim() || '';
+  }
 
   if (item.buildKind === 'code_check' && item.alarms?.length) return '';
 
@@ -365,7 +373,16 @@ export function parseBuildResultRow(row: BuildResultInput): ParsedBuildResult {
 
   const parsed = parseBuildResult(resultType, resultMsg);
   if (rowKind === 'compile') {
-    return { ...parsed, buildKind: 'compile', nodeStateDesc: row.nodeStateDesc };
+    const compileParsed = { ...parsed, buildKind: 'compile' as const, nodeStateDesc: row.nodeStateDesc };
+    if (compileParsed.kind === 'html' && compileParsed.plainText && !compileParsed.plainText.includes('error:')) {
+      compileParsed.kind = 'text';
+      compileParsed.plainText = compileParsed.plainText.trim() || resultMsg;
+      compileParsed.preview =
+        compileParsed.plainText.length > 160
+          ? `${compileParsed.plainText.slice(0, 160)}…`
+          : compileParsed.plainText;
+    }
+    return compileParsed;
   }
   return { ...parsed, buildKind: 'legacy' };
 }
