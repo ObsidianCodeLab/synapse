@@ -51,7 +51,23 @@ def test_format_code_check_build_entry_requires_failed_state_and_desc():
     assert "CCN(37↗46)" in entry["resultMsg"]
 
 
-def test_collect_code_check_step_zcm_ids_skips_compile_and_export():
+def test_summarize_ci_pipeline_steps_compile_failed_check_pending():
+    nodes = [
+        {"nodeNameEn": "COMPILE", "nodeState": 3, "runResult": "F"},
+        {"nodeNameEn": "SOURCEMONITOR(NEW)", "nodeState": 1, "runResult": "R"},
+    ]
+    steps = diw.summarize_ci_pipeline_steps(nodes)
+    assert steps["compile"] == "failed"
+    assert steps["flight"] == "active"
+
+
+def test_summarize_ci_pipeline_steps_all_ok():
+    nodes = [
+        {"nodeNameEn": "COMPILE", "nodeState": 2, "runResult": "S"},
+        {"nodeNameEn": "SOURCEMONITOR(NEW)", "nodeState": 2, "runResult": "S"},
+    ]
+    steps = diw.summarize_ci_pipeline_steps(nodes)
+    assert steps == {"compile": "ok", "flight": "ok"}
     nodes = [
         {"nodeNameEn": "Initial State", "stepZcmId": 0},
         {"nodeNameEn": "EXPORT", "stepZcmId": 176545},

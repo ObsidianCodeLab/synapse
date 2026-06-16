@@ -26,7 +26,111 @@ _FLIGHT_POLL_INTERVAL_SEC = 15
 _FLIGHT_POLL_MAX_WAIT_SEC = 1800
 _FLIGHT_FRESHNESS_GRACE_SEC = 120
 
-CodeCommitPhase = Literal["prepare", "commit", "flight_poll", "archive", "done"]
+CodeCommitPhase = Literal["prepare", "commit", "compile", "flight_poll", "archive", "done"]
+CodeCommitStepState = Literal["pending", "active", "ok", "failed"]
+
+
+def _merge_step_states(current: str, incoming: str) -> str:
+    order = {"failed": 4, "active": 3, "ok": 2, "pending": 1}
+    left = str(current or "pending").strip() or "pending"
+    right = str(incoming or "pending").strip() or "pending"
+    return left if order.get(left, 0) >= order.get(right, 0) else right
+
+
+def _ci_step_or_default(raw: object, default: str) -> str:
+    value = str(raw or "").strip()
+    if value in ("ok", "active", "failed"):
+        return value
+    return default
+
+
+def _aggregate_ci_pipeline_steps(tasks: list[dict[str, Any]]) -> dict[str, str]:
+    merged = {"compile": "pending", "flight": "pending"}
+    for row in tasks:
+        if not isinstance(row, dict):
+            continue
+        flight = row.get("flight") if isinstance(row.get("flight"), dict) else {}
+        data = flight.get("data") if isinstance(flight.get("data"), dict) else {}
+        steps = data.get("pipelineSteps") if isinstance(data.get("pipelineSteps"), dict) else {}
+        merged["compile"] = _merge_step_states(merged["compile"], str(steps.get("compile") or "pending"))
+        merged["flight"] = _merge_step_states(merged["flight"], str(steps.get("flight") or "pending"))
+    return merged
+
+
+def _resolve_code_commit_pipeline_steps(result_doc: dict[str, Any]) -> dict[str, str]:
+    progress = result_doc.get("progress") if isinstance(result_doc.get("progress"), dict) else {}
+    phase = str(progress.get("phase") or "").strip()
+    status = str(result_doc.get("status") or "").strip()
+    tasks = result_doc.get("tasks") if isinstance(result_doc.get("tasks"), list) else []
+    summary = result_doc.get("summary") if isinstance(result_doc.get("summary"), dict) else {}
+    flight = result_doc.get("flight") if isinstance(result_doc.get("flight"), dict) else {}
+
+    total = int(summary.get("total") or 0)
+    commit_ok = int(summary.get("commit_ok") or 0)
+    commit_failed = int(summary.get("commit_failed") or 0)
+    all_commits_terminal = (
+        total > 0
+        and len(tasks) >= total
+        and all(
+            str(row.get("status") or "") in ("ok", "failed", "skipped")
+            for row in tasks
+            if isinstance(row, dict)
+        )
+    )
+
+    steps: dict[str, str] = {"commit": "pending", "compile": "pending", "flight": "pending"}
+
+    if phase == "prepare" or (status == "running" and phase in ("", "prepare")):
+        steps["commit"] = "active"
+        return steps
+
+    if phase == "commit" or (status == "running" and not all_commits_terminal):
+        steps["commit"] = "active"
+        return steps
+
+    if all_commits_terminal:
+        if commit_ok <= 0 or commit_failed > 0:
+            steps["commit"] = "failed"
+        else:
+            steps["commit"] = "ok"
+    elif commit_ok > 0:
+        steps["commit"] = "active"
+
+    if steps["commit"] != "ok":
+        return steps
+
+    ci_steps = _aggregate_ci_pipeline_steps(tasks)
+    flight_status = str(flight.get("status") or "").strip()
+
+    if phase == "flight_poll" or (status == "running" and flight_status in ("", "pending")):
+        steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), "active")
+        steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "pending")
+        if steps["compile"] == "ok" and steps["flight"] == "pending":
+            steps["flight"] = "active"
+        return steps
+
+    if flight_status == "skipped":
+        steps["compile"] = "failed"
+        steps["flight"] = "failed"
+        return steps
+
+    if flight_status == "ok":
+        steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), "ok")
+        steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "ok")
+        return steps
+
+    if flight_status in ("failed", "timeout"):
+        steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), "ok")
+        steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), "failed")
+        return steps
+
+    if phase in ("archive", "done") or status in ("ok", "partial", "failed"):
+        default_compile = "ok" if flight_status == "ok" else "failed"
+        default_flight = "ok" if flight_status == "ok" else "failed"
+        steps["compile"] = _ci_step_or_default(ci_steps.get("compile"), default_compile)
+        steps["flight"] = _ci_step_or_default(ci_steps.get("flight"), default_flight)
+
+    return steps
 
 
 def _code_commit_progress_snapshot(
@@ -36,6 +140,8 @@ def _code_commit_progress_snapshot(
     task_index: int = 0,
     task_total: int = 0,
     task_no: str = "",
+    result_doc: dict[str, Any] | None = None,
+    steps: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     snap: dict[str, Any] = {
         "phase": phase,
@@ -45,6 +151,10 @@ def _code_commit_progress_snapshot(
         "task_no": task_no,
         "updated_at": datetime.now().isoformat(timespec="seconds"),
     }
+    if steps is not None:
+        snap["steps"] = steps
+    elif isinstance(result_doc, dict):
+        snap["steps"] = _resolve_code_commit_pipeline_steps(result_doc)
     return snap
 
 
@@ -391,6 +501,12 @@ def _normalize_flight_data(
         "ciFlowInstRunStateDesc": str(data.get("ciFlowInstRunStateDesc") or _run_state_desc(run_state)),
         "buildResult": build_result,
     }
+    pipeline_steps = data.get("pipelineSteps")
+    if isinstance(pipeline_steps, dict):
+        normalized_data["pipelineSteps"] = {
+            "compile": str(pipeline_steps.get("compile") or "pending"),
+            "flight": str(pipeline_steps.get("flight") or "pending"),
+        }
     error = ""
     if status == "failed":
         error = normalized_data["ciFlowInstRunStateDesc"] or "试飞构建失败"
@@ -727,15 +843,16 @@ def bootstrap_code_commit(
         "tasks": task_results,
         "flight": {"status": "pending", "error": "", "data": {}},
         "summary": {"total": task_total, "commit_ok": 0, "commit_failed": 0, "flight_ok": 0},
-        "progress": _code_commit_progress_snapshot(
-            phase="prepare",
-            message=f"准备提交 {task_total} 个研发子单",
-            task_total=task_total,
-        ),
         "archives": archives,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "finished_at": None,
     }
+    result_doc["progress"] = _code_commit_progress_snapshot(
+        phase="prepare",
+        message=f"准备提交 {task_total} 个研发子单",
+        task_total=task_total,
+        result_doc=result_doc,
+    )
     _persist_code_commit_state(sid, result_doc, pipe=pipe)
     if rid:
         _emit_code_commit_progress(
@@ -765,6 +882,7 @@ def bootstrap_code_commit(
             task_index=task_index,
             task_total=task_total,
             task_no=task_no,
+            result_doc=result_doc,
         )
         if tasks is not None:
             result_doc["tasks"] = tasks
@@ -775,6 +893,23 @@ def bootstrap_code_commit(
         if status is not None:
             result_doc["status"] = status
         _persist_code_commit_state(sid, result_doc, pipe=pipe)
+
+    def _emit_live_progress(*, log_type: str = "info") -> None:
+        if not rid:
+            return
+        progress = result_doc.get("progress") if isinstance(result_doc.get("progress"), dict) else {}
+        _emit_code_commit_progress(
+            sid,
+            event="code_commit_progress",
+            message=str(progress.get("message") or ""),
+            room_id=rid,
+            log_type=log_type,
+            phase=str(progress.get("phase") or "prepare"),  # type: ignore[arg-type]
+            task_index=int(progress.get("task_index") or 0),
+            task_total=task_total,
+            task_no=str(progress.get("task_no") or ""),
+            display=build_code_commit_display(result_doc),
+        )
 
     for order_index, order in enumerate(orders):
         task_index = order_index + 1
@@ -793,6 +928,7 @@ def bootstrap_code_commit(
             task_no=task_no,
             tasks=[*task_results, row],
         )
+        _emit_live_progress()
 
         sandbox_path = str(order.get("sandbox_path") or "").strip()
         feature_id = str(order.get("feature_id") or "").strip()
@@ -944,6 +1080,11 @@ def bootstrap_code_commit(
                     flight=flight_summary,
                     summary=poll_summary,
                 )
+                _emit_live_progress(
+                    log_type="info"
+                    if flight_st in ("ok", "pending", "")
+                    else "warning",
+                )
 
             commit_not_before = (
                 None
@@ -1046,14 +1187,15 @@ def bootstrap_code_commit(
             "flight": flight_summary,
             "summary": summary,
             "finished_at": datetime.now().isoformat(timespec="seconds"),
-            "progress": _code_commit_progress_snapshot(
-                phase="done",
-                message=done_message,
-                task_index=task_total,
-                task_total=task_total,
-            ),
             "archives": archives,
         }
+    )
+    result_doc["progress"] = _code_commit_progress_snapshot(
+        phase="done",
+        message=done_message,
+        task_index=task_total,
+        task_total=task_total,
+        result_doc=result_doc,
     )
     _persist_code_commit_state(sid, result_doc, pipe=pipe)
     if rid:

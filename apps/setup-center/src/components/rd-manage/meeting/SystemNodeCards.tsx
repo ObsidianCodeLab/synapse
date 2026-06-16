@@ -943,7 +943,7 @@ export function SystemCodeCommitCard({
 
       <CodeCommitProgressSteps stepStates={stepStates} />
 
-      {progress.message && variant === 'summary' ? (
+      {progress.message ? (
         <p className="mt-2 mb-0 text-[11px] text-primary/80">{String(progress.message)}</p>
       ) : null}
 

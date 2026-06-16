@@ -399,6 +399,37 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
             )
         return out
 
+    if et.startswith("code_commit_"):
+        display = ev.get("display") if isinstance(ev.get("display"), dict) else {}
+        out_cc: list[dict[str, Any]] = []
+        summary = format_event_chat_display(ev)
+        if summary:
+            out_cc.append(
+                _row(
+                    ev,
+                    index,
+                    text=summary,
+                    agent_id=SPEAKER_SYSTEM,
+                    speaker_role=SPEAKER_SYSTEM,
+                    display_kind="pipeline",
+                    suffix="-pipe",
+                )
+            )
+        if display:
+            out_cc.append(
+                _row(
+                    ev,
+                    index,
+                    text="代码提交进度",
+                    agent_id=SPEAKER_SYSTEM,
+                    speaker_role=SPEAKER_SYSTEM,
+                    display_kind="system_code_commit",
+                    payload=display,
+                    suffix="-cc",
+                )
+            )
+        return out_cc
+
     if et == "system_node_executed":
         from synapse.rd_meeting.system_node_display import (
             STRUCTURED_SYSTEM_NODES,

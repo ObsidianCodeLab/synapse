@@ -2,9 +2,12 @@
  * 代码提交节点结构化展示（与后端 build_code_commit_display 对齐）
  */
 
-export type CodeCommitPhase = 'prepare' | 'commit' | 'flight_poll' | 'archive' | 'done';
+export type CodeCommitPhase = 'prepare' | 'commit' | 'compile' | 'flight_poll' | 'archive' | 'done';
 
-export type CodeCommitStepId = 'commit' | 'flight_poll' | 'flight_done' | 'results';
+export type CodeCommitStepId = 'commit' | 'compile' | 'flight';
+
+/** 未开始 | 进行中 | 已完成 | 已失败 */
+export type StepVisualState = 'pending' | 'active' | 'ok' | 'failed';
 
 export interface CodeCommitStepDef {
   id: CodeCommitStepId;
@@ -13,13 +16,10 @@ export interface CodeCommitStepDef {
 }
 
 export const CODE_COMMIT_STEPS: CodeCommitStepDef[] = [
-  { id: 'commit', label: '提交完成', subtitle: '特性分支 push 至远程' },
-  { id: 'flight_poll', label: '试飞中', subtitle: '轮询 CI 构建状态' },
-  { id: 'flight_done', label: '试飞完成', subtitle: '全部子单试飞已结束' },
-  { id: 'results', label: '试飞结果', subtitle: '结果归档至 synapse_archive' },
+  { id: 'commit', label: '代码提交', subtitle: '特性分支 push 至远程' },
+  { id: 'compile', label: '代码编译', subtitle: 'CI 编译构建' },
+  { id: 'flight', label: '代码试飞', subtitle: '圈复杂度等检查' },
 ];
-
-export type StepVisualState = 'pending' | 'active' | 'ok' | 'failed' | 'partial';
 
 export interface CodeCommitArchiveEntry {
   name: string;
@@ -64,6 +64,36 @@ function asRows(value: unknown): RowRecord[] {
   return Array.isArray(value) ? value.filter((r): r is RowRecord => !!r && typeof r === 'object') : [];
 }
 
+function normalizeStepState(raw: unknown): StepVisualState {
+  const value = String(raw || '').trim();
+  if (value === 'active' || value === 'ok' || value === 'failed' || value === 'pending') {
+    return value;
+  }
+  return 'pending';
+}
+
+function mergeStepState(current: StepVisualState, incoming: StepVisualState): StepVisualState {
+  const order: Record<StepVisualState, number> = {
+    failed: 4,
+    active: 3,
+    ok: 2,
+    pending: 1,
+  };
+  return order[current] >= order[incoming] ? current : incoming;
+}
+
+function aggregateCiPipelineSteps(tasks: RowRecord[]): Record<'compile' | 'flight', StepVisualState> {
+  let compile: StepVisualState = 'pending';
+  let flight: StepVisualState = 'pending';
+  for (const row of tasks) {
+    const flightData = (row.flight_data as RowRecord) || {};
+    const steps = (flightData.pipelineSteps as RowRecord) || {};
+    compile = mergeStepState(compile, normalizeStepState(steps.compile));
+    flight = mergeStepState(flight, normalizeStepState(steps.flight));
+  }
+  return { compile, flight };
+}
+
 export function codeCommitSummaryLine(display: RowRecord): string {
   const progress = (display.progress as RowRecord) || {};
   const phase = String(progress.message || '').trim();
@@ -87,6 +117,15 @@ export function codeCommitSummaryLine(display: RowRecord): string {
 
 export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeCommitStepId, StepVisualState> {
   const progress = (display.progress as RowRecord) || {};
+  const backendSteps = (progress.steps as RowRecord) || {};
+  if (backendSteps.commit || backendSteps.compile || backendSteps.flight) {
+    return {
+      commit: normalizeStepState(backendSteps.commit),
+      compile: normalizeStepState(backendSteps.compile),
+      flight: normalizeStepState(backendSteps.flight),
+    };
+  }
+
   const phase = String(progress.phase || '') as CodeCommitPhase;
   const summary = (display.summary as RowRecord) || {};
   const total = Number(summary.total || 0);
@@ -94,27 +133,19 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
   const commitFailed = Number(summary.commit_failed || 0);
   const flight = (display.flight as RowRecord) || {};
   const flightStatus = String(flight.status || '');
-  const archives = asRows(display.archives);
-  const hasFlightArchive = archives.some((a) => String(a.name || '') === '试飞结果.md');
   const nodeStatus = String(display.status || '');
   const tasks = asRows(display.tasks);
+  const ciSteps = aggregateCiPipelineSteps(tasks);
 
   const allCommitsTerminal =
     total > 0 &&
     tasks.length >= total &&
     tasks.every((t) => ['ok', 'failed', 'skipped'].includes(String(t.status || '')));
-  const allFlightsTerminal =
-    tasks.length > 0 &&
-    tasks.every((t) => {
-      const st = String((t.flight_status as string) || '');
-      return st && !['pending', ''].includes(st);
-    });
 
   const states: Record<CodeCommitStepId, StepVisualState> = {
     commit: 'pending',
-    flight_poll: 'pending',
-    flight_done: 'pending',
-    results: 'pending',
+    compile: 'pending',
+    flight: 'pending',
   };
 
   if (phase === 'prepare') {
@@ -122,46 +153,55 @@ export function resolveCodeCommitStepStates(display: RowRecord): Record<CodeComm
     return states;
   }
 
-  if (allCommitsTerminal && commitOk > 0) {
-    states.commit = commitFailed > 0 ? 'partial' : 'ok';
-  } else if (phase === 'commit' || commitOk > 0) {
-    states.commit = nodeStatus === 'running' ? 'active' : commitOk > 0 ? 'partial' : 'active';
-  } else if (nodeStatus === 'running') {
+  if (phase === 'commit' || (nodeStatus === 'running' && !allCommitsTerminal)) {
+    states.commit = 'active';
+    return states;
+  }
+
+  if (allCommitsTerminal) {
+    if (commitOk <= 0 || commitFailed > 0) {
+      states.commit = 'failed';
+    } else {
+      states.commit = 'ok';
+    }
+  } else if (commitOk > 0) {
     states.commit = 'active';
   }
 
-  if (phase === 'flight_poll' || (allCommitsTerminal && commitOk > 0 && !allFlightsTerminal)) {
-    states.flight_poll = 'active';
-  } else if (allFlightsTerminal && flightStatus === 'pending') {
-    states.flight_poll = 'active';
-  } else if (allFlightsTerminal || phase === 'archive' || phase === 'done') {
-    states.flight_poll =
-      flightStatus === 'ok' ? 'ok' : flightStatus === 'failed' ? 'failed' : 'partial';
+  if (states.commit !== 'ok') {
+    return states;
   }
 
-  if (allFlightsTerminal || phase === 'archive' || phase === 'done') {
-    states.flight_done =
-      flightStatus === 'ok'
-        ? 'ok'
-        : flightStatus === 'failed'
-          ? 'failed'
-          : flightStatus === 'timeout'
-            ? 'failed'
-            : 'partial';
-  } else if (states.flight_poll === 'active') {
-    states.flight_done = 'pending';
+  if (phase === 'flight_poll' || (nodeStatus === 'running' && ['', 'pending'].includes(flightStatus))) {
+    states.compile = ciSteps.compile === 'pending' ? 'active' : ciSteps.compile;
+    states.flight = ciSteps.flight;
+    if (states.compile === 'ok' && states.flight === 'pending') {
+      states.flight = 'active';
+    }
+    return states;
   }
 
-  if (hasFlightArchive || phase === 'archive' || phase === 'done') {
-    states.results = hasFlightArchive
-      ? flightStatus === 'failed'
-        ? 'partial'
-        : 'ok'
-      : phase === 'done'
-        ? 'partial'
-        : 'active';
-  } else if (states.flight_done === 'ok' || states.flight_done === 'failed') {
-    states.results = 'active';
+  if (flightStatus === 'ok') {
+    states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
+    states.flight = ciSteps.flight === 'pending' ? 'ok' : ciSteps.flight;
+    return states;
+  }
+
+  if (flightStatus === 'failed' || flightStatus === 'timeout') {
+    states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
+    states.flight = ciSteps.flight === 'pending' ? 'failed' : ciSteps.flight;
+    return states;
+  }
+
+  if (flightStatus === 'skipped') {
+    states.compile = 'failed';
+    states.flight = 'failed';
+    return states;
+  }
+
+  if (phase === 'archive' || phase === 'done' || nodeStatus !== 'running') {
+    states.compile = ciSteps.compile === 'pending' ? 'ok' : ciSteps.compile;
+    states.flight = ciSteps.flight === 'pending' ? 'ok' : ciSteps.flight;
   }
 
   return states;

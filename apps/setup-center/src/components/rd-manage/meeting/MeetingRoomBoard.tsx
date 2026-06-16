@@ -2803,7 +2803,13 @@ const InterventionDialog = ({
                           nodeId={selectedNode.id}
                           nodeName={selectedNode.name}
                           nodeState={toMeetingNodeVisualState(selectedNodeState)}
-                          pollMs={selectedNodeState === 'processing' ? 4000 : 0}
+                          pollMs={
+                            selectedNodeState === 'processing'
+                              ? selectedNode.id === 'exception_check'
+                                ? 2500
+                                : 4000
+                              : 0
+                          }
                         />
                       </div>
                     )}

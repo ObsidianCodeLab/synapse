@@ -11,6 +11,7 @@ from synapse.rd_meeting.code_commit_assets import (
     _build_commit_message,
     _flight_result_is_fresh,
     _normalize_flight_data,
+    _resolve_code_commit_pipeline_steps,
     _resolve_overall_status,
     bootstrap_code_commit,
 )
@@ -215,7 +216,44 @@ def test_bootstrap_code_commit_per_task(tmp_path, monkeypatch):
     display = build_code_commit_display(assets)
     assert display["tasks"][0]["flight_data"]["ciFlowInstRunState"] == "1"
     assert display["progress"]["phase"] == "done"
+    assert display["progress"]["steps"]["commit"] == "ok"
+    assert display["progress"]["steps"]["flight"] == "failed"
     assert any(a.get("name") == "试飞结果.md" for a in display.get("archives") or [])
+
+
+def test_resolve_code_commit_pipeline_steps_three_phase_flow():
+    running_commit = {
+        "status": "running",
+        "progress": {"phase": "commit"},
+        "tasks": [{"status": "pending"}],
+        "summary": {"total": 1, "commit_ok": 0, "commit_failed": 0},
+        "flight": {"status": "pending"},
+    }
+    assert _resolve_code_commit_pipeline_steps(running_commit) == {
+        "commit": "active",
+        "compile": "pending",
+        "flight": "pending",
+    }
+
+    polling = {
+        "status": "running",
+        "progress": {"phase": "flight_poll"},
+        "tasks": [
+            {
+                "status": "ok",
+                "flight": {
+                    "status": "pending",
+                    "data": {"pipelineSteps": {"compile": "ok", "flight": "active"}},
+                },
+            }
+        ],
+        "summary": {"total": 1, "commit_ok": 1, "commit_failed": 0},
+        "flight": {"status": "pending"},
+    }
+    steps = _resolve_code_commit_pipeline_steps(polling)
+    assert steps["commit"] == "ok"
+    assert steps["compile"] == "ok"
+    assert steps["flight"] == "active"
 
 
 def test_collect_task_rows_includes_portal_task_id():

@@ -1955,7 +1955,8 @@ async def _get_ci_flow_build_result(body: GetCiFlowBuildResultRequest) -> dict:
         return error_response(502, f"研发云获取构建结果返回非 JSON：{resp.text}")
 
     # 提取数据（仅失败节点 runResult=F）
-    simplified = _simplify_ci_flow_build_nodes(raw.get("data") or [])
+    overview = _normalize_ci_flow_overview_nodes(raw.get("data") or [])
+    simplified = [node for node in overview if str(node.get("runResult") or "").strip() == "F"]
     return success_response(simplified)
 
 
@@ -2046,6 +2047,103 @@ async def _fetch_url_text(url: str, *, timeout: float = 30) -> str:
 
 def _ci_node_state_failed(node_state: object) -> bool:
     return str(node_state or "").strip() == "3"
+
+
+def _ci_node_state_ok(node_state: object) -> bool:
+    return str(node_state or "").strip() == "2"
+
+
+def _normalize_ci_flow_overview_nodes(raw_items: list) -> list[dict]:
+    nodes: list[dict] = []
+    for it in raw_items:
+        if not isinstance(it, dict):
+            continue
+        nodes.append(
+            {
+                "nodeName": it.get("nodeName"),
+                "nodeNameEn": it.get("nodeNameEn"),
+                "nodeTypeId": it.get("nodeTypeId"),
+                "stepId": it.get("stepId"),
+                "stepZcmId": it.get("stepZcmId"),
+                "nodeState": it.get("nodeState"),
+                "nodeStateDesc": it.get("nodeStateDesc"),
+                "runResult": it.get("runResult"),
+            }
+        )
+    return nodes
+
+
+def _ci_step_state_from_nodes(nodes: list[dict]) -> str:
+    if not nodes:
+        return "pending"
+    statuses: list[str] = []
+    for node in nodes:
+        if _ci_node_state_failed(node.get("nodeState")) or str(node.get("runResult") or "").strip() == "F":
+            statuses.append("failed")
+        elif _ci_node_state_ok(node.get("nodeState")) or str(node.get("runResult") or "").strip() in {
+            "S",
+            "SUCCESS",
+        }:
+            statuses.append("ok")
+        elif str(node.get("runResult") or "").strip() in {"R", "RUNNING", "P", "PROCESSING"}:
+            statuses.append("active")
+        else:
+            statuses.append("pending")
+    if "failed" in statuses:
+        return "failed"
+    if "active" in statuses:
+        return "active"
+    if statuses and all(item == "ok" for item in statuses):
+        return "ok"
+    if any(item == "ok" for item in statuses):
+        return "active"
+    return "pending"
+
+
+def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
+    compile_nodes = [node for node in nodes if _is_compile_ci_node(node)]
+    flight_nodes = [
+        node
+        for node in nodes
+        if not _is_compile_ci_node(node) and not _is_skipped_ci_overview_node(node)
+    ]
+    return {
+        "compile": _ci_step_state_from_nodes(compile_nodes),
+        "flight": _ci_step_state_from_nodes(flight_nodes),
+    }
+
+
+async def _fetch_ci_flow_node_instances(ci_flow_inst_id: str) -> list[dict]:
+    inst_id = str(ci_flow_inst_id or "").strip()
+    if not inst_id:
+        return []
+    try:
+        csrf, cookies = await _ensure_valid_creds_async()
+    except ValueError:
+        return []
+
+    url = f"{DEV_IWHALECLOUD_BASE_URL}/portal/zcm-cicd/ci/flow/history/qryFlowNodeInstanceDetail/{inst_id}"
+    params = {"_": int(datetime.now().timestamp() * 1000)}
+    headers = _build_get_ci_flow_build_result_headers(
+        GetCiFlowBuildResultRequest(ciFlowInstId=inst_id),
+        csrf,
+        cookies,
+    )
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=headers, params=params)
+            _log_httpx_response("fetch_ci_flow_node_instances", resp)
+            raw = resp.json()
+    except (httpx.RequestError, ValueError) as exc:
+        logger.warning("fetch ci flow node instances failed inst=%s: %s", inst_id, exc)
+        return []
+
+    if not _is_portal_success_code(raw.get("code")):
+        return []
+    data = raw.get("data")
+    if not isinstance(data, list):
+        return []
+    return _normalize_ci_flow_overview_nodes(data)
 
 
 def _is_compile_ci_node(node: dict) -> bool:
@@ -2425,7 +2523,32 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
             )
 
         merged = _merge_flow_build_status(per_flow_items)
-        return success_response({"taskId": body.taskId, **merged})
+
+        pipeline_steps = {"compile": "pending", "flight": "pending"}
+        primary_inst_id = ""
+        primary_run_state: object = None
+        for latest in latest_by_flow.values():
+            inst_id = str(latest.get("ciFlowInstId") or "").strip()
+            if not inst_id:
+                continue
+            run_state = latest.get("ciFlowInstRunState")
+            if _is_build_running_state(run_state):
+                primary_inst_id = inst_id
+                primary_run_state = run_state
+                break
+            if not primary_inst_id:
+                primary_inst_id = inst_id
+                primary_run_state = run_state
+        if primary_inst_id:
+            overview_nodes = await _fetch_ci_flow_node_instances(primary_inst_id)
+            if overview_nodes:
+                pipeline_steps = summarize_ci_pipeline_steps(overview_nodes)
+            elif _is_build_failed_state(primary_run_state):
+                pipeline_steps = {"compile": "failed", "flight": "failed"}
+            elif _is_build_success_state(primary_run_state):
+                pipeline_steps = {"compile": "ok", "flight": "ok"}
+
+        return success_response({"taskId": body.taskId, **merged, "pipelineSteps": pipeline_steps})
     except Exception as e:
         logger.exception("获取构建状态失败: %s", e)
         return error_response(502, f"获取构建状态失败: {e}")
