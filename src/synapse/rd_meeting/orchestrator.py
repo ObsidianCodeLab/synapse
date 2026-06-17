@@ -1552,6 +1552,16 @@ class MeetingRoomOrchestrator:
             payload = _read_da_result(sid) or {}
             write_result = _write_da_result
             blocked_key = "diff_analysis_blocked"
+            commit_phase = str(payload.get("commit_phase") or "").strip()
+            if dec in ("approve", "pass"):
+                if commit_phase == "await_confirm":
+                    raise ValueError("commit_not_confirmed")
+                if commit_phase == "running":
+                    raise ValueError("commit_in_progress")
+                if payload.get("flight_failed"):
+                    raise ValueError("flight_not_passed")
+                if commit_phase and commit_phase != "done":
+                    raise ValueError("commit_not_finished")
         else:
             payload = _read_result(sid) or {}
             write_result = _write_result
@@ -1614,6 +1624,7 @@ class MeetingRoomOrchestrator:
             advance=True,
             ticket_title=ticket_title,
             agent_pool=agent_pool,
+            bypass_downstream_gate=node_id == DA_NODE_ID,
         )
         rs = dict(load_room_state(sid) or {})
         rs.pop("pending_delivery", None)
@@ -1631,6 +1642,83 @@ class MeetingRoomOrchestrator:
             },
         )
         return {"status": "approved", "node_id": node_id, **out}
+
+    def trigger_diff_analysis_commit(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        ticket_title: str = "",
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """试飞优化：人工确认开发结果后，后台提交并等待试飞。"""
+        from synapse.rd_meeting.diff_analysis_exec import (
+            NODE_ID as DA_NODE_ID,
+            load_diff_analysis_payload,
+            render_diff_analysis_report_markdown,
+            trigger_diff_analysis_code_commit,
+        )
+
+        sid = scope_id.strip()
+        rid = room_id.strip()
+
+        def _run() -> None:
+            from synapse.rd_meeting.dev_status import load_dev_status
+            from synapse.rd_meeting.diff_analysis_post_commit import handle_diff_analysis_post_commit
+            from synapse.rd_meeting.pipeline import MeetingPipeline
+
+            try:
+                pipe = MeetingPipeline.load(sid)
+            except ValueError:
+                pipe = None
+            result = trigger_diff_analysis_code_commit(
+                scope_type,  # type: ignore[arg-type]
+                sid,
+                room_id=rid,
+                pipe=pipe,
+            )
+            post = handle_diff_analysis_post_commit(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=rid,
+                ticket_title=ticket_title,
+                result=result,
+                agent_pool=agent_pool,
+                orchestrator=self,
+            )
+            result = post.get("result") if isinstance(post.get("result"), dict) else result
+            dev = load_dev_status(sid) or {}
+            summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+            report_body = post.get("report_body") or render_diff_analysis_report_markdown(result)
+            self.enter_task_exec_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=rid,
+                node_id=DA_NODE_ID,
+                report_body=report_body,
+                tokens_used=int(summary.get("total_tokens") or 0),
+                duration_seconds=int(summary.get("total_duration_sec") or 0),
+                stage_id=int(dev.get("stage_id") or stage_id_for_node_id(DA_NODE_ID)),
+                ticket_title=ticket_title,
+            )
+            rs = dict(load_room_state(sid) or {})
+            if result.get("flight_failed"):
+                rs["diff_analysis_blocked"] = True
+                if result.get("error"):
+                    rs["escalate_reason"] = str(result.get("error") or "")
+            else:
+                rs.pop("diff_analysis_blocked", None)
+                rs.pop("escalate_reason", None)
+            save_room_state(sid, rs)
+
+        schedule_pipeline_background(rid or sid, _run, scope_id=sid)
+        payload = load_diff_analysis_payload(sid)
+        return {
+            "status": "commit_started",
+            "node_id": DA_NODE_ID,
+            "payload": payload,
+        }
 
     def confirm_solution_review_decision(
         self,
@@ -2547,6 +2635,129 @@ class MeetingRoomOrchestrator:
         except Exception as exc:
             logger.debug("hitl approve activity record failed: %s", exc)
         return {"status": "approved", **out, "room_state": rs}
+
+    async def run_embedded_host_node(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        ticket_title: str = "",
+        agent_pool: Any | None = None,
+        prompt_suffix: str = "",
+    ) -> dict[str, Any]:
+        """在不变更 dev_status 当前节点的前提下，内嵌执行指定节点的小鲸主控（如试飞方案技能）。"""
+        sid = scope_id.strip()
+        nid = (node_id or "").strip()
+        if not nid:
+            raise ValueError("invalid_node_id")
+        if agent_pool is None:
+            raise ValueError("agent_pool_required")
+
+        from synapse.rd_meeting.binding import resolve_node_binding
+        from synapse.rd_meeting.dynamic_prompt import build_node_prompt
+        from synapse.rd_meeting.host_prompt_cache import resolve_cached_host_user_prompt
+        from synapse.rd_meeting.meeting_agent import (
+            bind_meeting_agent_session,
+            clear_meeting_agent_session,
+            ensure_host_session,
+            get_or_create_with_skill_ids,
+            host_session_id,
+            meeting_skill_load_ids,
+            prepare_host_for_meeting_run,
+            resolve_agent_billable_tokens,
+        )
+        from synapse.rd_meeting.paths import scope_dir
+        from synapse.rd_meeting.user_context import drain_user_context_for_prompt
+
+        binding = resolve_node_binding(
+            nid,
+            scope_type=scope_type,
+            scope_id=sid,
+            ticket_title=ticket_title,
+        )
+        binding["node_id"] = nid
+        host_profile_id = str(binding.get("host_profile_id") or "default")
+
+        host_profile = _resolve_profile(host_profile_id)
+        if host_profile is None:
+            raise ValueError("host_profile_not_found")
+
+        scope_dir(sid).mkdir(parents=True, exist_ok=True)
+        host_agent = await get_or_create_with_skill_ids(
+            agent_pool,
+            host_session_id(room_id),
+            host_profile,
+            meeting_skill_load_ids(host_profile),
+        )
+        self._configure_meeting_agent(
+            host_agent,
+            role="host",
+            binding=binding,
+            scope_type=scope_type,
+            scope_id=sid,
+            ticket_title=ticket_title,
+            scope_path=str(scope_dir(sid)),
+        )
+        cached_user, _ = resolve_cached_host_user_prompt(sid, binding)
+        prompt = cached_user if cached_user else build_node_prompt(
+            scope_type=scope_type,
+            scope_id=sid,
+            node_id=nid,
+            binding=binding,
+            ticket_title=ticket_title,
+        )
+        user_ctx = drain_user_context_for_prompt(sid)
+        if user_ctx:
+            prompt = f"{prompt}\n\n{user_ctx}"
+        suffix = (prompt_suffix or "").strip()
+        if suffix:
+            prompt = f"{prompt}\n\n{suffix}"
+
+        append_history_event(
+            sid,
+            {
+                "event": "embedded_host_llm_begin",
+                "room_id": room_id,
+                "node_id": nid,
+                "host_profile_id": host_profile_id,
+                "log_type": "info",
+                "agent_id": host_profile_id,
+            },
+        )
+        meeting_session = ensure_host_session(room_id, host_profile_id)
+
+        prepare_host_for_meeting_run(host_agent)
+        bind_meeting_agent_session(host_agent, meeting_session)
+        try:
+            host_agent._hitl_locked = False
+            result = await host_agent.execute_task_from_message(
+                prompt,
+                usage_scene=f"rd_meeting_{sid}_{nid}_embedded",
+            )
+        finally:
+            clear_meeting_agent_session(host_agent)
+
+        tokens = resolve_agent_billable_tokens(host_agent)
+        append_history_event(
+            sid,
+            {
+                "event": "embedded_host_llm_end",
+                "room_id": room_id,
+                "node_id": nid,
+                "success": bool(result.success),
+                "tokens_used": tokens,
+                "log_type": "info" if result.success else "warning",
+                "agent_id": host_profile_id,
+            },
+        )
+        return {
+            "success": bool(result.success),
+            "data": str(result.data or ""),
+            "error": str(result.error or ""),
+            "tokens_used": tokens,
+        }
 
     async def run_current_node(
         self,

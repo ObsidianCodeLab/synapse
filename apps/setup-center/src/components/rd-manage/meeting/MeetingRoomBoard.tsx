@@ -37,6 +37,7 @@ import { FuncSolutionReviewPanel } from './FuncSolutionReviewPanel';
 import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
 import { MeetingProdSelectionPanel } from './panels/MeetingProdSelectionPanel';
+import { MeetingAutoSplitChoicePanel } from './panels/MeetingAutoSplitChoicePanel';
 import type {
   NodeReviewPayload,
   FuncSolutionReviewPayload,
@@ -72,6 +73,7 @@ import {
   resolveHitlTargetNodeId,
   resolveMeetingInterventionPanel,
   nodeTypeForId,
+  type AutoSplitChoicePayload,
   type InterventionPanelKind,
 } from './meetingInterventionPanel';
 import { MeetingChatEmpty, MeetingChatMessage } from './MeetingChatMessage';
@@ -171,6 +173,7 @@ interface MeetingRoom {
   reviewPayload?: NodeReviewPayload | null;
   interventionKind?: string | null;
   interventionPanel?: InterventionPanelKind | string | null;
+  autoSplitChoicePayload?: AutoSplitChoicePayload | null;
   solutionReviewPayload?: SolutionReviewPayload | null;
   solutionReviewBlocked?: boolean;
   funcSolutionReviewPayload?: FuncSolutionReviewPayload | null;
@@ -402,6 +405,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         solution_review_payload?: SolutionReviewPayload;
         func_solution_review_payload?: FuncSolutionReviewPayload;
         task_exec_payload?: TaskExecPayload;
+        diff_analysis_payload?: TaskExecPayload;
         report_body?: string;
       }
     | undefined;
@@ -440,6 +444,9 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
           pendingDelivery?.solution_review_payload ?? room.solutionReviewPayload,
         funcSolutionReviewPayload:
           pendingDelivery?.func_solution_review_payload ?? room.funcSolutionReviewPayload,
+        autoSplitChoicePayload:
+          (live.auto_split_choice_payload as AutoSplitChoicePayload | undefined) ??
+          room.autoSplitChoicePayload,
         hitlPendingNodeId:
           pendingDelivery?.node_id != null
             ? String(pendingDelivery.node_id)
@@ -450,6 +457,11 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     );
   const isSolutionReview =
     interventionKind === 'solution_review' || interventionPanel === 'solution_review';
+  const hasCliExecPayload = Boolean(
+    pendingDelivery?.diff_analysis_payload ||
+      pendingDelivery?.task_exec_payload ||
+      room.taskExecPayload,
+  );
   const isFuncSolutionReview =
     interventionKind === 'func_solution_review' || interventionPanel === 'func_solution_review';
   return {
@@ -486,12 +498,16 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       pendingDelivery?.node_id != null
         ? String(pendingDelivery.node_id)
         : room.hitlPendingNodeId ?? null,
-    reviewPayload: isSolutionReview || isFuncSolutionReview
+    reviewPayload: isSolutionReview || isFuncSolutionReview || hasCliExecPayload
       ? null
       : ((pendingDelivery?.review_payload as NodeReviewPayload | undefined) ??
         (live.pending_delivery !== undefined ? null : room.reviewPayload ?? null)),
     interventionKind,
     interventionPanel,
+    autoSplitChoicePayload:
+      (live.auto_split_choice_payload as AutoSplitChoicePayload | undefined) ??
+      room.autoSplitChoicePayload ??
+      null,
     solutionReviewPayload: isSolutionReview
       ? ((pendingDelivery?.solution_review_payload as SolutionReviewPayload | undefined) ??
         (live.pending_delivery !== undefined ? null : room.solutionReviewPayload ?? null))
@@ -892,6 +908,7 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
         interventionKind: item.room_state?.intervention_kind as string | undefined,
         hitlFormSchema: item.room_state?.hitl_form_schema,
         hitlLocked: Boolean(item.room_state?.hitl_locked),
+        autoSplitChoicePayload: item.room_state?.auto_split_choice_payload as AutoSplitChoicePayload | undefined,
         reviewPayload: (item.room_state?.pending_delivery as { review_payload?: unknown })
           ?.review_payload as { node_id?: string } | null,
         solutionReviewPayload: (item.room_state?.pending_delivery as {
@@ -932,6 +949,8 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
     taskExecBlocked: Boolean(
       item.room_state?.diff_analysis_blocked ?? item.room_state?.task_exec_blocked,
     ),
+    autoSplitChoicePayload:
+      (item.room_state?.auto_split_choice_payload as AutoSplitChoicePayload | undefined) ?? null,
     participants: item.participants,
     scopeType: item.scope_type,
     scopeId: item.scope_id,
@@ -2016,14 +2035,18 @@ const InterventionDialog = ({
   const prodSelectionActive =
     interventionPanel === 'prod_selection' ||
     (room?.interventionKind || '').toLowerCase() === 'prod_selection';
+  const autoSplitChoiceActive =
+    interventionPanel === 'auto_split_choice' ||
+    (room?.interventionKind || '').toLowerCase() === 'auto_split_choice';
   const hitlAvailable = Boolean(
     interventionPanel &&
       room?.status === 'human_intervention' &&
       !hitlLocked &&
-      (prodSelectionActive || isViewingHitlNode),
+      (prodSelectionActive || autoSplitChoiceActive || isViewingHitlNode),
   );
   const hitlBadgeText = useMemo(() => {
     if (interventionPanel === 'prod_selection') return '选择产品';
+    if (interventionPanel === 'auto_split_choice') return '拆单策略';
     if (interventionPanel === 'solution_review') return '方案评审';
     if (interventionPanel === 'func_solution_review') return '函数级方案评审';
     if (interventionPanel === 'task_exec') {
@@ -2682,6 +2705,15 @@ const InterventionDialog = ({
                     setCenterTab('detail');
                     onProdSubmitted?.(detail);
                   }}
+                />
+              </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'auto_split_choice' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+                <MeetingAutoSplitChoicePanel
+                  synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
+                  payload={room.autoSplitChoicePayload ?? null}
+                  onSubmitted={() => setCenterTab('detail')}
                 />
               </div>
             ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'task_exec' ? (

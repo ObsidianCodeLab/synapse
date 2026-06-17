@@ -5,7 +5,9 @@ import json
 import logging
 import re
 import socket
+import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Tuple
@@ -5050,6 +5052,44 @@ async def _page_list_row_to_demand_attrs(row: dict) -> dict:
         logger.exception(f"转换 {row} graphiti_pipeline Demand attributes 失败: %s", e)
         return {}
 
+
+def _page_list_row_demand_no(row: dict[str, Any]) -> str:
+    ad = row.get("adTask")
+    if not isinstance(ad, dict):
+        return ""
+    return _snapshot_norm_id(ad.get("taskNo"))
+
+
+def _owner_order_record_demand_no(record: dict[str, Any]) -> str:
+    return _snapshot_norm_id(record.get("demand_no"))
+
+
+def _validate_owner_order_fetch_result(
+    rows: list[dict[str, Any]],
+    out_list: list[dict[str, Any]],
+) -> None:
+    """门户 page-list 有行但转换后缺少 demand_no 时中止同步，避免误删本地 userwork/work。"""
+    if not rows:
+        return
+    failed_nos: list[str] = []
+    for row, converted in zip(rows, out_list, strict=False):
+        expected = _page_list_row_demand_no(row)
+        if not expected:
+            failed_nos.append("(unknown)")
+            continue
+        actual = _owner_order_record_demand_no(converted if isinstance(converted, dict) else {})
+        if actual != expected:
+            failed_nos.append(expected)
+    if not failed_nos:
+        return
+    preview = ", ".join(failed_nos[:5])
+    suffix = f" 等{len(failed_nos)}条" if len(failed_nos) > 5 else ""
+    raise OwnerOrderSyncError(
+        f"需求单字段转换失败（{len(failed_nos)}条：{preview}{suffix}），已保留本地 userwork，未合并、未回收 work 目录",
+        status_code=502,
+    )
+
+
 def _get_demand_by_user_portal_cookies_sync(username: str, password: str) -> tuple[str, str]:
     """仅 get_demand_by_user：Playwright 登录取门户 x-csrf-token 与 Cookie；不读不写 iwhalecloud_session。
 
@@ -5248,7 +5288,7 @@ async def fetch_owner_orders_from_devcloud(*, owner_info_cipher: str) -> tuple[l
     login_user_id = user_blob["login_user_id"]
 
     try:
-        async with _iwhalecloud_session_lock:
+        async with _acquire_iwhalecloud_session_lock():
             csrf, cookies = await asyncio.to_thread(
                 _get_demand_by_user_portal_cookies_sync, employee_id, password
             )
@@ -5354,6 +5394,7 @@ async def fetch_owner_orders_from_devcloud(*, owner_info_cipher: str) -> tuple[l
                     logger.exception("fetch_owner_orders 拉取研发单失败 demand_no=%s: %s", dn, exc)
                     o["owned_work_items"] = []
 
+    _validate_owner_order_fetch_result(rows, out_list)
     return out_list, total
 
 
@@ -6378,14 +6419,24 @@ def _cookies_to_header(cookies: list[dict]) -> str:
     return "; ".join(parts)
 
 
-_iwhalecloud_session_lock = asyncio.Lock()
+_IWHALECLOUD_SESSION_LOCK = threading.Lock()
+
+
+@asynccontextmanager
+async def _acquire_iwhalecloud_session_lock():
+    """Playwright 登录与 iwhalecloud_session.json 的全进程串行锁（跨 event loop / 线程）。"""
+    await asyncio.to_thread(_IWHALECLOUD_SESSION_LOCK.acquire)
+    try:
+        yield
+    finally:
+        _IWHALECLOUD_SESSION_LOCK.release()
 
 
 def _fetch_token_and_cookies_sync(username: str, password: str) -> tuple[str, str]:
     """
     同步：用 Playwright 登录研发云，抓取 **x-csrf-token**（请求头）与 Cookie 串。
     与 userinfo.encryption 里的 API Authorization token 无关，勿混用。
-    仅由 _ensure_valid_creds_async 在持有 asyncio.Lock 时经 asyncio.to_thread 调用，故全局已串行；
+    仅由 _ensure_valid_creds_async 在持有 threading.Lock 时经 asyncio.to_thread 调用，故全局已串行；
     进入后若会话文件已写入则直接返回（双检）。
     """
     sess = _load_iwhalecloud_session()
@@ -6470,9 +6521,9 @@ def _fetch_token_and_cookies_sync(username: str, password: str) -> tuple[str, st
 async def _ensure_valid_creds_async(force_refresh: bool = False) -> tuple[str, str]:
     """
     确保拥有有效的 x-csrf-token 和 cookies（存于 data/iwhalecloud_session.json）。
-    缺失或 force_refresh 时走 _fetch_token_and_cookies_sync（asyncio 锁串行 + to_thread 写文件）。
+    缺失或 force_refresh 时走 _fetch_token_and_cookies_sync（threading 锁串行 + to_thread 写文件）。
     """
-    async with _iwhalecloud_session_lock:
+    async with _acquire_iwhalecloud_session_lock():
         if force_refresh:
             _clear_iwhalecloud_session()
         else:

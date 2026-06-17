@@ -14,6 +14,7 @@ from synapse.api.routes.dev_iwhalecloud import (
     _merge_owned_work_items,
     _merge_owner_order_lists,
     _refresh_local_state_from_demand_status,
+    _validate_owner_order_fetch_result,
     sync_owner_orders_from_devcloud,
 )
 from synapse.scheduler import ScheduledTask, TriggerType
@@ -408,6 +409,59 @@ async def test_register_system_tasks_adds_owner_order_sync(monkeypatch):
     assert owner_task is not None
     assert owner_task.action == "system:sync_owner_orders"
     assert owner_task.trigger_config == {"cron": "0 * * * *"}
+
+
+def test_validate_owner_order_fetch_result_passes_when_demand_no_matches():
+    rows = [{"adTask": {"taskNo": "21881451"}}]
+    out_list = [{"demand_no": "21881451", "demand_title": "ok"}]
+    _validate_owner_order_fetch_result(rows, out_list)
+
+
+def test_validate_owner_order_fetch_result_raises_when_conversion_empty():
+    rows = [{"adTask": {"taskNo": "21881451"}}]
+    out_list = [{}]
+    with pytest.raises(OwnerOrderSyncError) as exc:
+        _validate_owner_order_fetch_result(rows, out_list)
+    assert exc.value.status_code == 502
+    assert "21881451" in exc.value.message
+    assert "未合并" in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_sync_owner_orders_skips_persist_when_fetch_validation_fails(monkeypatch):
+    async def fake_fetch(**_kwargs):
+        raise OwnerOrderSyncError(
+            "需求单字段转换失败（1条：21881451），已保留本地 userwork，未合并、未回收 work 目录",
+            status_code=502,
+        )
+
+    persist_calls: list[dict] = []
+
+    def fake_persist(*, out_list):
+        persist_calls.append({"out_list": out_list})
+        return {"removed_demands": [], "cleaned_work_dirs": []}
+
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.load_owner_info_cipher_from_file",
+        lambda: "cipher",
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.load_owner_order_snapshot_from_file",
+        lambda: {"list": [{"demand_no": "21881451", "local_process_state": "处理中"}]},
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.fetch_owner_orders_from_devcloud",
+        fake_fetch,
+    )
+    monkeypatch.setattr(
+        "synapse.api.routes.dev_iwhalecloud.persist_owner_order_snapshot_to_file",
+        fake_persist,
+    )
+
+    with pytest.raises(OwnerOrderSyncError) as exc:
+        await sync_owner_orders_from_devcloud()
+    assert exc.value.status_code == 502
+    assert persist_calls == []
 
 
 @pytest.mark.asyncio

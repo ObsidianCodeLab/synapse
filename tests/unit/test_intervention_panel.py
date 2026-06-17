@@ -18,6 +18,22 @@ def test_resolve_solution_review_panel() -> None:
     assert panel == "solution_review"
 
 
+def test_resolve_prod_selection_panel() -> None:
+    panel = resolve_intervention_panel(
+        node_id="reprocess_prep",
+        intervention_kind="prod_selection",
+    )
+    assert panel == "prod_selection"
+
+
+def test_resolve_auto_split_choice_panel() -> None:
+    panel = resolve_intervention_panel(
+        node_id="auto_split",
+        intervention_kind="auto_split_choice",
+    )
+    assert panel == "auto_split_choice"
+
+
 def test_resolve_hitl_for_human_node() -> None:
     panel = resolve_intervention_panel(
         node_id="req_clarify",
@@ -101,6 +117,27 @@ def test_func_solution_stale_hitl_schema_uses_review_panel() -> None:
         },
     )
     assert panel == "func_solution_review"
+
+
+def test_resolve_diff_analysis_cli_panel() -> None:
+    panel = resolve_intervention_panel(
+        node_id="diff_analysis",
+        intervention_kind="task_exec",
+        pending_delivery={"diff_analysis_payload": {"status": "ok", "commit_phase": "await_confirm"}},
+    )
+    assert panel == "task_exec"
+
+
+def test_diff_analysis_payload_wins_over_stale_node_review() -> None:
+    panel = resolve_intervention_panel(
+        node_id="diff_analysis",
+        intervention_kind="result_confirm",
+        pending_delivery={
+            "diff_analysis_payload": {"status": "ok"},
+            "review_payload": {"node_id": "diff_analysis", "summaries": []},
+        },
+    )
+    assert panel == "task_exec"
 
 
 def test_func_solution_exception_still_uses_hitl() -> None:

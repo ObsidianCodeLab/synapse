@@ -204,9 +204,10 @@ def handle_auto_split(
 ) -> dict[str, Any]:
     """自动拆单：读 split_plan 调 create_task，并同步 userwork / 门户清单。"""
     sid = scope_id.strip()
-    from synapse.rd_meeting.auto_split_assets import bootstrap_auto_split, format_auto_split_report
+    from synapse.rd_meeting.auto_split_assets import format_auto_split_report
+    from synapse.rd_meeting.auto_split_gate import bootstrap_auto_split_with_choice
 
-    assets = bootstrap_auto_split(scope_type, sid)
+    assets = bootstrap_auto_split_with_choice(scope_type, sid, pipe=pipe)
 
     _save_pipeline_context_assets(sid, "auto_split_assets", assets, pipe=pipe)
 

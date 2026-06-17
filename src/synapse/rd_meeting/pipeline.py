@@ -716,6 +716,54 @@ def _step_assemble_host_prompt(pipe: MeetingPipeline, ctx: PipelineRunContext) -
         pipe.set_flow_step(STEP_WAITING, reason="无有效节点，跳过主控提示词组装")
         return
 
+    if run_node == "task_feedback":
+        from synapse.rd_meeting.flight_optimize_gate import (
+            evaluate_flight_optimize_need,
+            write_skipped_flight_optimize_plan,
+        )
+
+        optimize_need = evaluate_flight_optimize_need(sid)
+        if optimize_need == "not_needed":
+            write_skipped_flight_optimize_plan(sid, reason="代码提交试飞已全部通过")
+            append_history_event(
+                sid,
+                {
+                    "event": "node_skipped",
+                    "room_id": room_id,
+                    "node_id": run_node,
+                    "reason": "flight_all_passed",
+                    "flow_stage": FLOW_STEP_LABEL[STEP_ASSEMBLE_HOST_PROMPT],
+                    "log_type": "info",
+                    "agent_id": "system",
+                    "system_node": True,
+                },
+            )
+            from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+
+            orch = MeetingRoomOrchestrator()
+            pctx = pipe._data.get("context")
+            if not isinstance(pctx, dict):
+                pctx = {}
+            pctx["last_finished_node_id"] = run_node
+            pipe._data["context"] = pctx
+            orch.on_node_complete(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=run_node,
+                artifacts=None,
+                tokens_used=0,
+                duration_seconds=0,
+                sync_userwork=True,
+                advance=True,
+                schedule_pipeline_advance=False,
+                ticket_title=ticket_title,
+                agent_pool=ctx.agent_pool,
+            )
+            pipe.mark_step_completed(STEP_ASSEMBLE_HOST_PROMPT)
+            pipe.set_flow_step(STEP_NODE_FINISH, reason="试飞已通过，跳过试飞方案节点")
+            return
+
     from synapse.rd_meeting.task_exec import uses_task_exec_cli
 
     if uses_task_exec_cli(run_node):
@@ -1292,6 +1340,11 @@ def _step_reprocess_prep(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None
     if uses_task_exec_node(run_node):
         on_task_exec_reprocess_prep(pipe, reason=reason)
 
+    from synapse.rd_meeting.diff_analysis_rounds import prepare_diff_analysis_reprocess, uses_diff_analysis_node
+
+    if uses_diff_analysis_node(run_node) and reason:
+        prepare_diff_analysis_reprocess(sid, reason=reason)
+
     extra = [n for n in range_ids if n != run_node] if historical else None
     ctx.room_state = clear_room_state_for_node_reprocess(sid, run_node, extra_node_ids=extra)
     if reason:
@@ -1431,6 +1484,12 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     )
     save_room_state(sid, rs)
     ctx.room_state = rs
+
+    if run_node == "auto_split":
+        from synapse.rd_meeting.auto_split_gate import maybe_enter_auto_split_choice_gate
+
+        if maybe_enter_auto_split_choice_gate(pipe, ctx, room_id=room_id, run_node=run_node):
+            return
 
     from synapse.rd_meeting.system_nodes import run_system_node
 
@@ -1615,6 +1674,59 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         },
     )
 
+    if is_diff_analysis:
+        from synapse.rd_meeting.flight_optimize_gate import (
+            build_skipped_diff_analysis_result,
+            evaluate_flight_optimize_need,
+            persist_skipped_diff_analysis,
+            write_skipped_flight_optimize_plan,
+        )
+
+        optimize_need = evaluate_flight_optimize_need(sid)
+        if optimize_need == "not_needed":
+            write_skipped_flight_optimize_plan(sid, reason="代码提交试飞已全部通过")
+            skip_result = build_skipped_diff_analysis_result(sid, reason="代码提交试飞已全部通过")
+            persist_skipped_diff_analysis(sid, skip_result)
+            append_history_event(
+                sid,
+                {
+                    "event": "node_skipped",
+                    "room_id": room_id,
+                    "node_id": run_node,
+                    "reason": "flight_all_passed",
+                    "flow_stage": FLOW_STEP_LABEL[STEP_TASK_EXEC_CLI],
+                    "log_type": "info",
+                    "agent_id": "system",
+                    "system_node": True,
+                },
+            )
+            pctx = pipe._data.get("context")
+            if not isinstance(pctx, dict):
+                pctx = {}
+            pctx["diff_analysis_assets"] = skip_result
+            pctx["last_finished_node_id"] = run_node
+            pipe._data["context"] = pctx
+            from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+
+            orch = MeetingRoomOrchestrator()
+            orch.on_node_complete(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=run_node,
+                artifacts=None,
+                tokens_used=0,
+                duration_seconds=0,
+                sync_userwork=True,
+                advance=True,
+                schedule_pipeline_advance=False,
+                ticket_title=ticket_title,
+                agent_pool=ctx.agent_pool,
+            )
+            pipe.mark_step_completed(STEP_TASK_EXEC_CLI)
+            pipe.set_flow_step(STEP_NODE_FINISH, reason="试飞已通过，跳过试飞优化节点")
+            return
+
     rs = dict(load_room_state(sid) or {})
     rs["status"] = "processing"
     rs["current_node_id"] = run_node
@@ -1640,6 +1752,7 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     model_label = display_cli_model_label(tool_norm, cli_model, cli_model_custom)
     if is_diff_analysis:
         from synapse.rd_meeting.diff_analysis_exec import write_diff_analysis_cli_starting
+        from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_starting
 
         write_diff_analysis_cli_starting(
             sid,
@@ -1649,6 +1762,7 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             cli_model_label=model_label,
             demand_no=_resolve_demand_no(scope_type, sid),
         )
+        on_diff_analysis_cli_starting(sid, reason=reprocess_reason)
     else:
         write_task_exec_cli_starting(
             sid,
@@ -1688,6 +1802,10 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         )
         report_body = render_diff_analysis_report_markdown(result)
         assets_key = "diff_analysis_assets"
+
+        from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_finished
+
+        on_diff_analysis_cli_finished(sid, result)
     else:
         result = bootstrap_task_exec(
             scope_type,  # type: ignore[arg-type]
@@ -1735,39 +1853,31 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
 
     orch = MeetingRoomOrchestrator()
     summary = result.get("summary") if isinstance(result.get("summary"), dict) else {}
+    orch.enter_task_exec_gate(
+        scope_type=scope_type,
+        scope_id=sid,
+        room_id=room_id,
+        node_id=run_node,
+        report_body=report_body,
+        tokens_used=int(summary.get("total_tokens") or 0),
+        duration_seconds=int(summary.get("total_duration_sec") or 0),
+        stage_id=int(data.get("stage_id") or stage_id_for_node_id(run_node)),
+        ticket_title=ticket_title,
+    )
     if is_diff_analysis and result.get("flight_failed"):
-        orch.enter_cli_exec_exception_gate(
-            scope_type=scope_type,
-            scope_id=sid,
-            room_id=room_id,
-            node_id=run_node,
-            report_body=report_body,
-            error=str(result.get("error") or "试飞仍未通过，不允许推进节点"),
-            tokens_used=int(summary.get("total_tokens") or 0),
-            duration_seconds=int(summary.get("total_duration_sec") or 0),
-            stage_id=int(data.get("stage_id") or stage_id_for_node_id(run_node)),
-            ticket_title=ticket_title,
-            payload=result,
-            payload_key="diff_analysis_payload",
-            blocked_key="diff_analysis_blocked",
-        )
-    else:
-        orch.enter_task_exec_gate(
-            scope_type=scope_type,
-            scope_id=sid,
-            room_id=room_id,
-            node_id=run_node,
-            report_body=report_body,
-            tokens_used=int(summary.get("total_tokens") or 0),
-            duration_seconds=int(summary.get("total_duration_sec") or 0),
-            stage_id=int(data.get("stage_id") or stage_id_for_node_id(run_node)),
-            ticket_title=ticket_title,
-        )
+        rs_block = dict(load_room_state(sid) or {})
+        rs_block["diff_analysis_blocked"] = True
+        if result.get("error"):
+            rs_block["escalate_reason"] = str(result.get("error") or "")
+        save_room_state(sid, rs_block)
 
     pipe.mark_step_completed(STEP_TASK_EXEC_CLI)
     wait_reason = "试飞优化 CLI 完成，等待人工评审" if is_diff_analysis else "任务执行 CLI 完成，等待人工评审"
-    if is_diff_analysis and result.get("flight_failed"):
-        wait_reason = "试飞优化失败：试飞仍未通过，流程已阻断"
+    commit_phase = str(result.get("commit_phase") or "")
+    if is_diff_analysis and commit_phase == "await_confirm":
+        wait_reason = "试飞优化代码修复完成，待确认后提交"
+    elif is_diff_analysis and result.get("flight_failed"):
+        wait_reason = "试飞优化失败：试飞仍未通过，请填写优化建议后重处理"
     pipe.set_flow_step(STEP_WAITING, reason=wait_reason)
 
 

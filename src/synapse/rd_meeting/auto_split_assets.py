@@ -367,6 +367,8 @@ def format_auto_split_report(assets: dict[str, Any], *, node_name: str) -> str:
         conclusion = "自动拆单失败：split_plan 中的研发子单未能全部创建成功。"
     elif status == "partial":
         conclusion = f"自动拆单部分成功：计划 {plan_n} 条，成功 {ok_n} 条。"
+    elif assets.get("reuse_existing"):
+        conclusion = f"用户选择沿用已有任务单，跳过 create_task；共 {ok_n} 条可用子单。"
     elif not plan_n:
         conclusion = "未找到 split_plan 拆单计划，无法执行自动拆单。"
     else:

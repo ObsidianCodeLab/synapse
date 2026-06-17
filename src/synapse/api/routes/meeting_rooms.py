@@ -60,6 +60,13 @@ class SubmitMeetingProdBody(BaseModel):
     prod: str = Field(..., min_length=1, description="统一服务产品标识（get_prod_info.prod）")
 
 
+class SubmitAutoSplitChoiceBody(BaseModel):
+    choice: str = Field(
+        ...,
+        description="continue=继续按 split_plan 拆单；reuse_existing=沿用 userwork 已有任务单",
+    )
+
+
 class InterveneBody(BaseModel):
     text: str = Field(..., description="人工指令或聊天内容")
     message_type: str = Field("instruction", description="instruction 或 chat")
@@ -391,6 +398,28 @@ async def submit_meeting_prod(room_id: str, body: SubmitMeetingProdBody, request
     except Exception as exc:
         logger.exception("submit_meeting_prod failed: %s", exc)
         return error_response(500, "submit_meeting_prod_failed", str(exc))
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/auto-split-choice")
+async def submit_auto_split_choice(
+    room_id: str,
+    body: SubmitAutoSplitChoiceBody,
+    request: Request,
+) -> dict:
+    """需求单已有任务单时，用户选择继续拆单或沿用已有子单。"""
+    pool = getattr(request.app.state, "agent_pool", None)
+    try:
+        item = _service.submit_auto_split_choice(
+            room_id,
+            body.choice.strip(),
+            agent_pool=pool,
+        )
+        return success_response(item)
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("submit_auto_split_choice failed: %s", exc)
+        return error_response(500, "submit_auto_split_choice_failed", str(exc))
 
 
 @router.get("/api/dev/work/{scope_type}/{scope_id}/dev.status")
@@ -976,16 +1005,51 @@ async def get_task_exec(room_id: str, node_id: str = "") -> dict:
         payload = load_diff_analysis_payload(sid)
         live_tail = read_diff_analysis_live_tail(sid)
         blocked_key = "diff_analysis_blocked"
+        from synapse.rd_meeting.diff_analysis_panel import (
+            build_optimize_comment_hint,
+            list_optimize_plan_sections,
+            resolve_flight_key_content,
+            resolve_identified_issues_markdown,
+        )
+        from synapse.rd_meeting.diff_analysis_rounds import (
+            current_diff_analysis_round,
+            load_diff_analysis_rounds,
+        )
+
+        panel_extra = {
+            "optimize_plan_sections": list_optimize_plan_sections(sid),
+            "flight_key_content": resolve_flight_key_content(sid, payload),
+            "optimize_comment_hint": build_optimize_comment_hint(sid, payload),
+            "identified_issues_markdown": resolve_identified_issues_markdown(sid),
+        }
+        rounds = load_diff_analysis_rounds(sid)
+        current_round = current_diff_analysis_round(sid)
     else:
         payload = load_task_exec_payload(sid)
         live_tail = read_task_exec_live_tail(sid)
         blocked_key = "task_exec_blocked"
+        panel_extra = {}
+        rounds = load_task_exec_rounds(sid)
+        current_round = current_task_exec_round(sid)
 
     if payload is None:
         return error_response(404, "task_exec_not_found")
+
+    if effective_node == "diff_analysis" and str(payload.get("commit_phase") or "") == "running":
+        from synapse.rd_meeting.paths import meeting_pipeline_path
+        from synapse.rd_meeting.room_runtime import read_json_file
+        from synapse.rd_meeting.system_node_display import build_code_commit_display
+
+        pipe_raw = read_json_file(meeting_pipeline_path(sid))
+        if isinstance(pipe_raw, dict):
+            ctx = pipe_raw.get("context") if isinstance(pipe_raw.get("context"), dict) else {}
+            cc = ctx.get("code_commit_assets")
+            if isinstance(cc, dict) and cc:
+                payload = dict(payload)
+                payload["code_commit"] = {**cc, "display": build_code_commit_display(cc)}
+
     if not live_tail.get("path"):
         live_tail = None
-    rounds = load_task_exec_rounds(sid) if effective_node != "diff_analysis" else []
     return success_response(
         {
             "room_id": room_id,
@@ -993,11 +1057,12 @@ async def get_task_exec(room_id: str, node_id: str = "") -> dict:
             "node_id": effective_node,
             "payload": payload,
             "reprocess_rounds": rounds,
-            "current_round": current_task_exec_round(sid) if effective_node != "diff_analysis" else 0,
+            "current_round": current_round,
             "live_tail": live_tail,
             "intervention_kind": room_state.get("intervention_kind"),
             "blocked": bool(room_state.get(blocked_key)),
             "pending_node_id": pending.get("node_id"),
+            **panel_extra,
         }
     )
 
@@ -1038,16 +1103,26 @@ async def get_task_exec_code_diffs(room_id: str, node_id: str = "") -> dict:
 
 
 @router.put("/api/dev/meeting-rooms/{room_id}/task-exec/code-diffs")
-async def save_task_exec_code_diff(room_id: str, body: TaskExecCodeDiffSaveBody) -> dict:
+async def save_task_exec_code_diff(room_id: str, body: TaskExecCodeDiffSaveBody, node_id: str = "") -> dict:
     """任务执行评审：保存人工编辑后的变更后代码到沙箱工作区。"""
     resolved = _resolve_scope_for_room(room_id)
     if resolved is None:
         return error_response(404, "meeting_room_not_found")
     sid, _ = resolved
+    from synapse.rd_meeting.dev_status import load_dev_status
+    from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
     from synapse.rd_meeting.task_exec import load_task_exec_payload
     from synapse.rd_meeting.task_exec_code_diff import save_task_exec_code_diff_file
 
-    payload = load_task_exec_payload(sid)
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    dev = load_dev_status(sid) or {}
+    effective_node = (node_id or pending.get("node_id") or dev.get("current_node_id") or "task_exec").strip()
+
+    if effective_node == "diff_analysis":
+        payload = load_diff_analysis_payload(sid)
+    else:
+        payload = load_task_exec_payload(sid)
     if payload is None:
         return error_response(404, "task_exec_not_found")
     if str(payload.get("status") or "").lower() == "running":
@@ -1077,6 +1152,42 @@ async def save_task_exec_code_diff(room_id: str, body: TaskExecCodeDiffSaveBody)
             "file": file_entry,
         }
     )
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/task-exec/commit")
+async def submit_task_exec_commit(room_id: str, request: Request, node_id: str = "") -> dict:
+    """试飞优化：人工确认开发结果后触发代码提交与试飞等待。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, scope_type = resolved
+
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    dev = load_dev_status(sid) or {}
+    effective_node = (node_id or pending.get("node_id") or dev.get("current_node_id") or "").strip()
+    if effective_node != "diff_analysis":
+        return error_response(400, "commit_not_supported_for_node")
+
+    pool = getattr(request.app.state, "agent_pool", None)
+    detail = _service.get_room_detail(room_id) or {}
+    ticket_title = str(detail.get("ticket_title") or "")
+
+    orch = MeetingRoomOrchestrator()
+    try:
+        result = orch.trigger_diff_analysis_commit(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            ticket_title=ticket_title,
+            agent_pool=pool,
+        )
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("submit_task_exec_commit failed: %s", exc)
+        return error_response(500, "task_exec_commit_failed", str(exc))
+    return success_response(result)
 
 
 @router.post("/api/dev/meeting-rooms/{room_id}/task-exec/decision")

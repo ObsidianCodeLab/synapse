@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import difflib
 import logging
 import re
 import subprocess
@@ -98,6 +99,52 @@ def _parse_status_paths(status_out: str) -> list[tuple[str, str]]:
         else:
             rows.append(("modified", norm))
     return rows
+
+
+def _count_line_changes(original_bytes: bytes, modified_bytes: bytes) -> tuple[int, int]:
+    """按行 diff 统计增删行数（未跟踪/新增文件 numstat 常为 0）。"""
+    orig_lines = decode_text_bytes(original_bytes).splitlines()
+    mod_lines = decode_text_bytes(modified_bytes).splitlines()
+    if not orig_lines and mod_lines:
+        return len(mod_lines), 0
+    if orig_lines and not mod_lines:
+        return 0, len(orig_lines)
+    if orig_lines == mod_lines:
+        return 0, 0
+
+    additions = deletions = 0
+    matcher = difflib.SequenceMatcher(None, orig_lines, mod_lines)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "insert":
+            additions += j2 - j1
+        elif tag == "delete":
+            deletions += i2 - i1
+        elif tag == "replace":
+            deletions += i2 - i1
+            additions += j2 - j1
+    return additions, deletions
+
+
+def _resolve_file_line_stats(
+    *,
+    status: str,
+    rel_path: str,
+    original_bytes: bytes,
+    modified_bytes: bytes,
+    numstat: dict[str, dict[str, int]],
+) -> tuple[int, int]:
+    if status == "added":
+        return _count_line_changes(b"", modified_bytes)
+    if status == "deleted":
+        return _count_line_changes(original_bytes, b"")
+
+    stat = numstat.get(rel_path)
+    if stat:
+        add_n = int(stat.get("additions") or 0)
+        del_n = int(stat.get("deletions") or 0)
+        if add_n or del_n:
+            return add_n, del_n
+    return _count_line_changes(original_bytes, modified_bytes)
 
 
 def _parse_numstat(numstat_out: str) -> dict[str, dict[str, int]]:
@@ -292,7 +339,13 @@ def collect_repo_code_diff_files(repo_path: str) -> list[dict[str, Any]]:
         if status != "added" and status != "deleted" and original_bytes == modified_bytes:
             continue
 
-        stat = numstat.get(rel_path, {"additions": 0, "deletions": 0})
+        additions, deletions = _resolve_file_line_stats(
+            status=status,
+            rel_path=rel_path,
+            original_bytes=original_bytes,
+            modified_bytes=modified_bytes,
+            numstat=numstat,
+        )
         rows.append(
             {
                 "path": rel_path,
@@ -302,8 +355,8 @@ def collect_repo_code_diff_files(repo_path: str) -> list[dict[str, Any]]:
                 "original": decode_text_bytes(original_bytes),
                 "modified": decode_text_bytes(modified_bytes),
                 "has_modified": bool(modified_bytes),
-                "additions": int(stat.get("additions") or 0),
-                "deletions": int(stat.get("deletions") or 0),
+                "additions": additions,
+                "deletions": deletions,
                 "language": infer_diff_language(rel_path),
             }
         )

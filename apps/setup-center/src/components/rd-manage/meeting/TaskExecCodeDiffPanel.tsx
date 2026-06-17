@@ -173,7 +173,9 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
   const [activeId, setActiveId] = useState('');
   const [textEncoding, setTextEncoding] = useState<DiffTextEncoding>('utf-8');
   const [saving, setSaving] = useState(false);
+  const [dirtyRevision, setDirtyRevision] = useState(0);
   const editedByIdRef = useRef<Record<string, string>>({});
+  const editorBaselineByIdRef = useRef<Record<string, string>>({});
   const diffEditorRef = useRef<DiffEditorInstance | null>(null);
   const diffUpdateDisposableRef = useRef<{ dispose?: () => void } | null>(null);
   const modifiedChangeDisposableRef = useRef<{ dispose?: () => void } | null>(null);
@@ -187,18 +189,16 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
     (file: TaskExecCodeDiffFile) => {
       const cached = editedByIdRef.current[file.id];
       if (cached !== undefined) return cached;
-      if (file.id === activeId) {
-        return diffEditorRef.current?.getModifiedEditor?.()?.getValue?.() ?? getBaselineModified(file);
-      }
+      const editorBaseline = editorBaselineByIdRef.current[file.id];
+      if (editorBaseline !== undefined) return editorBaseline;
       return getBaselineModified(file);
     },
-    [activeId, getBaselineModified],
+    [getBaselineModified],
   );
 
-  const isFileDirty = useCallback(
-    (file: TaskExecCodeDiffFile) => getEditedContent(file) !== getBaselineModified(file),
-    [getBaselineModified, getEditedContent],
-  );
+  const isFileDirty = useCallback((file: TaskExecCodeDiffFile) => {
+    return editedByIdRef.current[file.id] !== undefined;
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -212,6 +212,9 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
         if (prev && rows.some((f) => f.id === prev)) return prev;
         return rows[0]?.id || '';
       });
+      editedByIdRef.current = {};
+      editorBaselineByIdRef.current = {};
+      setDirtyRevision((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载代码差异失败');
       setFiles([]);
@@ -241,6 +244,20 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
     [activeId, files],
   );
 
+  const activeDirty = useMemo(() => {
+    if (!activeFile) return false;
+    void dirtyRevision;
+    return isFileDirty(activeFile);
+  }, [activeFile, dirtyRevision, isFileDirty]);
+
+  const fileDirty = useCallback(
+    (file: TaskExecCodeDiffFile) => {
+      void dirtyRevision;
+      return isFileDirty(file);
+    },
+    [dirtyRevision, isFileDirty],
+  );
+
   const activeDiffText = useMemo(() => {
     if (!activeFile) return { original: '', modified: '' };
     return decodeDiffFileText(activeFile, textEncoding);
@@ -248,10 +265,23 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
 
   const activeEditable = Boolean(activeFile) && !isDeletedFile(activeFile);
 
-  const onModifiedChange = useCallback((value: string | undefined) => {
-    if (!activeFile) return;
-    editedByIdRef.current[activeFile.id] = value ?? '';
-  }, [activeFile]);
+  const onModifiedChange = useCallback(
+    (fileId: string, value: string | undefined) => {
+      const next = value ?? '';
+      const baseline = editorBaselineByIdRef.current[fileId] ?? next;
+      if (next === baseline) {
+        if (editedByIdRef.current[fileId] !== undefined) {
+          delete editedByIdRef.current[fileId];
+          setDirtyRevision((n) => n + 1);
+        }
+        return;
+      }
+      if (editedByIdRef.current[fileId] === next) return;
+      editedByIdRef.current[fileId] = next;
+      setDirtyRevision((n) => n + 1);
+    },
+    [],
+  );
 
   const onSaveActive = useCallback(async () => {
     if (!activeFile || !activeEditable) return;
@@ -269,7 +299,10 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
       });
       const saved = res.file;
       setFiles((prev) => prev.map((f) => (f.id === saved.id ? saved : f)));
+      const savedText = decodeDiffFileText(saved, textEncoding).modified;
+      editorBaselineByIdRef.current[activeFile.id] = savedText;
       delete editedByIdRef.current[activeFile.id];
+      setDirtyRevision((n) => n + 1);
       message.success('已保存到沙箱工作区');
       void refresh();
     } catch (e) {
@@ -354,7 +387,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
             <div className="flex min-w-max items-center gap-1.5">
               {files.map((file) => {
                 const active = file.id === activeFile?.id;
-                const dirty = isFileDirty(file);
+                const dirty = fileDirty(file);
                 const name = fileBaseName(file.path);
                 return (
                   <button
@@ -392,7 +425,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                     {activeEditable ? (
                       <Button
                         size="small"
-                        className="rd-task-exec-save-btn"
+                        className={`rd-task-exec-save-btn${activeDirty ? ' rd-task-exec-save-btn--dirty' : ''}`}
                         icon={<Save className="h-3 w-3" />}
                         loading={saving}
                         disabled={saving}
@@ -476,10 +509,27 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                         lineNumbers: 'on',
                       });
 
-                      modifiedChangeDisposableRef.current =
-                        modifiedEditor?.onDidChangeModelContent?.(() => {
-                          onModifiedChange(modifiedEditor.getValue?.());
-                        }) ?? null;
+                      const fileId = activeFile.id;
+                      let baselineLocked = false;
+
+                      const lockEditorBaseline = () => {
+                        if (baselineLocked) return;
+                        baselineLocked = true;
+                        const initialValue =
+                          modifiedEditor?.getValue?.() ?? activeDiffText.modified;
+                        editorBaselineByIdRef.current[fileId] = initialValue;
+                        delete editedByIdRef.current[fileId];
+
+                        modifiedChangeDisposableRef.current?.dispose?.();
+                        modifiedChangeDisposableRef.current =
+                          modifiedEditor?.onDidChangeModelContent?.(() => {
+                            onModifiedChange(fileId, modifiedEditor.getValue?.());
+                          }) ?? null;
+                      };
+
+                      diffEditor.onDidUpdateDiff?.(() => lockEditorBaseline());
+                      requestAnimationFrame(() => lockEditorBaseline());
+                      window.setTimeout(() => lockEditorBaseline(), 0);
 
                       diffUpdateDisposableRef.current = bindDiffCenterScroll(diffEditor) ?? null;
                     }}

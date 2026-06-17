@@ -2,7 +2,7 @@
  * 任务执行评审面板：展示 CLI 批量执行结果，供人工确认后推进。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Input, message } from 'antd';
+import { Alert, Button, Input, Tabs, message } from 'antd';
 import {
   Bot,
   CheckCircle2,
@@ -12,10 +12,12 @@ import {
   FileCode2,
   FileDiff,
   FolderGit2,
+  GitBranch,
   ListTree,
   Loader2,
   RotateCw,
   Sparkles,
+  AlertTriangle,
   Target,
   Terminal,
   Wrench,
@@ -23,11 +25,13 @@ import {
 import {
   fetchTaskExec,
   reprocessMeetingRoom,
+  submitTaskExecCommit,
   submitTaskExecDecision,
   type TaskExecPayload,
   type TaskExecReprocessRound,
   type TaskExecLiveTail,
   type TaskExecTaskRow,
+  type TaskExecGetResponse,
 } from '../../../api/meetingRoomService';
 import { CLI_TOOL_OPTIONS } from './cliToolConfig';
 import { displayCliModelLabel } from './cliModelConfig';
@@ -35,6 +39,9 @@ import { CursorAgentInstallModal } from './CursorAgentInstallModal';
 import { ReviewMarkdown } from './ReviewMarkdown';
 import { TaskExecCliLogViewer } from './TaskExecCliLogViewer';
 import { TaskExecCodeDiffPanel } from './TaskExecCodeDiffPanel';
+import { CodeCommitFlightPanel } from './CodeCommitFlightPanel';
+import { CodeCommitProgressSteps } from './CodeCommitProgressSteps';
+import { codeCommitSummaryLine, resolveCodeCommitStepStates } from './codeCommitDisplay';
 
 const { TextArea } = Input;
 
@@ -165,7 +172,10 @@ function PromptBlock({ title, content }: { title: string; content?: string }) {
   );
 }
 
-function roundKindLabel(kind: string | undefined): string {
+function roundKindLabel(kind: string | undefined, variant: 'task_exec' | 'diff_analysis'): string {
+  if (variant === 'diff_analysis') {
+    return kind === 'reprocess' ? '优化处理' : '首轮优化';
+  }
   return kind === 'reprocess' ? '重新处理' : '首轮执行';
 }
 
@@ -183,19 +193,25 @@ function roundStatusLabel(status: string | undefined): string {
 function TaskExecRoundsPanel({
   rounds,
   currentRound,
+  variant = 'task_exec',
 }: {
   rounds: TaskExecReprocessRound[];
   currentRound?: number;
+  variant?: 'task_exec' | 'diff_analysis';
 }) {
   if (!rounds.length) return null;
   const total = currentRound || rounds[rounds.length - 1]?.round || rounds.length;
+  const panelTitle = variant === 'diff_analysis' ? '优化轮次' : '执行轮次';
+  const reasonPrefix = variant === 'diff_analysis' ? '优化建议' : '处理建议';
+  const emptyInitialHint =
+    variant === 'diff_analysis' ? '首轮优化，无额外优化意见' : '首轮执行，无额外处理建议';
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-violet-950/20 p-4 shadow-[0_8px_32px_rgba(139,92,246,0.08)]">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
           <RotateCw className="h-3.5 w-3.5 text-violet-400" />
-          执行轮次
+          {panelTitle}
         </div>
         <span className="rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-200">
           共 {total} 轮
@@ -217,7 +233,7 @@ function TaskExecRoundsPanel({
             >
               <div className="flex flex-wrap items-center gap-2 text-[11px]">
                 <span className="font-semibold text-foreground">第 {round.round} 轮</span>
-                <span className="text-muted-foreground">{roundKindLabel(round.kind)}</span>
+                <span className="text-muted-foreground">{roundKindLabel(round.kind, variant)}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] ${
                     String(round.status).toLowerCase() === 'ok'
@@ -242,11 +258,11 @@ function TaskExecRoundsPanel({
               </div>
               {reason ? (
                 <p className="mt-2 mb-0 text-[12px] leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                  <span className="text-muted-foreground">处理建议：</span>
+                  <span className="text-muted-foreground">{reasonPrefix}：</span>
                   {reason}
                 </p>
               ) : round.kind === 'initial' ? (
-                <p className="mt-2 mb-0 text-[12px] text-muted-foreground">首轮执行，无额外处理建议</p>
+                <p className="mt-2 mb-0 text-[12px] text-muted-foreground">{emptyInitialHint}</p>
               ) : null}
               {round.note ? (
                 <p className="mt-1 mb-0 text-[11px] text-muted-foreground/80">{round.note}</p>
@@ -255,6 +271,196 @@ function TaskExecRoundsPanel({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function DiffAnalysisTaskRowCard({ task }: { task: TaskExecTaskRow }) {
+  const status = String(task.status || '—');
+  const meta = statusMeta(status);
+  const isRunning = status === 'running';
+  const phase = String(task.phase || '').trim();
+
+  return (
+    <div className="rounded-xl border border-amber-500/15 bg-black/20 px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-sm font-medium text-foreground">
+            {task.task_no} {task.task_title || ''}
+          </span>
+          {task.product_module ? (
+            <p className="mb-0 mt-0.5 text-[11px] text-muted-foreground">{task.product_module}</p>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          {isRunning && phase ? (
+            <span className="inline-flex items-center gap-1 text-blue-300">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {PHASE_LABEL[phase] || phase}
+            </span>
+          ) : null}
+          <span className={`rd-task-exec-status ${meta.className}`}>{meta.label}</span>
+          <span className="tabular-nums">{task.tokens_used ?? 0} tk</span>
+          <span className="tabular-nums">{formatDuration(Number(task.duration_seconds || 0))}</span>
+        </div>
+      </div>
+      {task.error ? (
+        <Alert type="error" showIcon message={String(task.error)} className="mt-2 text-[11px]" />
+      ) : null}
+    </div>
+  );
+}
+
+function DiffAnalysisDetailSubsection({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-white/10 last:border-b-0">
+      <div className="flex items-center gap-2 border-b border-white/5 bg-black/15 px-4 py-2.5 text-[11px] font-semibold text-foreground/90">
+        {icon}
+        {title}
+      </div>
+      <div className="px-4 py-3">{children}</div>
+    </div>
+  );
+}
+
+function FlightOptimizePlanTabs({
+  section,
+}: {
+  section: NonNullable<TaskExecGetResponse['optimize_plan_sections']>[number] | undefined;
+}) {
+  if (!section) {
+    return <Alert type="info" showIcon message="暂无试飞优化方案中的修复建议" />;
+  }
+
+  const items = Array.isArray(section.plan_items) ? section.plan_items : [];
+  const fallbackMd = String(section.markdown || '').trim();
+  const tabItems =
+    items.length > 0
+      ? items.map((item) => ({
+          key: String(item.item_no ?? item.label ?? item.title),
+          label: String(item.label || item.title || `计划项 ${item.item_no ?? ''}`),
+          children: (
+            <div className="rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 py-2 text-[13px] leading-relaxed">
+              <ReviewMarkdown content={String(item.markdown || '')} compact />
+            </div>
+          ),
+        }))
+      : fallbackMd
+        ? [
+            {
+              key: 'all',
+              label: '修复建议',
+              children: (
+                <div className="rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 py-2 text-[13px] leading-relaxed">
+                  <ReviewMarkdown content={fallbackMd} compact />
+                </div>
+              ),
+            },
+          ]
+        : [];
+
+  return (
+    <div className="space-y-2">
+      {String(section.intro || '').trim() ? (
+        <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[12px] text-muted-foreground rd-task-exec-report__body">
+          <ReviewMarkdown content={String(section.intro)} compact />
+        </div>
+      ) : null}
+      {tabItems.length > 0 ? (
+        <Tabs size="small" items={tabItems} className="rd-flight-plan-tabs" destroyInactiveTabPane={false} />
+      ) : (
+        <Alert type="warning" showIcon message="未解析到计划项" />
+      )}
+    </div>
+  );
+}
+
+function DiffAnalysisDetailPanel({
+  flightContent,
+  commitRunning,
+  codeCommitDisplay,
+  codeCommitStepStates,
+  identifiedIssuesMarkdown,
+  optimizePlanSections,
+}: {
+  flightContent?: TaskExecGetResponse['flight_key_content'];
+  commitRunning?: boolean;
+  codeCommitDisplay?: Record<string, unknown> | null;
+  codeCommitStepStates?: ReturnType<typeof resolveCodeCommitStepStates>;
+  identifiedIssuesMarkdown?: string | null;
+  optimizePlanSections: NonNullable<TaskExecGetResponse['optimize_plan_sections']>;
+}) {
+  const display =
+    (commitRunning || codeCommitDisplay ? codeCommitDisplay : flightContent?.display) as
+      | Record<string, unknown>
+      | null
+      | undefined;
+  const latestPlan =
+    optimizePlanSections.length > 0
+      ? optimizePlanSections[optimizePlanSections.length - 1]
+      : undefined;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-br from-slate-900/90 via-slate-900/70 to-amber-950/15 shadow-[0_8px_32px_rgba(251,191,36,0.08)]">
+      <DiffAnalysisDetailSubsection
+        title="代码提交明细"
+        icon={<GitBranch className="h-3.5 w-3.5 text-sky-400" />}
+      >
+        {commitRunning ? (
+          <div className="mb-3 rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-sky-400" />
+              {codeCommitDisplay ? codeCommitSummaryLine(codeCommitDisplay) : '正在提交并等待试飞…'}
+            </div>
+            {codeCommitStepStates ? (
+              <div className="mt-3">
+                <CodeCommitProgressSteps stepStates={codeCommitStepStates} />
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {display ? (
+          <CodeCommitFlightPanel display={display} hideArchives />
+        ) : flightContent?.markdown ? (
+          <div className="rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto rounded-xl border border-amber-500/10 bg-black/20 p-3">
+            <ReviewMarkdown content={flightContent.markdown} compact />
+          </div>
+        ) : (
+          <Alert type="info" showIcon message="暂无代码提交与试飞明细" />
+        )}
+      </DiffAnalysisDetailSubsection>
+
+      <DiffAnalysisDetailSubsection
+        title="已识别问题清单"
+        icon={<AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}
+      >
+        {identifiedIssuesMarkdown ? (
+          <div className="rd-task-exec-report__body custom-scrollbar max-h-[360px] overflow-y-auto text-[13px] leading-relaxed">
+            <ReviewMarkdown content={identifiedIssuesMarkdown} compact />
+          </div>
+        ) : (
+          <Alert type="info" showIcon message="暂无已识别问题清单，请先完成试飞方案节点" />
+        )}
+      </DiffAnalysisDetailSubsection>
+
+      <DiffAnalysisDetailSubsection
+        title={
+          latestPlan && Number(latestPlan.round) > 1
+            ? `修复建议（第 ${latestPlan.round} 轮）`
+            : '修复建议'
+        }
+        icon={<Sparkles className="h-3.5 w-3.5 text-violet-400" />}
+      >
+        <FlightOptimizePlanTabs section={latestPlan} />
+      </DiffAnalysisDetailSubsection>
     </div>
   );
 }
@@ -315,6 +521,7 @@ function TaskRowCard({
       </div>
 
       <div className="relative space-y-3 text-[12px]">
+        {showVerify ? (
         <div className="rd-task-exec-field">
           <div className="rd-task-exec-field__label">
             <Target className="h-3.5 w-3.5 text-amber-400" />
@@ -322,6 +529,7 @@ function TaskRowCard({
           </div>
           <p className="rd-task-exec-field__value">{task.goal || '—'}</p>
         </div>
+        ) : null}
 
         {showVerify ? (
         <div className="rd-task-exec-field">
@@ -358,10 +566,10 @@ function TaskRowCard({
           </details>
         ) : null}
 
-        <PromptBlock title={copy.developPrompt} content={task.develop_prompt} />
+        {showVerify ? <PromptBlock title={copy.developPrompt} content={task.develop_prompt} /> : null}
         {showVerify ? <PromptBlock title={copy.verifyPrompt} content={task.verify_prompt} /> : null}
 
-        {task.develop_agent_command ? (
+        {showVerify && task.develop_agent_command ? (
           <details className="rd-task-exec-prompt">
             <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5 text-emerald-400" />
@@ -416,10 +624,21 @@ export function TaskExecReviewPanel({
   const [error, setError] = useState('');
   const [installOpen, setInstallOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [committing, setCommitting] = useState(false);
   const [liveTail, setLiveTail] = useState<TaskExecLiveTail | null>(null);
+  const [optimizePlanSections, setOptimizePlanSections] = useState<
+    NonNullable<TaskExecGetResponse['optimize_plan_sections']>
+  >([]);
+  const [flightKeyContent, setFlightKeyContent] = useState<TaskExecGetResponse['flight_key_content']>();
+  const [optimizeCommentHint, setOptimizeCommentHint] = useState('');
+  const [identifiedIssuesMarkdown, setIdentifiedIssuesMarkdown] = useState<string | null>(null);
+  const [commentPrefilled, setCommentPrefilled] = useState(false);
   const liveTailEndRef = useRef<HTMLDivElement>(null);
 
-  const isRunning = live || String(payload?.status || '') === 'running';
+  const isRunning =
+    live ||
+    String(payload?.status || '') === 'running' ||
+    (nodeId === 'diff_analysis' && String(payload?.commit_phase || '') === 'running');
 
   const refresh = useCallback(async () => {
     if (!isRunning) setLoading(true);
@@ -430,6 +649,14 @@ export function TaskExecReviewPanel({
       setReprocessRounds(Array.isArray(res.reprocess_rounds) ? res.reprocess_rounds : []);
       setCurrentRound(Number(res.current_round) || 0);
       if (res.live_tail) setLiveTail(res.live_tail);
+      if (nodeId === 'diff_analysis') {
+        setOptimizePlanSections(Array.isArray(res.optimize_plan_sections) ? res.optimize_plan_sections : []);
+        setFlightKeyContent(res.flight_key_content);
+        setOptimizeCommentHint(String(res.optimize_comment_hint || ''));
+        setIdentifiedIssuesMarkdown(
+          res.identified_issues_markdown != null ? String(res.identified_issues_markdown) : null,
+        );
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : '加载失败';
       if (!isRunning || !msg.includes('404')) {
@@ -502,10 +729,60 @@ export function TaskExecReviewPanel({
     }
   };
 
+  const onConfirmCommit = async () => {
+    setCommitting(true);
+    try {
+      await submitTaskExecCommit(synapseApiBase, roomId, 'diff_analysis');
+      message.success('已确认，正在提交代码并等待试飞…');
+      await refresh();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '触发提交失败');
+    } finally {
+      setCommitting(false);
+    }
+  };
+
   const flightFailed = Boolean(payload?.flight_failed);
-  const canApprove = !blocked && !submitting && !flightFailed;
-  const optimizeDisabled = submitting || isRunning || agentCliMissing;
+  const isDiffAnalysis = nodeId === 'diff_analysis';
+  const hasFlightIssues = isDiffAnalysis
+    ? Boolean(flightKeyContent?.has_issues ?? flightFailed)
+    : flightFailed;
+  const commitPhase = String(payload?.commit_phase || '').trim();
+  const awaitCommitConfirm = isDiffAnalysis && commitPhase === 'await_confirm';
+  const commitRunning = isDiffAnalysis && (commitPhase === 'running' || committing);
+  const commitDone = isDiffAnalysis && commitPhase === 'done';
+  const codeCommitDisplay = useMemo(() => {
+    const raw = payload?.code_commit;
+    if (!raw || typeof raw !== 'object') return null;
+    const display = (raw as { display?: Record<string, unknown> }).display;
+    return (display && typeof display === 'object' ? display : raw) as Record<string, unknown>;
+  }, [payload?.code_commit]);
+  const codeCommitStepStates = useMemo(
+    () => (codeCommitDisplay ? resolveCodeCommitStepStates(codeCommitDisplay) : null),
+    [codeCommitDisplay],
+  );
+  const canApprove =
+    !blocked &&
+    !submitting &&
+    !flightFailed &&
+    !hasFlightIssues &&
+    !awaitCommitConfirm &&
+    !commitRunning &&
+    (!isDiffAnalysis || commitDone);
+  const optimizeDisabled =
+    submitting ||
+    isRunning ||
+    agentCliMissing ||
+    commitRunning ||
+    (isDiffAnalysis && commitDone && !hasFlightIssues);
   const canOptimize = comment.trim().length > 0 && !optimizeDisabled;
+  const canConfirmCommit =
+    isDiffAnalysis &&
+    awaitCommitConfirm &&
+    !submitting &&
+    !commitRunning &&
+    !agentCliMissing &&
+    !tasks.some((t) => t.status === 'failed');
 
   const agentInstallHint =
     (payload?.agent_cli && typeof payload.agent_cli === 'object'
@@ -515,6 +792,25 @@ export function TaskExecReviewPanel({
   useEffect(() => {
     if (agentCliMissing) setInstallOpen(true);
   }, [agentCliMissing]);
+
+  useEffect(() => {
+    if (!isDiffAnalysis || commentPrefilled || isRunning) return;
+    if (commitDone && hasFlightIssues && optimizeCommentHint.trim()) {
+      setComment(optimizeCommentHint.trim());
+      setCommentPrefilled(true);
+    }
+  }, [
+    isDiffAnalysis,
+    commitDone,
+    hasFlightIssues,
+    optimizeCommentHint,
+    commentPrefilled,
+    isRunning,
+  ]);
+
+  useEffect(() => {
+    if (awaitCommitConfirm) setCommentPrefilled(false);
+  }, [awaitCommitConfirm]);
 
   const onAgentReady = async () => {
     setReprocessing(true);
@@ -676,7 +972,11 @@ export function TaskExecReviewPanel({
         </div>
       </div>
 
-      <TaskExecRoundsPanel rounds={reprocessRounds} currentRound={currentRound || undefined} />
+      <TaskExecRoundsPanel
+        rounds={reprocessRounds}
+        currentRound={currentRound || undefined}
+        variant={isDiffAnalysis ? 'diff_analysis' : 'task_exec'}
+      />
 
       {agentCliMissing ? (
         <Alert
@@ -703,7 +1003,7 @@ export function TaskExecReviewPanel({
         />
       ) : null}
 
-      {blocked ? (
+      {blocked && !isDiffAnalysis ? (
         <Alert type="error" showIcon message={copy.blockedMsg} />
       ) : null}
 
@@ -712,7 +1012,30 @@ export function TaskExecReviewPanel({
           <ListTree className="h-3.5 w-3.5 text-amber-400" />
           {copy.detailList}
         </div>
-        {tasks.length === 0 && !agentCliMissing && !isRunning ? (
+        {isDiffAnalysis ? (
+          <>
+            {(!isRunning || commitRunning || commitDone) && !agentCliMissing ? (
+              <DiffAnalysisDetailPanel
+                flightContent={flightKeyContent}
+                commitRunning={commitRunning}
+                codeCommitDisplay={commitDone || commitRunning ? codeCommitDisplay : null}
+                codeCommitStepStates={codeCommitStepStates ?? undefined}
+                identifiedIssuesMarkdown={identifiedIssuesMarkdown}
+                optimizePlanSections={optimizePlanSections}
+              />
+            ) : null}
+            {tasks.length > 0 ? (
+              <div className="space-y-2 pt-1">
+                <p className="mb-0 text-[10px] uppercase tracking-wider text-muted-foreground">执行明细</p>
+                {tasks.map((t) => (
+                  <DiffAnalysisTaskRowCard key={String(t.task_no)} task={t} />
+                ))}
+              </div>
+            ) : !agentCliMissing && !isRunning ? (
+              <Alert type="warning" message={copy.emptyDetail} showIcon />
+            ) : null}
+          </>
+        ) : tasks.length === 0 && !agentCliMissing && !isRunning ? (
           <Alert type="warning" message={copy.emptyDetail} showIcon />
         ) : (
           tasks.map((t) => (
@@ -731,7 +1054,7 @@ export function TaskExecReviewPanel({
         </div>
       ) : null}
 
-      {!agentCliMissing && !isRunning ? (
+      {!agentCliMissing && (!isRunning || commitRunning) ? (
       <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-6">
         <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5">
           <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
@@ -741,15 +1064,19 @@ export function TaskExecReviewPanel({
           rows={3}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="优化处理时必填：说明 CLI 执行结果的问题、需调整的方向或后续研发要求…"
-          disabled={blocked || submitting}
+          placeholder={
+            isDiffAnalysis
+              ? '优化处理时必填：说明修复方向、需调整的改造要点…'
+              : '优化处理时必填：说明 CLI 执行结果的问题、需调整的方向或后续研发要求…'
+          }
+          disabled={(blocked && !isDiffAnalysis) || submitting || (isDiffAnalysis && commitDone && !hasFlightIssues)}
         />
         <div className="flex flex-wrap gap-4 justify-end pt-3">
           <Button
             type={canOptimize ? 'primary' : 'default'}
             icon={<Wrench className="h-4 w-4" />}
             loading={submitting}
-            disabled={optimizeDisabled}
+            disabled={!canOptimize}
             className={
               canOptimize
                 ? '!bg-orange-600 !border-orange-600 !text-white shadow-none hover:!bg-orange-500 hover:!border-orange-500 focus:!bg-orange-600 active:!bg-orange-700'
@@ -759,16 +1086,42 @@ export function TaskExecReviewPanel({
           >
             优化处理
           </Button>
-          <Button
-            type="primary"
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            loading={submitting}
-            disabled={!canApprove}
-            className="bg-emerald-600 hover:bg-emerald-500"
-            onClick={() => void onDecision('approve')}
-          >
-            通过并推进
-          </Button>
+          {canConfirmCommit ? (
+            <Button
+              type="primary"
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              loading={committing}
+              disabled={submitting}
+              className="bg-sky-600 hover:bg-sky-500"
+              onClick={() => void onConfirmCommit()}
+            >
+              确认并提交
+            </Button>
+          ) : null}
+          {isDiffAnalysis ? (
+            canApprove ? (
+              <Button
+                type="primary"
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                loading={submitting}
+                className="bg-emerald-600 hover:bg-emerald-500"
+                onClick={() => void onDecision('approve')}
+              >
+                试飞通过并推进
+              </Button>
+            ) : null
+          ) : (
+            <Button
+              type="primary"
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              loading={submitting}
+              disabled={!canApprove}
+              className="bg-emerald-600 hover:bg-emerald-500"
+              onClick={() => void onDecision('approve')}
+            >
+              通过并推进
+            </Button>
+          )}
         </div>
       </div>
       ) : null}

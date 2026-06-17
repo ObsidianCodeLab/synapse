@@ -7076,6 +7076,23 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   background: rgb(0 0 0 / 0.22) !important;
   color: rgb(161 161 170) !important;
 }
+.rd-task-exec-save-btn--dirty.ant-btn:not(:disabled) {
+  border-color: rgb(34 211 238 / 0.55) !important;
+  background: rgb(34 211 238 / 0.22) !important;
+  color: rgb(224 242 254) !important;
+  box-shadow: 0 0 0 1px rgb(34 211 238 / 0.15), 0 0 12px rgb(34 211 238 / 0.2) !important;
+}
+.rd-task-exec-save-btn--dirty.ant-btn:not(:disabled):hover {
+  border-color: rgb(34 211 238 / 0.7) !important;
+  background: rgb(34 211 238 / 0.32) !important;
+  color: rgb(255 255 255) !important;
+  box-shadow: 0 0 0 1px rgb(34 211 238 / 0.25), 0 0 16px rgb(34 211 238 / 0.28) !important;
+}
+.rd-task-exec-save-btn--dirty.ant-btn:not(:disabled):active {
+  border-color: rgb(34 211 238 / 0.75) !important;
+  background: rgb(34 211 238 / 0.38) !important;
+  color: rgb(255 255 255) !important;
+}
 
 /* 任务执行 inline diff：隐藏原稿侧行号列，只保留改后行号（Monaco 默认双列） */
 .rd-task-exec-diff-inline .monaco-diff-editor .editor.original .margin-view-overlays {

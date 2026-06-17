@@ -369,6 +369,20 @@ export async function fetchMeetingRoomDetail(
   return apiGet<MeetingRoomDetail>(base, `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}`);
 }
 
+export type AutoSplitChoice = 'continue' | 'reuse_existing';
+
+export type AutoSplitChoicePayload = {
+  demand_no?: string;
+  existing_task_count?: number;
+  existing_tasks?: Array<{
+    task_no?: string;
+    task_title?: string;
+    sop_node?: string;
+    local_process_state?: string;
+    product_module_name?: string;
+  }>;
+};
+
 export interface MeetingRoomLivePayload {
   room_id: string;
   scope_id?: string;
@@ -411,6 +425,7 @@ export interface MeetingRoomLivePayload {
   intervention_kind?: string;
   /** 中栏面板：solution_review | node_review | hitl */
   intervention_panel?: string | null;
+  auto_split_choice_payload?: AutoSplitChoicePayload;
   hitl_form_schema?: HitlFormSchema;
   hitl_locked?: boolean;
   hitl_submission?: { values?: Record<string, unknown>; submitted_at?: string; locked?: boolean };
@@ -700,6 +715,7 @@ export interface TaskExecPayload {
   human_review?: { status?: string; comment?: string; decided_at?: string | null };
   flight_failed?: boolean;
   code_commit?: Record<string, unknown> | null;
+  commit_phase?: 'none' | 'await_confirm' | 'running' | 'done' | string;
   plan_doc_path?: string;
 }
 
@@ -732,6 +748,29 @@ export interface TaskExecGetResponse {
   intervention_kind?: string;
   blocked?: boolean;
   pending_node_id?: string;
+  optimize_plan_sections?: Array<{
+    round?: number;
+    title?: string;
+    markdown?: string;
+    intro?: string;
+    source?: string;
+    plan_items?: Array<{
+      item_no?: number;
+      title?: string;
+      subtitle?: string;
+      label?: string;
+      markdown?: string;
+    }>;
+  }>;
+  flight_key_content?: {
+    round?: number;
+    source?: string;
+    display?: Record<string, unknown> | null;
+    markdown?: string | null;
+    has_issues?: boolean;
+  };
+  optimize_comment_hint?: string;
+  identified_issues_markdown?: string | null;
 }
 
 export async function fetchTaskExec(
@@ -757,6 +796,20 @@ export async function submitTaskExecDecision(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/decision`,
     body,
+  );
+}
+
+export async function submitTaskExecCommit(
+  synapseApiBase: string,
+  roomId: string,
+  nodeId: 'diff_analysis' = 'diff_analysis',
+): Promise<{ status: string; node_id?: string; payload?: TaskExecPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const qs = `?node_id=${encodeURIComponent(nodeId)}`;
+  return apiPost<{ status: string; node_id?: string; payload?: TaskExecPayload }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/commit${qs}`,
+    {},
   );
 }
 
@@ -1143,6 +1196,23 @@ export async function submitMeetingRoomProd(
   return apiPost<MeetingRoomDetail>(base, `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/prod`, {
     prod: key,
   });
+}
+
+export async function submitMeetingRoomAutoSplitChoice(
+  synapseApiBase: string,
+  roomId: string,
+  choice: AutoSplitChoice,
+): Promise<MeetingRoomDetail> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const key = (choice || '').trim();
+  if (key !== 'continue' && key !== 'reuse_existing') {
+    throw new Error('invalid_auto_split_choice');
+  }
+  return apiPost<MeetingRoomDetail>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/auto-split-choice`,
+    { choice: key },
+  );
 }
 
 export async function openMeetingRoom(

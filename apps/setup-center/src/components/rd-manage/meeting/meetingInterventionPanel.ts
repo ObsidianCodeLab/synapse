@@ -6,7 +6,8 @@ export type InterventionPanelKind =
   | 'task_exec'
   | 'node_review'
   | 'hitl'
-  | 'prod_selection';
+  | 'prod_selection'
+  | 'auto_split_choice';
 
 /** 协同型（ai_human）节点完成门控使用的专用面板（与后端 intervention_panel 对齐） */
 const COLLAB_DEDICATED_PANEL: Record<string, InterventionPanelKind> = {
@@ -65,8 +66,21 @@ export type MeetingInterventionRoomSlice = {
   funcSolutionReviewPayload?: unknown;
   funcSolutionBlocked?: boolean;
   taskExecPayload?: unknown;
+  autoSplitChoicePayload?: AutoSplitChoicePayload | null;
   /** pending_delivery.node_id：人工门控所属 SOP 节点（优先于 currentNode） */
   hitlPendingNodeId?: string | null;
+};
+
+export type AutoSplitChoicePayload = {
+  demand_no?: string;
+  existing_task_count?: number;
+  existing_tasks?: Array<{
+    task_no?: string;
+    task_title?: string;
+    sop_node?: string;
+    local_process_state?: string;
+    product_module_name?: string;
+  }>;
 };
 
 const INTERVENTION_KIND_LABELS: Record<string, string> = {
@@ -79,6 +93,7 @@ const INTERVENTION_KIND_LABELS: Record<string, string> = {
   exception: '异常裁决',
   gate: '流程门控',
   prod_selection: '选择产品',
+  auto_split_choice: '拆单策略',
 };
 
 export function interventionKindLabel(kind: string | null | undefined): string {
@@ -100,11 +115,19 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
     return current || 'pending';
   }
 
-  if (kind === 'task_exec' || panel === 'task_exec') {
-    return pendingNid || current || 'task_exec';
+  if (kind === 'auto_split_choice' || panel === 'auto_split_choice') {
+    return current || 'auto_split';
   }
-  if (panel === 'task_exec' && (pendingNid === 'diff_analysis' || current === 'diff_analysis')) {
-    return 'diff_analysis';
+
+  if (
+    kind === 'task_exec' ||
+    panel === 'task_exec' ||
+    pendingNid === 'diff_analysis' ||
+    current === 'diff_analysis'
+  ) {
+    return pendingNid === 'diff_analysis' || current === 'diff_analysis'
+      ? 'diff_analysis'
+      : pendingNid || current || 'task_exec';
   }
 
   if (
@@ -172,7 +195,8 @@ export function resolveMeetingInterventionPanel(
     panel === 'task_exec' ||
     panel === 'node_review' ||
     panel === 'hitl' ||
-    panel === 'prod_selection'
+    panel === 'prod_selection' ||
+    panel === 'auto_split_choice'
   ) {
     return panel;
   }
@@ -181,10 +205,19 @@ export function resolveMeetingInterventionPanel(
   if (kind === 'prod_selection') {
     return 'prod_selection';
   }
+  if (kind === 'auto_split_choice') {
+    return 'auto_split_choice';
+  }
   const nid = (nodeId || room.currentNode || '').trim();
+  const pendingNid = (room.hitlPendingNodeId || '').trim();
   const resolvedType = nodeTypeForId(nid, nodeType);
 
-  if (kind === 'task_exec' || room.taskExecPayload) {
+  if (
+    kind === 'task_exec' ||
+    room.taskExecPayload ||
+    nid === 'diff_analysis' ||
+    pendingNid === 'diff_analysis'
+  ) {
     return 'task_exec';
   }
 

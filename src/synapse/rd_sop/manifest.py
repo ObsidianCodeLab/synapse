@@ -152,10 +152,9 @@ def is_human_only_node(node_id: str) -> bool:
     return NODE_TYPES.get(node_id, "") == "human"
 
 
-# 节点完成后暂不推进下游（原因 → 展示/落盘）；用于下游 SOP 尚未就绪的临时门控
-NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {
-    "task_feedback": "试飞优化方案待人工评估，评估通过后再继续执行试飞优化。",
-}
+# 节点完成后暂不推进下游（原因 → 展示/落盘）；用于下游 SOP 尚未就绪的临时门控。
+# 试飞优化（diff_analysis）由 CLI 评审面板（task_exec gate）门控，不在此重复阻断。
+NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {}
 
 
 def downstream_advance_block_reason(node_id: str) -> str:

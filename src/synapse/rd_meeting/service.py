@@ -384,6 +384,7 @@ class MeetingRoomService:
             "recent_chat": history_to_chat_logs(history),
             "intervention_kind": room_state.get("intervention_kind"),
             "intervention_panel": self._resolve_intervention_panel(room_state),
+            "auto_split_choice_payload": room_state.get("auto_split_choice_payload"),
             "hitl_form_schema": room_state.get("hitl_form_schema"),
             "hitl_locked": bool(room_state.get("hitl_locked")),
             "hitl_submission": room_state.get("hitl_submission"),
@@ -797,6 +798,88 @@ class MeetingRoomService:
 
         titles = build_title_index()
         payload = self._room_detail_payload(load_dev_status(sid) or dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
+
+    def submit_auto_split_choice(
+        self,
+        room_id: str,
+        choice: str,
+        *,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """自动拆单前用户选择：继续拆单或沿用已有任务单。"""
+        rid = (room_id or "").strip()
+        choice_norm = (choice or "").strip().lower()
+        if choice_norm not in ("continue", "reuse_existing"):
+            raise ValueError("invalid_auto_split_choice")
+        if not rid:
+            raise ValueError("room_id required")
+
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+
+        rs = load_room_state(sid) or {}
+        if str(rs.get("intervention_kind") or "") != "auto_split_choice":
+            raise ValueError("auto_split_choice_not_active")
+
+        from synapse.rd_meeting.auto_split_gate import (
+            clear_auto_split_choice_gate,
+            resume_auto_split_after_choice,
+        )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
+        from synapse.rd_meeting.pipeline import (
+            STEP_SYSTEM_NODE_EXEC,
+            PipelineRunContext,
+            run_pipeline_until_waiting,
+        )
+
+        clear_auto_split_choice_gate(sid)
+
+        pipe = MeetingPipeline.load(sid)
+        resume_auto_split_after_choice(pipe, choice=choice_norm)  # type: ignore[arg-type]
+
+        ctx = PipelineRunContext(
+            scope_type=scope_type,
+            scope_id=sid,
+            prod=str(detail.get("prod") or ""),
+            sync_userwork=True,
+            promote_to_processing=False,
+            agent_pool=agent_pool,
+            dev_status=load_dev_status(sid) or {},
+            detail=dict(detail),
+        )
+
+        def _resume_auto_split() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_SYSTEM_NODE_EXEC, create=False)
+
+        schedule_pipeline_background(rid, _resume_auto_split, scope_id=sid)
+
+        label = "继续拆单" if choice_norm == "continue" else "沿用已有任务单"
+        append_history_event(
+            sid,
+            {
+                "event": "auto_split_choice_submitted",
+                "room_id": rid,
+                "scope_id": sid,
+                "choice": choice_norm,
+                "flow_stage": "自动拆单",
+                "log_type": "info",
+                "chat_text": f"已选择：{label}",
+            },
+        )
+
+        titles = build_title_index()
+        payload = self._room_detail_payload(load_dev_status(sid) or {}, sid, titles)
         payload["status"] = "processing"
         payload["run_in_progress"] = True
         return payload

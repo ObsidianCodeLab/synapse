@@ -272,10 +272,6 @@ export const CodeCommitFlightPanel: React.FC<{
 
       {flights.length > 0 ? (
         <section className="space-y-3">
-          <h4 className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-            <GitBranch className="h-3.5 w-3.5" />
-            代码提交明细
-          </h4>
           {flights.map((entry) => (
             <FlightTaskCard key={entry.id} entry={entry} />
           ))}

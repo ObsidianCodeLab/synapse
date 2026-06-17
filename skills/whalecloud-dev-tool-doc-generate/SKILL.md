@@ -24,6 +24,7 @@ label: 文档生成工具
 | `templates/需求澄清.md` | `需求澄清.md` | 需求澄清交付文档 |
 | `templates/模块功能.md` | `模块功能.md` | 模块功能清单 |
 | `templates/函数级方案.md` | `函数级方案.md` | 函数级改造方案 |
+| `templates/试飞优化方案.md` | `试飞优化方案.md` | 试飞优化研发计划 |
 
 新增模板：在 `templates/` 下放置 `{文件名}.md`，调用时设 `OUTPUT` 与文件名一致即可。
 
@@ -53,6 +54,7 @@ label: 文档生成工具
 | 脚本 | 用途 |
 |------|------|
 | `scripts/fill_function_solution.py` | `OUTPUT=函数级方案.md` 时**必须**调用；含 `--validate-only` 契约预检 |
+| `scripts/fill_flight_optimize_plan.py` | `OUTPUT=试飞优化方案.md` 时**必须**调用；含 `--validate-only` 契约预检 |
 | `scripts/fill_clarify.py` | `OUTPUT=需求澄清.md` 时可选，替代手填 `{{#each}}` |
 
 **推荐**通过 `run_skill_script` 调用（`script_name` 用下表文件名即可，loader 会在 `scripts/` 下解析）：
@@ -78,6 +80,30 @@ run_skill_script(
   skill_name="whalecloud-dev-tool-doc-generate",
   script_name="fill_function_solution.py",
   args=["--validate-only", "{OUTPUT_DIR}/.tmp/_function_solution_fill_ctx.json"]
+)
+```
+
+试飞优化方案填充示例：
+
+```
+run_skill_script(
+  skill_name="whalecloud-dev-tool-doc-generate",
+  script_name="fill_flight_optimize_plan.py",
+  args=[
+    "skills/whalecloud-dev-tool-doc-generate/templates/试飞优化方案.md",
+    "{OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json",
+    "{OUTPUT_DIR}/试飞优化方案.md"
+  ]
+)
+```
+
+试飞优化方案契约预检：
+
+```
+run_skill_script(
+  skill_name="whalecloud-dev-tool-doc-generate",
+  script_name="fill_flight_optimize_plan.py",
+  args=["--validate-only", "{OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json"]
 )
 ```
 
@@ -198,6 +224,9 @@ Step 2 — 收集变量
       - `CONTEXT_JSON` 不得含 `DOCUMENT_BODY`；契约与骨架见 `whalecloud-dev-tool-function-solution/references/function_solution_context.skeleton.json`
       - 合并 Step 2 变量后，可先 `run_skill_script` 预检：`script_name=fill_function_solution.py`，`args=["--validate-only", "{OUTPUT_DIR}/.tmp/_function_solution_fill_ctx.json"]`（非零 → **中止**）
       - Step 3a 执行 `scripts/fill_function_solution.py` 填充前会再次调用 `validate_context`，契约错误非零退出
+  2g. 若 `OUTPUT` 为 `试飞优化方案.md`：
+      - 契约与骨架见 [references/flight_optimize_plan_context.skeleton.json](references/flight_optimize_plan_context.skeleton.json)
+      - 可先 `run_skill_script` 预检：`script_name=fill_flight_optimize_plan.py`，`args=["--validate-only", "{OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json"]`
 
 Step 3 — 填充模板
   3a. 若 `OUTPUT`（或 `TEMPLATE`）为 `函数级方案.md`（**强制，禁止手填**）：
@@ -208,9 +237,13 @@ Step 3 — 填充模板
       - **增量修订模式（仅 `函数级方案.md`）**：当输入含「增量修订」指令（存在 `revision_context.json`）时，**禁止全量重渲**，必须改用局部模式：
         `fill_function_solution.py --patch-modules <模板> <ctx.json> <已存在的 函数级方案.md> "<待修订模块名,逗号分隔>"`；
         `ctx.json.modules` 只需包含待修订模块，脚本只替换命中的 §1.7.N 小节、其余章节字节级保留；`approved_plans` 对应模块**严禁**出现在参数中（出现会触发冻结校验失败被打回）
-  3b. 其他模板：读取 `templates/{TEMPLATE}`，按 [references/template-filling.md](references/template-filling.md) 手填；`需求澄清.md` **必须** `scripts/fill_clarify.py`（第 4 参数 `true`=STRICT；先 merge `clarify_sections.json`）
-  3c. 空列表按规范写「（无）」或保留调用方提供的占位说明（`函数级方案.md` 由脚本处理）。
-  3d. 自检：无未解析 `{{` 占位符、无 `{{#each` 残留；`函数级方案.md` 须含模板固定章节与表头（见 template-filling.md）。
+  3b. 若 `OUTPUT`（或 `TEMPLATE`）为 `试飞优化方案.md`（**强制，禁止手填**）：
+      - 将 Step 2 合并后的变量对象用 `write_file` 写入 `{OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json`
+      - **必须** `run_skill_script`：`fill_flight_optimize_plan.py` + 模板路径 + ctx.json + **最终交付路径 `{OUTPUT_DIR}/{OUTPUT}`**
+      - 脚本非零退出或校验失败 → **中止**；**禁止**手填 `{{VAR}}` / `{{#each}}` 或跳过脚本
+  3c. 其他模板：读取 `templates/{TEMPLATE}`，按 [references/template-filling.md](references/template-filling.md) 手填；`需求澄清.md` **必须** `scripts/fill_clarify.py`（第 4 参数 `true`=STRICT；先 merge `clarify_sections.json`）
+  3d. 空列表按规范写「（无）」或保留调用方提供的占位说明（`函数级方案.md` / `试飞优化方案.md` 由脚本处理）。
+  3e. 自检：无未解析 `{{` 占位符、无 `{{#each` 残留；`函数级方案.md` / `试飞优化方案.md` 须含模板固定章节与表头（见 template-filling.md）。
 
 Step 4 — 落盘与输出
   4a. 确认 OUTPUT_DIR 可写（write_file 会自动创建父目录）
@@ -275,7 +308,9 @@ OUTPUT_MODE: file
 | 大文档模型 inline 输出整篇致 `content` 截断丢失 | **中止**，改用技能脚本按 section 分段 `open` 写（≤ 8KB/段）后重试 |
 | 未使用 `write_file` 写盘 | **中止**，改用 `write_file` 重写 |
 | `OUTPUT=函数级方案.md` 未执行 `scripts/fill_function_solution.py` 或手填模板 | **中止**，按 Step 3a 重试 |
+| `OUTPUT=试飞优化方案.md` 未执行 `scripts/fill_flight_optimize_plan.py` 或手填模板 | **中止**，按 Step 3b 重试 |
 | `scripts/fill_function_solution.py` 执行失败或 `CONTEXT_JSON 契约校验失败` | **中止**，对照 skeleton.json 修正键名后重试 |
+| `scripts/fill_flight_optimize_plan.py` 执行失败或契约校验失败 | **中止**，对照 `flight_optimize_plan_context.skeleton.json` 修正后重试 |
 | `需求澄清.md` + 已有确认项但 `fill_clarify.py` 完整性校验失败 | **中止**，补写 `clarify_sections.json`（含 `understanding_by_qid`、scope_in/out、scenarios）后重试 |
 
 ---

@@ -133,7 +133,13 @@ def test_collect_repo_code_diff_files(tmp_path: Path) -> None:
     assert main["modified_b64"]
     assert "void run" in main["modified"]
     assert "class Main {}" in main["original"]
-    assert base64.b64decode(main["modified_b64"]).decode("utf-8").startswith("class Main { void run")
+    assert main["additions"] >= 1
+    assert main["deletions"] >= 1
+
+    new_file = next(r for r in rows if r["path"] == "src/New.java")
+    assert new_file["status"] == "added"
+    assert new_file["additions"] == 1
+    assert new_file["deletions"] == 0
 
 
 def test_collect_task_exec_code_diffs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

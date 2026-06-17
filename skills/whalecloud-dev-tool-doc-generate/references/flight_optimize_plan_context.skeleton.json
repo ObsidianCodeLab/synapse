@@ -1,0 +1,56 @@
+{
+  "$comment": "试飞优化方案.md 模板 CONTEXT_JSON 契约；由 whalecloud-dev-tool-flight-optimize-plan 组装后交 doc-generate 落盘",
+  "TIMESTAMP": "[待补充]",
+  "WORK_ORDER_DIR": "[待补充]",
+  "FLIGHT_RESULT_SOURCE": "archive/开发中/exception_check/试飞结果.md",
+  "OVERALL_FLIGHT_STATUS": "[待补充]",
+  "flight_summary": [
+    {
+      "task_no": "研发子单号",
+      "feature_id": "特性分支",
+      "flight_status": "failed | ok | partial | timeout",
+      "build_conclusion": "构建结论摘要"
+    }
+  ],
+  "identified_issues": [
+    {
+      "sub_task": "子单号",
+      "check_item": "检查项类型（resultType）",
+      "failure_summary": "失败摘要（resultMsg 摘录）",
+      "root_cause": "根因分析（须具体）",
+      "priority": "P0 | P1 | P2"
+    }
+  ],
+  "plan_items": [
+    {
+      "title": "计划项标题",
+      "problem_ref": "#1",
+      "change_scope": "改动文件路径或模块",
+      "change_description": "改动说明（Markdown 列表字符串，每项一行以「1. 」开头）",
+      "before_code_snippet": "可选：重构前代码片段",
+      "after_code_structure": "可选：重构后代码结构",
+      "standard_alignment": "须满足的规范/阈值",
+      "verification_steps": ["本地验证步骤 1", "本地验证步骤 2"]
+    }
+  ],
+  "regression_risks": [
+    {
+      "risk_type": "风险类型",
+      "description": "风险说明",
+      "mitigation": "防引入策略"
+    }
+  ],
+  "conclusion": {
+    "needs_code_change": true,
+    "affected_sub_tasks": ["11929917"],
+    "downstream_suggestions": ["下游建议 1"],
+    "summary": "执行结论摘要"
+  },
+  "change_summary": [
+    {
+      "file": "相对路径/文件名",
+      "change_type": "新增 | 修改 | 重构 | 删除",
+      "change_content": "变更内容摘要"
+    }
+  ]
+}

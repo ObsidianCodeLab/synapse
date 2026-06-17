@@ -45,6 +45,14 @@
 - 可选预检：`run_skill_script(..., script_name="fill_function_solution.py", args=["--validate-only", "<context.json>"])`
 - 验收：无 `{{` 残留；保留模板全部固定标题（`## 1. 方案内容` … `## 2. 附录`、`### 1.7 模块改造方案` 等）及表格列名。
 
+## 试飞优化方案（`试飞优化方案.md`）
+
+- `CONTEXT_JSON` 为**内联 JSON 字符串**或 **`.json` 文件路径**。
+- 使用结构化字段（列表 + 标量），**禁止** `DOCUMENT_BODY`；骨架见 [flight_optimize_plan_context.skeleton.json](flight_optimize_plan_context.skeleton.json)。
+- **必须**经 `run_skill_script` 运行 `scripts/fill_flight_optimize_plan.py`，**禁止**手填模板或 `write_file` 直接写交付物。
+- 可选预检：`run_skill_script(..., script_name="fill_flight_optimize_plan.py", args=["--validate-only", "<context.json>"])`
+- 验收：无 `{{` 残留；保留模板固定章节（`## 试飞结果摘要`、`## 已识别问题清单`、`## 优化研发计划`、`## 回归风险与防引入策略`、`## 执行结论`、`## 附录：代码变更摘要`）及表格列名。
+
 ## 输出
 
 - 填充完成后得到纯 Markdown 字符串，不含 Handlebars 未解析残留（不应出现 `{{#each` 等）。

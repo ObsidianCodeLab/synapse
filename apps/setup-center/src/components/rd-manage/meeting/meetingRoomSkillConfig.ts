@@ -39,6 +39,7 @@ export const HOST_REQUIRED_SKILLS: RequiredSkillRule[] = [
   { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },
   { displayName: '代码阅读', skillIds: ['whalecloud-dev-tool-c-code-access'] },
   { displayName: '函数级方案技能', skillIds: ['whalecloud-dev-tool-function-solution'] },
+  { displayName: '试飞优化方案', skillIds: ['whalecloud-dev-tool-flight-optimize-plan'] },
 ];
 
 /** 协作智能体 profile id → 必备技能 */

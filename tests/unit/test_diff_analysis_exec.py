@@ -72,15 +72,6 @@ def test_bootstrap_diff_analysis_skips_when_no_code_change(tmp_path, monkeypatch
             "**是否需代码改动**：否",
         ),
     )
-    monkeypatch.setattr(
-        "synapse.rd_meeting.diff_analysis_exec._run_code_commit_phase",
-        lambda *_a, **_k: {
-            "status": "ok",
-            "flight": {"status": "ok", "error": ""},
-            "tasks": [],
-            "summary": {"total": 1, "commit_ok": 1, "flight_ok": 1},
-        },
-    )
     monkeypatch.setattr("synapse.rd_meeting.diff_analysis_exec.patch_userwork_summary", lambda **_k: None)
     monkeypatch.setattr("synapse.rd_meeting.diff_analysis_exec._emit_progress", lambda *_a, **_k: None)
     monkeypatch.setattr("synapse.rd_meeting.diff_analysis_exec.check_cursor_agent_cli", lambda: {"ready": True})
@@ -88,3 +79,5 @@ def test_bootstrap_diff_analysis_skips_when_no_code_change(tmp_path, monkeypatch
     result = bootstrap_diff_analysis("demand", scope_id, cli_tool="cursor_cli")
     assert result["status"] == "ok"
     assert result["tasks"][0]["status"] == "skipped"
+    assert result.get("commit_phase") == "await_confirm"
+    assert result.get("code_commit") is None

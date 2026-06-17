@@ -126,6 +126,7 @@ class TestPresetSkillFixes:
             "whalecloud-dev-tool-c-code-access",
             "whalecloud-dev-tool-doc-generate",
             "whalecloud-dev-tool-function-solution",
+            "whalecloud-dev-tool-flight-optimize-plan",
             "whalecloud-dev-tool-solution-review",
         ]
         assert default.skills_mode == SkillsMode.INCLUSIVE

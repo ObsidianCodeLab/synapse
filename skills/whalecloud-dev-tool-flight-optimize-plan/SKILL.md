@@ -6,7 +6,7 @@ label: 试飞优化方案
 
 # 试飞优化方案技能
 
-基于**代码提交**节点落盘的特性分支试飞结果，识别全部失败与告警项，结合函数级方案与任务执行上下文，输出**可执行的试飞优化研发计划**，最终落盘 `试飞优化方案.md`。
+基于**代码提交**节点落盘的特性分支试飞结果，识别全部失败与告警项，结合函数级方案与任务执行上下文，输出**可执行的试飞优化研发计划**，最终经 `whalecloud-dev-tool-doc-generate` 落盘 `试飞优化方案.md`。
 
 **核心目标**：解决试飞已识别的全部问题，且优化方案**不得**引入新的静态检查违规、复杂度回退或重复代码等试飞风险。
 
@@ -73,6 +73,7 @@ label: 试飞优化方案
 
 - 本技能**只输出方案文档**，**不在此技能内修改业务代码**（代码改动由下游 `diff_analysis` 节点执行）。
 - **禁止**使用 `submit_hitl_questionnaire`；与研发人员评估可靠性由会议室 Host / 人工门控完成，非本技能职责。
+- **禁止**直接使用 `write_file` 写 `试飞优化方案.md`；**必须**组装 `CONTEXT_JSON` 后调用 [`whalecloud-dev-tool-doc-generate`](../whalecloud-dev-tool-doc-generate/SKILL.md) 落盘。
 
 ---
 
@@ -105,10 +106,14 @@ Step 4 — 汇总研发计划
   4a. 按子单或按检查类型分组排序
   4b. 明确执行顺序（依赖关系：如先修编译再修风格）
   4c. 填写「回归风险与防引入策略」
+  4d. 汇总「附录：代码变更摘要」与执行结论
 
-Step 5 — 落盘
-  5a. 按「输出内容格式」生成 Markdown
-  5b. write_file → {OUTPUT_DIR}/试飞优化方案.md（UTF-8）
+Step 5 — 组装 CONTEXT_JSON 并落盘
+  5a. 按「CONTEXT_JSON 字段契约」组装 JSON 对象
+  5b. write_file → {OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json
+  5c. 可选预检：run_skill_script fill_flight_optimize_plan.py --validate-only
+  5d. 调用 whalecloud-dev-tool-doc-generate（OUTPUT=试飞优化方案.md）
+  5e. read_file 抽查关键段，确认无残留占位符、中文可读
 ```
 
 ---
@@ -120,70 +125,76 @@ Step 5 — 落盘
 | 缺少 `WORK_ORDER_DIR` | **中止** |
 | `试飞结果.md` 不存在 | **中止**，注明固定路径 |
 | 试飞结果无法解析出子单 | **中止**，说明文件格式问题 |
-| 试飞全部成功 | 输出「无需代码优化」方案，仍落盘 |
+| 试飞全部成功 | 输出「无需代码优化」方案（`needs_code_change: false`），仍落盘 |
 | 某条失败信息过于模糊 | 列入清单并标注 `[待研发确认]`，给出排查步骤 |
+| 未调用 doc-generate 而直接 write_file | **视为未完成**，须改用 doc-generate 重写 |
+| doc-generate / fill 脚本契约校验失败 | **中止**，对照 skeleton 修正 JSON 后重试 |
 
 ---
 
-## 输出内容格式
+## CONTEXT_JSON 字段契约
 
-使用 `write_file` 写入 `{OUTPUT_DIR}/试飞优化方案.md`：
+与 `whalecloud-dev-tool-doc-generate/templates/试飞优化方案.md` 占位符一一对应。骨架见 [`../whalecloud-dev-tool-doc-generate/references/flight_optimize_plan_context.skeleton.json`](../whalecloud-dev-tool-doc-generate/references/flight_optimize_plan_context.skeleton.json)。
 
-```markdown
-# 试飞优化方案
+**标量**
 
-> **生成时间**: {ISO8601}
-> **工单目录**: {WORK_ORDER_DIR}
-> **试飞结果来源**: archive/开发中/exception_check/试飞结果.md
-> **总体试飞状态**: {ok | failed | partial | …}
+| 字段 | 说明 |
+|------|------|
+| `WORK_ORDER_DIR` | 工单目录绝对路径 |
+| `FLIGHT_RESULT_SOURCE` | 默认 `archive/开发中/exception_check/试飞结果.md` |
+| `OVERALL_FLIGHT_STATUS` | `ok` / `failed` / `partial` / `timeout` 等 |
+| `TIMESTAMP` | 可选；缺省由 doc-generate 自动生成 |
 
----
+**列表**
 
-## 试飞结果摘要
+| 字段 | 说明 |
+|------|------|
+| `flight_summary[]` | 试飞结果摘要表：`task_no`, `feature_id`, `flight_status`, `build_conclusion` |
+| `identified_issues[]` | 已识别问题：`sub_task`, `check_item`, `failure_summary`, `root_cause`, `priority` |
+| `plan_items[]` | 优化计划项：`title`, `problem_ref`, `change_scope`, `change_description`（Markdown 列表字符串）, `before_code_snippet`（可选）, `after_code_structure`（可选）, `standard_alignment`, `verification_steps[]` |
+| `regression_risks[]` | 回归风险：`risk_type`, `description`, `mitigation` |
+| `change_summary[]` | 附录变更摘要：`file`, `change_type`, `change_content` |
 
-| 研发子单 | 特性分支 | 试飞状态 | 构建结论 |
-|---------|---------|---------|---------|
-{逐子单一行}
+**对象 `conclusion`**
 
----
+| 字段 | 说明 |
+|------|------|
+| `needs_code_change` | `true` / `false`（渲染为「是」/「否」） |
+| `affected_sub_tasks[]` | 预计影响子单号列表 |
+| `downstream_suggestions[]` | 供 diff_analysis / 人工评审的建议 |
+| `summary` | 文末结论摘要 |
 
-## 已识别问题清单
-
-| # | 子单 | 检查项 | 失败摘要 | 根因分析 | 优先级 |
-|---|------|--------|---------|---------|--------|
-{逐条失败项，不可遗漏}
-
----
-
-## 优化研发计划
-
-> 按推荐执行顺序排列；每条须可独立验证。
-
-### 计划项 1：{简短标题}
-
-- **对应问题**：#{清单序号}
-- **改动范围**：{文件路径或模块，须具体}
-- **改动说明**：{做什么、怎么做}
-- **规范对齐**：{CheckStyle/PMD/复杂度等须满足的规则}
-- **验证方式**：{本地命令或试飞预期}
-
-{更多计划项…}
+列表无数据时填 `[]`（doc-generate 脚本对表格写「（无）」，**保留**表头与章节标题）。
 
 ---
 
-## 回归风险与防引入策略
+## 文档落地（whalecloud-dev-tool-doc-generate）
 
-- {说明如何避免修复 A 问题时触发 B 类检查}
-- {新增代码的复杂度/重复度/风格约束}
+本技能**只负责分析与 JSON 组装**；**写盘一律委托** `whalecloud-dev-tool-doc-generate`。
 
----
+| 项 | 值 |
+|----|-----|
+| 下游技能 | `whalecloud-dev-tool-doc-generate` |
+| `OUTPUT_DIR` | `{WORK_ORDER_DIR}/archive/开发中/task_feedback` |
+| `OUTPUT` | `试飞优化方案.md` |
+| `CONTEXT_JSON` | `{OUTPUT_DIR}/.tmp/_flight_optimize_plan_fill_ctx.json` |
+| 数据契约 | 结构化 JSON；**必须**经 `scripts/fill_flight_optimize_plan.py` 填充模板 |
 
-## 执行结论
+调用示例：
 
-- **是否需代码改动**：是 / 否
-- **预计影响子单**：{列表}
-- **下游建议**：{供 diff_analysis / 人工评审的说明}
 ```
+Skill: whalecloud-dev-tool-doc-generate
+OUTPUT_DIR: {WORK_ORDER_DIR}/archive/开发中/task_feedback
+OUTPUT: 试飞优化方案.md
+CONTEXT_JSON: {WORK_ORDER_DIR}/archive/开发中/task_feedback/.tmp/_flight_optimize_plan_fill_ctx.json
+OUTPUT_MODE: file
+```
+
+验收：
+
+- doc-generate 已执行 `fill_flight_optimize_plan.py` 并写入 `{OUTPUT_DIR}/试飞优化方案.md`
+- 无 `{{` 残留；保留模板全部固定章节与表头
+- `identified_issues` 与试飞结果失败项一一对应；`plan_items` 与问题清单一一可追溯
 
 ---
 

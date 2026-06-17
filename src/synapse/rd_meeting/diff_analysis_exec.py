@@ -253,12 +253,17 @@ def build_diff_analysis_develop_prompt(
     goal = str(order.get("goal") or order.get("task_title") or "修复试飞已识别问题").strip()
     lines: list[str] = []
     reason = (reprocess_reason or "").strip()
-    if reason:
+    from synapse.rd_meeting.diff_analysis_rounds import format_diff_analysis_reprocess_prompt_block
+
+    reprocess_block = format_diff_analysis_reprocess_prompt_block(scope_id, current_reason=reason)
+    if reprocess_block.strip():
+        lines.extend([reprocess_block.strip(), ""])
+    elif reason:
         lines.extend(
             [
-                "【用户重处理要求 · 最高优先级】",
-                f"用户重处理要求：{reason}",
-                "本条优先级高于试飞优化方案及一切历史结论；冲突时以用户重处理要求为准。",
+                "【用户优化处理要求 · 最高优先级】",
+                f"用户优化处理要求：{reason}",
+                "本条优先级高于试飞优化方案及一切历史结论；冲突时以用户优化处理要求为准。",
                 "",
             ]
         )
@@ -799,49 +804,18 @@ def bootstrap_diff_analysis(
 
     commit_result: dict[str, Any] | None = None
     flight_failed = False
+    commit_phase = "none"
 
-    if dev_ok_or_skip and not dev_failed and task_rows:
+    if dev_failed:
+        overall = "failed"
+    elif dev_ok_or_skip and task_rows:
+        commit_phase = "await_confirm"
+        overall = "ok"
         _sync_running(
-            phase="code_commit",
-            message="代码修复完成，开始代码提交与试飞等待…",
+            phase="await_confirm",
+            message="代码修复完成，待人工确认后提交并试飞",
             task_index=task_total,
         )
-        _emit_progress(
-            sid,
-            event="diff_analysis_code_commit_started",
-            message="进入代码提交 SOP，提交并等待试飞结果",
-            room_id=room_id,
-            phase="code_commit",
-            task_total=task_total,
-        )
-        commit_result = _run_code_commit_phase(
-            sid,
-            scope_type=scope_type,
-            room_id=room_id,
-            pipe=pipe,
-        )
-        result_doc["code_commit"] = commit_result
-        flight = commit_result.get("flight") if isinstance(commit_result.get("flight"), dict) else {}
-        flight_status = str(flight.get("status") or commit_result.get("status") or "").strip()
-        flight_failed = flight_status in ("failed", "timeout", "partial") or (
-            commit_result.get("status") in ("failed", "partial")
-            and flight_status not in ("ok", "skipped")
-        )
-        if flight_failed:
-            result_doc["flight_failed"] = True
-            result_doc["error"] = str(
-                commit_result.get("error") or flight.get("error") or "试飞仍未通过，不允许推进节点"
-            )
-
-    ok_count = sum(1 for t in task_rows if t.get("status") == "ok")
-    if flight_failed or dev_failed:
-        overall = "failed"
-    elif dev_ok_or_skip and commit_result and str(commit_result.get("status") or "") in ("ok", "partial"):
-        overall = "ok" if not flight_failed else "failed"
-    elif ok_count == len(task_rows) and ok_count > 0:
-        overall = "ok"
-    elif ok_count > 0:
-        overall = "partial"
     else:
         overall = "failed"
 
@@ -850,9 +824,16 @@ def bootstrap_diff_analysis(
         {
             "finished_at": finished_at,
             "status": overall,
+            "commit_phase": commit_phase,
+            "code_commit": commit_result,
+            "flight_failed": flight_failed,
             "progress": _progress_snapshot(
-                phase="finished",
-                message=f"试飞优化 CLI 结束：{overall}",
+                phase="await_confirm" if commit_phase == "await_confirm" else "finished",
+                message=(
+                    "代码修复完成，待人工确认后提交并试飞"
+                    if commit_phase == "await_confirm"
+                    else f"试飞优化 CLI 结束：{overall}"
+                ),
                 task_index=task_total,
                 task_total=task_total,
             ),
@@ -862,6 +843,107 @@ def bootstrap_diff_analysis(
     )
     _persist_state(sid, result_doc)
 
+    patch_userwork_summary(scope_type=scope_type, scope_id=sid, sop_node="试飞优化")
+    return result_doc
+
+
+def trigger_diff_analysis_code_commit(
+    scope_type: ScopeType,
+    scope_id: str,
+    *,
+    room_id: str = "",
+    pipe: Any = None,
+) -> dict[str, Any]:
+    """人工确认开发结果后：提交代码并等待试飞（异步入口亦调用此函数）。"""
+    sid = (scope_id or "").strip()
+    result_doc = _read_result(sid)
+    if not isinstance(result_doc, dict):
+        raise ValueError("diff_analysis_not_found")
+
+    commit_phase = str(result_doc.get("commit_phase") or "").strip()
+    if commit_phase == "running":
+        raise ValueError("commit_in_progress")
+    if commit_phase != "await_confirm":
+        raise ValueError("commit_not_ready")
+
+    task_rows = result_doc.get("tasks") if isinstance(result_doc.get("tasks"), list) else []
+    task_total = len(task_rows)
+    rid = (room_id or _resolve_room_id(sid)).strip()
+
+    result_doc["commit_phase"] = "running"
+    result_doc["status"] = "running"
+    result_doc["flight_failed"] = False
+    result_doc["error"] = ""
+    result_doc["progress"] = _progress_snapshot(
+        phase="code_commit",
+        message="正在提交代码并等待试飞…",
+        task_index=0,
+        task_total=max(task_total, 1),
+    )
+    _persist_state(sid, result_doc)
+
+    _emit_progress(
+        sid,
+        event="diff_analysis_code_commit_started",
+        message="人工已确认，开始代码提交与试飞等待",
+        room_id=rid,
+        phase="code_commit",
+        task_total=task_total,
+    )
+
+    commit_result = _run_code_commit_phase(
+        sid,
+        scope_type=scope_type,
+        room_id=rid,
+        pipe=pipe,
+    )
+    from synapse.rd_meeting.system_node_display import build_code_commit_display
+
+    if isinstance(commit_result, dict):
+        commit_result = dict(commit_result)
+        commit_result["display"] = build_code_commit_display(commit_result)
+
+    flight = commit_result.get("flight") if isinstance(commit_result.get("flight"), dict) else {}
+    flight_status = str(flight.get("status") or commit_result.get("status") or "").strip()
+    flight_failed = flight_status in ("failed", "timeout", "partial") or (
+        commit_result.get("status") in ("failed", "partial")
+        and flight_status not in ("ok", "skipped")
+    )
+
+    overall = "failed" if flight_failed else str(commit_result.get("status") or "ok")
+    if overall not in ("ok", "partial", "failed"):
+        overall = "failed" if flight_failed else "ok"
+
+    finished_at = datetime.now().isoformat(timespec="seconds")
+    result_doc.update(
+        {
+            "commit_phase": "done",
+            "finished_at": finished_at,
+            "status": overall,
+            "code_commit": commit_result,
+            "flight_failed": flight_failed,
+            "error": (
+                str(commit_result.get("error") or flight.get("error") or "试飞仍未通过，不允许推进节点")
+                if flight_failed
+                else ""
+            ),
+            "progress": _progress_snapshot(
+                phase="finished",
+                message=(
+                    "提交与试飞已完成"
+                    if not flight_failed
+                    else str(
+                        commit_result.get("error")
+                        or flight.get("error")
+                        or "试飞仍未通过"
+                    )
+                ),
+                task_index=task_total,
+                task_total=task_total,
+            ),
+        }
+    )
+    _persist_state(sid, result_doc)
     patch_userwork_summary(scope_type=scope_type, scope_id=sid, sop_node="试飞优化")
     return result_doc
 

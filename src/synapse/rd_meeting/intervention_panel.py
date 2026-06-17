@@ -13,6 +13,7 @@ InterventionPanel = Literal[
     "node_review",
     "hitl",
     "prod_selection",
+    "auto_split_choice",
 ]
 
 # 协同型（ai_human）节点完成门控使用的专用面板（非 MeetingHitlForm 问卷）
@@ -20,6 +21,7 @@ _COLLAB_DEDICATED_PANEL: dict[str, InterventionPanel] = {
     "solution_review": "solution_review",
     "func_solution": "func_solution_review",
     "task_exec": "task_exec",
+    "diff_analysis": "task_exec",
     "leader_review": "node_review",
 }
 
@@ -74,13 +76,21 @@ def resolve_intervention_panel(
     if kind == "prod_selection":
         return "prod_selection"
 
+    if kind == "auto_split_choice":
+        return "auto_split_choice"
+
     if kind == "solution_review" or pending.get("solution_review_payload"):
         return "solution_review"
 
     if kind == "func_solution_review" or pending.get("func_solution_review_payload"):
         return "func_solution_review"
 
-    if kind == "task_exec" or pending.get("task_exec_payload"):
+    if (
+        kind == "task_exec"
+        or pending.get("task_exec_payload")
+        or pending.get("diff_analysis_payload")
+        or (nid == "diff_analysis" and kind in ("task_exec", "exception", "gate", ""))
+    ):
         return "task_exec"
 
     dedicated = collab_dedicated_panel(nid)
