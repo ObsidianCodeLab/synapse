@@ -26,12 +26,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from synapse.rd_meeting.paths import agent_node_dir, archive_node_dir, meeting_pipeline_path
+from synapse.rd_meeting.paths import agent_node_dir, archive_node_dir
 from synapse.rd_meeting.room_runtime import (
     load_room_state,
     read_meeting_pipeline_json,
+    save_meeting_pipeline,
     save_room_state,
-    write_json_file,
 )
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 
@@ -953,7 +953,7 @@ def save_node_review(
         ctx["node_review"] = node_review
         raw["context"] = ctx
         raw["updated_at"] = _now_iso()
-        write_json_file(pipeline_path, raw)
+        save_meeting_pipeline(sid, raw)
 
     if not sync_pending:
         return
