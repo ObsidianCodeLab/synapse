@@ -504,6 +504,8 @@ export function TaskExecReviewPanel({
 
   const flightFailed = Boolean(payload?.flight_failed);
   const canApprove = !blocked && !submitting && !flightFailed;
+  const optimizeDisabled = submitting || isRunning || agentCliMissing;
+  const canOptimize = comment.trim().length > 0 && !optimizeDisabled;
 
   const agentInstallHint =
     (payload?.agent_cli && typeof payload.agent_cli === 'object'
