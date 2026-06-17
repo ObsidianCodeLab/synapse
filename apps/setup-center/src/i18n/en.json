@@ -388,6 +388,7 @@
     "connect": "Connect",
     "connectFail": "No running service detected. Ensure synapse serve is started.",
     "start": "Start",
+    "stop": "Stop",
     "starting": "Starting service...",
     "autoStarting": "Auto-starting service...",
     "autoStartSuccess": "Service auto-started successfully",
@@ -416,7 +417,11 @@
     "webAccess": "Web Access",
     "remoteUrl": "Remote URL",
     "copyRemoteUrl": "Copy remote access URL",
-    "ipNotFound": "Cannot detect LAN IP. Use ipconfig / ifconfig to check"
+    "ipNotFound": "Cannot detect LAN IP. Use ipconfig / ifconfig to check",
+    "notifications": "Notifications ({{count}} pending)",
+    "notificationsTitle": "Notifications",
+    "notificationsUnread": "{{count}} messages to review",
+    "notificationsEmpty": "No messages to review"
   },
   "tokenStats": {
     "serviceNotRunning": "Service not running, unable to view stats",

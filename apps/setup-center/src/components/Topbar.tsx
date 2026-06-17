@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { openExternalUrl } from "../platform";
 import { copyToClipboard } from "../utils/clipboard";
 import { RemoteAccessDialog } from "./RemoteAccessDialog";
+import { TopbarNotificationButton } from "./TopbarNotificationButton";
 
 export type TopbarProps = {
   wsDropdownOpen: boolean;
@@ -56,6 +57,8 @@ export type TopbarProps = {
   restartService?: () => Promise<void>;
   askConfirm?: (msg: string, onConfirm: () => void) => void;
   setView?: (view: ViewId) => void;
+  unreadFeedbackCount?: number;
+  pendingApprovalsCount?: number;
 };
 
 export function Topbar({
@@ -70,6 +73,7 @@ export function Topbar({
   onSetTheme, themePrefState, isWeb, onLogout, webAccessUrl, apiBaseUrl,
   onToggleMobileSidebar, serverName, onServerManager,
   envDraft, setEnvDraft, restartService, askConfirm,
+  setView, unreadFeedbackCount, pendingApprovalsCount,
 }: TopbarProps) {
   const { t, i18n } = useTranslation();
   const [remoteCopyState, setRemoteCopyState] = useState<"idle" | "copied" | "no_ip">("idle");
@@ -305,6 +309,16 @@ export function Topbar({
       </div>
       <TooltipProvider delayDuration={300}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          {serviceRunning && (
+            <>
+              <TopbarNotificationButton
+                unreadFeedbackCount={unreadFeedbackCount}
+                pendingApprovalsCount={pendingApprovalsCount}
+                onNavigate={setView}
+              />
+              <div className="h-4 w-px bg-border" />
+            </>
+          )}
           {isWeb ? (
             onLogout && (
               <Tooltip>
@@ -319,7 +333,13 @@ export function Topbar({
           ) : serviceRunning ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-sm" onClick={onDisconnect} disabled={!!busy}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className={dataMode === "remote" ? undefined : "topbarStopBtn"}
+                  onClick={onDisconnect}
+                  disabled={!!busy}
+                >
                   {dataMode === "remote" ? <LogOut size={16} /> : <Square size={14} />}
                 </Button>
               </TooltipTrigger>

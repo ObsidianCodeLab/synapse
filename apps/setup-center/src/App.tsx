@@ -6645,6 +6645,9 @@ export function App() {
           onToggleMobileSidebar={isMobile ? () => setMobileSidebarOpen((v) => !v) : undefined}
           serverName={IS_CAPACITOR ? (getActiveServer()?.name || undefined) : undefined}
           onServerManager={IS_CAPACITOR ? () => setShowServerManager(true) : undefined}
+          setView={transitionToView}
+          unreadFeedbackCount={unreadFeedbackCount}
+          pendingApprovalsCount={pendingApprovalsCount}
         />
 
         {showPwBanner && (

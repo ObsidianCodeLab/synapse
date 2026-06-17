@@ -389,6 +389,7 @@
     "connect": "连接服务",
     "connectFail": "未检测到运行中的服务，请确认 synapse serve 已启动",
     "start": "启动服务",
+    "stop": "停止服务",
     "starting": "正在启动服务...",
     "autoStarting": "正在自动启动服务...",
     "autoStartSuccess": "服务已自动启动",
@@ -417,7 +418,11 @@
     "webAccess": "网页访问",
     "remoteUrl": "远程地址",
     "copyRemoteUrl": "复制远程访问地址",
-    "ipNotFound": "无法获取外网 IP，请用 ipconfig 或 ifconfig 查看"
+    "ipNotFound": "无法获取外网 IP，请用 ipconfig 或 ifconfig 查看",
+    "notifications": "消息通知（{{count}} 条待查看）",
+    "notificationsTitle": "消息通知",
+    "notificationsUnread": "{{count}} 条待查看消息",
+    "notificationsEmpty": "暂无待查看消息"
   },
   "tokenStats": {
     "serviceNotRunning": "服务未运行，无法查看统计",
