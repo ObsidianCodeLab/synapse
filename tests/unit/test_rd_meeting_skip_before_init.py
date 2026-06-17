@@ -146,3 +146,32 @@ def test_skip_disabled_single_pipeline_init_once(meeting_scope: str) -> None:
     boundary_events = [str(ev.get("event") or "") for ev in read_history(scope_id, node_id="boundary")]
     assert "node_skipped" in boundary_events
     assert boundary_events.count("node_finished") == 1
+
+
+def test_on_node_complete_skips_disabled_next_node(meeting_scope: str) -> None:
+    """on_node_complete 推进时同步跳过 disabled 下一节点，dev.status 不落 boundary。"""
+    scope_id = meeting_scope
+    dev = load_dev_status(scope_id)
+    assert dev is not None
+    dev["current_node_id"] = "req_clarify"
+    save_dev_status(scope_id, dev)
+
+    orch = MeetingRoomOrchestrator()
+    out = orch.on_node_complete(
+        scope_type="demand",
+        scope_id=scope_id,
+        room_id="mr_test_skip",
+        node_id="req_clarify",
+        artifacts=[{"name": "需求澄清.md", "relative_path": "archive/需求分析/req_clarify/需求澄清.md"}],
+        sync_userwork=False,
+        advance=True,
+        schedule_pipeline_advance=False,
+    )
+
+    expected_next = next_node_id("boundary")
+    assert out["next_node_id"] == expected_next
+    assert load_dev_status(scope_id)["current_node_id"] == expected_next
+
+    boundary_hist = read_history(scope_id, node_id="boundary")
+    events = [str(ev.get("event") or "") for ev in boundary_hist]
+    assert "node_skipped" in events

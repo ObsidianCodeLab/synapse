@@ -104,6 +104,44 @@ _MAX_SKIP_CHAIN = len(ALL_NODES) + 2
 
 logger = logging.getLogger(__name__)
 
+
+def _skip_disabled_nodes_forward(
+    start_node_id: str,
+    *,
+    scope_type: str,
+    scope_id: str,
+    room_id: str,
+    ticket_title: str = "",
+) -> tuple[str | None, list[str]]:
+    """从 start_node_id 起跳过 disabled 节点，返回 (首个 enabled 节点或 None, 被跳过列表)。"""
+    next_id = (start_node_id or "").strip() or None
+    skipped: list[str] = []
+    if not next_id:
+        return None, skipped
+    for _ in range(_MAX_SKIP_CHAIN):
+        binding = resolve_node_binding(
+            next_id,
+            scope_type=scope_type,
+            scope_id=scope_id,
+            ticket_title=ticket_title,
+        )
+        if binding.get("enabled", True):
+            return next_id, skipped
+        skipped.append(next_id)
+        append_history_event(
+            scope_id,
+            {
+                "event": "node_skipped",
+                "room_id": room_id,
+                "node_id": next_id,
+                "reason": "disabled_in_config",
+            },
+        )
+        next_id = next_node_id(next_id)
+        if not next_id:
+            return None, skipped
+    raise ValueError("skip_chain_exceeded")
+
 _running_tasks: dict[str, asyncio.Task[None]] = {}
 _pipeline_tasks: dict[str, asyncio.Task[None]] = {}
 _meeting_scheduler_loop: asyncio.AbstractEventLoop | None = None
@@ -595,6 +633,21 @@ class MeetingRoomOrchestrator:
         if advance:
             next_id = next_node_id(node_id)
             if next_id:
+                next_id, skipped_ahead = _skip_disabled_nodes_forward(
+                    next_id,
+                    scope_type=scope_type,
+                    scope_id=sid,
+                    room_id=room_id,
+                    ticket_title=ticket_title,
+                )
+                if skipped_ahead:
+                    logger.info(
+                        "on_node_complete skipped disabled nodes scope=%s skipped=%s next=%s",
+                        sid,
+                        skipped_ahead,
+                        next_id,
+                    )
+            if next_id:
                 dev["current_node_id"] = next_id
                 dev["stage_id"] = stage_id_for_node_id(next_id)
                 dev["sop_node_display"] = node_display_name(next_id)
@@ -729,6 +782,12 @@ class MeetingRoomOrchestrator:
         # 让 SOP 流程自动接力，不再依赖人工再次"一键开会"。
         # pipeline 内 inline skip 时由同一次 run_pipeline while 切 flow_step，不再 schedule。
         if advance and next_id and schedule_pipeline_advance:
+            logger.info(
+                "on_node_complete scheduling node_finish scope=%s node=%s next=%s",
+                sid,
+                node_id,
+                next_id,
+            )
             try:
                 from synapse.rd_meeting.pipeline import schedule_node_finish
 

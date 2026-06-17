@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import json
 
-from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path, scope_dir
+from synapse.rd_meeting.paths import (
+    archive_node_dir,
+    meeting_pipeline_path,
+    room_history_path,
+    scope_dir,
+)
 from synapse.rd_meeting.pipeline import (
     _clear_node_for_reprocess,
     clear_current_node_reprocess_artifacts,
@@ -55,6 +60,24 @@ def test_clear_current_node_reprocess_artifacts_removes_archive_and_pipeline(
     assert raw["phase"] == "running"
     assert node_id not in raw.get("context", {}).get("node_review", {})
     assert "host_prompt" not in raw.get("context", {})
+
+
+def test_clear_node_for_reprocess_removes_room_history(tmp_path, monkeypatch):
+    scope = "reproc-chat"
+    node_id = "req_clarify"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    hist = room_history_path(scope, node_id)
+    hist.parent.mkdir(parents=True)
+    hist.write_text(
+        '{"event":"host_llm_begin","text":"旧协作流"}\n',
+        encoding="utf-8",
+    )
+
+    _clear_node_for_reprocess(scope, node_id, stage_id=1)
+
+    assert not hist.is_file()
+    assert not hist.parent.is_dir()
 
 
 def test_clear_room_state_for_node_reprocess(monkeypatch):

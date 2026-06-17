@@ -1907,7 +1907,16 @@ def schedule_node_finish(
         except Exception as exc:  # pragma: no cover
             logger.exception("schedule_node_finish failed scope=%s: %s", sid, exc)
 
-    from synapse.rd_meeting.orchestrator import _schedule_on_coordinator_loop
+    from synapse.rd_meeting.orchestrator import (
+        _resolve_meeting_coordinator_loop,
+        _schedule_on_coordinator_loop,
+    )
+
+    logger.info(
+        "schedule_node_finish invoked scope=%s last_node=%s",
+        sid,
+        last_node_id or "-",
+    )
 
     async def _runner() -> None:
         await _run_node_finish_coro(
@@ -1918,8 +1927,33 @@ def schedule_node_finish(
         )
 
     try:
-        _schedule_on_coordinator_loop(_runner)
+        caller_loop = asyncio.get_running_loop()
     except RuntimeError:
+        caller_loop = None
+
+    coordinator_loop = _resolve_meeting_coordinator_loop()
+    if (
+        caller_loop is not None
+        and coordinator_loop is not None
+        and caller_loop is not coordinator_loop
+    ):
+        # HITL 审批等在 API loop 上同步调用：在调用方 loop 调度，避免跨 loop 投递丢失。
+        try:
+            caller_loop.create_task(_runner())
+            logger.info("schedule_node_finish scheduled on caller loop scope=%s", sid)
+            return
+        except Exception as exc:
+            logger.warning(
+                "schedule_node_finish create_task on caller loop failed scope=%s: %s",
+                sid,
+                exc,
+            )
+
+    try:
+        _schedule_on_coordinator_loop(_runner)
+        logger.info("schedule_node_finish scheduled on coordinator loop scope=%s", sid)
+    except RuntimeError:
+        logger.info("schedule_node_finish running synchronously scope=%s", sid)
         _do_advance()
 
 
