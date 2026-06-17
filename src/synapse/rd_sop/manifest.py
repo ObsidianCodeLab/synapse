@@ -154,7 +154,7 @@ def is_human_only_node(node_id: str) -> bool:
 
 # 节点完成后暂不推进下游（原因 → 展示/落盘）；用于下游 SOP 尚未就绪的临时门控
 NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {
-    "diff_analysis": "试飞优化待人工评审，评审通过后再继续执行任务检查。",
+    "task_feedback": "试飞优化方案待人工评估，评估通过后再继续执行试飞优化。",
 }
 
 
