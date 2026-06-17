@@ -13,6 +13,7 @@ const COLLAB_DEDICATED_PANEL: Record<string, InterventionPanelKind> = {
   solution_review: 'solution_review',
   func_solution: 'func_solution_review',
   task_exec: 'task_exec',
+  diff_analysis: 'task_exec',
   leader_review: 'node_review',
 };
 
@@ -72,6 +73,7 @@ const INTERVENTION_KIND_LABELS: Record<string, string> = {
   solution_review: '方案评审',
   func_solution_review: '函数级方案评审',
   task_exec: '任务执行评审',
+  diff_analysis: '试飞优化评审',
   result_confirm: '结果确认',
   interactive: '会中澄清',
   exception: '异常裁决',
@@ -100,6 +102,9 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
 
   if (kind === 'task_exec' || panel === 'task_exec') {
     return pendingNid || current || 'task_exec';
+  }
+  if (panel === 'task_exec' && (pendingNid === 'diff_analysis' || current === 'diff_analysis')) {
+    return 'diff_analysis';
   }
 
   if (

@@ -53,8 +53,12 @@ LIVE_DISPLAY_LINE_MAX = 600
 ScopeType = Literal["demand", "task"]
 
 
+CLI_EXEC_NODE_IDS = frozenset({NODE_ID, "diff_analysis"})
+
+
 def uses_task_exec_cli(node_id: str) -> bool:
-    return (node_id or "").strip() == NODE_ID
+    """任务执行 / 试飞优化等走 CLI 批量处理、跳过小鲸主控的节点。"""
+    return (node_id or "").strip() in CLI_EXEC_NODE_IDS
 
 
 def resolve_cli_tool_for_node(node_id: str = NODE_ID) -> str:

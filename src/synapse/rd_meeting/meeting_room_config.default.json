@@ -181,7 +181,10 @@
     "diff_analysis": {
       "host_profile_id": "default",
       "worker_profile_ids": [],
-      "node_intent": "根据试飞优化方案执行并提交代码。"
+      "node_intent": "根据试飞优化方案执行并提交代码。",
+      "cli_tool": "cursor_cli",
+      "cli_model": "auto",
+      "cli_timeout_seconds": 3600
     },
     "env_start": {
       "host_profile_id": "default",

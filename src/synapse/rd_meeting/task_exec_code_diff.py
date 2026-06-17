@@ -441,10 +441,26 @@ def save_task_exec_code_diff_file(
     raise ValueError("code_diff_refresh_failed")
 
 
-def collect_task_exec_code_diffs(scope_id: str) -> dict[str, Any]:
-    """汇总任务执行各子单沙箱的未提交 git diff。"""
-    payload = load_task_exec_payload(scope_id) or {}
-    tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+def collect_task_exec_code_diffs(scope_id: str, *, node_id: str = "") -> dict[str, Any]:
+    """汇总 CLI 执行节点各子单沙箱的未提交 git diff。"""
+    nid = (node_id or "").strip()
+    tasks: list[Any] = []
+    if nid == "diff_analysis":
+        from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+
+        payload = load_diff_analysis_payload(scope_id) or {}
+        tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+    elif nid == "task_exec":
+        payload = load_task_exec_payload(scope_id) or {}
+        tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+    else:
+        from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+
+        payload = load_diff_analysis_payload(scope_id) or {}
+        tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+        if not tasks:
+            payload = load_task_exec_payload(scope_id) or {}
+            tasks = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
 
     files: list[dict[str, Any]] = []
     seen_repo_roots: set[str] = set()

@@ -380,10 +380,15 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
     if et == "node_init":
         return _expand_node_init(ev, index, host_id)
 
-    if et in ("task_exec_develop_started", "task_exec_verify_started"):
+    if et in ("task_exec_develop_started", "task_exec_verify_started", "diff_analysis_develop_started"):
         display = ev.get("display") if isinstance(ev.get("display"), dict) else {}
-        phase = str(display.get("phase") or ("develop" if et.endswith("develop_started") else "verify"))
-        card_title = "任务执行 · 开发轮 Agent 命令" if phase == "develop" else "任务执行 · 完成检测 Agent 命令"
+        node_id = str(display.get("node_id") or ev.get("node_id") or "task_exec")
+        is_diff = node_id == "diff_analysis"
+        phase = str(display.get("phase") or ("develop" if "develop_started" in et else "verify"))
+        if is_diff:
+            card_title = "试飞优化 · 问题修复 Agent 命令"
+        else:
+            card_title = "任务执行 · 开发轮 Agent 命令" if phase == "develop" else "任务执行 · 完成检测 Agent 命令"
         out: list[dict[str, Any]] = []
         summary = format_event_chat_display(ev)
         if summary:
@@ -407,7 +412,7 @@ def expand_history_event_to_chat(ev: dict[str, Any], index: int) -> list[dict[st
                     agent_id=SPEAKER_SYSTEM,
                     speaker_role=SPEAKER_SYSTEM,
                     display_kind="system_task_exec",
-                    payload={**display, "phase": phase, "node_id": "task_exec"},
+                    payload={**display, "phase": phase, "node_id": node_id},
                     suffix="-cmd",
                 )
             )

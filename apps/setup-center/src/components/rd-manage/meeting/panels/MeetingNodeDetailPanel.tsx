@@ -296,7 +296,7 @@ export function MeetingNodeDetailPanel({
           nodeId === 'solution_review' || (isStructuredSystemNode && !processing);
         const skipHeavySummary = processing;
         const nodeReviewRefresh = processing || refresh;
-        const isTaskExecLive = nodeId === 'task_exec' && processing;
+        const isTaskExecLive = (nodeId === 'task_exec' || nodeId === 'diff_analysis') && processing;
         const isCodeCommitLive = nodeId === 'exception_check' && processing;
         const agentContextLimit = processing ? 8_000 : 0;
         const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
@@ -315,7 +315,9 @@ export function MeetingNodeDetailPanel({
           isStructuredSystemNode
             ? fetchSystemNodeDisplay(synapseApiBase, roomId, nodeId)
             : Promise.resolve(null),
-          isTaskExecLive ? fetchTaskExec(synapseApiBase, roomId) : Promise.resolve(null),
+          isTaskExecLive
+            ? fetchTaskExec(synapseApiBase, roomId, nodeId === 'diff_analysis' ? 'diff_analysis' : 'task_exec')
+            : Promise.resolve(null),
         ]);
 
         if (reviewRes.status === 'fulfilled' && reviewRes.value) {

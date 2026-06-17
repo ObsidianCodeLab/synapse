@@ -51,15 +51,77 @@ const PHASE_LABEL: Record<string, string> = {
   prepare: '准备',
   develop: '开发轮',
   verify: '完成检测',
-  done: '子单收尾',
+  done: '明细收尾',
   finished: '全部结束',
   skipped: '已跳过',
+  code_commit: '代码提交与试飞',
+};
+
+type CliExecNodeId = 'task_exec' | 'diff_analysis';
+
+const NODE_COPY: Record<
+  CliExecNodeId,
+  {
+    titleRunning: string;
+    titleReview: string;
+    detailList: string;
+    goalLabel: string;
+    coverageLabel: string;
+    runningHint: string;
+    reviewHint: (total: number, ok: number) => string;
+    emptyDetail: string;
+    blockedMsg: string;
+    loading: string;
+    waiting: string;
+    empty: string;
+    developPrompt: string;
+    verifyPrompt: string;
+    reprocessTarget: CliExecNodeId;
+  }
+> = {
+  task_exec: {
+    titleRunning: '任务执行进度',
+    titleReview: '任务执行评审',
+    detailList: '子单明细',
+    goalLabel: '任务目标',
+    coverageLabel: '覆盖功能',
+    runningHint: 'Cursor CLI 正在处理研发子单',
+    reviewHint: (total, ok) =>
+      `CLI 已循环处理 ${total} 个研发子单 · 成功 ${ok} 个 · 请核对研发工作汇报、工作路径与提示词后裁决`,
+    emptyDetail: '无子单执行记录',
+    blockedMsg: '任务执行流程异常阻断，请通过重处理或优化处理恢复',
+    loading: '加载任务执行结果…',
+    waiting: '任务执行进行中，等待首批进度…',
+    empty: '暂无任务执行结果',
+    developPrompt: '开发要求',
+    verifyPrompt: '审计要求',
+    reprocessTarget: 'task_exec',
+  },
+  diff_analysis: {
+    titleRunning: '试飞优化进度',
+    titleReview: '试飞优化评审',
+    detailList: '试飞优化明细',
+    goalLabel: '试飞优化关键内容',
+    coverageLabel: '关联子单',
+    runningHint: 'Cursor CLI 正在按试飞优化方案修复问题',
+    reviewHint: (total, ok) =>
+      `CLI 已完成 ${total} 条试飞优化明细 · 成功 ${ok} 条 · 请核对修复内容与代码提交/试飞结果后裁决`,
+    emptyDetail: '无试飞优化明细',
+    blockedMsg: '试飞优化流程异常阻断（含试飞未通过），请通过重处理恢复',
+    loading: '加载试飞优化结果…',
+    waiting: '试飞优化进行中，等待首批进度…',
+    empty: '暂无试飞优化结果',
+    developPrompt: '修复要求',
+    verifyPrompt: '审计要求',
+    reprocessTarget: 'diff_analysis',
+  },
 };
 
 interface Props {
   synapseApiBase: string;
   roomId: string;
   scopeId?: string;
+  nodeId?: CliExecNodeId;
   initialPayload?: TaskExecPayload | null;
   blocked?: boolean;
   /** 节点仍在 processing 时轮询 task-exec 增量结果 */
@@ -197,7 +259,15 @@ function TaskExecRoundsPanel({
   );
 }
 
-function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
+function TaskRowCard({
+  task,
+  copy,
+  showVerify,
+}: {
+  task: TaskExecTaskRow;
+  copy: (typeof NODE_COPY)[CliExecNodeId];
+  showVerify: boolean;
+}) {
   const status = String(task.status || '—');
   const meta = statusMeta(status);
   const cov = Array.isArray(task.coverage) ? task.coverage : [];
@@ -248,15 +318,16 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
         <div className="rd-task-exec-field">
           <div className="rd-task-exec-field__label">
             <Target className="h-3.5 w-3.5 text-amber-400" />
-            任务目标
+            {copy.goalLabel}
           </div>
           <p className="rd-task-exec-field__value">{task.goal || '—'}</p>
         </div>
 
+        {showVerify ? (
         <div className="rd-task-exec-field">
           <div className="rd-task-exec-field__label">
             <Bot className="h-3.5 w-3.5 text-violet-400" />
-            覆盖功能
+            {copy.coverageLabel}
           </div>
           {cov.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
@@ -273,6 +344,7 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
             <p className="rd-task-exec-field__empty">—</p>
           )}
         </div>
+        ) : null}
 
         {task.report_markdown ? (
           <details className="rd-task-exec-prompt" open>
@@ -286,19 +358,19 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
           </details>
         ) : null}
 
-        <PromptBlock title="开发要求" content={task.develop_prompt} />
-        <PromptBlock title="审计要求" content={task.verify_prompt} />
+        <PromptBlock title={copy.developPrompt} content={task.develop_prompt} />
+        {showVerify ? <PromptBlock title={copy.verifyPrompt} content={task.verify_prompt} /> : null}
 
         {task.develop_agent_command ? (
           <details className="rd-task-exec-prompt">
             <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5 text-emerald-400" />
-              开发轮 agent 命令
+              {showVerify ? '开发轮 agent 命令' : '修复轮 agent 命令'}
             </summary>
             <pre className="rd-task-exec-prompt__body custom-scrollbar">{task.develop_agent_command}</pre>
           </details>
         ) : null}
-        {task.verify_agent_command ? (
+        {showVerify && task.verify_agent_command ? (
           <details className="rd-task-exec-prompt">
             <summary className="rd-task-exec-field__label cursor-pointer select-none list-none inline-flex items-center gap-1.5">
               <Terminal className="h-3.5 w-3.5 text-sky-400" />
@@ -327,11 +399,14 @@ function TaskRowCard({ task }: { task: TaskExecTaskRow }) {
 export function TaskExecReviewPanel({
   synapseApiBase,
   roomId,
+  nodeId = 'task_exec',
   initialPayload,
   blocked,
   live = false,
   onDecided,
 }: Props) {
+  const copy = NODE_COPY[nodeId] ?? NODE_COPY.task_exec;
+  const showVerify = nodeId === 'task_exec';
   const [payload, setPayload] = useState<TaskExecPayload | null>(initialPayload ?? null);
   const [reprocessRounds, setReprocessRounds] = useState<TaskExecReprocessRound[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
@@ -350,7 +425,7 @@ export function TaskExecReviewPanel({
     if (!isRunning) setLoading(true);
     setError('');
     try {
-      const res = await fetchTaskExec(synapseApiBase, roomId);
+      const res = await fetchTaskExec(synapseApiBase, roomId, nodeId);
       setPayload(res.payload);
       setReprocessRounds(Array.isArray(res.reprocess_rounds) ? res.reprocess_rounds : []);
       setCurrentRound(Number(res.current_round) || 0);
@@ -363,7 +438,7 @@ export function TaskExecReviewPanel({
     } finally {
       if (!isRunning) setLoading(false);
     }
-  }, [isRunning, synapseApiBase, roomId]);
+  }, [isRunning, nodeId, synapseApiBase, roomId]);
 
   useEffect(() => {
     void refresh();
@@ -417,8 +492,8 @@ export function TaskExecReviewPanel({
     }
     setSubmitting(true);
     try {
-      await reprocessMeetingRoom(synapseApiBase, roomId, 'task_exec', text);
-      message.success('已触发任务执行重处理，请稍候刷新结果');
+      await reprocessMeetingRoom(synapseApiBase, roomId, copy.reprocessTarget, text);
+      message.success(`已触发${copy.titleReview.replace('评审', '')}重处理，请稍候刷新结果`);
       onDecided?.();
     } catch (e) {
       message.error(e instanceof Error ? e.message : '优化处理失败');
@@ -427,8 +502,8 @@ export function TaskExecReviewPanel({
     }
   };
 
-  const optimizeDisabled = blocked || submitting || !comment.trim();
-  const canOptimize = Boolean(comment.trim()) && !blocked && !submitting;
+  const flightFailed = Boolean(payload?.flight_failed);
+  const canApprove = !blocked && !submitting && !flightFailed;
 
   const agentInstallHint =
     (payload?.agent_cli && typeof payload.agent_cli === 'object'
@@ -445,10 +520,10 @@ export function TaskExecReviewPanel({
       await reprocessMeetingRoom(
         synapseApiBase,
         roomId,
-        'task_exec',
-        'Cursor Agent CLI 已安装，重新执行任务执行',
+        copy.reprocessTarget,
+        `Cursor Agent CLI 已安装，重新执行${copy.titleReview.replace('评审', '')}`,
       );
-      message.success('已触发任务执行重新处理，请稍候刷新结果');
+      message.success(`已触发${copy.titleReview.replace('评审', '')}重新处理，请稍候刷新结果`);
       setInstallOpen(false);
       await refresh();
     } catch (e) {
@@ -462,7 +537,7 @@ export function TaskExecReviewPanel({
     return (
       <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        加载任务执行结果…
+        {copy.loading}
       </div>
     );
   }
@@ -471,7 +546,7 @@ export function TaskExecReviewPanel({
     return (
       <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        任务执行进行中，等待首批进度…
+        {copy.waiting}
       </div>
     );
   }
@@ -487,7 +562,7 @@ export function TaskExecReviewPanel({
   if (!payload) {
     return (
       <div className="flex h-full items-center justify-center p-8">
-        <Alert type="warning" message="暂无任务执行结果" showIcon />
+        <Alert type="warning" message={copy.empty} showIcon />
       </div>
     );
   }
@@ -505,7 +580,7 @@ export function TaskExecReviewPanel({
     ((progress?.message || '').trim() ||
       (progress?.task_total
         ? `工单 ${progress.task_no || progress.task_index || 0} · ${PHASE_LABEL[String(progress.phase || '')] || progress.phase || '执行中'}（${progress.task_index || 0}/${progress.task_total}）`
-        : 'CLI 任务执行进行中…'));
+        : `${copy.runningHint}…`));
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -537,7 +612,7 @@ export function TaskExecReviewPanel({
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center gap-2 flex-nowrap overflow-hidden">
               <h2 className="text-lg font-bold text-foreground m-0 tracking-tight shrink-0 whitespace-nowrap">
-                {isRunning ? '任务执行进度' : '任务执行评审'}
+                {isRunning ? copy.titleRunning : copy.titleReview}
               </h2>
               <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-medium text-amber-200 shrink-0 whitespace-nowrap">
                 <Terminal className="h-3 w-3" />
@@ -561,18 +636,18 @@ export function TaskExecReviewPanel({
             </div>
             <p className="text-sm text-muted-foreground m-0 leading-relaxed">
               {isRunning
-                ? `Cursor CLI 正在处理研发子单，页面每 3 秒自动刷新。${total ? `共 ${total} 个子单。` : ''}`
+                ? `${copy.runningHint}，页面每 3 秒自动刷新。${total ? `共 ${total} 条。` : ''}`
                 : agentCliMissing
                 ? payload?.status === 'agent_cli_login_required'
-                  ? '任务执行尚未开始：Cursor Agent CLI 已安装，请先完成账号登录。'
-                  : '任务执行尚未开始：本机缺少 Cursor Agent CLI（agent），请先安装后再重新执行。'
-                : `CLI 已循环处理 ${total} 个研发子单 · 成功 ${ok} 个 · 请核对研发工作汇报、工作路径与提示词后裁决`}
+                  ? `${copy.titleReview.replace('评审', '')}尚未开始：Cursor Agent CLI 已安装，请先完成账号登录。`
+                  : `${copy.titleReview.replace('评审', '')}尚未开始：本机缺少 Cursor Agent CLI（agent），请先安装后再重新执行。`
+                : copy.reviewHint(total, ok)}
             </p>
           </div>
         </div>
         <div className="relative mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: '子单总数', value: total, icon: <Bot className="h-4 w-4 text-violet-400" /> },
+            { label: nodeId === 'diff_analysis' ? '明细总数' : '子单总数', value: total, icon: <Bot className="h-4 w-4 text-violet-400" /> },
             { label: '成功', value: ok, icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" /> },
             {
               label: 'Token 合计',
@@ -617,19 +692,30 @@ export function TaskExecReviewPanel({
         />
       ) : null}
 
+      {flightFailed ? (
+        <Alert
+          type="error"
+          showIcon
+          message="试飞仍未通过"
+          description={String(payload?.error || '代码已提交但试飞失败，不允许推进节点，请重处理后重试。')}
+        />
+      ) : null}
+
       {blocked ? (
-        <Alert type="error" showIcon message="任务执行流程异常阻断，请通过重处理或优化处理恢复" />
+        <Alert type="error" showIcon message={copy.blockedMsg} />
       ) : null}
 
       <div className="space-y-3">
         <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold text-foreground/90">
           <ListTree className="h-3.5 w-3.5 text-amber-400" />
-          子单明细
+          {copy.detailList}
         </div>
         {tasks.length === 0 && !agentCliMissing && !isRunning ? (
-          <Alert type="warning" message="无子单执行记录" showIcon />
+          <Alert type="warning" message={copy.emptyDetail} showIcon />
         ) : (
-          tasks.map((t) => <TaskRowCard key={String(t.task_no)} task={t} />)
+          tasks.map((t) => (
+            <TaskRowCard key={String(t.task_no)} task={t} copy={copy} showVerify={showVerify} />
+          ))
         )}
       </div>
 
@@ -675,7 +761,7 @@ export function TaskExecReviewPanel({
             type="primary"
             icon={<CheckCircle2 className="h-4 w-4" />}
             loading={submitting}
-            disabled={blocked}
+            disabled={!canApprove}
             className="bg-emerald-600 hover:bg-emerald-500"
             onClick={() => void onDecision('approve')}
           >

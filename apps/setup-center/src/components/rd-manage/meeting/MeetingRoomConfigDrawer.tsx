@@ -456,7 +456,7 @@ export const MeetingRoomConfigDrawer: React.FC<{
   const humanConfirm = effectiveHumanConfirm(override, binding);
   const showHumanConfirmSwitch = humanConfirmSwitchVisible(nodeType);
   const isSystemNode = binding?.type === 'system';
-  const isTaskExecNode = selectedNodeId === 'task_exec';
+  const isTaskExecNode = selectedNodeId === 'task_exec' || selectedNodeId === 'diff_analysis';
   const cliTool = normalizeCliTool(override.cli_tool ?? binding?.cli_tool ?? DEFAULT_CLI_TOOL);
   const cliModel = normalizeCursorCliModel(
     override.cli_model ?? binding?.cli_model ?? DEFAULT_CURSOR_CLI_MODEL,

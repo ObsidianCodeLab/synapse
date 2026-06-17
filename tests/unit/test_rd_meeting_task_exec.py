@@ -198,6 +198,7 @@ def test_build_task_prompts_cover_goal_scheme_and_human_notes():
 
 def test_uses_task_exec_cli_only_for_task_exec_node():
     assert uses_task_exec_cli(NODE_ID) is True
+    assert uses_task_exec_cli("diff_analysis") is True
     assert uses_task_exec_cli("sandbox_build") is False
 
 

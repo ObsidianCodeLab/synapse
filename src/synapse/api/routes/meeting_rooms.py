@@ -953,50 +953,76 @@ class TaskExecCodeDiffSaveBody(BaseModel):
 
 
 @router.get("/api/dev/meeting-rooms/{room_id}/task-exec")
-async def get_task_exec(room_id: str) -> dict:
-    """读取任务执行结构化 payload（task_exec_result.json）。"""
+async def get_task_exec(room_id: str, node_id: str = "") -> dict:
+    """读取 CLI 执行结构化 payload（任务执行 / 试飞优化）。"""
     resolved = _resolve_scope_for_room(room_id)
     if resolved is None:
         return error_response(404, "meeting_room_not_found")
     sid, _ = resolved
+    from synapse.rd_meeting.dev_status import load_dev_status
+    from synapse.rd_meeting.diff_analysis_exec import (
+        load_diff_analysis_payload,
+        read_diff_analysis_live_tail,
+    )
     from synapse.rd_meeting.task_exec import load_task_exec_payload, read_task_exec_live_tail
     from synapse.rd_meeting.task_exec_rounds import current_task_exec_round, load_task_exec_rounds
 
-    payload = load_task_exec_payload(sid)
-    if payload is None:
-        return error_response(404, "task_exec_not_found")
     room_state = load_room_state(sid) or {}
     pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
-    live_tail = read_task_exec_live_tail(sid)
+    dev = load_dev_status(sid) or {}
+    effective_node = (node_id or pending.get("node_id") or dev.get("current_node_id") or "task_exec").strip()
+
+    if effective_node == "diff_analysis":
+        payload = load_diff_analysis_payload(sid)
+        live_tail = read_diff_analysis_live_tail(sid)
+        blocked_key = "diff_analysis_blocked"
+    else:
+        payload = load_task_exec_payload(sid)
+        live_tail = read_task_exec_live_tail(sid)
+        blocked_key = "task_exec_blocked"
+
+    if payload is None:
+        return error_response(404, "task_exec_not_found")
     if not live_tail.get("path"):
         live_tail = None
-    rounds = load_task_exec_rounds(sid)
+    rounds = load_task_exec_rounds(sid) if effective_node != "diff_analysis" else []
     return success_response(
         {
             "room_id": room_id,
             "scope_id": sid,
+            "node_id": effective_node,
             "payload": payload,
             "reprocess_rounds": rounds,
-            "current_round": current_task_exec_round(sid),
+            "current_round": current_task_exec_round(sid) if effective_node != "diff_analysis" else 0,
             "live_tail": live_tail,
             "intervention_kind": room_state.get("intervention_kind"),
-            "blocked": bool(room_state.get("task_exec_blocked")),
+            "blocked": bool(room_state.get(blocked_key)),
             "pending_node_id": pending.get("node_id"),
         }
     )
 
 
 @router.get("/api/dev/meeting-rooms/{room_id}/task-exec/code-diffs")
-async def get_task_exec_code_diffs(room_id: str) -> dict:
-    """任务执行评审：各子单沙箱 git diff（过滤测试/归档/AGENTS.md）。"""
+async def get_task_exec_code_diffs(room_id: str, node_id: str = "") -> dict:
+    """CLI 执行评审：各子单沙箱 git diff（过滤测试/归档/AGENTS.md）。"""
     resolved = _resolve_scope_for_room(room_id)
     if resolved is None:
         return error_response(404, "meeting_room_not_found")
     sid, _ = resolved
+    from synapse.rd_meeting.dev_status import load_dev_status
+    from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
     from synapse.rd_meeting.task_exec import load_task_exec_payload
     from synapse.rd_meeting.task_exec_code_diff import collect_task_exec_code_diffs
 
-    payload = load_task_exec_payload(sid)
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    dev = load_dev_status(sid) or {}
+    effective_node = (node_id or pending.get("node_id") or dev.get("current_node_id") or "task_exec").strip()
+
+    if effective_node == "diff_analysis":
+        payload = load_diff_analysis_payload(sid)
+    else:
+        payload = load_task_exec_payload(sid)
     if payload is None:
         return error_response(404, "task_exec_not_found")
     if str(payload.get("status") or "").lower() == "running":
@@ -1005,7 +1031,8 @@ async def get_task_exec_code_diffs(room_id: str) -> dict:
         {
             "room_id": room_id,
             "scope_id": sid,
-            **collect_task_exec_code_diffs(sid),
+            "node_id": effective_node,
+            **collect_task_exec_code_diffs(sid, node_id=effective_node),
         }
     )
 

@@ -107,7 +107,7 @@ def test_task_check_flight_fail_redirects_to_task_feedback(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     ("node_id", "reason_snippet", "next_id"),
     [
-        ("task_feedback", "试飞优化方案待人工评估", "diff_analysis"),
+        ("diff_analysis", "试飞优化待人工评审", "env_start"),
     ],
 )
 def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet, next_id, monkeypatch):
@@ -118,7 +118,7 @@ def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet
 
     assert reason_snippet in downstream_advance_block_reason(node_id)
     assert next_node_id(node_id) == next_id
-    assert not downstream_advance_block_reason("diff_analysis")
+    assert not downstream_advance_block_reason("task_feedback")
 
     scope_id = f"block-{node_id}"
     save_dev_status(

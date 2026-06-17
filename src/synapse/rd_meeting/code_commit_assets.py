@@ -627,10 +627,30 @@ def _task_exec_index(scope_id: str) -> dict[str, dict[str, Any]]:
     }
 
 
+def _diff_analysis_index(scope_id: str) -> dict[str, dict[str, Any]]:
+    from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+
+    payload = load_diff_analysis_payload(scope_id) or {}
+    rows = payload.get("tasks") if isinstance(payload.get("tasks"), list) else []
+    return {
+        str(row.get("task_no") or "").strip(): row
+        for row in rows
+        if isinstance(row, dict) and str(row.get("task_no") or "").strip()
+    }
+
+
+def _cli_exec_commit_index(scope_id: str) -> dict[str, dict[str, Any]]:
+    """优先使用试飞优化明细中的 commit_summary，否则回退任务执行。"""
+    diff_idx = _diff_analysis_index(scope_id)
+    if diff_idx:
+        return diff_idx
+    return _task_exec_index(scope_id)
+
+
 def _collect_commit_orders(scope_type: ScopeType, scope_id: str) -> list[dict[str, Any]]:
     auto_ctx = _auto_split_context_for_bindings(scope_id)
     task_rows = collect_task_rows(auto_ctx)
-    exec_by_no = _task_exec_index(scope_id)
+    exec_by_no = _cli_exec_commit_index(scope_id)
     orders: list[dict[str, Any]] = []
 
     for row in task_rows:

@@ -698,6 +698,9 @@ export interface TaskExecPayload {
   };
   tasks?: TaskExecTaskRow[];
   human_review?: { status?: string; comment?: string; decided_at?: string | null };
+  flight_failed?: boolean;
+  code_commit?: Record<string, unknown> | null;
+  plan_doc_path?: string;
 }
 
 export interface TaskExecReprocessRound {
@@ -721,22 +724,26 @@ export interface TaskExecReprocessRound {
 export interface TaskExecGetResponse {
   room_id: string;
   scope_id: string;
+  node_id?: string;
   payload: TaskExecPayload;
   reprocess_rounds?: TaskExecReprocessRound[];
   current_round?: number;
   live_tail?: TaskExecLiveTail | null;
   intervention_kind?: string;
   blocked?: boolean;
+  pending_node_id?: string;
 }
 
 export async function fetchTaskExec(
   synapseApiBase: string,
   roomId: string,
+  nodeId?: string,
 ): Promise<TaskExecGetResponse> {
   const base = synapseApiBase.replace(/\/$/, '');
+  const qs = nodeId ? `?node_id=${encodeURIComponent(nodeId)}` : '';
   return apiGet<TaskExecGetResponse>(
     base,
-    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec`,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec${qs}`,
   );
 }
 

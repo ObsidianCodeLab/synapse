@@ -1301,23 +1301,40 @@ class MeetingRoomOrchestrator:
         stage_id: int,
         ticket_title: str,
     ) -> dict[str, Any]:
-        """任务执行节点：CLI 完成后进入专用人工评审面板。"""
-        from synapse.rd_meeting.task_exec import load_task_exec_payload
+        """CLI 执行节点（任务执行 / 试飞优化）：完成后进入专用人工评审面板。"""
+        from synapse.rd_meeting.diff_analysis_exec import (
+            NODE_ID as DA_NODE_ID,
+            load_diff_analysis_payload,
+        )
+        from synapse.rd_meeting.task_exec import NODE_ID as TE_NODE_ID, load_task_exec_payload
 
         sid = scope_id.strip()
+        nid = (node_id or "").strip()
         set_phase(sid, "result_gate")
-        te_payload = load_task_exec_payload(sid)
-        if not isinstance(te_payload, dict):
+        if nid == DA_NODE_ID:
+            cli_payload = load_diff_analysis_payload(sid)
+            payload_key = "diff_analysis_payload"
+            blocked_key = "diff_analysis_blocked"
+            intervention_kind = "task_exec"
+        else:
+            cli_payload = load_task_exec_payload(sid)
+            payload_key = "task_exec_payload"
+            blocked_key = "task_exec_blocked"
+            intervention_kind = "task_exec"
+            nid = nid or TE_NODE_ID
+
+        node_label = node_display_name(nid)
+        if not isinstance(cli_payload, dict):
             gate = self.mark_human_gate(
                 scope_type=scope_type,
                 scope_id=sid,
                 room_id=room_id,
-                node_id=node_id,
-                reason=f"{node_display_name(node_id)} 任务执行产物未就绪",
+                node_id=nid,
+                reason=f"{node_label} 执行产物未就绪",
                 ticket_title=ticket_title,
                 hitl_form_schema=None,
                 pending_delivery={
-                    "node_id": node_id,
+                    "node_id": nid,
                     "report_body": report_body,
                     "await_confirm": False,
                     "tokens_used": tokens_used,
@@ -1327,48 +1344,111 @@ class MeetingRoomOrchestrator:
                 intervention_kind="exception",
             )
             set_phase(sid, "exception_gate")
-            return {"status": "human_intervention", "node_id": node_id, "exception": True, **gate}
+            return {"status": "human_intervention", "node_id": nid, "exception": True, **gate}
 
         pending: dict[str, Any] = {
-            "node_id": node_id,
+            "node_id": nid,
             "report_body": report_body,
             "await_confirm": True,
             "tokens_used": tokens_used,
             "duration_seconds": duration_seconds,
             "stage_id": stage_id,
-            "task_exec_payload": te_payload,
+            payload_key: cli_payload,
         }
         gate = self.mark_human_gate(
             scope_type=scope_type,
             scope_id=sid,
             room_id=room_id,
-            node_id=node_id,
-            reason=f"{node_display_name(node_id)} 待人工评审（CLI 执行结果确认）",
+            node_id=nid,
+            reason=f"{node_label} 待人工评审（CLI 执行结果确认）",
             ticket_title=ticket_title,
             hitl_form_schema=None,
             pending_delivery=pending,
-            intervention_kind="task_exec",
+            intervention_kind=intervention_kind,
         )
         append_history_event(
             sid,
             {
                 "event": "task_exec_gate",
                 "room_id": room_id,
-                "node_id": node_id,
-                "text": f"{node_display_name(node_id)} 待人工评审任务执行结果",
-                "intervention_kind": "task_exec",
+                "node_id": nid,
+                "text": f"{node_label} 待人工评审 CLI 执行结果",
+                "intervention_kind": intervention_kind,
                 "tokens_used": tokens_used,
                 "duration_seconds": duration_seconds,
                 "log_type": "info",
             },
         )
+        rs = dict(load_room_state(sid) or {})
+        rs.pop(blocked_key, None)
+        save_room_state(sid, rs)
         return {
             "status": "human_intervention",
-            "node_id": node_id,
+            "node_id": nid,
             "pending_confirm": True,
-            "task_exec_payload": te_payload,
+            payload_key: cli_payload,
             **gate,
         }
+
+    def enter_cli_exec_exception_gate(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        report_body: str,
+        error: str,
+        tokens_used: int,
+        duration_seconds: int,
+        stage_id: int,
+        ticket_title: str,
+        payload: dict[str, Any],
+        payload_key: str = "diff_analysis_payload",
+        blocked_key: str = "diff_analysis_blocked",
+    ) -> dict[str, Any]:
+        """CLI 节点失败（如试飞仍未通过）：异常门控，禁止推进。"""
+        sid = scope_id.strip()
+        nid = (node_id or "").strip()
+        node_label = node_display_name(nid)
+        set_phase(sid, "exception_gate")
+        pending: dict[str, Any] = {
+            "node_id": nid,
+            "report_body": report_body,
+            "await_confirm": False,
+            "tokens_used": tokens_used,
+            "duration_seconds": duration_seconds,
+            "stage_id": stage_id,
+            payload_key: payload,
+            "error": error,
+        }
+        gate = self.mark_human_gate(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=nid,
+            reason=f"{node_label} 失败：{error}",
+            ticket_title=ticket_title,
+            hitl_form_schema=None,
+            pending_delivery=pending,
+            intervention_kind="exception",
+        )
+        rs = dict(load_room_state(sid) or {})
+        rs[blocked_key] = True
+        rs["escalate_reason"] = error
+        save_room_state(sid, rs)
+        append_history_event(
+            sid,
+            {
+                "event": "diff_analysis_flight_failed",
+                "room_id": room_id,
+                "node_id": nid,
+                "text": error,
+                "log_type": "error",
+                "agent_id": "system",
+            },
+        )
+        return {"status": "human_intervention", "node_id": nid, "exception": True, **gate}
 
     def confirm_task_exec_decision(
         self,
@@ -1381,34 +1461,44 @@ class MeetingRoomOrchestrator:
         agent_pool: Any | None = None,
         ticket_title: str = "",
     ) -> dict[str, Any]:
-        """任务执行人工评审：通过则推进下一节点。"""
+        """CLI 执行节点人工评审：通过则推进下一节点。"""
         sid = scope_id.strip()
         rs = dict(load_room_state(sid) or {})
         pending = rs.get("pending_delivery") if isinstance(rs.get("pending_delivery"), dict) else {}
+        from synapse.rd_meeting.diff_analysis_exec import NODE_ID as DA_NODE_ID
         from synapse.rd_meeting.task_exec import NODE_ID as TE_NODE_ID
 
         node_id = str(pending.get("node_id") or rs.get("current_node_id") or TE_NODE_ID)
-        if node_id != TE_NODE_ID:
+        if node_id not in (TE_NODE_ID, DA_NODE_ID):
             raise ValueError("not_task_exec_node")
 
         dec = (decision or "").strip().lower()
         if dec not in ("approve", "reject", "pass", "fail"):
             raise ValueError("invalid_decision")
 
+        from synapse.rd_meeting.diff_analysis_exec import _read_result as _read_da_result
+        from synapse.rd_meeting.diff_analysis_exec import _write_result as _write_da_result
         from synapse.rd_meeting.task_exec import _read_result, _write_result
 
-        payload = _read_result(sid) or {}
+        if node_id == DA_NODE_ID:
+            payload = _read_da_result(sid) or {}
+            write_result = _write_da_result
+            blocked_key = "diff_analysis_blocked"
+        else:
+            payload = _read_result(sid) or {}
+            write_result = _write_result
+            blocked_key = "task_exec_blocked"
         human = dict(payload.get("human_review") or {})
         human["status"] = "approved" if dec in ("approve", "pass") else "rejected"
         human["comment"] = comment.strip()
         human["decided_at"] = datetime.now().isoformat(timespec="seconds")
         payload["human_review"] = human
-        _write_result(sid, payload)
+        write_result(sid, payload)
 
         if dec in ("reject", "fail"):
             rs["status"] = "human_intervention"
             rs["intervention_kind"] = "exception"
-            rs["task_exec_blocked"] = True
+            rs[blocked_key] = True
             if comment.strip():
                 rs["escalate_reason"] = comment.strip()
             save_room_state(sid, rs)
@@ -1434,7 +1524,12 @@ class MeetingRoomOrchestrator:
         stage_name = stage_name_for_id(stage_id)
         dest = archive_node_dir(sid, stage_name, node_id)
         artifacts = []
-        for name in ("任务执行记录.md", "task_exec_result.json"):
+        report_names = (
+            ("试飞优化执行记录.md", "diff_analysis_result.json")
+            if node_id == DA_NODE_ID
+            else ("任务执行记录.md", "task_exec_result.json")
+        )
+        for name in report_names:
             path = dest / name
             if path.is_file():
                 artifacts.append({"name": name, "path": str(path)})
@@ -1454,7 +1549,7 @@ class MeetingRoomOrchestrator:
         )
         rs = dict(load_room_state(sid) or {})
         rs.pop("pending_delivery", None)
-        rs.pop("task_exec_blocked", None)
+        rs.pop(blocked_key, None)
         save_room_state(sid, rs)
         append_history_event(
             sid,

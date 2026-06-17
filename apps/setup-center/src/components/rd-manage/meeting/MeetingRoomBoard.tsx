@@ -509,10 +509,13 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     ),
     funcSolutionBlocked: Boolean(live.func_solution_blocked ?? room.funcSolutionBlocked),
     taskExecPayload:
+      (pendingDelivery?.diff_analysis_payload as TaskExecPayload | undefined) ??
       (pendingDelivery?.task_exec_payload as TaskExecPayload | undefined) ??
       room.taskExecPayload ??
       null,
-    taskExecBlocked: Boolean(live.task_exec_blocked ?? room.taskExecBlocked),
+    taskExecBlocked: Boolean(
+      live.diff_analysis_blocked ?? live.task_exec_blocked ?? room.taskExecBlocked,
+    ),
     brief: live.phase ? `${nextBrief.split(' · ')[0] || nextBrief} · ${live.phase}` : nextBrief,
     chatSopKey: nextSopKey,
     participants: live.participants?.length ? live.participants : room.participants,
@@ -921,9 +924,14 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
         ?.func_solution_review_payload as FuncSolutionReviewPayload | undefined) ?? null,
     funcSolutionBlocked: Boolean(item.room_state?.func_solution_blocked),
     taskExecPayload:
+      ((item.room_state?.pending_delivery as { diff_analysis_payload?: TaskExecPayload; task_exec_payload?: TaskExecPayload })
+        ?.diff_analysis_payload as TaskExecPayload | undefined) ??
       ((item.room_state?.pending_delivery as { task_exec_payload?: TaskExecPayload })
-        ?.task_exec_payload as TaskExecPayload | undefined) ?? null,
-    taskExecBlocked: Boolean(item.room_state?.task_exec_blocked),
+        ?.task_exec_payload as TaskExecPayload | undefined) ??
+      null,
+    taskExecBlocked: Boolean(
+      item.room_state?.diff_analysis_blocked ?? item.room_state?.task_exec_blocked,
+    ),
     participants: item.participants,
     scopeType: item.scope_type,
     scopeId: item.scope_id,
@@ -2018,13 +2026,21 @@ const InterventionDialog = ({
     if (interventionPanel === 'prod_selection') return '选择产品';
     if (interventionPanel === 'solution_review') return '方案评审';
     if (interventionPanel === 'func_solution_review') return '函数级方案评审';
-    if (interventionPanel === 'task_exec') return '任务执行评审';
+    if (interventionPanel === 'task_exec') {
+      const nid = (room.hitlPendingNodeId || room.currentNode || 'task_exec').trim();
+      return nid === 'diff_analysis' ? '试飞优化评审' : '任务执行评审';
+    }
     if (interventionPanel === 'node_review') return '结果待确认';
     const k = (room?.interventionKind || '').toLowerCase();
     if (k === 'exception') return '异常待裁决';
     if (k === 'interactive') return '澄清待回复';
     return '待人工确认';
-  }, [interventionPanel, room?.interventionKind]);
+  }, [interventionPanel, room?.interventionKind, room?.hitlPendingNodeId, room?.currentNode]);
+
+  const cliExecNodeId = useMemo((): 'task_exec' | 'diff_analysis' => {
+    const nid = (room?.hitlPendingNodeId || room?.currentNode || 'task_exec').trim();
+    return nid === 'diff_analysis' ? 'diff_analysis' : 'task_exec';
+  }, [room?.hitlPendingNodeId, room?.currentNode]);
 
   const hitlFocusKey = useMemo(() => {
     if (!hitlAvailable || !room) return null;
@@ -2674,6 +2690,7 @@ const InterventionDialog = ({
                   synapseApiBase={synapseApiBase || ''}
                   roomId={room.id}
                   scopeId={room.scopeId}
+                  nodeId={cliExecNodeId}
                   initialPayload={room.taskExecPayload ?? null}
                   blocked={room.taskExecBlocked}
                   onDecided={() => setCenterTab('detail')}
@@ -2791,25 +2808,28 @@ const InterventionDialog = ({
 
                     {detailViewMode === 'skipped' ? (
                       <SkippedNodeDetailPanel nodeName={selectedNode.name} />
-                    ) : detailViewMode === 'review' && selectedNode.id === 'task_exec' ? (
+                    ) : detailViewMode === 'review' &&
+                      (selectedNode.id === 'task_exec' || selectedNode.id === 'diff_analysis') ? (
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <TaskExecReviewPanel
-                          key={`detail-te-${room.id}`}
+                          key={`detail-te-${room.id}-${selectedNode.id}`}
                           synapseApiBase={synapseApiBase || ''}
                           roomId={room.id}
                           scopeId={room.scopeId}
+                          nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
                         />
                       </div>
-                    ) : selectedNode.id === 'task_exec' &&
+                    ) : (selectedNode.id === 'task_exec' || selectedNode.id === 'diff_analysis') &&
                       (selectedNodeState === 'processing' || room.status === 'processing') ? (
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <TaskExecReviewPanel
-                          key={`detail-te-live-${room.id}`}
+                          key={`detail-te-live-${room.id}-${selectedNode.id}`}
                           synapseApiBase={synapseApiBase || ''}
                           roomId={room.id}
                           scopeId={room.scopeId}
+                          nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
                           live
