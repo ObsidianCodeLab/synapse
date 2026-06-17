@@ -323,7 +323,7 @@ def _ensure_whalehub_cli() -> None:
     logger.info("whalehub 未安装，正在 npm install -g %s", WHALEHUB_NPM_PKG)
     try:
         subprocess.run(
-            ["npm", "install", "-g", WHALEHUB_NPM_PKG],
+            ["npm.cmd", "install", "-g", WHALEHUB_NPM_PKG],
             check=True,
             capture_output=True,
             text=True,
@@ -339,7 +339,7 @@ def _ensure_whalehub_cli() -> None:
 
     try:
         npm_bin = subprocess.run(
-            ["npm", "bin", "-g"],
+            ["npm.cmd", "bin", "-g"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -361,6 +361,7 @@ def install_skill(slug: str) -> dict:
     if not slug:
         raise ValueError("slug 不能为空")
 
+    project_root = _project_root()
     install_dir = skills_install_dir()
     target_dir = install_dir / slug
     if target_dir.is_dir():
@@ -373,10 +374,11 @@ def install_skill(slug: str) -> dict:
     if not whalehub_path:
         raise RuntimeError("whalehub CLI 不可用，请手动安装")
 
-    logger.info("正在安装技能: whalehub install %s (cwd=%s)", slug, install_dir)
+    # whalehub install 固定写入 ./skills/<slug>，cwd 必须是项目根而非 skills/ 本身
+    logger.info("正在安装技能: whalehub install %s (cwd=%s)", slug, project_root)
     result = subprocess.run(
         [whalehub_path, "install", slug],
-        cwd=str(install_dir),
+        cwd=str(project_root),
         capture_output=True,
         text=True,
         encoding="utf-8",
