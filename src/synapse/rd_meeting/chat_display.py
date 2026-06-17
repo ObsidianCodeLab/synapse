@@ -834,6 +834,26 @@ def _looks_like_pipeline_chat(text: str, event_type: str) -> bool:
     )
 
 
+def _dedupe_chat_logs_by_id(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """同 id 的协作卡片只保留最后一次 payload（与前端 mergeChatLogs 一致）。
+
+    代码提交等系统节点在 room_history 中会连续写入多条带相同 stable id 的进度事件；
+    若不去重，会议流会堆叠多张「进行中」卡片。
+    """
+    if not logs:
+        return logs
+    last_by_id: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for idx, row in enumerate(logs):
+        rid = str(row.get("id") or "").strip()
+        if not rid:
+            rid = f"__row_{idx}"
+        if rid not in last_by_id:
+            order.append(rid)
+        last_by_id[rid] = row
+    return [last_by_id[k] for k in order]
+
+
 def history_to_chat_logs(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """会议室 UI chat log（结构化展示 + 系统/主持/协作角色）。"""
     logs: list[dict[str, Any]] = []
@@ -841,4 +861,4 @@ def history_to_chat_logs(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if not isinstance(ev, dict):
             continue
         logs.extend(expand_history_event_to_chat(ev, i))
-    return logs
+    return _dedupe_chat_logs_by_id(logs)

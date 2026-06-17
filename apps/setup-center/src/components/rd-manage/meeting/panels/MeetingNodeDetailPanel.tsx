@@ -1,7 +1,7 @@
 /**
  * MeetingNodeDetailPanel — 会议室节点详情
  * AI 节点：产出 / 消耗 / 流程 Tab；代码提交（exception_check）为独立面板，不共用 Tab 布局。
- * 节点 token/耗时取自 meeting-summary（room_state.node_metrics）；流程/产出等仍拉 agent-contexts 等。
+ * 节点 token/耗时：已完成时取自 meeting-summary；进行中轮询 node-review?refresh=true（metrics-only）。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Spin, Tabs, Tooltip } from 'antd';
@@ -293,15 +293,16 @@ export function MeetingNodeDetailPanel({
       try {
         const sid = (scopeId || '').trim();
         const skipNodeReview =
-          nodeId === 'solution_review' || isStructuredSystemNode || processing;
+          nodeId === 'solution_review' || (isStructuredSystemNode && !processing);
         const skipHeavySummary = processing;
+        const nodeReviewRefresh = processing || refresh;
         const isTaskExecLive = nodeId === 'task_exec' && processing;
         const isCodeCommitLive = nodeId === 'exception_check' && processing;
         const agentContextLimit = processing ? 8_000 : 0;
         const [reviewRes, ctxRes, summaryRes, systemRes, taskExecRes] = await Promise.allSettled([
           skipNodeReview
             ? Promise.resolve(null)
-            : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh }),
+            : fetchNodeReview(synapseApiBase, roomId, { nodeId, refresh: nodeReviewRefresh }),
           isStructuredSystemNode
             ? Promise.resolve(null)
             : fetchMeetingAgentContexts(synapseApiBase, roomId, {
@@ -319,7 +320,7 @@ export function MeetingNodeDetailPanel({
 
         if (reviewRes.status === 'fulfilled' && reviewRes.value) {
           setReview(reviewRes.value);
-        } else if (nodeState !== 'pending' && !skipNodeReview) {
+        } else if (nodeState !== 'pending' && !skipNodeReview && !processing) {
           setReview(null);
         }
 
@@ -483,8 +484,10 @@ export function MeetingNodeDetailPanel({
     [artifacts],
   );
 
-  const tokenTotal = summaryNode?.metrics?.tokens ?? 0;
-  const durationSec = summaryNode?.metrics?.deal_seconds ?? 0;
+  const tokenTotal =
+    summaryNode?.metrics?.tokens ?? metrics?.node_token_total ?? 0;
+  const durationSec =
+    summaryNode?.metrics?.deal_seconds ?? metrics?.node_duration_seconds ?? 0;
   const toolTotal = metrics?.tool_call_total ?? 0;
   const skillTotal = metrics?.skill_call_total ?? 0;
   const delegationTotal = metrics?.delegation_total ?? 0;
@@ -648,7 +651,7 @@ export function MeetingNodeDetailPanel({
     <div className="space-y-5">
       {metricsGrid}
       {agentCards}
-      {!metrics && !summaryNode && !loading ? (
+      {!metrics && !summaryNode && !loading && !refreshing ? (
         <p className="text-center text-xs text-muted-foreground">指标汇总将在节点首次产出后可用</p>
       ) : null}
     </div>

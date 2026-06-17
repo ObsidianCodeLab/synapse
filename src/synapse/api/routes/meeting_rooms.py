@@ -621,7 +621,7 @@ async def get_node_review(
         )
 
         if refresh:
-            payload = build_node_review_metrics_only(**common)
+            payload = await asyncio.to_thread(build_node_review_metrics_only, **common)
             inline = pending.get("review_payload") if isinstance(pending, dict) else None
             apply_preserved_summaries(
                 payload,
