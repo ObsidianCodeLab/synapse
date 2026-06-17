@@ -824,9 +824,12 @@ class MeetingRoomService:
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
 
+        from synapse.rd_meeting.hitl_lifecycle import reset_human_confirm_lifecycle
+        from synapse.rd_meeting.hitl_submit import clear_pending_questionnaire
         from synapse.rd_meeting.pipeline import (
             STEP_REPROCESS_PREP,
             PipelineRunContext,
+            _clear_node_for_reprocess,
             clear_room_state_for_node_reprocess,
             run_pipeline_until_waiting,
         )
@@ -842,6 +845,11 @@ class MeetingRoomService:
         dev["local_process_state"] = "处理中"
         save_dev_status(sid, dev)
         if current and current != "pending":
+            # 同步删除 agents/<node>/room_history.jsonl，避免 API 返回后前端拉到旧协作流
+            stage_id = int(dev.get("stage_id") or stage_id_for_node_id(current))
+            _clear_node_for_reprocess(sid, current, stage_id=stage_id)
+            reset_human_confirm_lifecycle(sid)
+            clear_pending_questionnaire(sid)
             clear_room_state_for_node_reprocess(sid, current)
         else:
             rs2 = dict(rs) if isinstance(rs, dict) else {}
@@ -1159,9 +1167,12 @@ class MeetingRoomService:
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
 
+        from synapse.rd_meeting.hitl_lifecycle import reset_human_confirm_lifecycle
+        from synapse.rd_meeting.hitl_submit import clear_pending_questionnaire
         from synapse.rd_meeting.pipeline import (
             STEP_REPROCESS_PREP,
             PipelineRunContext,
+            clear_nodes_for_historical_reprocess,
             clear_room_state_for_node_reprocess,
             run_pipeline_until_waiting,
         )
@@ -1185,6 +1196,9 @@ class MeetingRoomService:
                 current_node_id=target,
                 local_process_state="处理中",
             )
+        clear_nodes_for_historical_reprocess(scope_id, node_range)
+        reset_human_confirm_lifecycle(scope_id)
+        clear_pending_questionnaire(scope_id)
         extra = [n for n in node_range if n != target]
         clear_room_state_for_node_reprocess(
             scope_id, target, extra_node_ids=extra or None

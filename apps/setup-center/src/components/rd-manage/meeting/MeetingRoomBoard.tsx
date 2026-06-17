@@ -3343,27 +3343,13 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
       chatEpoch,
     });
     void reprocessMeetingRoom(base, roomId, nodeId, reason)
-      .then(async (detail) => {
+      .then((detail) => {
         const updatedRoom = mapDetailToRoom(detail);
         updatedRoom.brief = '正在重新处理节点…';
-        updatedRoom.chatEpoch = Date.now();
-        try {
-          const payload = await fetchMeetingRoomNodeChat(base, roomId, nodeId);
-          const nodeLogs = (payload.chat_logs || []).map(mapChatWireToLog);
-          if (nodeLogs.length) {
-            updatedRoom.allChatLogs = replaceNodeChatLogs(
-              updatedRoom.allChatLogs ?? updatedRoom.logs,
-              nodeId,
-              nodeLogs,
-            );
-            updatedRoom.logs = filterLogsForNodeExact(
-              updatedRoom.allChatLogs,
-              updatedRoom.currentNode,
-            );
-          }
-        } catch {
-          /* 协作流稍后由 live 轮询补齐 */
-        }
+        updatedRoom.chatEpoch = chatEpoch;
+        // 保留乐观清空的协作流；新事件由 live 轮询 / chatEpoch 拉取补齐
+        updatedRoom.allChatLogs = cleared;
+        updatedRoom.logs = filterLogsForNodeExact(cleared, updatedRoom.currentNode);
         updatedRoom.reprocessingNodeId = null;
         setActiveRoom(updatedRoom);
         setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
