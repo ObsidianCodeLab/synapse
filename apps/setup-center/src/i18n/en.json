@@ -421,7 +421,9 @@
     "notifications": "Notifications ({{count}} pending)",
     "notificationsTitle": "Notifications",
     "notificationsUnread": "{{count}} messages to review",
-    "notificationsEmpty": "No messages to review"
+    "notificationsEmpty": "No messages to review",
+    "notificationsMeetingHitl": "Meeting room · human intervention ({{count}})",
+    "notificationsMeetingHitlMore": "{{count}} more rooms awaiting intervention…"
   },
   "tokenStats": {
     "serviceNotRunning": "Service not running, unable to view stats",

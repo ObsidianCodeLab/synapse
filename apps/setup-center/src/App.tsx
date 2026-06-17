@@ -87,6 +87,8 @@ import {
 } from "./constants";
 import { safeFetch } from "./providers";
 import { whalecloudHeart } from "./api/rdUnifiedService";
+import { fetchPendingHumanIntervention, type MeetingRoomListItem } from "./api/meetingRoomService";
+import { setMeetingRoomFocus } from "./rd-meeting/focus";
 import { DevToolsSkillPanel } from "./components/product/DevToolsSkillPanel";
 import {
   slugify, joinPath, toFileUrl,
@@ -409,6 +411,7 @@ export function App() {
   const [feedbackRefreshKey, setFeedbackRefreshKey] = useState(0);
   const [unreadFeedbackCount, setUnreadFeedbackCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [pendingHumanInterventions, setPendingHumanInterventions] = useState<MeetingRoomListItem[]>([]);
   const [disabledViews, setDisabledViews] = useState<string[]>([]);
   const [multiAgentEnabled, setMultiAgentEnabled] = useState(false);
   const [storeVisible, setStoreVisible] = useState(() => localStorage.getItem("synapse_storeVisible") === "true");
@@ -2029,6 +2032,22 @@ export function App() {
       if (event === "pending_approval_created" || event === "pending_approval_resolved") poll();
     }) : undefined;
     return () => { clearInterval(timer); unsub?.(); };
+  }, [serviceStatus?.running, dataMode, apiBaseUrl]);
+
+  useEffect(() => {
+    if (!serviceStatus?.running) {
+      setPendingHumanInterventions([]);
+      return;
+    }
+    const poll = async () => {
+      try {
+        const items = await fetchPendingHumanIntervention(httpApiBase());
+        setPendingHumanInterventions(items);
+      } catch { /* ignore */ }
+    };
+    poll();
+    const timer = setInterval(poll, 30_000);
+    return () => clearInterval(timer);
   }, [serviceStatus?.running, dataMode, apiBaseUrl]);
 
   const fetchAgentMode = useCallback(async () => {
@@ -6648,6 +6667,15 @@ export function App() {
           setView={transitionToView}
           unreadFeedbackCount={unreadFeedbackCount}
           pendingApprovalsCount={pendingApprovalsCount}
+          pendingHumanInterventions={pendingHumanInterventions}
+          onOpenMeetingRoom={(item) => {
+            setMeetingRoomFocus({
+              roomId: item.room_id,
+              scopeType: item.scope_type,
+              scopeId: item.scope_id,
+            });
+            transitionToView("workbench_meeting");
+          }}
         />
 
         {showPwBanner && (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { MeetingRoomListItem } from "../api/meetingRoomService";
 import type { EnvMap, ViewId, WorkspaceSummary } from "../types";
 import type { Theme } from "../theme";
 import { setLanguage, getLanguagePref } from "../i18n";
@@ -59,6 +60,8 @@ export type TopbarProps = {
   setView?: (view: ViewId) => void;
   unreadFeedbackCount?: number;
   pendingApprovalsCount?: number;
+  pendingHumanInterventions?: MeetingRoomListItem[];
+  onOpenMeetingRoom?: (item: MeetingRoomListItem) => void;
 };
 
 export function Topbar({
@@ -74,6 +77,7 @@ export function Topbar({
   onToggleMobileSidebar, serverName, onServerManager,
   envDraft, setEnvDraft, restartService, askConfirm,
   setView, unreadFeedbackCount, pendingApprovalsCount,
+  pendingHumanInterventions, onOpenMeetingRoom,
 }: TopbarProps) {
   const { t, i18n } = useTranslation();
   const [remoteCopyState, setRemoteCopyState] = useState<"idle" | "copied" | "no_ip">("idle");
@@ -314,7 +318,9 @@ export function Topbar({
               <TopbarNotificationButton
                 unreadFeedbackCount={unreadFeedbackCount}
                 pendingApprovalsCount={pendingApprovalsCount}
+                pendingHumanInterventions={pendingHumanInterventions}
                 onNavigate={setView}
+                onOpenMeetingRoom={onOpenMeetingRoom}
               />
               <div className="h-4 w-px bg-border" />
             </>

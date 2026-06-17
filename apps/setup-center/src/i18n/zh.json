@@ -422,7 +422,9 @@
     "notifications": "消息通知（{{count}} 条待查看）",
     "notificationsTitle": "消息通知",
     "notificationsUnread": "{{count}} 条待查看消息",
-    "notificationsEmpty": "暂无待查看消息"
+    "notificationsEmpty": "暂无待查看消息",
+    "notificationsMeetingHitl": "研发会议室 · 待人工介入（{{count}}）",
+    "notificationsMeetingHitlMore": "还有 {{count}} 个待介入会议室…"
   },
   "tokenStats": {
     "serviceNotRunning": "服务未运行，无法查看统计",

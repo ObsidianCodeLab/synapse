@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Bell } from "lucide-react";
+import type { MeetingRoomListItem } from "../api/meetingRoomService";
 import type { ViewId } from "../types";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,16 +16,21 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 export type TopbarNotificationButtonProps = {
   unreadFeedbackCount?: number;
   pendingApprovalsCount?: number;
+  pendingHumanInterventions?: MeetingRoomListItem[];
   onNavigate?: (view: ViewId) => void;
+  onOpenMeetingRoom?: (item: MeetingRoomListItem) => void;
 };
 
 export function TopbarNotificationButton({
   unreadFeedbackCount = 0,
   pendingApprovalsCount = 0,
+  pendingHumanInterventions = [],
   onNavigate,
+  onOpenMeetingRoom,
 }: TopbarNotificationButtonProps) {
   const { t } = useTranslation();
-  const totalCount = unreadFeedbackCount + pendingApprovalsCount;
+  const pendingHitlCount = pendingHumanInterventions.length;
+  const totalCount = unreadFeedbackCount + pendingApprovalsCount + pendingHitlCount;
   const hasUnread = totalCount > 0;
 
   const badgeLabel = totalCount > 99 ? "99+" : String(totalCount);
@@ -59,11 +65,38 @@ export function TopbarNotificationButton({
             : t("topbar.notificationsEmpty")}
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="end" className="min-w-[220px]">
+      <DropdownMenuContent align="end" className="min-w-[260px] max-w-[320px]">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           {t("topbar.notificationsTitle")}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {pendingHitlCount > 0 && (
+          <>
+            <DropdownMenuLabel className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 py-1">
+              {t("topbar.notificationsMeetingHitl", { count: pendingHitlCount })}
+            </DropdownMenuLabel>
+            {pendingHumanInterventions.slice(0, 8).map((item) => (
+              <DropdownMenuItem
+                key={item.room_id}
+                className="gap-2 text-xs flex-col items-start py-2"
+                onClick={() => onOpenMeetingRoom?.(item)}
+              >
+                <span className="font-medium truncate w-full" title={item.ticket_title || item.scope_id}>
+                  {item.ticket_title || item.scope_id}
+                </span>
+              </DropdownMenuItem>
+            ))}
+            {pendingHitlCount > 8 && (
+              <DropdownMenuItem
+                className="text-xs text-muted-foreground"
+                onClick={() => onNavigate?.("workbench_meeting")}
+              >
+                {t("topbar.notificationsMeetingHitlMore", { count: pendingHitlCount - 8 })}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem
           className="gap-2 text-xs justify-between"
           disabled={pendingApprovalsCount === 0}
