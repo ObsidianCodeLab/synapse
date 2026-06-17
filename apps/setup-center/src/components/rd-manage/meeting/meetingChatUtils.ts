@@ -175,16 +175,32 @@ export function filterLogsForNodeExact(logs: MeetingChatLog[], nodeId: string): 
   return filterLogsForSopNode(logs, nid);
 }
 
+/** 同 id 只保留最后一次 payload（与后端 history_to_chat_logs 一致） */
+export function dedupeChatLogsById(logs: MeetingChatLog[]): MeetingChatLog[] {
+  if (!logs.length) return logs;
+  const lastById = new Map<string, MeetingChatLog>();
+  const order: string[] = [];
+  logs.forEach((log, idx) => {
+    const id = (log.id || '').trim() || `__row_${idx}`;
+    if (!lastById.has(id)) order.push(id);
+    lastById.set(id, log);
+  });
+  return order.map((id) => lastById.get(id)!);
+}
+
 /** 合并协作流日志（按 id 去重，保留既有顺序并追加新条目） */
 export function mergeChatLogs(existing: MeetingChatLog[], incoming: MeetingChatLog[]): MeetingChatLog[] {
-  if (!incoming.length) return existing;
-  const byId = new Map(existing.map((l) => [l.id, l]));
-  const order = existing.map((l) => l.id);
-  for (const l of incoming) {
-    if (!byId.has(l.id)) order.push(l.id);
-    byId.set(l.id, l);
-  }
-  return order.map((id) => byId.get(id)!);
+  if (!incoming.length) return dedupeChatLogsById(existing);
+  const lastById = new Map<string, MeetingChatLog>();
+  const order: string[] = [];
+  const touch = (log: MeetingChatLog, idx: number) => {
+    const id = (log.id || '').trim() || `__row_${order.length}_${idx}`;
+    if (!lastById.has(id)) order.push(id);
+    lastById.set(id, log);
+  };
+  existing.forEach((log, idx) => touch(log, idx));
+  incoming.forEach((log, idx) => touch(log, existing.length + idx));
+  return order.map((id) => lastById.get(id)!);
 }
 
 /** 重处理 / 按节点全量刷新：先剔除该节点旧日志，再合并服务端快照（避免 merge 残留 hist-N） */

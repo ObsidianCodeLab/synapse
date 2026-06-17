@@ -83,6 +83,7 @@ import {
   workerColor,
 } from './MeetingAgentAvatar';
 import {
+  dedupeChatLogsById,
   filterLogsForNodeExact,
   mergeChatLogs,
   replaceNodeChatLogs,
@@ -833,7 +834,7 @@ const RoomCardChatStream = ({
 function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
   const timeStr = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const nodeId = item.current_node_id || 'pending';
-  const allChatLogs = (item.chat_logs || []).map(mapChatWireToLog);
+  const allChatLogs = dedupeChatLogsById((item.chat_logs || []).map(mapChatWireToLog));
   const logs =
     filterLogsForNodeExact(allChatLogs, nodeId).length > 0
       ? filterLogsForNodeExact(allChatLogs, nodeId)
