@@ -1847,10 +1847,43 @@ def _step_node_finish(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
 
     rs_gate = load_room_state(sid) or {}
     if rs_gate.get("downstream_blocked"):
-        ctx.room_state = dict(rs_gate)
-        block_reason = str(rs_gate.get("downstream_block_reason") or "下游门控，等待人工确认")
-        pipe.set_flow_step(STEP_WAITING, reason=block_reason)
-        return
+        pctx_gate = pipe._data.get("context") if isinstance(pipe._data.get("context"), dict) else {}
+        pending_gate = rs_gate.get("pending_delivery")
+        gate_node = (
+            str(pending_gate.get("node_id") or "").strip()
+            if isinstance(pending_gate, dict)
+            else ""
+        )
+        last_finished = str(pctx_gate.get("last_finished_node_id") or "").strip()
+        current_node = str(rs_gate.get("current_node_id") or "").strip()
+        from synapse.rd_sop.manifest import downstream_advance_block_reason
+
+        stale_gate = bool(
+            gate_node
+            and last_finished == gate_node
+            and current_node
+            and current_node != gate_node
+            and not downstream_advance_block_reason(last_finished)
+        )
+        if stale_gate:
+            logger.info(
+                "node_finish: clearing stale downstream gate scope=%s gate_node=%s current=%s",
+                sid,
+                gate_node,
+                current_node,
+            )
+            rs_gate = dict(rs_gate)
+            rs_gate.pop("downstream_blocked", None)
+            rs_gate.pop("downstream_block_reason", None)
+            rs_gate.pop("pending_delivery", None)
+            rs_gate.pop("intervention_kind", None)
+            save_room_state(sid, rs_gate)
+            ctx.room_state = rs_gate
+        else:
+            ctx.room_state = dict(rs_gate)
+            block_reason = str(rs_gate.get("downstream_block_reason") or "下游门控，等待人工确认")
+            pipe.set_flow_step(STEP_WAITING, reason=block_reason)
+            return
 
     # 若没有下一个节点（next_node 为空 / "pending"），收尾后置 DONE，不再 INIT
     if not next_node or next_node == "pending":

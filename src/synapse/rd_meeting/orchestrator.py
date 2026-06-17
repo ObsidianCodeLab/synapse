@@ -706,6 +706,15 @@ class MeetingRoomOrchestrator:
         if advance and next_id:
             room_state.pop(READY_FOR_NODE_REVIEW_KEY, None)
             room_state.pop(HITL_CLARIFY_ROUND_KEY, None)
+            # 无门控推进：清除历史 downstream 门控残留，避免 node_finish 卡在 waiting。
+            room_state.pop("downstream_blocked", None)
+            room_state.pop("downstream_block_reason", None)
+            if room_state.get("intervention_kind") == "result_confirm":
+                room_state.pop("intervention_kind", None)
+            pending_stale = room_state.get("pending_delivery")
+            if isinstance(pending_stale, dict) and str(pending_stale.get("node_id") or "") == node_id:
+                room_state.pop("pending_delivery", None)
+            dev["local_process_state"] = "处理中"
 
         save_dev_status(sid, dev)
         save_room_state(sid, room_state)
@@ -2483,6 +2492,10 @@ class MeetingRoomOrchestrator:
         rs = load_room_state(sid) or {}
         rs = dict(rs)
         rs.pop("pending_delivery", None)
+        rs.pop("downstream_blocked", None)
+        rs.pop("downstream_block_reason", None)
+        if rs.get("intervention_kind") == "result_confirm":
+            rs.pop("intervention_kind", None)
         rs.pop("hitl_form_schema", None)
         rs.pop("hitl_locked", None)
         rs.pop("hitl_submission", None)

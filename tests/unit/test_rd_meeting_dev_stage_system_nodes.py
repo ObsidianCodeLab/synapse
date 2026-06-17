@@ -172,3 +172,68 @@ def test_downstream_advance_blocked_after_dev_stage_node(node_id, reason_snippet
     pending = rs.get("pending_delivery")
     assert isinstance(pending, dict)
     assert pending.get("await_confirm") is True
+
+
+def test_on_node_complete_clears_stale_downstream_block_on_advance(monkeypatch):
+    """manifest 门控迁移后，旧 downstream_blocked 不应阻止推进 diff_analysis。"""
+    from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+    from synapse.rd_meeting.room_runtime import default_room_state, load_room_state, save_room_state
+
+    scope_id = "stale-gate-task_feedback"
+    save_dev_status(
+        scope_id,
+        {
+            "scope_type": "demand",
+            "scope_id": scope_id,
+            "stage_id": 4,
+            "current_node_id": "task_feedback",
+            "local_process_state": "待人工",
+        },
+    )
+    save_room_state(
+        scope_id,
+        {
+            **default_room_state(
+                room_id="room-stale",
+                scope_type="demand",
+                scope_id=scope_id,
+                stage_id=4,
+                current_node_id="task_feedback",
+                status="human_intervention",
+            ),
+            "downstream_blocked": True,
+            "downstream_block_reason": "试飞优化方案待人工评估，评估通过后再继续执行试飞优化。",
+            "intervention_kind": "result_confirm",
+            "pending_delivery": {
+                "node_id": "task_feedback",
+                "await_confirm": True,
+            },
+        },
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.orchestrator.set_phase", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.schedule_human_intervention_notify",
+        lambda **_k: None,
+    )
+
+    orch = MeetingRoomOrchestrator()
+    out = orch.on_node_complete(
+        scope_type="demand",
+        scope_id=scope_id,
+        room_id="room-stale",
+        node_id="task_feedback",
+        advance=True,
+        schedule_pipeline_advance=False,
+        sync_userwork=False,
+    )
+
+    assert out["next_node_id"] == "diff_analysis"
+    dev = load_dev_status(scope_id) or {}
+    assert dev.get("current_node_id") == "diff_analysis"
+    assert dev.get("local_process_state") == "处理中"
+    rs = load_room_state(scope_id) or {}
+    assert rs.get("downstream_blocked") is not True
+    assert "downstream_block_reason" not in rs
+    assert "pending_delivery" not in rs
