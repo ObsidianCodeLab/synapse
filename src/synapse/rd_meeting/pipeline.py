@@ -38,13 +38,12 @@ from synapse.rd_meeting.paths import (
 from synapse.rd_meeting.room_runtime import (
     append_history_event,
     load_room_state,
-    read_json_file,
+    read_meeting_pipeline_json,
     reset_node_metrics_for_rerun,
+    save_meeting_pipeline,
     save_room_state,
     sync_metrics_tokens_from_node_metrics,
     sync_room_state_from_dev,
-    save_meeting_pipeline,
-    write_json_file,
 )
 from synapse.rd_meeting.userwork_sync import build_title_index, patch_userwork_summary
 from synapse.rd_sop.manifest import is_system_node
@@ -253,9 +252,12 @@ class MeetingPipeline:
         sid = (scope_id or "").strip()
         if not sid:
             raise ValueError("scope_id required")
-        raw = read_json_file(meeting_pipeline_path(sid))
-        if not raw:
+        path = meeting_pipeline_path(sid)
+        if not path.is_file():
             raise ValueError("meeting_pipeline_not_found")
+        raw = read_meeting_pipeline_json(sid)
+        if not raw:
+            raise ValueError("meeting_pipeline_read_failed")
         return cls(sid, raw)
 
     @classmethod
@@ -1056,8 +1058,7 @@ def clear_current_node_reprocess_artifacts(
 
         clear_sandbox_workspace(sid)
 
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context")

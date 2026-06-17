@@ -279,6 +279,71 @@ def parse_func_solution_impact_assessment(md: str) -> dict[str, Any]:
     return out
 
 
+_FUNC_SOLUTION_MODULE_RE = re.compile(r"^####\s+1\.7\.\d+\s+(.+)\s*$", re.MULTILINE)
+_FUNC_SOLUTION_DUTY_RE = re.compile(r"^-\s*职责\s*[：:]\s*(.+)\s*$")
+
+
+def parse_func_solution_demand_functions(md: str) -> list[dict[str, str]]:
+    """从函数级方案 §1.7 模块改造方案解析改造模块名与职责。"""
+    section = _extract_section(md, "模块改造方案")
+    if not section.strip():
+        content = _extract_section(md, "方案内容")
+        if content.strip():
+            section = _extract_section(content, "模块改造方案")
+    if not section.strip():
+        return []
+
+    matches = list(_FUNC_SOLUTION_MODULE_RE.finditer(section))
+    out: list[dict[str, str]] = []
+    for i, match in enumerate(matches):
+        name = match.group(1).strip()
+        if not name:
+            continue
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(section)
+        block = section[start:end]
+        desc = ""
+        for line in block.splitlines():
+            duty = _FUNC_SOLUTION_DUTY_RE.match(line.strip())
+            if duty:
+                desc = duty.group(1).strip()
+                break
+        out.append(
+            {
+                "id": f"fp-{len(out) + 1}",
+                "functionPoint": name,
+                "functionDesc": desc,
+            }
+        )
+    return out
+
+
+def build_split_task_comments(
+    *,
+    change_summary: str,
+    module_points: list[dict[str, Any]],
+) -> str:
+    """研发单描述：函数级方案 §1.3 改造内容 + §1.7 模块职责。"""
+    base = (change_summary or "").strip()
+    detail_parts: list[str] = []
+    for row in module_points:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("functionPoint") or row.get("function_point") or "").strip()
+        desc = str(row.get("functionDesc") or row.get("function_desc") or "").strip()
+        if name and desc:
+            detail_parts.append(f"{name}：{desc}")
+        elif name:
+            detail_parts.append(name)
+    if not base and not detail_parts:
+        return ""
+    if not detail_parts:
+        return base[:2000]
+    if not base:
+        return "；".join(detail_parts)[:2000]
+    return f"{base}。{'；'.join(detail_parts)}"[:2000]
+
+
 def parse_module_func_md(md: str) -> list[dict[str, str]]:
     """从模块功能.md 解析模块级改造清单。
 
@@ -359,20 +424,15 @@ def _demand_functions_from_payload(payload: dict[str, Any]) -> list[dict[str, An
     return out
 
 
-def _demand_functions_from_archive(scope_id: str) -> list[dict[str, Any]]:
-    base = archive_node_dir(scope_id, "需求分析", "module_func")
-    for name in ("模块功能.md", "功能模块.md"):
-        fpath = base / name
-        if not fpath.is_file():
-            continue
-        try:
-            md = fpath.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        parsed = parse_module_func_md(md)
-        if parsed:
-            return parsed
-    return []
+def _demand_functions_from_func_solution_archive(scope_id: str) -> list[dict[str, Any]]:
+    fpath = _func_solution_archive_path(scope_id)
+    if not fpath.is_file():
+        return []
+    try:
+        md = fpath.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return parse_func_solution_demand_functions(md)
 
 
 def _demand_functions_from_split_tasks(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -417,11 +477,11 @@ def _merge_demand_functions(lists: list[list[dict[str, Any]]]) -> list[dict[str,
 
 
 def resolve_demand_functions(payload: dict[str, Any], scope_id: str) -> list[dict[str, Any]]:
-    """合并 payload、模块功能.md 与拆单草案中的功能点清单。"""
+    """合并 payload、函数级方案 §1.7 与拆单草案中的功能点清单。"""
     return _merge_demand_functions(
         [
             _demand_functions_from_payload(payload),
-            _demand_functions_from_archive(scope_id),
+            _demand_functions_from_func_solution_archive(scope_id),
             _demand_functions_from_split_tasks(payload),
         ]
     )
@@ -573,9 +633,9 @@ def _load_catalog_repos(scope_id: str) -> list[dict[str, Any]]:
     mr = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
     prod = str(mr.get("prod") or "").strip()
     if not prod:
-        from synapse.rd_meeting.paths import meeting_pipeline_path
+        from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
 
-        raw = read_json_file(meeting_pipeline_path(sid))
+        raw = read_meeting_pipeline_json(sid)
         if isinstance(raw, dict):
             ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
             prod = str(ctx.get("selected_prod") or "").strip()
@@ -709,6 +769,88 @@ def enrich_split_tasks_from_catalog(scope_id: str, payload: dict[str, Any]) -> d
     return out
 
 
+def _should_sync_split_from_func_solution(payload: dict[str, Any], scope_id: str) -> bool:
+    if is_solution_review_formally_decided(scope_id):
+        return False
+    human = payload.get("human_review") if isinstance(payload.get("human_review"), dict) else {}
+    status = str(human.get("status") or "pending").strip().lower()
+    return status == "pending"
+
+
+def enrich_split_tasks_from_func_solution(
+    scope_id: str,
+    payload: dict[str, Any],
+    *,
+    func_solution_md: str = "",
+) -> dict[str, Any]:
+    """按函数级方案 §1.3/§1.7 同步拆单草案的研发单描述与功能点（待人工裁决时）。"""
+    if not _should_sync_split_from_func_solution(payload, scope_id):
+        return payload
+    draft = payload.get("split_tasks_draft")
+    if not isinstance(draft, list) or not draft:
+        return payload
+
+    md = func_solution_md.strip()
+    if not md:
+        fpath = _func_solution_archive_path(scope_id)
+        if fpath.is_file():
+            try:
+                md = fpath.read_text(encoding="utf-8")
+            except OSError:
+                md = ""
+
+    modules = parse_func_solution_demand_functions(md) if md else []
+    module_by_name = {
+        str(m.get("functionPoint") or "").strip(): m for m in modules if str(m.get("functionPoint") or "").strip()
+    }
+    parsed = payload.get("func_solution_parsed") if isinstance(payload.get("func_solution_parsed"), dict) else {}
+    repos = parsed.get("repos") if isinstance(parsed.get("repos"), list) else []
+
+    def _repo_for_task(task: dict[str, Any]) -> dict[str, Any] | None:
+        bid = str(task.get("branch_version_id") or "").strip()
+        mod = str(task.get("productModuleName") or "").strip()
+        for repo in repos:
+            if not isinstance(repo, dict):
+                continue
+            if bid and str(repo.get("branch_version_id") or "").strip() == bid:
+                return repo
+            if mod and str(repo.get("product_module_name") or "").strip() == mod:
+                return repo
+        return repos[0] if len(repos) == 1 and isinstance(repos[0], dict) else None
+
+    synced: list[dict[str, Any]] = []
+    single_task = len(draft) == 1
+    for raw in draft:
+        if not isinstance(raw, dict):
+            continue
+        task = dict(raw)
+        repo = _repo_for_task(task)
+        change_summary = str((repo or {}).get("change_summary") or "").strip()
+
+        fps = normalize_function_points(task)
+        if single_task and modules:
+            fps = [str(m.get("functionPoint") or "").strip() for m in modules if str(m.get("functionPoint") or "").strip()]
+        elif fps and module_by_name:
+            fps = [fp for fp in fps if fp in module_by_name]
+
+        module_points = [module_by_name[fp] for fp in fps if fp in module_by_name]
+        if single_task and modules and not module_points:
+            module_points = modules
+
+        task["functionPoints"] = fps
+        task["comments"] = build_split_task_comments(
+            change_summary=change_summary,
+            module_points=module_points,
+        )
+        synced.append(task)
+
+    if not synced:
+        return payload
+    out = dict(payload)
+    out["split_tasks_draft"] = synced
+    return out
+
+
 def _merge_impact_assessment(
     prev: dict[str, Any] | None,
     extracted: dict[str, Any],
@@ -741,7 +883,8 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
     prev = parsed if isinstance(parsed, dict) else {}
     fpath = _func_solution_archive_path(scope_id)
     if not fpath.is_file():
-        return enrich_split_tasks_from_catalog(scope_id, payload)
+        out = enrich_split_tasks_from_catalog(scope_id, payload)
+        return enrich_split_tasks_from_func_solution(scope_id, out)
     try:
         md = fpath.read_text(encoding="utf-8")
     except OSError:
@@ -758,7 +901,8 @@ def enrich_payload_from_archive(scope_id: str, payload: dict[str, Any]) -> dict[
         "repos": merged_repos or [],
         "impact_assessment": merged_impact,
     }
-    return enrich_split_tasks_from_catalog(scope_id, out)
+    out = enrich_split_tasks_from_catalog(scope_id, out)
+    return enrich_split_tasks_from_func_solution(scope_id, out, func_solution_md=md)
 
 
 def enrich_demand_functions(scope_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1010,11 +1154,11 @@ def ensure_split_tasks_draft(
     impacts = _build_impact_strings(impact)
     task_impact = _default_task_impact_desc(impact)
     title_base = str(payload.get("requirement_name") or payload.get("demand_title") or demand_no).strip()
-    all_fps = [
+    all_fps = resolve_demand_functions(payload, sid)
+    module_names = [
         str(f.get("functionPoint") or f.get("function_point") or "").strip()
-        for f in resolve_demand_functions(payload, str(payload.get("demand_no") or demand_no))
-        if isinstance(f, dict)
-        and str(f.get("functionPoint") or f.get("function_point") or "").strip()
+        for f in all_fps
+        if isinstance(f, dict) and str(f.get("functionPoint") or f.get("function_point") or "").strip()
     ]
 
     if not repos:
@@ -1022,49 +1166,54 @@ def ensure_split_tasks_draft(
             {
                 "taskNo": demand_no,
                 "taskTitle": f"{title_base} 研发实施",
-                "comments": str((payload.get("whale_review") or {}).get("summary_markdown") or "")[:2000],
+                "comments": build_split_task_comments(change_summary="", module_points=all_fps),
                 "productModuleName": "",
                 "branchVersionName": "",
                 "patchName": "",
                 "taskImpactDesc": task_impact,
                 **impacts,
                 "branch_version_id": "",
-                "functionPoints": all_fps,
+                "functionPoints": module_names,
             }
         ]
 
     tasks: list[dict[str, Any]] = []
+    single_repo = len(repos) == 1
     for repo in repos:
         if not isinstance(repo, dict):
             continue
         mod = str(repo.get("product_module_name") or "").strip()
         branch = str(repo.get("branch_version_name") or "").strip()
+        change_summary = str(repo.get("change_summary") or "").strip()
         tasks.append(
             {
                 "taskNo": demand_no,
                 "taskTitle": f"{title_base} — {mod or '研发子单'}",
-                "comments": str(repo.get("change_summary") or "")[:2000],
+                "comments": build_split_task_comments(
+                    change_summary=change_summary,
+                    module_points=all_fps if single_repo else [],
+                ),
                 "productModuleName": mod,
                 "branchVersionName": branch,
                 "patchName": "",
                 "taskImpactDesc": task_impact,
                 **impacts,
                 "branch_version_id": str(repo.get("branch_version_id") or "").strip(),
-                "functionPoints": [],
+                "functionPoints": module_names if single_repo else [],
             }
         )
     return tasks or [
         {
             "taskNo": demand_no,
             "taskTitle": f"{title_base} 研发实施",
-            "comments": "",
+            "comments": build_split_task_comments(change_summary="", module_points=all_fps),
             "productModuleName": "",
             "branchVersionName": "",
             "patchName": "",
             "taskImpactDesc": task_impact,
             **impacts,
             "branch_version_id": "",
-            "functionPoints": all_fps,
+            "functionPoints": module_names,
         }
     ]
 

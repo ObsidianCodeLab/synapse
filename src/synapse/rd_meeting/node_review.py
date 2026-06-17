@@ -29,7 +29,7 @@ from typing import Any, Literal
 from synapse.rd_meeting.paths import agent_node_dir, archive_node_dir, meeting_pipeline_path
 from synapse.rd_meeting.room_runtime import (
     load_room_state,
-    read_json_file,
+    read_meeting_pipeline_json,
     save_room_state,
     write_json_file,
 )
@@ -945,8 +945,7 @@ def save_node_review(
     if not sid or not nid:
         return
 
-    pipeline_path = meeting_pipeline_path(sid)
-    raw = read_json_file(pipeline_path)
+    raw = read_meeting_pipeline_json(sid)
     if isinstance(raw, dict):
         ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
         node_review = ctx.get("node_review") if isinstance(ctx.get("node_review"), dict) else {}
@@ -987,7 +986,7 @@ def load_node_review(scope_id: str, node_id: str) -> dict[str, Any] | None:
     nid = (node_id or "").strip()
     if not sid or not nid:
         return None
-    raw = read_json_file(meeting_pipeline_path(sid))
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return None
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else None

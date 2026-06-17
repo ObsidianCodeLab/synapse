@@ -1036,11 +1036,10 @@ async def get_task_exec(room_id: str, node_id: str = "") -> dict:
         return error_response(404, "task_exec_not_found")
 
     if effective_node == "diff_analysis" and str(payload.get("commit_phase") or "") == "running":
-        from synapse.rd_meeting.paths import meeting_pipeline_path
-        from synapse.rd_meeting.room_runtime import read_json_file
+        from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
         from synapse.rd_meeting.system_node_display import build_code_commit_display
 
-        pipe_raw = read_json_file(meeting_pipeline_path(sid))
+        pipe_raw = read_meeting_pipeline_json(sid)
         if isinstance(pipe_raw, dict):
             ctx = pipe_raw.get("context") if isinstance(pipe_raw.get("context"), dict) else {}
             cc = ctx.get("code_commit_assets")
@@ -1249,7 +1248,7 @@ async def save_solution_review_tasks(
 
 class FuncSolutionPlanReviewRow(BaseModel):
     id: str = Field(..., description="改造方案 id")
-    status: str | None = Field(None, description="pending | approved | needs_change")
+    status: str | None = Field(None, description="pending | approved | needs_change | deprecated")
     comment: str | None = Field(None, description="评审意见")
 
 

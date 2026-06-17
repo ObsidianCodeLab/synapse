@@ -192,8 +192,44 @@ def _build_owned_work_item_from_create(
             row.get("product_module_name") or getattr(req, "productModuleName", "") or ""
         ),
         "repo_url": str(row.get("repo_url") or ""),
-        "feature_id": str(row.get("feature_id") or "").strip(),
+        "feature_id": str(row.get("feature_id") or "").strip() or str(task_no).strip(),
     }
+
+
+def normalize_auto_split_work_item(
+    work_item: dict[str, Any] | None,
+    *,
+    plan: dict[str, Any] | None = None,
+    task_no: str = "",
+) -> dict[str, Any]:
+    """补齐沿用已有子单时 work_item 相对 create_task 缺失的字段。
+
+    create_task 会创建特性分支并将 ``feature_id``（git 分支名，通常等于 task_no）写入
+    owned_work_items；门户快照 / 沿用路径常缺该字段，导致沙箱只 clone 基础分支、不 checkout。
+    """
+    out = dict(work_item) if isinstance(work_item, dict) else {}
+    resolved_no = str(out.get("task_no") or task_no or "").strip()
+    if resolved_no:
+        out["task_no"] = resolved_no
+    if plan:
+        if not str(out.get("task_title") or "").strip():
+            out["task_title"] = str(plan.get("taskTitle") or "").strip()
+        if not str(out.get("product_module_name") or "").strip():
+            out["product_module_name"] = str(plan.get("productModuleName") or "").strip()
+        if not str(out.get("task_desc") or "").strip():
+            out["task_desc"] = str(plan.get("comments") or "").strip()
+    if not str(out.get("feature_id") or "").strip() and resolved_no:
+        out["feature_id"] = resolved_no
+    return out
+
+
+def resolve_auto_split_feature_id(work_item: dict[str, Any] | None, task_no: str = "") -> str:
+    """特性分支 ID：优先 work_item.feature_id，否则回退 task_no（与 create_task 分支名一致）。"""
+    wi = work_item if isinstance(work_item, dict) else {}
+    feature_id = str(wi.get("feature_id") or "").strip()
+    if feature_id:
+        return feature_id
+    return str(wi.get("task_no") or task_no or "").strip()
 
 
 async def _create_tasks_from_split_plan_async(

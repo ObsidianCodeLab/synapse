@@ -25,6 +25,7 @@ import {
   Sparkles,
   Target,
   Timer,
+  Trash2,
   Users,
   Wrench,
   XCircle,
@@ -181,7 +182,7 @@ function NodeProcessingMetricsSection({ metrics }: { metrics: NodeReviewMetrics 
 }
 
 type PlanDraft = {
-  status: 'pending' | 'approved' | 'needs_change';
+  status: 'pending' | 'approved' | 'needs_change' | 'deprecated';
   comment: string;
   collapsed: boolean;
   showRejectForm: boolean;
@@ -189,12 +190,19 @@ type PlanDraft = {
 
 function planDraftFromPayload(plan: FuncSolutionTransformationPlan): PlanDraft {
   const st = plan.human_review?.status || 'pending';
-  const status = st === 'approved' ? 'approved' : st === 'needs_change' ? 'needs_change' : 'pending';
+  const status =
+    st === 'approved'
+      ? 'approved'
+      : st === 'needs_change'
+        ? 'needs_change'
+        : st === 'deprecated'
+          ? 'deprecated'
+          : 'pending';
   return {
     status,
     comment: plan.human_review?.comment || '',
     collapsed: status === 'approved',
-    showRejectForm: status === 'needs_change',
+    showRejectForm: status === 'needs_change' || status === 'deprecated',
   };
 }
 
@@ -298,6 +306,7 @@ const PlanReviewCard: React.FC<{
 }> = ({ plan, index, draft, onChange, isDark, readOnly = false }) => {
   const approved = draft.status === 'approved';
   const needsChange = draft.status === 'needs_change';
+  const deprecated = draft.status === 'deprecated';
   const reqLabel = (plan.requirement_summary || plan.requirement_ref || '').trim();
   const moduleLabel = (plan.module_name || '').trim();
   const titleLabel = (plan.title || moduleLabel || `改造方案 ${index + 1}`).trim();
@@ -325,14 +334,25 @@ const PlanReviewCard: React.FC<{
     });
   };
 
+  const requestDeprecate = () => {
+    onChange({
+      ...draft,
+      status: 'deprecated',
+      collapsed: false,
+      showRejectForm: true,
+    });
+  };
+
   return (
     <div
       className={`rounded-xl border transition-all duration-300 ${
         approved
           ? 'border-[rgba(0,255,178,0.35)] bg-[rgba(0,217,165,0.08)]'
-          : needsChange
-            ? 'border-amber-500/45 bg-amber-500/[0.05]'
-            : 'border-border/60 bg-gradient-to-br from-white/[0.03] to-white/[0.01]'
+          : deprecated
+            ? 'border-red-500/45 bg-red-500/[0.05]'
+            : needsChange
+              ? 'border-amber-500/45 bg-amber-500/[0.05]'
+              : 'border-border/60 bg-gradient-to-br from-white/[0.03] to-white/[0.01]'
       }`}
     >
       <div className="flex items-start gap-3 px-4 py-3.5">
@@ -340,9 +360,11 @@ const PlanReviewCard: React.FC<{
           className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border font-mono text-[12px] font-semibold ${
             approved
               ? 'border-[rgba(0,255,178,0.4)] bg-[rgba(0,217,165,0.15)] text-[#5efecf]'
-              : needsChange
-                ? 'border-amber-500/45 bg-amber-500/12 text-amber-200'
-                : 'border-violet-500/35 bg-violet-500/12 text-violet-200'
+              : deprecated
+                ? 'border-red-500/45 bg-red-500/12 text-red-200'
+                : needsChange
+                  ? 'border-amber-500/45 bg-amber-500/12 text-amber-200'
+                  : 'border-violet-500/35 bg-violet-500/12 text-violet-200'
           }`}
         >
           {index + 1}
@@ -355,6 +377,10 @@ const PlanReviewCard: React.FC<{
             {approved ? (
               <Tag className="m-0 inline-flex shrink-0 items-center border-[rgba(0,255,178,0.35)] bg-[rgba(0,217,165,0.15)] px-2 py-0.5 text-[11px] leading-snug text-[#5efecf]">
                 已通过
+              </Tag>
+            ) : deprecated ? (
+              <Tag color="error" className="m-0 inline-flex shrink-0 items-center px-2 py-0.5 text-[11px] leading-snug">
+                待废弃
               </Tag>
             ) : needsChange ? (
               <Tag color="warning" className="m-0 inline-flex shrink-0 items-center px-2 py-0.5 text-[11px] leading-snug">
@@ -430,6 +456,15 @@ const PlanReviewCard: React.FC<{
             <div className="flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
               <Button
                 size="small"
+                danger={deprecated}
+                type={deprecated ? 'primary' : 'default'}
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+                onClick={requestDeprecate}
+              >
+                {deprecated ? '继续填写废弃原因' : '废弃'}
+              </Button>
+              <Button
+                size="small"
                 danger={needsChange}
                 type={needsChange ? 'primary' : 'default'}
                 icon={<MessageSquareWarning className="h-3.5 w-3.5" />}
@@ -440,27 +475,55 @@ const PlanReviewCard: React.FC<{
             </div>
           ) : null}
 
-          {readOnly && needsChange && draft.comment.trim() ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
-              <Text className="!mb-1 block text-[10px] font-medium text-amber-200/90">评审意见</Text>
+          {readOnly && (needsChange || deprecated) && draft.comment.trim() ? (
+            <div
+              className={`rounded-lg border p-4 ${
+                deprecated
+                  ? 'border-red-500/30 bg-red-500/[0.04]'
+                  : 'border-amber-500/30 bg-amber-500/[0.04]'
+              }`}
+            >
+              <Text
+                className={`!mb-1 block text-[10px] font-medium ${
+                  deprecated ? 'text-red-200/90' : 'text-amber-200/90'
+                }`}
+              >
+                {deprecated ? '废弃原因' : '评审意见'}
+              </Text>
               <p className="text-[12px] leading-relaxed text-foreground/90">{draft.comment.trim()}</p>
             </div>
           ) : null}
 
-          {!readOnly && (draft.showRejectForm || needsChange) ? (
-            <div className="flex flex-col gap-4 rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
-              <Text className="!mb-0 block text-[10px] leading-relaxed text-amber-200/90">
-                评审意见（必填，说明不合理之处或改进方向，≥{MIN_PLAN_COMMENT_LEN} 字）
+          {!readOnly && (draft.showRejectForm || needsChange || deprecated) ? (
+            <div
+              className={`flex flex-col gap-4 rounded-lg border p-4 ${
+                deprecated
+                  ? 'border-red-500/30 bg-red-500/[0.04]'
+                  : 'border-amber-500/30 bg-amber-500/[0.04]'
+              }`}
+            >
+              <Text
+                className={`!mb-0 block text-[10px] leading-relaxed ${
+                  deprecated ? 'text-red-200/90' : 'text-amber-200/90'
+                }`}
+              >
+                {deprecated
+                  ? `废弃原因（必填，说明为何完全移除此改造方案，≥${MIN_PLAN_COMMENT_LEN} 字）`
+                  : `评审意见（必填，说明不合理之处或改进方向，≥${MIN_PLAN_COMMENT_LEN} 字）`}
               </Text>
               <TextArea
                 rows={3}
                 value={draft.comment}
-                placeholder="例如：优先级调整应走现有 TaskService 扩展，不应新增并行入口…"
+                placeholder={
+                  deprecated
+                    ? '例如：该模块已有等价实现，无需重复改造；移除后不影响主链路…'
+                    : '例如：优先级调整应走现有 TaskService 扩展，不应新增并行入口…'
+                }
                 className="text-[12px]"
                 onChange={(e) =>
                   onChange({
                     ...draft,
-                    status: 'needs_change',
+                    status: deprecated ? 'deprecated' : 'needs_change',
                     comment: e.target.value,
                     showRejectForm: true,
                   })
@@ -561,6 +624,8 @@ export function FuncSolutionReviewPanel({
   const plans = payload?.transformation_plans || [];
   const approvedCount = plans.filter((p) => planDrafts[p.id]?.status === 'approved').length;
   const needsChangePlans = plans.filter((p) => planDrafts[p.id]?.status === 'needs_change');
+  const deprecatedPlans = plans.filter((p) => planDrafts[p.id]?.status === 'deprecated');
+  const reviseActionCount = needsChangePlans.length + deprecatedPlans.length;
   const allApproved = plans.length > 0 && approvedCount === plans.length;
 
   const planUpdates = useCallback(
@@ -585,11 +650,12 @@ export function FuncSolutionReviewPanel({
     setPlanDrafts((prev) => ({ ...prev, [planId]: next }));
   }, []);
 
-  const validateNeedsChangeComments = (): string | null => {
-    for (const p of needsChangePlans) {
+  const validateReviseActionComments = (): string | null => {
+    for (const p of [...needsChangePlans, ...deprecatedPlans]) {
       const comment = (planDrafts[p.id]?.comment || '').trim();
+      const action = planDrafts[p.id]?.status === 'deprecated' ? '废弃原因' : '评审意见';
       if (comment.length < MIN_PLAN_COMMENT_LEN) {
-        return `「${p.title || p.module_name}」的评审意见至少 ${MIN_PLAN_COMMENT_LEN} 字`;
+        return `「${p.title || p.module_name}」的${action}至少 ${MIN_PLAN_COMMENT_LEN} 字`;
       }
     }
     return null;
@@ -606,11 +672,11 @@ export function FuncSolutionReviewPanel({
         return;
       }
     } else {
-      if (needsChangePlans.length === 0) {
-        message.warning('请对需调整的改造方案点击「请求变更」并填写评审意见');
+      if (reviseActionCount === 0) {
+        message.warning('请对需处理的改造方案点击「废弃」或「请求变更」并填写意见');
         return;
       }
-      const commentErr = validateNeedsChangeComments();
+      const commentErr = validateReviseActionComments();
       if (commentErr) {
         message.warning(commentErr);
         return;
@@ -636,9 +702,9 @@ export function FuncSolutionReviewPanel({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '提交失败';
       if (msg.includes('no_plans_need_change')) {
-        message.warning('请至少标记一条改造方案为「请求变更」');
+        message.warning('请至少标记一条改造方案为「废弃」或「请求变更」');
       } else if (msg.includes('plan_comment_required')) {
-        message.warning('每条「需调整」方案须填写评审意见');
+        message.warning('每条「需调整」或「待废弃」方案须填写意见');
       } else {
         message.error(msg);
       }
@@ -685,7 +751,7 @@ export function FuncSolutionReviewPanel({
             </Title>
             <Text type="secondary" className="text-[12px]">
               每条改造方案展示<strong>改造内容</strong>与<strong>设计逻辑</strong>；
-              右上角「通过」胶囊按钮一键确认；不通过请「请求变更」并填写意见
+              右上角「通过」胶囊按钮一键确认；不通过可「废弃」（完全移除）或「请求变更」（覆盖修订）并填写意见
             </Text>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-black/20 px-4 py-2">
@@ -701,6 +767,12 @@ export function FuncSolutionReviewPanel({
                 <div className="text-[10px] text-muted-foreground">待调整</div>
               </div>
             ) : null}
+            {deprecatedPlans.length > 0 ? (
+              <div className="text-center">
+                <div className="text-lg font-semibold text-red-400">{deprecatedPlans.length}</div>
+                <div className="text-[10px] text-muted-foreground">待废弃</div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -714,7 +786,7 @@ export function FuncSolutionReviewPanel({
             showIcon
             className="mb-4"
             message="上次评审要求修订方案"
-            description="系统将保留已通过改造方案，仅按各条评审意见修订 marked plans；修订完成后会再次进入本评审面板。"
+            description="系统将保留已通过改造方案；标记「请求变更」的按意见覆盖修订，标记「废弃」的将从清单完全移除；完成后会再次进入本评审面板。"
           />
         ) : null}
 
@@ -872,10 +944,10 @@ export function FuncSolutionReviewPanel({
             danger
             icon={<XCircle className="h-4 w-4" />}
             loading={submitting}
-            disabled={needsChangePlans.length === 0}
+            disabled={reviseActionCount === 0}
             onClick={() => void handleDecision('revise')}
           >
-            提交修订并重跑 ({needsChangePlans.length})
+            提交修订并重跑 ({reviseActionCount})
           </Button>
           <Button
             type="primary"

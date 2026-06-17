@@ -11,7 +11,7 @@ import httpx
 from synapse.api.routes.dev_iwhalecloud import _snapshot_norm_id
 from synapse.rd_meeting.devservice import read_devservice_host, unified_service_base_url
 from synapse.rd_meeting.paths import meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_meeting.userwork_sync import _scope_row
 
 logger = logging.getLogger(__name__)
@@ -330,7 +330,7 @@ def _strip_owner_info_from_prod_catalog(rows: list[dict[str, Any]]) -> list[dict
 
 def load_prod_catalog_from_pipeline(scope_id: str) -> list[dict[str, Any]] | None:
     """读取 open_meeting 阶段缓存的产品全量列表。"""
-    raw = read_json_file(meeting_pipeline_path((scope_id or "").strip()))
+    raw = read_meeting_pipeline_json((scope_id or "").strip())
     if not isinstance(raw, dict):
         return None
     ctx = raw.get("context")
@@ -346,8 +346,7 @@ def save_prod_catalog_to_pipeline(scope_id: str, rows: list[dict[str, Any]], *, 
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context")
@@ -380,8 +379,7 @@ def save_product_session_cache(scope_id: str, cache: dict[str, Any]) -> None:
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context")
@@ -396,7 +394,7 @@ def save_product_session_cache(scope_id: str, cache: dict[str, Any]) -> None:
 
 
 def load_product_session_cache(scope_id: str) -> dict[str, Any] | None:
-    raw = read_json_file(meeting_pipeline_path((scope_id or "").strip()))
+    raw = read_meeting_pipeline_json((scope_id or "").strip())
     if not isinstance(raw, dict):
         return None
     ctx = raw.get("context")

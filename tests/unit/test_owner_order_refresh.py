@@ -93,8 +93,8 @@ def test_resolve_run_status_from_room_state(monkeypatch, tmp_path):
         lambda sid: json.loads((tmp_path / "work" / sid / "room_state.json").read_text(encoding="utf-8")),
     )
     monkeypatch.setattr(
-        "synapse.rd_meeting.owner_order_refresh.read_json_file",
-        lambda _p: None,
+        "synapse.rd_meeting.owner_order_refresh.read_meeting_pipeline_json",
+        lambda _sid: None,
     )
 
     assert resolve_run_status(dn) == "待人工"

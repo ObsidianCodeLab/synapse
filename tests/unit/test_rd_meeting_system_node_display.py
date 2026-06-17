@@ -113,6 +113,29 @@ def test_collect_task_rows_includes_feature_id():
     assert rows[0]["feature_id"] == "feat-T1"
 
 
+def test_collect_task_rows_feature_id_fallback_to_task_no():
+    """沿用已有子单时 work_item 常无 feature_id，应回退 task_no 供沙箱 checkout。"""
+    assets = {
+        "split_plan_tasks": [
+            {"taskNo": "21881451", "taskTitle": "沿用子单", "productModuleName": "ZMDB"},
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "task_no": "T-OLD",
+                "reused_existing": True,
+                "work_item": {
+                    "task_no": "T-OLD",
+                    "task_title": "沿用子单",
+                    "product_module_name": "ZMDB",
+                },
+            }
+        ],
+    }
+    rows = collect_task_rows(assets)
+    assert rows[0]["feature_id"] == "T-OLD"
+
+
 def test_build_task_sandbox_bindings_matches_module():
     auto_split = {
         "split_plan_tasks": [

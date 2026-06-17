@@ -771,7 +771,7 @@ export function SolutionReviewPanel({
           <SectionHeader
             icon={<Sparkles className="h-5 w-5" />}
             title="方案涉及功能与拆单"
-            subtitle="功能点来自模块功能.md；每条研发子单须认领功能点且不可重复"
+            subtitle="功能点来自函数级方案 §1.7；每条研发子单须认领功能点且不可重复"
             accent="blue"
           />
           <DemandFunctionMatrix rows={demandFunctionRows} readOnly={readOnly} />

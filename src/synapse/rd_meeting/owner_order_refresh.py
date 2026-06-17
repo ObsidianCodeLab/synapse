@@ -16,7 +16,7 @@ from synapse.rd_meeting.dev_status import load_dev_status
 from synapse.rd_meeting.devservice import unified_service_base_url
 from synapse.rd_meeting.owner_order_archive import archive_completed_demand_if_needed
 from synapse.rd_meeting.paths import meeting_pipeline_path, scope_dir
-from synapse.rd_meeting.room_runtime import load_room_state, read_json_file
+from synapse.rd_meeting.room_runtime import load_room_state, read_meeting_pipeline_json
 from synapse.rd_meeting.sandbox_assets import _force_remove_path
 from synapse.rd_sop.nodes import (
     node_display_name,
@@ -142,7 +142,7 @@ def resolve_run_status(demand_no: str, *, local_process_state: str = "") -> str:
             if st in _ROOM_STATUS_TO_RUN_STATUS:
                 return _ROOM_STATUS_TO_RUN_STATUS[st]
 
-        pipe = read_json_file(meeting_pipeline_path(dn))
+        pipe = read_meeting_pipeline_json(dn)
         if isinstance(pipe, dict):
             phase = str(pipe.get("phase") or "").strip()
             if phase in _PIPELINE_PHASE_TO_RUN_STATUS:

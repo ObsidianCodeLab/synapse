@@ -32,7 +32,7 @@ from synapse.rd_meeting.product_context import (
     _repo_name_from_url,
     match_prod_row_by_prod,
 )
-from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -352,8 +352,7 @@ def save_product_assets_to_pipeline(scope_id: str, assets: dict[str, Any]) -> No
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context")
@@ -366,7 +365,7 @@ def save_product_assets_to_pipeline(scope_id: str, assets: dict[str, Any]) -> No
 
 
 def load_product_assets_from_pipeline(scope_id: str) -> dict[str, Any] | None:
-    raw = read_json_file(meeting_pipeline_path((scope_id or "").strip()))
+    raw = read_meeting_pipeline_json((scope_id or "").strip())
     if not isinstance(raw, dict):
         return None
     ctx = raw.get("context")

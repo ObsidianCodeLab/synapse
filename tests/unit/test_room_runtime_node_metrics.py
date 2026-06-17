@@ -585,3 +585,52 @@ def test_refresh_node_metrics_task_exec_human_intervention(tmp_path, monkeypatch
     assert tokens == 1800
     saved = load_room_state(scope_id) or {}
     assert int((saved.get("node_metrics") or {}).get(node_id, {}).get("tokens") or 0) == 1800
+
+
+def test_read_meeting_pipeline_json_retries_transient_permission_denied(monkeypatch, tmp_path) -> None:
+    from pathlib import Path
+
+    from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
+
+    scope_id = "pipe-read-retry"
+    work = tmp_path / "work" / scope_id
+    work.mkdir(parents=True)
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    save_meeting_pipeline(scope_id, {"schema_version": 1, "context": {"x": 1}})
+
+    original_read_text = Path.read_text
+    calls = {"n": 0}
+
+    def _flaky_read_text(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError(13, "Permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _flaky_read_text)
+
+    raw = read_meeting_pipeline_json(scope_id)
+    assert raw is not None
+    assert raw.get("context", {}).get("x") == 1
+    assert calls["n"] >= 2
+
+
+def test_meeting_pipeline_load_distinguishes_missing_and_read_failed(monkeypatch, tmp_path) -> None:
+    from synapse.rd_meeting.pipeline import MeetingPipeline
+    from synapse.rd_meeting.paths import meeting_pipeline_path
+
+    scope_id = "pipe-read-failed"
+    work = tmp_path / "work" / scope_id
+    work.mkdir(parents=True)
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+
+    meeting_pipeline_path(scope_id).write_text('{"schema_version": 1}', encoding="utf-8")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.pipeline.read_meeting_pipeline_json",
+        lambda _sid: None,
+    )
+
+    with pytest.raises(ValueError, match="meeting_pipeline_read_failed"):
+        MeetingPipeline.load(scope_id)

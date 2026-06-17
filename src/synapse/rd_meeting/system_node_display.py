@@ -18,7 +18,7 @@ from synapse.rd_meeting.paths import (
     product_doc_dir,
 )
 from synapse.rd_meeting.prior_outputs import load_skipped_node_ids
-from synapse.rd_meeting.room_runtime import read_json_file
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
 from synapse.rd_sop.nodes import node_display_name, stage_id_for_node_id, stage_name_for_id
 
 SYSTEM_NODE_DISPLAY_KINDS: dict[str, str] = {
@@ -41,7 +41,7 @@ def _load_pipeline_context_asset(scope_id: str, key: str) -> dict[str, Any] | No
     sid = (scope_id or "").strip()
     if not sid:
         return None
-    raw = read_json_file(meeting_pipeline_path(sid))
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return None
     ctx = raw.get("context")
@@ -105,6 +105,8 @@ def _auto_split_context_for_bindings(scope_id: str) -> dict[str, Any]:
 
 def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str, Any]]:
     """按 split_plan 条数汇总拆单结果：每条计划对应一行，合并同序 create_task 结果。"""
+    from synapse.rd_meeting.auto_split_assets import resolve_auto_split_feature_id
+
     assets = auto_split_assets or {}
     plan_tasks = [
         dict(t) for t in (assets.get("split_plan_tasks") or []) if isinstance(t, dict)
@@ -142,7 +144,7 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             row["task_desc"] = str(row.get("comments") or wi.get("task_desc") or "").strip()
             if not row.get("task_impact_desc"):
                 row["task_impact_desc"] = str(plan.get("taskImpactDesc") or "").strip()
-            feature_id = str(wi.get("feature_id") or "").strip()
+            feature_id = resolve_auto_split_feature_id(wi, portal_no)
             if feature_id:
                 row["feature_id"] = feature_id
             portal_task_id = wi.get("portal_task_id") or wi.get("task_id") or wi.get("taskId")
@@ -171,7 +173,7 @@ def collect_task_rows(auto_split_assets: dict[str, Any] | None) -> list[dict[str
             "comments": str(wi.get("task_desc") or "").strip(),
             "task_desc": str(wi.get("task_desc") or "").strip(),
         }
-        feature_id = str(wi.get("feature_id") or "").strip()
+        feature_id = resolve_auto_split_feature_id(wi, portal_no)
         if feature_id:
             row["feature_id"] = feature_id
         portal_task_id = wi.get("portal_task_id") or wi.get("task_id") or wi.get("taskId")
@@ -708,7 +710,7 @@ def _pipeline_context(scope_id: str) -> dict[str, Any]:
     sid = (scope_id or "").strip()
     if not sid:
         return {}
-    raw = read_json_file(meeting_pipeline_path(sid))
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return {}
     ctx = raw.get("context")

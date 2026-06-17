@@ -2848,6 +2848,8 @@ async def create_task(body: CreateTaskRequest) -> dict:
     branch_data = branch_result.get("data") if isinstance(branch_result, dict) else None
 
     feature_id = _feature_id_from_branch_data(branch_data if isinstance(branch_data, dict) else None)
+    if not feature_id and created_task_no:
+        feature_id = str(created_task_no).strip()
     return success_response(
         {
             "task_no": created_task_no,

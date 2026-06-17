@@ -9,11 +9,15 @@ import pytest
 from synapse.rd_meeting.code_commit_assets import (
     _FLIGHT_POLL_MAX_WAIT_SEC,
     _build_commit_message,
+    _flight_poll_applies_to_task_row,
+    _flight_poll_progress_message,
     _flight_result_is_fresh,
     _normalize_flight_data,
     _resolve_code_commit_pipeline_steps,
     _resolve_overall_status,
+    _summarize_build_result_msg,
     bootstrap_code_commit,
+    format_flight_result_report,
 )
 from synapse.rd_meeting.system_node_display import build_code_commit_display, collect_task_rows
 from synapse.rd_meeting.task_exec import _extract_commit_summary
@@ -108,6 +112,45 @@ def test_flight_result_is_fresh_rejects_stale_success():
     }
     assert _flight_result_is_fresh(stale, commit_at) is False
     assert _flight_result_is_fresh(fresh, commit_at) is True
+
+
+def test_flight_poll_helpers_ignore_stale_terminal_for_ui():
+    commit_at = datetime(2026, 6, 17, 23, 29, 55)
+    stale_failed = {
+        "status": "failed",
+        "data": {
+            "ciFlowInstRunState": "1",
+            "ciFlowInstBeginDate": "2026-06-17 17:54:59",
+        },
+    }
+    fresh_pending = {
+        "status": "pending",
+        "data": {
+            "ciFlowInstRunState": "-1",
+            "ciFlowInstBeginDate": "2026-06-17 23:29:59",
+        },
+    }
+    fresh_failed = {
+        "status": "failed",
+        "data": {
+            "ciFlowInstRunState": "1",
+            "ciFlowInstBeginDate": "2026-06-17 23:31:20",
+        },
+    }
+
+    assert _flight_poll_applies_to_task_row(stale_failed, not_before=commit_at) is False
+    assert _flight_poll_applies_to_task_row(fresh_pending, not_before=commit_at) is True
+    assert _flight_poll_applies_to_task_row(fresh_failed, not_before=commit_at) is True
+
+    assert _flight_poll_progress_message("11929917", stale_failed, not_before=commit_at) == (
+        "试飞轮询中：11929917"
+    )
+    assert _flight_poll_progress_message("11929917", fresh_pending, not_before=commit_at) == (
+        "试飞轮询中：11929917"
+    )
+    assert _flight_poll_progress_message("11929917", fresh_failed, not_before=commit_at) == (
+        "子单 11929917 试飞结束"
+    )
 
 
 def test_resolve_overall_status_timeout_is_failed():
@@ -349,3 +392,122 @@ def test_bootstrap_skips_commit_when_sandbox_clean(tmp_path, monkeypatch):
     assert assets["tasks"][0]["commit_skipped"] is True
     assert assets["tasks"][0]["status"] == "ok"
     assert assets["status"] == "ok"
+
+
+def test_bootstrap_code_commit_feature_id_fallback_for_reuse_existing(tmp_path, monkeypatch):
+    """沿用已有子单时 work_item 无 feature_id，应回退 task_no 完成提交。"""
+    scope_id = "cc-reuse"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    auto_ctx = {
+        "split_plan_tasks": [
+            {"taskNo": "21881451", "taskTitle": "沿用子单", "productModuleName": "ZMDB"},
+        ],
+        "create_task_results": [
+            {
+                "status": "ok",
+                "task_no": "11929917",
+                "reused_existing": True,
+                "work_item": {
+                    "task_no": "11929917",
+                    "product_module_name": "ZMDB",
+                },
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._auto_split_context_for_bindings",
+        lambda _sid: auto_ctx,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets.load_task_exec_payload",
+        lambda _sid: {
+            "tasks": [
+                {
+                    "task_no": "11929917",
+                    "sandbox_path": str(sandbox),
+                    "commit_summary": "改造摘要",
+                }
+            ]
+        },
+    )
+    captured: dict[str, str] = {}
+
+    def _mock_commit(**kwargs):
+        captured["feature_branch"] = kwargs["feature_branch"]
+        return {
+            "status": "ok",
+            "commit_hash": "abc",
+            "local_path": kwargs["local_path"],
+            "error": "",
+            "commit_skipped": False,
+            "commit_finished_at": datetime.now().isoformat(timespec="seconds"),
+        }
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._commit_task_or_skip",
+        _mock_commit,
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._wait_for_flight_result",
+        lambda portal_task_id, **kwargs: {
+            "status": "ok",
+            "error": "",
+            "data": {"taskId": portal_task_id, "ciFlowInstRunState": "0"},
+        },
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._persist_code_commit_state",
+        lambda *args, **kwargs: None,
+    )
+
+    assets = bootstrap_code_commit(scope_id, scope_type="demand")
+    assert captured["feature_branch"] == "11929917"
+    assert assets["tasks"][0]["feature_id"] == "11929917"
+    assert assets["tasks"][0]["status"] == "ok"
+
+
+def test_summarize_build_result_msg_preserves_compile_errors_from_long_log():
+    noise = "chmod: cannot access '/root/build.sh': No such file or directory\n" + (
+        "g++ -c ZmdbConfig.cpp\n" * 200
+    )
+    tail = (
+        "ZmdbConfig.cpp:13554:13: error: 'iDays' was not declared in this scope\n"
+        "make: *** [ZmdbConfig.o] Error 1"
+    )
+    log = noise + tail
+    summary = _summarize_build_result_msg(log)
+    assert "【编译/构建错误摘录】" in summary
+    assert "iDays" in summary
+    assert "make:" in summary
+    assert "chmod: cannot access" not in summary
+
+
+def test_format_flight_result_report_uses_compile_error_excerpt():
+    long_msg = "chmod warning\n" + ("cleaning ...\n" * 300) + (
+        "ZmdbConfig.cpp:99: error: symbol missing\nmake: *** Error 1\n"
+    )
+    report = format_flight_result_report(
+        {
+            "status": "partial",
+            "flight": {"status": "failed", "error": "11929917: 构建失败"},
+            "tasks": [
+                {
+                    "task_no": "11929917",
+                    "feature_id": "11929917",
+                    "flight": {
+                        "status": "failed",
+                        "data": {
+                            "buildResult": [
+                                {"resultType": "编译节点", "resultMsg": long_msg, "kind": "compile"}
+                            ]
+                        },
+                    },
+                }
+            ],
+        }
+    )
+    assert "error: symbol missing" in report
+    assert "chmod warning" not in report

@@ -877,7 +877,7 @@ export async function saveSolutionReviewTasks(
   );
 }
 
-export type FuncSolutionPlanReviewStatus = 'pending' | 'approved' | 'needs_change';
+export type FuncSolutionPlanReviewStatus = 'pending' | 'approved' | 'needs_change' | 'deprecated';
 
 export interface FuncSolutionDiagram {
   id?: string;

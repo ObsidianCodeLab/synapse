@@ -208,7 +208,7 @@ export const DemandFunctionMatrix: React.FC<{
   if (!total) {
     return (
       <p className="text-sm text-muted-foreground italic py-2">
-        未解析到改造模块，请检查「模块功能.md」模块改造清单或小鲸 solution_review.json
+        未解析到改造模块，请检查「函数级方案.md」§1.7 或小鲸 solution_review.json
       </p>
     );
   }
@@ -618,7 +618,7 @@ export const SplitTaskEditorCard: React.FC<{
               />
             ) : (
               <p className="text-xs italic text-amber-400/90">
-                暂无改造模块，请确认「模块功能.md」已写入模块改造清单或小鲸 solution_review.json
+                暂无改造模块，请确认「函数级方案.md」§1.7 已写入模块改造方案或小鲸 solution_review.json
               </p>
             )}
           </div>

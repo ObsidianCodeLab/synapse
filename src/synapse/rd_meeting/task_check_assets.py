@@ -7,7 +7,7 @@ import re
 from typing import Any, Literal
 
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import _load_pipeline_context_asset
 from synapse.rd_sop.nodes import stage_name_for_id
 
@@ -50,8 +50,7 @@ def _save_code_commit_assets(scope_id: str, assets: dict[str, Any]) -> None:
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
@@ -80,7 +79,7 @@ def _overlay_flight_error_on_code_commit(scope_id: str, error_text: str) -> None
 
 
 def _pipeline_context(scope_id: str) -> dict[str, Any]:
-    raw = read_json_file(meeting_pipeline_path(scope_id))
+    raw = read_meeting_pipeline_json(scope_id)
     if not isinstance(raw, dict):
         return {}
     ctx = raw.get("context")
@@ -99,8 +98,7 @@ def _task_check_fail_count(scope_id: str) -> int:
 
 def _bump_task_check_fail_count(scope_id: str) -> int:
     sid = (scope_id or "").strip()
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return 1
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}

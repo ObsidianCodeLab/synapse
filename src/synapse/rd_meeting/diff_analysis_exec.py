@@ -24,7 +24,7 @@ from synapse.rd_meeting.config_store import load_meeting_room_config
 from synapse.rd_meeting.cursor_agent_cli import check_cursor_agent_cli
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
 from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
-from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
     collect_task_rows,
@@ -104,8 +104,7 @@ def _write_result(scope_id: str, data: dict[str, Any]) -> None:
 
 
 def _save_assets(scope_id: str, assets: dict[str, Any]) -> None:
-    path = meeting_pipeline_path(scope_id)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(scope_id)
     if not isinstance(raw, dict):
         raw = {}
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}

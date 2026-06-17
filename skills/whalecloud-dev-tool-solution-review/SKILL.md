@@ -96,15 +96,15 @@ label: 方案评审
   "demand_function": [
     {
       "id": "fp-1",
-      "functionPoint": "功能模块名称（来自模块功能.md 模块改造清单）",
-      "functionDesc": "模块目标（来自模块功能.md 模块改造清单「模块目标」列）"
+      "functionPoint": "改造模块名称（来自函数级方案.md §1.7 模块改造方案标题）",
+      "functionDesc": "模块职责（来自函数级方案.md §1.7 模块概要「职责」）"
     }
   ],
   "split_tasks_draft": [
     {
       "taskNo": "需求单号",
       "taskTitle": "研发单标题",
-      "comments": "研发单描述",
+      "comments": "研发单描述（§1.3 改造内容 + §1.7 模块职责，禁止引用模块功能.md）",
       "productModuleName": "应用模块",
       "branchVersionName": "产品分支",
       "patchName": "",
@@ -116,7 +116,7 @@ label: 方案评审
       "securityImpact": "",
       "compatibilityImpact": "",
       "branch_version_id": "",
-      "functionPoints": ["功能模块名称（本研发子单负责的架构模块）"]
+      "functionPoints": ["改造模块名称（须与函数级方案 §1.7 模块标题一致）"]
     }
   ],
   "human_review": {
@@ -150,7 +150,7 @@ label: 方案评审
 | 跨模块但改造范围小（局部函数/配置） | **不拆分** | 仍生成 1 条，在 `comments` 中列明涉及模块 |
 
 **复杂方案判定**（须同时满足）：
-1. **跨模块**：函数级方案 §1.3 / §1.10 功能影响涉及 **≥2 个**  distinct 应用模块或业务域；
+1. **跨模块**：函数级方案 §1.3 / §1.7 / §1.10 涉及 **≥2 个** distinct 改造模块；
 2. **大范围改造**：待改造函数/类 **≥5 个**，或涉及核心链路重构、数据库结构变更、公共接口 Breaking Change 之一。
 
 #### 拆分颗粒度
@@ -164,11 +164,12 @@ label: 方案评审
 
 - 所有任务共用同一 `taskNo`（需求单号）；
 - `taskTitle`：「{需求名称} — {模块/子域/仓库简称}」；
+- `comments`：**仅**从函数级方案归纳——单仓库用 §1.3「改造内容」；可追加 §1.7 各模块「职责」；**禁止**引用模块功能.md 或自行编造函数名/API；
 - `taskImpactDesc` 与 `performanceImpact` 等从 §1.10 **仅归纳本任务范围** 内的影响，勿把全方案影响复制到每条；
 - `branch_version_id` / `productModuleName` / `branchVersionName` 须与函数级方案 §1.3 一致；
 - `patchName` 在 SKILL 阶段 **一律留空**（人工在评审面板选择）；
-- `demand_function`：从 **模块功能.md → 模块改造清单**（修改模块 + 新增模块）复制「功能模块名称 / 模块名称」与「模块目标」；评审通过时落盘至 `split_plan.json` 的 `demand_function`（含 `assignedTaskTitle`）；
-- `functionPoints`：每条 `split_tasks_draft` **必须**列出本研发子单负责的**架构模块名称**（与模块改造清单一一对应）；**禁止**多工单重复认领同一模块；单任务方案可认领全部模块；
+- `demand_function`：从 **函数级方案.md §1.7 模块改造方案**（`#### 1.7.x` 标题 + 模块概要「职责」）；评审通过时落盘至 `split_plan.json` 的 `demand_function`（含 `assignedTaskTitle`）；
+- `functionPoints`：每条 `split_tasks_draft` **必须**列出本研发子单负责的 **§1.7 改造模块名称**；**禁止**多工单重复认领同一模块；单任务方案可认领全部 §1.7 模块；
 - 无仓库表时生成 **单条** 草案。
 
 #### 决策流程（生成前自检）
@@ -187,8 +188,8 @@ label: 方案评审
 1. 读取 WORK_ORDER_DIR 下需求设计阶段各节点产出（仅 included 项）
 2. 重点精读：历史方案映射.md、函数级方案.md、entropy agent.md/rule.md
 3. 填写 whale_review（评分 0-100、建议带 evidence_refs）
-4. 从函数级方案解析 repos 与 impact_assessment（表格行转为对象数组）
-5. 按「拆单策略」生成 split_tasks_draft（1～5 条，patchName 为空）
+4. 从函数级方案解析 repos、§1.7 改造模块与 impact_assessment
+5. 按「拆单策略」生成 split_tasks_draft（1～5 条；comments / functionPoints / demand_function 均来自函数级方案）
 6. 自检：跨仓库必拆、简单方案单条、复杂方案按模块切分且无交叉改造
 7. write_file → {ARCHIVE_DIR}/solution_review.json
 8. whalecloud-dev-tool-doc-generate → 方案评审结论.md

@@ -128,6 +128,7 @@ def test_bootstrap_auto_split_reuse_existing(monkeypatch, tmp_path):
     assert assets.get("reuse_existing") is True
     assert assets["create_task_results"][0]["task_no"] == "T-OLD"
     assert assets["create_task_results"][0].get("reused_existing") is True
+    assert assets["create_task_results"][0]["work_item"]["feature_id"] == "T-OLD"
     assert assets["userwork_added_task_nos"] == []
 
 

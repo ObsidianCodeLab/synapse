@@ -89,6 +89,11 @@ Step 1 — 读取试飞结果
   1a. read_file(FLIGHT_RESULT)
   1b. 解析：总体试飞状态、各研发子单 task_no / feature_id、试飞状态、构建明细（resultType + resultMsg）
   1c. 若文件为空或无子单记录 → 中止
+  1d. **编译节点日志分析（强制）**：
+      - 优先阅读 `【编译/构建错误摘录】` 段或含 `error:` / `make:` / `cc1plus:` 的行
+      - 构建日志开头的 `chmod: cannot access '/root/build.sh'` 等 CI 环境告警**通常非根因**（后续 makeall 仍会继续执行）
+      - 根因须对应具体文件/行号/符号（如 `ZmdbConfig.cpp:13554: error: 'iDays' was not declared`）
+      - 若 `试飞结果.md` 仅有环境告警、无编译错误摘录 → 读取 `meeting_pipeline.json` 中 `code_commit_assets.flight.tasks[].data.buildResult[].resultMsg` 全文，或标注 `[待研发确认]` 并给出排查步骤
 
 Step 2 — 读取上下文（可选但推荐）
   2a. 代码提交日志.md — 提交 hash、分支、子单映射

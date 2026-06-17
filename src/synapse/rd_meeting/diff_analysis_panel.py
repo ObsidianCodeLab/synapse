@@ -9,7 +9,7 @@ from typing import Any
 from synapse.rd_meeting.diff_analysis_exec import PLAN_FILENAME, PLAN_NODE_ID
 from synapse.rd_meeting.flight_optimize_gate import evaluate_flight_optimize_need
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
 from synapse.rd_meeting.system_node_display import (
     _load_pipeline_context_asset,
     build_code_commit_display,
@@ -304,8 +304,7 @@ def build_optimize_comment_hint(scope_id: str, payload: dict[str, Any] | None) -
 def archive_plan_round_before_regen(scope_id: str, *, round_no: int) -> None:
     """新一轮方案生成前，将当前方案归档到 pipeline context。"""
     sid = (scope_id or "").strip()
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         raw = {}
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
@@ -341,8 +340,7 @@ def sync_commit_flight_to_exception_check(scope_id: str, commit_result: dict[str
     if not isinstance(commit_result, dict):
         return
     write_flight_result_archive(scope_id, DEV_STAGE_NAME, commit_result)
-    ctx_path = meeting_pipeline_path(scope_id)
-    raw = read_json_file(ctx_path)
+    raw = read_meeting_pipeline_json(scope_id)
     if isinstance(raw, dict):
         ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
         ctx["code_commit_assets"] = commit_result

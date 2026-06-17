@@ -9,6 +9,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
+from synapse.rd_meeting.auto_split_assets import resolve_auto_split_feature_id
 from synapse.rd_meeting.product_assets import _run_git, resolve_sandbox_path_for_product_module
 from synapse.rd_meeting.system_node_display import (
     _auto_split_context_for_bindings,
@@ -164,14 +165,12 @@ def _persist_code_commit_state(
     *,
     pipe: Any = None,
 ) -> None:
-    from synapse.rd_meeting.paths import meeting_pipeline_path
-    from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+    from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
@@ -265,6 +264,36 @@ def _flight_result_is_fresh(flight_row: dict[str, Any], not_before: datetime | N
         return False
     grace = timedelta(seconds=_FLIGHT_FRESHNESS_GRACE_SEC)
     return begin >= not_before - grace
+
+
+def _flight_poll_applies_to_task_row(
+    flight_row: dict[str, Any],
+    *,
+    not_before: datetime | None,
+) -> bool:
+    """Poll 回调是否应把 flight_row 写入任务行（排除 stale 的历史终态，避免 UI 误判）。"""
+    st = str(flight_row.get("status") or "").strip()
+    if st in ("ok", "failed", "timeout"):
+        return _flight_result_is_fresh(flight_row, not_before)
+    return True
+
+
+def _flight_poll_progress_message(
+    task_no: str,
+    flight_row: dict[str, Any],
+    *,
+    not_before: datetime | None,
+) -> str:
+    st = str(flight_row.get("status") or "").strip()
+    if st in ("ok", "failed", "timeout", "skipped") and _flight_poll_applies_to_task_row(
+        flight_row, not_before=not_before
+    ):
+        if st == "ok":
+            return f"子单 {task_no} 试飞成功"
+        if st == "skipped":
+            return f"子单 {task_no} 试飞已跳过"
+        return f"子单 {task_no} 试飞结束"
+    return f"试飞轮询中：{task_no}"
 
 
 def _is_no_flight_history_response(resp: dict[str, Any]) -> bool:
@@ -667,7 +696,10 @@ def _collect_commit_orders(scope_type: ScopeType, scope_id: str) -> list[dict[st
         commit_summary = str(exec_row.get("commit_summary") or "").strip()
         if not commit_summary:
             commit_summary = str(row.get("comments") or row.get("task_desc") or row.get("task_title") or "").strip()
-        feature_id = str(row.get("feature_id") or "").strip()
+        feature_id = resolve_auto_split_feature_id(
+            {"feature_id": row.get("feature_id"), "task_no": task_no},
+            task_no,
+        )
         portal_task_id = _resolve_portal_task_id(task_no, row.get("portal_task_id"))
         orders.append(
             {
@@ -752,6 +784,44 @@ def format_code_commit_log_report(assets: dict[str, Any], *, node_name: str = "�
     return "\n".join(lines) + "\n"
 
 
+_BUILD_RESULT_ERROR_MARKERS = (
+    "error:",
+    "fatal error",
+    "undefined reference",
+    "was not declared",
+    "make:",
+    "cc1plus:",
+)
+
+
+def _summarize_build_result_msg(msg: str, *, max_chars: int = 4000) -> str:
+    """压缩过长 CI 构建日志，优先保留编译/链接错误行（通常在日志末尾）。"""
+    text = str(msg or "").strip()
+    if not text:
+        return ""
+
+    lines = text.splitlines()
+    error_lines = [
+        line
+        for line in lines
+        if any(marker in line.lower() for marker in _BUILD_RESULT_ERROR_MARKERS)
+    ]
+    if error_lines:
+        excerpt = "\n".join(error_lines[-40:])
+        prefix = "【编译/构建错误摘录】\n"
+        body = excerpt
+        if len(prefix) + len(body) > max_chars:
+            body = body[-(max_chars - len(prefix)) :]
+        return prefix + body
+
+    if len(text) <= max_chars:
+        return text
+
+    tail_note = "…（日志过长，展示末尾）\n"
+    tail_budget = max_chars - len(tail_note)
+    return tail_note + text[-tail_budget:]
+
+
 def format_flight_result_report(assets: dict[str, Any], *, node_name: str = "试飞结果") -> str:
     lines = [f"# {node_name}", ""]
     flight = assets.get("flight") if isinstance(assets.get("flight"), dict) else {}
@@ -783,7 +853,7 @@ def format_flight_result_report(assets: dict[str, Any], *, node_name: str = "试
                     kind = str(item.get("kind") or "").strip()
                     lines.append(
                         f"  - {item.get('resultType') or '检查项'}："
-                        f"{str(item.get('resultMsg') or '')[:500]}"
+                        f"{_summarize_build_result_msg(str(item.get('resultMsg') or ''))}"
                     )
                     if kind == "code_check":
                         alarms = item.get("alarms") if isinstance(item.get("alarms"), list) else []
@@ -1079,14 +1149,22 @@ def bootstrap_code_commit(
                 tasks=task_results,
             )
 
+            commit_not_before = (
+                None
+                if row.get("commit_skipped")
+                else _parse_portal_dt(row.get("commit_finished_at"))
+            )
+
             def _on_flight_poll(
                 flight_row: dict[str, Any],
                 *,
                 target_row: dict[str, Any] = row,
                 idx: int = poll_index,
                 tno: str = task_no,
+                fresh_not_before: datetime | None = commit_not_before,
             ) -> None:
-                target_row["flight"] = flight_row
+                if _flight_poll_applies_to_task_row(flight_row, not_before=fresh_not_before):
+                    target_row["flight"] = flight_row
                 flight_summary = _aggregate_flight_status(task_results)
                 flight_ok = sum(
                     1
@@ -1098,10 +1176,14 @@ def bootstrap_code_commit(
                     "flight_ok": flight_ok,
                 }
                 poll_phase: CodeCommitPhase = "flight_poll"
-                poll_message = f"试飞轮询中：{tno}"
+                poll_message = _flight_poll_progress_message(
+                    tno, flight_row, not_before=fresh_not_before
+                )
                 flight_st = str(flight_row.get("status") or "").strip()
-                if flight_st in ("ok", "failed", "timeout", "skipped"):
-                    poll_message = f"子单 {tno} 试飞{'成功' if flight_st == 'ok' else '结束'}"
+                terminal_and_fresh = flight_st in ("ok", "failed", "timeout", "skipped") and (
+                    flight_st == "skipped"
+                    or _flight_poll_applies_to_task_row(flight_row, not_before=fresh_not_before)
+                )
                 _sync_running(
                     phase=poll_phase,
                     message=poll_message,
@@ -1113,15 +1195,9 @@ def bootstrap_code_commit(
                 )
                 _emit_live_progress(
                     log_type="info"
-                    if flight_st in ("ok", "pending", "")
+                    if not terminal_and_fresh or flight_st in ("ok", "pending", "", "skipped")
                     else "warning",
                 )
-
-            commit_not_before = (
-                None
-                if row.get("commit_skipped")
-                else _parse_portal_dt(row.get("commit_finished_at"))
-            )
             row["flight"] = _wait_for_flight_result(
                 portal_task_id,
                 on_poll=_on_flight_poll,

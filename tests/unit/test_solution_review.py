@@ -12,10 +12,13 @@ from synapse.rd_meeting.solution_review import (
     MIN_HUMAN_REVIEW_COMMENT_LEN,
     apply_human_decision,
     build_demand_function_with_assignments,
+    build_split_task_comments,
     ensure_human_review_pending_for_gate,
     ensure_split_tasks_draft,
     enrich_func_solution_repos_from_catalog,
     enrich_payload_from_archive,
+    enrich_split_tasks_from_func_solution,
+    parse_func_solution_demand_functions,
     parse_func_solution_impact_assessment,
     parse_func_solution_md,
     parse_module_func_md,
@@ -130,6 +133,10 @@ def test_ensure_split_tasks_draft_fills_branch_from_catalog(monkeypatch):
         "synapse.rd_meeting.solution_review._load_catalog_repos",
         lambda _sid: catalog,
     )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review._demand_functions_from_func_solution_archive",
+        lambda _sid: [],
+    )
     payload = {
         "requirement_name": "ZMDB改造",
         "func_solution_parsed": {
@@ -148,6 +155,7 @@ def test_ensure_split_tasks_draft_fills_branch_from_catalog(monkeypatch):
     assert tasks[0]["productModuleName"] == "ZMDB"
     assert tasks[0]["branchVersionName"] == "CBOSS_BSS_ZMDB_V9.0_主分支"
     assert tasks[0]["branch_version_id"] == "4531"
+    assert tasks[0]["comments"] == "核心改造"
 
 
 def test_enrich_payload_from_archive_reparses_impact(tmp_path, monkeypatch):
@@ -195,6 +203,48 @@ SAMPLE_MODULE_FUNC = """# 模块功能
 """
 
 
+SAMPLE_FUNC_SOLUTION_WITH_MODULES = """# 函数级方案
+
+## 1. 方案内容
+
+### 1.3 涉及仓库
+| 产品分支ID | 应用模块 | 仓库地址 | 改造内容 |
+|-----------|---------|---------|---------|
+| 4531 | ZMDB | https://git.example.com/repo.git | 改造计费模块 |
+
+### 1.7 模块改造方案
+
+#### 1.7.1 任务调度模块
+
+**模块概要**
+
+- 职责：支持运营在线调整任务优先级
+
+#### 1.7.2 账单导出模块
+
+**模块概要**
+
+- 职责：支持导出 PDF/Excel 账单
+"""
+
+
+def test_parse_func_solution_demand_functions():
+    rows = parse_func_solution_demand_functions(SAMPLE_FUNC_SOLUTION_WITH_MODULES)
+    assert len(rows) == 2
+    assert rows[0]["functionPoint"] == "任务调度模块"
+    assert rows[0]["functionDesc"] == "支持运营在线调整任务优先级"
+    assert rows[1]["functionPoint"] == "账单导出模块"
+
+
+def test_build_split_task_comments():
+    text = build_split_task_comments(
+        change_summary="核心改造",
+        module_points=[{"functionPoint": "模块A", "functionDesc": "职责A"}],
+    )
+    assert "核心改造" in text
+    assert "模块A：职责A" in text
+
+
 def test_parse_module_func_md():
     rows = parse_module_func_md(SAMPLE_MODULE_FUNC)
     assert len(rows) == 2
@@ -224,13 +274,13 @@ def test_parse_module_func_md_legacy():
 
 def test_resolve_demand_functions_merges_split_tasks(tmp_path, monkeypatch):
     scope_id = "merge-fp"
-    archive_mod = tmp_path / scope_id / "archive" / "需求分析" / "module_func"
-    archive_mod.mkdir(parents=True)
-    (archive_mod / "模块功能.md").write_text(SAMPLE_MODULE_FUNC, encoding="utf-8")
+    archive_func = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
+    archive_func.mkdir(parents=True)
+    (archive_func / "函数级方案.md").write_text(SAMPLE_FUNC_SOLUTION_WITH_MODULES, encoding="utf-8")
 
     monkeypatch.setattr(
-        "synapse.rd_meeting.solution_review.archive_node_dir",
-        lambda sid, stage, node: tmp_path / sid / "archive" / stage / node,
+        "synapse.rd_meeting.solution_review._func_solution_archive_path",
+        lambda sid: archive_func / "函数级方案.md",
     )
 
     payload = {
@@ -245,6 +295,48 @@ def test_resolve_demand_functions_merges_split_tasks(tmp_path, monkeypatch):
     assert "任务调度模块" in points
     assert "账单导出模块" in points
     assert "仅存在于拆单" in points
+
+
+def test_enrich_split_tasks_from_func_solution_syncs_comments(tmp_path, monkeypatch):
+    scope_id = "sync-comments"
+    archive_func = tmp_path / scope_id / "archive" / "需求设计" / "func_solution"
+    archive_func.mkdir(parents=True)
+    (archive_func / "函数级方案.md").write_text(SAMPLE_FUNC_SOLUTION_WITH_MODULES, encoding="utf-8")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review._func_solution_archive_path",
+        lambda sid: archive_func / "函数级方案.md",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.solution_review.is_solution_review_formally_decided",
+        lambda _sid: False,
+    )
+    payload = {
+        "human_review": {"status": "pending", "comment": "", "decided_at": None},
+        "func_solution_parsed": {
+            "repos": [
+                {
+                    "branch_version_id": "4531",
+                    "product_module_name": "ZMDB",
+                    "change_summary": "改造计费模块",
+                }
+            ]
+        },
+        "split_tasks_draft": [
+            {
+                "taskTitle": "子单",
+                "comments": "小鲸乱写的描述",
+                "branch_version_id": "4531",
+                "functionPoints": ["进程管理模块", "任务调度模块"],
+            }
+        ],
+    }
+    out = enrich_split_tasks_from_func_solution(scope_id, payload)
+    task = out["split_tasks_draft"][0]
+    assert "改造计费模块" in task["comments"]
+    assert "任务调度模块" in task["functionPoints"]
+    assert "账单导出模块" in task["functionPoints"]
+    assert "进程管理模块" not in task["functionPoints"]
+    assert "小鲸乱写的描述" not in task["comments"]
 
 
 def test_validate_function_point_duplicate_rejected():

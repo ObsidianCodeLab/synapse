@@ -2777,10 +2777,9 @@ class MeetingRoomOrchestrator:
         rs_gate = load_room_state(sid) or {}
         if rs_gate.get("task_check_blocked"):
             raise ValueError("task_check_ai_blocked")
-        from synapse.rd_meeting.paths import meeting_pipeline_path
-        from synapse.rd_meeting.room_runtime import read_json_file
+        from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
 
-        pipe_raw = read_json_file(meeting_pipeline_path(sid))
+        pipe_raw = read_meeting_pipeline_json(sid)
         if isinstance(pipe_raw, dict):
             pctx = pipe_raw.get("context") if isinstance(pipe_raw.get("context"), dict) else {}
             if pctx.get("ai_processing_blocked"):

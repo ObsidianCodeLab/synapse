@@ -808,6 +808,7 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
         f"- **修订上下文**：必须先 `read_file` `{ctx_path}`（`{REVISION_CONTEXT_NAME}`），"
         "再读 `func_solution_review.json` 与 `函数级方案.md`。",
         "- **仅改 marked**：只修订 `plans_to_revise` 中列出的 plan id；"
+        "对 `plans_to_deprecate` 中列出的 plan id **完全废弃**（从 JSON 与 MD §1.7 移除，禁止覆盖修订）；"
         "`approved_plans` 中条目内容与评审状态**禁止改动**。",
         "- **改干净（强约束）**：被修订的 plan 必须**整段重写** `content_markdown`，"
         "并同步改写 `title`/`design_rationale`/`design_evidence`/`expected_effect`；"
@@ -821,8 +822,19 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
 
     to_revise = ctx.get("plans_to_revise") if isinstance(ctx.get("plans_to_revise"), list) else []
     if to_revise:
-        lines.append("- **待修订改造方案**：")
+        lines.append("- **待修订改造方案**（覆盖调整）：")
         for row in to_revise:
+            if not isinstance(row, dict):
+                continue
+            pid = str(row.get("id") or "").strip()
+            title = str(row.get("title") or row.get("module_name") or pid).strip()
+            comment = str(row.get("comment") or "").strip()
+            lines.append(f"  - `{pid}` {title}：{comment}" if comment else f"  - `{pid}` {title}")
+
+    to_deprecate = ctx.get("plans_to_deprecate") if isinstance(ctx.get("plans_to_deprecate"), list) else []
+    if to_deprecate:
+        lines.append("- **待废弃改造方案**（完全移除，禁止保留正文）：")
+        for row in to_deprecate:
             if not isinstance(row, dict):
                 continue
             pid = str(row.get("id") or "").strip()
@@ -849,12 +861,16 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
     mods_arg = ",".join(dict.fromkeys(revise_module_names))
     lines.append(
         "- **落盘要求（强制局部修订，禁止全量覆盖）**："
-        "先更新 `func_solution_review.json` 中**仅** `plans_to_revise` 对应 plan 的字段，"
-        "其 `human_review.status` 重置为 `pending`；`approved_plans` 条目**原样保留**。"
+        "先更新 `func_solution_review.json`："
+        "`plans_to_revise` 对应 plan 整段重写并重置 `human_review.status=pending`；"
+        "`plans_to_deprecate` 对应 plan **从 transformation_plans 删除**；"
+        "`approved_plans` 条目**原样保留**。"
     )
     lines.append(
-        "- **`函数级方案.md` 落盘**：**只能**用 doc-generate 的 `--patch-modules` 局部模式，"
-        "禁止用全量三参数形式整篇重渲（会触发冻结校验失败被打回）。命令形如："
+        "- **`函数级方案.md` 落盘**："
+        "`plans_to_revise` **只能**用 doc-generate 的 `--patch-modules` 局部模式；"
+        "`plans_to_deprecate` 须**手工删除**对应 §1.7.N 小节（禁止 patch 覆盖保留旧正文）。"
+        "禁止用全量三参数形式整篇重渲（会触发冻结校验失败被打回）。修订命令形如："
     )
     lines.append(
         "  ```\n"
@@ -937,6 +953,7 @@ _HOST_DUTY_TEXTS: dict[str, str] = {
         "- **函数级方案（增量修订）**：必须先读归档目录下 `revision_context.json`、"
         "现有 `func_solution_review.json` 与 `函数级方案.md`；"
         "**仅修订** `plans_to_revise` 中列出的改造方案并同步 MD 对应章节；"
+        "**完全废弃** `plans_to_deprecate` 中列出的改造方案（从 JSON 与 §1.7 移除）；"
         "`approved_plans` 中条目**禁止修改**内容与 `human_review.status=approved`；"
         "overview / consistency 仅在本次修订波及总览一致性时才调整；完成后回写 JSON 与 MD。"
     ),

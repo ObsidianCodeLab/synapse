@@ -9,6 +9,7 @@ from synapse.rd_meeting.auto_split_assets import (
     _local_owned_tasks,
     _resolve_demand_no,
     bootstrap_auto_split,
+    normalize_auto_split_work_item,
 )
 from synapse.rd_meeting.pipeline import STEP_SYSTEM_NODE_EXEC, STEP_WAITING, MeetingPipeline, PipelineRunContext
 from synapse.rd_meeting.room_runtime import append_history_event, load_room_state, save_room_state
@@ -217,7 +218,10 @@ def bootstrap_auto_split_reuse_existing(scope_type: ScopeType, scope_id: str) ->
         for index, plan in enumerate(split_plan_tasks):
             ex_summary = existing[index] if index < len(existing) else {}
             task_no = str(ex_summary.get("task_no") or "").strip()
-            work_item = dict(owned_by_no.get(task_no) or {}) if task_no else {}
+            raw_wi = dict(owned_by_no.get(task_no) or {}) if task_no else {}
+            work_item = (
+                normalize_auto_split_work_item(raw_wi, plan=plan, task_no=task_no) if task_no else {}
+            )
             create_results.append(
                 {
                     "status": "ok" if task_no else "skipped",
@@ -231,7 +235,10 @@ def bootstrap_auto_split_reuse_existing(scope_type: ScopeType, scope_id: str) ->
     else:
         for ex in existing:
             task_no = str(ex.get("task_no") or "").strip()
-            work_item = dict(owned_by_no.get(task_no) or ex)
+            work_item = normalize_auto_split_work_item(
+                dict(owned_by_no.get(task_no) or ex),
+                task_no=task_no,
+            )
             create_results.append(
                 {
                     "status": "ok",

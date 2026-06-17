@@ -690,6 +690,73 @@ def test_build_revision_context_splits_approved_and_needs_change():
     assert len(ctx["approved_plans"]) == 1
     assert ctx["approved_plans"][0]["id"] == "plan-2"
     assert ctx["overall_comment"] == "总体收紧"
+    assert ctx.get("plans_to_deprecate") == []
+
+
+def test_build_revision_context_includes_deprecated_plans():
+    payload = normalize_payload(dict(SAMPLE_REVIEW))
+    plans = payload["transformation_plans"]
+    plans[0]["human_review"] = {
+        "status": "deprecated",
+        "comment": "该模块已有等价实现，无需重复改造",
+    }
+    ctx = build_revision_context(payload, "")
+    assert len(ctx["plans_to_deprecate"]) == 1
+    assert ctx["plans_to_deprecate"][0]["id"] == "plan-1"
+    assert "等价实现" in ctx["plans_to_deprecate"][0]["comment"]
+    assert ctx.get("plans_to_revise") == []
+
+
+def test_write_revision_context_accepts_deprecated_only(tmp_path, monkeypatch):
+    scope_id = "fs-deprecate-only"
+    archive, patch = _archive_paths(tmp_path, scope_id)
+    archive.mkdir(parents=True)
+    review = dict(SAMPLE_REVIEW)
+    review["transformation_plans"][0]["human_review"] = {
+        "status": "deprecated",
+        "comment": "完全移除该改造方案",
+    }
+    (archive / "函数级方案.md").write_text("# 函数级方案\n\n" + ("x" * 100), encoding="utf-8")
+    (archive / "func_solution_review.json").write_text(
+        json.dumps(review, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    patch(monkeypatch)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "archive" / "需求设计" / "func_solution" / "revision_context.json",
+    )
+    write_revision_context(scope_id, review, "废弃多余方案")
+    loaded = load_revision_context(scope_id)
+    assert loaded is not None
+    assert len(loaded["plans_to_deprecate"]) == 1
+    assert loaded["plans_to_deprecate"][0]["comment"] == "完全移除该改造方案"
+
+
+def test_validate_deprecated_plans_must_be_removed(tmp_path, monkeypatch):
+    scope_id = "fs-deprecate-gate"
+    _, patch = _archive_paths(tmp_path, scope_id)
+    patch(monkeypatch)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.func_solution_review.revision_context_path",
+        lambda sid: tmp_path / sid / "rev.json",
+    )
+    review = _build_two_plan_review()
+    review["transformation_plans"][0]["human_review"] = {
+        "status": "deprecated",
+        "comment": "移除 plan-1",
+    }
+    write_revision_context(scope_id, review, "废弃")
+
+    # plan-1 仍存在 → 校验报错
+    still_there = json.loads(json.dumps(review))
+    errs = validate_revision_frozen_plans(scope_id, still_there)
+    assert any("plan-1" in e and "废弃" in e for e in errs)
+
+    # plan-1 已删除 → 通过
+    removed = json.loads(json.dumps(review))
+    removed["transformation_plans"] = [removed["transformation_plans"][1]]
+    assert validate_revision_frozen_plans(scope_id, removed) == []
 
 
 def test_write_and_clear_revision_context(tmp_path, monkeypatch):

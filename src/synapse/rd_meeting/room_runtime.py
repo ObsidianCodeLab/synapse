@@ -449,6 +449,15 @@ def default_room_state(
     }
 
 
+def _transient_json_io_error(exc: BaseException) -> bool:
+    """Windows 原子 replace 与并发读时的可重试 IO 错误。"""
+    if not isinstance(exc, OSError):
+        return False
+    if getattr(exc, "errno", None) == 13:
+        return True
+    return getattr(exc, "winerror", None) in (5, 32)
+
+
 def read_json_file(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
@@ -458,6 +467,51 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
         logger.warning("读取 JSON 失败 %s: %s", path, exc)
         return None
     return data if isinstance(data, dict) else None
+
+
+def read_json_file_locked(
+    path: Path,
+    lock_path: Path,
+    *,
+    retries: int = 6,
+) -> dict[str, Any] | None:
+    """与写路径共用 FileLock；遇 Permission denied / sharing violation 短重试。"""
+    import time
+
+    if not path.is_file():
+        return None
+    lock = FileLock(str(lock_path), timeout=30)
+    last_exc: OSError | None = None
+    for attempt in range(retries):
+        try:
+            with lock:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+            logger.warning("读取 JSON 非 dict %s", path)
+            return None
+        except json.JSONDecodeError as exc:
+            logger.warning("读取 JSON 失败 %s: %s", path, exc)
+            return None
+        except OSError as exc:
+            last_exc = exc
+            if not _transient_json_io_error(exc) or attempt >= retries - 1:
+                logger.warning("读取 JSON 失败 %s: %s", path, exc)
+                return None
+            time.sleep(0.05 * (2**attempt))
+    if last_exc is not None:
+        logger.warning("读取 JSON 失败 %s: %s", path, last_exc)
+    return None
+
+
+def read_meeting_pipeline_json(scope_id: str) -> dict[str, Any] | None:
+    sid = (scope_id or "").strip()
+    if not sid:
+        return None
+    return read_json_file_locked(
+        meeting_pipeline_path(sid),
+        meeting_pipeline_lock_path(sid),
+    )
 
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
@@ -505,7 +559,10 @@ def save_meeting_pipeline(scope_id: str, payload: dict[str, Any]) -> None:
 
 
 def load_room_state(scope_id: str) -> dict[str, Any] | None:
-    data = read_json_file(room_state_path(scope_id))
+    sid = (scope_id or "").strip()
+    if not sid:
+        return None
+    data = read_json_file_locked(room_state_path(sid), room_state_lock_path(sid))
     if not isinstance(data, dict) or not isinstance(data.get("node_metrics"), dict):
         return data
     metrics = data.get("metrics")

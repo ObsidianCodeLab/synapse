@@ -39,7 +39,7 @@ def _coerce_schema_version(raw: Any) -> int:
 _PLAN_SUMMARY_MAX_LEN = 240
 MIN_HUMAN_REVIEW_COMMENT_LEN = 20
 
-PlanReviewStatus = Literal["pending", "approved", "needs_change"]
+PlanReviewStatus = Literal["pending", "approved", "needs_change", "deprecated"]
 
 _FUNC_SOLUTION_HITL_FORBIDDEN = (
     "func_solution 节点禁止使用 submit_hitl_questionnaire。"
@@ -123,7 +123,7 @@ def _normalize_plan_row(row: dict[str, Any], *, fallback_id: str) -> dict[str, A
     req_summary = str(row.get("requirement_summary") or row.get("requirement_desc") or "").strip()
     review = row.get("human_review") if isinstance(row.get("human_review"), dict) else {}
     status = str(review.get("status") or "pending").strip().lower()
-    if status not in ("pending", "approved", "needs_change"):
+    if status not in ("pending", "approved", "needs_change", "deprecated"):
         status = "pending"
     evidence = row.get("design_evidence")
     if not isinstance(evidence, list):
@@ -407,7 +407,8 @@ def format_revision_brief(payload: dict[str, Any], overall_comment: str = "") ->
         if not isinstance(plan, dict):
             continue
         review = plan.get("human_review") if isinstance(plan.get("human_review"), dict) else {}
-        if str(review.get("status") or "") != "needs_change":
+        st = str(review.get("status") or "").strip().lower()
+        if st not in ("needs_change", "deprecated"):
             continue
         comment = str(review.get("comment") or "").strip()
         if not comment:
@@ -416,7 +417,10 @@ def format_revision_brief(payload: dict[str, Any], overall_comment: str = "") ->
         mod = str(plan.get("module_name") or "").strip()
         req = str(plan.get("requirement_summary") or plan.get("requirement_ref") or "").strip()
         meta = " · ".join(x for x in (f"模块={mod}" if mod else "", f"需求={req}" if req else "") if x)
-        lines.append(f"【{title}】{meta}：{comment}" if meta else f"【{title}】：{comment}")
+        action = "废弃" if st == "deprecated" else "调整"
+        lines.append(
+            f"【{title}·{action}】{meta}：{comment}" if meta else f"【{title}·{action}】：{comment}"
+        )
     if lines:
         lines.insert(0, "函数级方案评审未通过，请按下列意见调整对应改造方案后重新落盘：")
     return "\n".join(lines).strip()
@@ -458,6 +462,7 @@ def build_revision_context(
     """构建函数级方案增量修订上下文（写入 revision_context.json）。"""
     plans = payload.get("transformation_plans") or []
     plans_to_revise: list[dict[str, Any]] = []
+    plans_to_deprecate: list[dict[str, Any]] = []
     approved_plans: list[dict[str, Any]] = []
     for plan in plans:
         if not isinstance(plan, dict):
@@ -479,6 +484,13 @@ def build_revision_context(
                     "comment": str(review.get("comment") or "").strip(),
                 }
             )
+        elif status == "deprecated":
+            plans_to_deprecate.append(
+                {
+                    **base,
+                    "comment": str(review.get("comment") or "").strip(),
+                }
+            )
         elif status == "approved":
             approved_plans.append(
                 {
@@ -493,6 +505,7 @@ def build_revision_context(
         "created_at": _now_iso(),
         "overall_comment": (overall_comment or "").strip(),
         "plans_to_revise": plans_to_revise,
+        "plans_to_deprecate": plans_to_deprecate,
         "approved_plans": approved_plans,
         "archive_files": {
             "review_json": JSON_NAME,
@@ -508,14 +521,15 @@ def write_revision_context(
     overall_comment: str = "",
 ) -> dict[str, Any]:
     ctx = build_revision_context(payload, overall_comment)
-    if not ctx.get("plans_to_revise"):
+    if not ctx.get("plans_to_revise") and not ctx.get("plans_to_deprecate"):
         raise ValueError("no_plans_need_change")
     _write_json_file(revision_context_path(scope_id), ctx)
     logger.info(
-        "func_solution_revision: wrote %s scope=%s revise=%d approved=%d",
+        "func_solution_revision: wrote %s scope=%s revise=%d deprecate=%d approved=%d",
         REVISION_CONTEXT_NAME,
         scope_id,
         len(ctx.get("plans_to_revise") or []),
+        len(ctx.get("plans_to_deprecate") or []),
         len(ctx.get("approved_plans") or []),
     )
     return ctx
@@ -1057,6 +1071,32 @@ def validate_revision_frozen_plans(
             )
     # 闸 3b：待修订（marked）方案的修订质量校验——确保改干净、与评审意见对齐。
     errors.extend(_validate_marked_plans_revised(ctx, by_id))
+    # 闸 3c：待废弃方案必须从 transformation_plans 与 §1.7 中完全移除。
+    errors.extend(_validate_deprecated_plans_removed(ctx, by_id))
+    return errors
+
+
+def _validate_deprecated_plans_removed(
+    ctx: dict[str, Any],
+    by_id: dict[str, dict[str, Any]],
+) -> list[str]:
+    """闸 3c：plans_to_deprecate 对应条目不得仍留在 transformation_plans。"""
+    to_deprecate = ctx.get("plans_to_deprecate")
+    if not isinstance(to_deprecate, list) or not to_deprecate:
+        return []
+    errors: list[str] = []
+    for row in to_deprecate:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("id") or "").strip()
+        title = str(row.get("title") or row.get("module_name") or pid).strip()
+        if not pid:
+            continue
+        if pid in by_id:
+            errors.append(
+                f"待废弃方案 `{pid}` {title} 仍存在于 transformation_plans，"
+                "必须从 func_solution_review.json 与 函数级方案.md §1.7 中完全移除"
+            )
     return errors
 
 
@@ -1137,7 +1177,7 @@ def save_plan_reviews(
         pr = plan.get("human_review") if isinstance(plan.get("human_review"), dict) else {}
         if "status" in upd:
             st = str(upd.get("status") or "pending").strip().lower()
-            if st in ("pending", "approved", "needs_change"):
+            if st in ("pending", "approved", "needs_change", "deprecated"):
                 pr["status"] = st
         if "comment" in upd:
             pr["comment"] = str(upd.get("comment") or "").strip()
@@ -1176,16 +1216,17 @@ def apply_human_decision(
         }
         payload["reviewed_at"] = _now_iso()
     else:
-        needs_change = [
+        needs_action = [
             p
             for p in plans
-            if str((p.get("human_review") or {}).get("status") or "") == "needs_change"
+            if str((p.get("human_review") or {}).get("status") or "")
+            in ("needs_change", "deprecated")
         ]
-        if not needs_change:
+        if not needs_action:
             raise ValueError("no_plans_need_change")
         missing_comment = [
             p
-            for p in needs_change
+            for p in needs_action
             if not str((p.get("human_review") or {}).get("comment") or "").strip()
         ]
         if missing_comment:

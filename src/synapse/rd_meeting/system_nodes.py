@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
-from synapse.rd_meeting.room_runtime import read_json_file, save_meeting_pipeline
+from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_sop.manifest import node_output_artifacts
 from synapse.rd_sop.nodes import node_display_name, stage_name_for_id
 
@@ -63,7 +63,7 @@ def _load_catalog_rows(scope_id: str, pipe: Any) -> list[dict[str, Any]]:
         catalog = pctx.get("prod_catalog")
         if isinstance(catalog, list):
             return [r for r in catalog if isinstance(r, dict)]
-    raw = read_json_file(meeting_pipeline_path(scope_id))
+    raw = read_meeting_pipeline_json(scope_id)
     if isinstance(raw, dict):
         ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
         catalog = ctx.get("prod_catalog")
@@ -101,8 +101,7 @@ def _save_pipeline_context_assets(
     sid = (scope_id or "").strip()
     if not sid:
         return
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}

@@ -10,17 +10,17 @@ from synapse.api.routes.dev_iwhalecloud import (
     OWNED_WORK_ITEM_STATE_DEV_DONE,
 )
 from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
-from synapse.rd_meeting.paths import meeting_pipeline_path, scope_dir
+from synapse.rd_meeting.paths import scope_dir
 from synapse.rd_meeting.pipeline import (
     clear_nodes_for_historical_reprocess,
     clear_room_state_for_node_reprocess,
 )
 from synapse.rd_meeting.room_runtime import (
     load_room_state,
-    read_json_file,
+    read_meeting_pipeline_json,
+    save_meeting_pipeline,
     save_room_state,
     sync_room_state_from_dev,
-    write_json_file,
 )
 from synapse.rd_meeting.userwork_sync import (
     _load_userwork_list,
@@ -143,8 +143,7 @@ def prepare_code_commit_reprocess(
 
     clear_nodes_for_historical_reprocess(sid, list(node_range))
 
-    path = meeting_pipeline_path(sid)
-    raw = read_json_file(path)
+    raw = read_meeting_pipeline_json(sid)
     if isinstance(raw, dict):
         ctx = raw.get("context")
         if not isinstance(ctx, dict):
@@ -164,7 +163,7 @@ def prepare_code_commit_reprocess(
         raw["steps_completed"] = [s for s in steps if s not in _PIPELINE_STEPS_DROP]
         raw["current_node_id"] = CODE_COMMIT_NODE_ID
         raw["phase"] = "running"
-        write_json_file(path, raw)
+        save_meeting_pipeline(sid, raw)
 
     dev["current_node_id"] = CODE_COMMIT_NODE_ID
     dev["stage_id"] = stage_id
