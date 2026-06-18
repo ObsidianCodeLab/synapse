@@ -21,6 +21,23 @@ SKIP_PLAN_MARKER = "无需试飞优化"
 
 FlightOptimizeNeed = Literal["needed", "not_needed", "unknown"]
 
+_COMMIT_SKIP_FLIGHT_MARKER = "代码未提交成功，跳过试飞"
+
+
+def _commit_summary_failed(assets: dict[str, Any]) -> bool:
+    summary = assets.get("summary") if isinstance(assets.get("summary"), dict) else {}
+    try:
+        return int(summary.get("commit_failed") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _flight_skipped_due_to_commit_failure(flight: dict[str, Any]) -> bool:
+    if str(flight.get("status") or "").strip().lower() != "skipped":
+        return False
+    err = str(flight.get("error") or "")
+    return _COMMIT_SKIP_FLIGHT_MARKER in err or "未提交成功" in err
+
 
 def _read_flight_result_archive(scope_id: str) -> str:
     path = archive_node_dir(scope_id, DEV_STAGE_NAME, "exception_check") / "试飞结果.md"
@@ -45,25 +62,45 @@ def evaluate_flight_optimize_need(scope_id: str) -> FlightOptimizeNeed:
 
     assets = _load_code_commit_assets(sid)
     if assets:
+        tasks = assets.get("tasks") if isinstance(assets.get("tasks"), list) else []
+        commit_failed = _commit_summary_failed(assets) or any(
+            isinstance(row, dict) and str(row.get("status") or "").strip().lower() == "failed"
+            for row in tasks
+        )
+
         passed, _err = _analyze_flight_result(assets)
-        if passed:
+        if passed and not commit_failed:
             return "not_needed"
 
         flight = assets.get("flight") if isinstance(assets.get("flight"), dict) else {}
         status = str(flight.get("status") or assets.get("status") or "").strip().lower()
-        tasks = assets.get("tasks") if isinstance(assets.get("tasks"), list) else []
         if tasks:
             saw_failed = False
             saw_pending = False
+            saw_commit_failed = False
+            saw_flight_skipped_for_commit = False
             for row in tasks:
                 if not isinstance(row, dict):
                     continue
+                if str(row.get("status") or "").strip().lower() == "failed":
+                    saw_commit_failed = True
                 task_flight = row.get("flight") if isinstance(row.get("flight"), dict) else {}
                 fs = str(task_flight.get("status") or "").strip().lower()
                 if fs == "failed":
                     saw_failed = True
                 elif fs in ("pending", "timeout", "partial"):
                     saw_pending = True
+                elif _flight_skipped_due_to_commit_failure(task_flight):
+                    saw_flight_skipped_for_commit = True
+            if saw_commit_failed or saw_flight_skipped_for_commit or commit_failed:
+                archive_text = _read_flight_result_archive(sid)
+                if re.search(r"总体试飞状态：\s*failed", archive_text, re.IGNORECASE):
+                    return "needed"
+                if re.search(r"试飞状态：\s*failed", archive_text, re.IGNORECASE):
+                    return "needed"
+                if "构建失败" in archive_text or "试飞仍未通过" in archive_text:
+                    return "needed"
+                return "unknown"
             if saw_failed:
                 return "needed"
             if saw_pending:
@@ -75,7 +112,11 @@ def evaluate_flight_optimize_need(scope_id: str) -> FlightOptimizeNeed:
             return "needed"
         if status in ("pending", "timeout", "partial"):
             return "unknown"
-        if status in ("ok", "skipped"):
+        if status == "skipped":
+            if _flight_skipped_due_to_commit_failure(flight) or commit_failed:
+                return "unknown"
+            return "not_needed"
+        if status == "ok":
             return "not_needed"
 
     text = _read_flight_result_archive(sid)
@@ -95,11 +136,44 @@ def evaluate_flight_optimize_need(scope_id: str) -> FlightOptimizeNeed:
     return "unknown"
 
 
-def write_skipped_flight_optimize_plan(scope_id: str, *, reason: str = "") -> dict[str, Any]:
-    """试飞方案节点跳过时落盘占位方案，供下游 diff_analysis 识别无需改动。"""
+def _existing_plan_is_skip_placeholder(text: str) -> bool:
+    body = str(text or "").strip()
+    if not body:
+        return True
+    if SKIP_PLAN_MARKER in body:
+        return True
+    if re.search(r"是否需代码改动：\s*否", body) and len(body) < 400:
+        return True
+    return False
+
+
+def write_skipped_flight_optimize_plan(
+    scope_id: str,
+    *,
+    reason: str = "",
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """试飞方案节点跳过时落盘占位方案，供下游 diff_analysis 识别无需改动。
+
+    若 ``overwrite=False`` 或磁盘上已有实质性方案，则保留原文件不覆盖。
+    """
     sid = (scope_id or "").strip()
     dest = archive_node_dir(sid, DEV_STAGE_NAME, TASK_FEEDBACK_NODE)
     dest.mkdir(parents=True, exist_ok=True)
+    path = dest / PLAN_FILENAME
+    if path.is_file():
+        try:
+            existing = path.read_text(encoding="utf-8")
+        except OSError:
+            existing = ""
+        if not overwrite or not _existing_plan_is_skip_placeholder(existing):
+            return {
+                "name": PLAN_FILENAME,
+                "path": str(path),
+                "preserved": True,
+                "skipped_write": True,
+            }
+
     body = "\n".join(
         [
             "# 试飞优化方案",
@@ -114,9 +188,8 @@ def write_skipped_flight_optimize_plan(scope_id: str, *, reason: str = "") -> di
             "",
         ]
     )
-    path = dest / PLAN_FILENAME
     path.write_text(body, encoding="utf-8")
-    return {"name": PLAN_FILENAME, "path": str(path)}
+    return {"name": PLAN_FILENAME, "path": str(path), "preserved": False, "skipped_write": False}
 
 
 def build_skipped_diff_analysis_result(scope_id: str, *, reason: str = "") -> dict[str, Any]:

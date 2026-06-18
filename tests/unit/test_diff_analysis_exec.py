@@ -41,6 +41,32 @@ def test_bootstrap_diff_analysis_fails_without_plan(tmp_path, monkeypatch):
     assert "试飞优化方案" in str(result.get("error") or "")
 
 
+def test_bootstrap_diff_analysis_snapshots_upstream_plan(tmp_path, monkeypatch):
+    scope_id = "T-da-3"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    from synapse.rd_meeting.paths import archive_node_dir
+    from synapse.rd_sop.nodes import stage_name_for_id
+
+    stage = stage_name_for_id(4)
+    plan_dir = archive_node_dir(scope_id, stage, "task_feedback")
+    plan_dir.mkdir(parents=True)
+    (plan_dir / "试飞优化方案.md").write_text("# 试飞优化方案\n\n需修复\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.diff_analysis_exec._collect_optimize_orders",
+        lambda *_a, **_k: ([], "", ""),
+    )
+
+    result = bootstrap_diff_analysis("demand", scope_id)
+    assert result["status"] == "failed"
+
+    from synapse.rd_meeting.diff_analysis_inputs import diff_analysis_inputs_dir
+
+    snap = diff_analysis_inputs_dir(scope_id) / "试飞优化方案.md"
+    assert snap.is_file()
+    assert "需修复" in snap.read_text(encoding="utf-8")
+
+
 def test_bootstrap_diff_analysis_skips_when_no_code_change(tmp_path, monkeypatch):
     scope_id = "T-da-2"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")

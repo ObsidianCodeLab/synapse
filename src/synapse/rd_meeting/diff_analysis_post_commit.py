@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
-from synapse.rd_meeting.diff_analysis_panel import (
-    archive_plan_round_before_regen,
-    sync_commit_flight_to_exception_check,
+from synapse.rd_meeting.diff_analysis_inputs import (
+    plan_round_filename,
+    resolve_flight_result_for_regen,
+    resolve_plan_regen_output_path,
+    sync_diff_analysis_commit_result,
 )
-from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_finished, on_diff_analysis_cli_starting
+from synapse.rd_meeting.diff_analysis_panel import archive_plan_round_before_regen
+from synapse.rd_meeting.diff_analysis_rounds import (
+    on_diff_analysis_cli_finished,
+    on_diff_analysis_cli_starting,
+)
 from synapse.rd_meeting.flight_optimize_gate import evaluate_flight_optimize_need
 
 logger = logging.getLogger(__name__)
@@ -24,8 +29,10 @@ async def _run_embedded_flight_plan_host(
     ticket_title: str,
     agent_pool: Any,
     orchestrator: Any,
+    flight_result_path: str,
+    plan_output_path: str,
 ) -> dict[str, Any]:
-    """内嵌调用小鲸执行试飞优化方案技能（不推进 task_feedback 节点）。"""
+    """内嵌调用小鲸执行试飞优化方案技能（不推进 task_feedback 节点、不写上游 archive）。"""
     from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
 
     orch = orchestrator if orchestrator is not None else MeetingRoomOrchestrator()
@@ -33,8 +40,10 @@ async def _run_embedded_flight_plan_host(
         "\n\n## 内嵌任务说明\n"
         "当前处于试飞优化（diff_analysis）环节提交后试飞失败的处理流程。"
         "请调用 **whalecloud-dev-tool-flight-optimize-plan** 技能，"
-        "基于 archive/开发中/exception_check/试飞结果.md 中**最新**试飞结果，"
-        "生成或更新 archive/开发中/task_feedback/试飞优化方案.md。"
+        f"基于 `{flight_result_path}` 中**最新**试飞结果，"
+        f"生成试飞优化方案并落盘至 `{plan_output_path}`。"
+        "**禁止**写入 `task_feedback/` 或 `exception_check/` 目录；"
+        "仅允许写入上述 diff_analysis 本节点路径。"
         "须覆盖全部新的失败项；禁止 submit_hitl_questionnaire。"
         "完成后简要说明已落盘的路径。"
     )
@@ -68,8 +77,9 @@ def handle_diff_analysis_post_commit(
     """提交试飞完成后：通过则保持 done；失败则同步试飞、再生方案并重跑 CLI。"""
     sid = (scope_id or "").strip()
     commit_result = result.get("code_commit") if isinstance(result.get("code_commit"), dict) else {}
+    opt_round = int(result.get("optimization_round") or 1)
     if commit_result:
-        sync_commit_flight_to_exception_check(sid, commit_result)
+        sync_diff_analysis_commit_result(sid, commit_result, round_no=opt_round)
 
     if not result.get("flight_failed"):
         return {"action": "commit_passed", "result": result}
@@ -80,8 +90,10 @@ def handle_diff_analysis_post_commit(
         result["error"] = ""
         return {"action": "commit_passed_no_issues", "result": result}
 
-    opt_round = int(result.get("optimization_round") or 1) + 1
-    archive_plan_round_before_regen(sid, round_no=opt_round - 1)
+    next_plan_round = opt_round + 1
+    archive_plan_round_before_regen(sid, round_no=opt_round)
+    flight_path = resolve_flight_result_for_regen(sid)
+    plan_out = resolve_plan_regen_output_path(sid, next_plan_round)
 
     try:
         host_out = _run_async(
@@ -92,13 +104,18 @@ def handle_diff_analysis_post_commit(
                 ticket_title=ticket_title,
                 agent_pool=agent_pool,
                 orchestrator=orchestrator,
+                flight_result_path=flight_path,
+                plan_output_path=str(plan_out),
             )
         )
     except Exception as exc:
         logger.exception("embedded flight plan host failed scope=%s: %s", sid, exc)
         return {"action": "plan_regen_failed", "error": str(exc), "result": result}
 
-    from synapse.rd_meeting.diff_analysis_exec import bootstrap_diff_analysis, render_diff_analysis_report_markdown
+    from synapse.rd_meeting.diff_analysis_exec import (
+        bootstrap_diff_analysis,
+        render_diff_analysis_report_markdown,
+    )
     from synapse.rd_meeting.room_skill import load_reprocess_reason
 
     on_diff_analysis_cli_starting(sid, reason="提交后试飞仍有问题，按最新试飞优化方案自动重跑修复")
@@ -109,7 +126,7 @@ def handle_diff_analysis_post_commit(
     )
     on_diff_analysis_cli_finished(sid, cli_result)
     cli_result = dict(cli_result)
-    cli_result["optimization_round"] = opt_round
+    cli_result["optimization_round"] = next_plan_round
     if str(cli_result.get("commit_phase") or "") == "await_confirm":
         cli_result["flight_failed"] = False
         cli_result["error"] = ""
@@ -123,4 +140,7 @@ def handle_diff_analysis_post_commit(
         "host": host_out,
         "result": cli_result,
         "report_body": render_diff_analysis_report_markdown(cli_result),
+        "plan_round": next_plan_round,
+        "plan_path": str(plan_out),
+        "plan_filename": plan_round_filename(next_plan_round),
     }

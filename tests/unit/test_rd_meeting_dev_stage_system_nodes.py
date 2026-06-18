@@ -109,8 +109,73 @@ def test_downstream_advance_not_blocked_for_dev_cli_nodes():
 
     assert not downstream_advance_block_reason("task_feedback")
     assert not downstream_advance_block_reason("diff_analysis")
+    assert downstream_advance_block_reason("env_start")
     assert next_node_id("task_feedback") == "diff_analysis"
     assert next_node_id("diff_analysis") == "env_start"
+
+
+def test_on_node_complete_blocks_on_disabled_checkpoint_in_skip_chain(monkeypatch):
+    """配置关闭的 env_start 在跳过链上仍触发 NODE_DOWNSTREAM_ADVANCE_BLOCKED。"""
+    from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
+    from synapse.rd_meeting.orchestrator import MeetingRoomOrchestrator
+    from synapse.rd_meeting.room_runtime import default_room_state, load_room_state, save_room_state
+
+    scope_id = "skip-chain-env-start-gate"
+    save_dev_status(
+        scope_id,
+        {
+            "scope_type": "demand",
+            "scope_id": scope_id,
+            "stage_id": 4,
+            "current_node_id": "diff_analysis",
+            "local_process_state": "处理中",
+        },
+    )
+    save_room_state(
+        scope_id,
+        default_room_state(
+            room_id="room-skip-gate",
+            scope_type="demand",
+            scope_id=scope_id,
+            stage_id=4,
+            current_node_id="diff_analysis",
+            status="processing",
+        ),
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.orchestrator.set_phase", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.orchestrator.schedule_human_intervention_notify",
+        lambda **_k: None,
+    )
+
+    def _binding(*_a, **kw):
+        nid = str(kw.get("node_id") or (_a[0] if _a else ""))
+        enabled = nid != "env_start"
+        return {"enabled": enabled, "host_profile_id": "default", "worker_profile_ids": []}
+
+    monkeypatch.setattr("synapse.rd_meeting.orchestrator.resolve_node_binding", _binding)
+
+    orch = MeetingRoomOrchestrator()
+    out = orch.on_node_complete(
+        scope_type="demand",
+        scope_id=scope_id,
+        room_id="room-skip-gate",
+        node_id="diff_analysis",
+        advance=True,
+        schedule_pipeline_advance=False,
+        sync_userwork=False,
+    )
+
+    assert out.get("next_node_id") is None
+    dev = load_dev_status(scope_id) or {}
+    assert dev.get("current_node_id") == "diff_analysis"
+    assert dev.get("local_process_state") == "待人工"
+    rs = load_room_state(scope_id) or {}
+    assert rs.get("downstream_blocked") is True
+    assert rs.get("intervention_kind") == "result_confirm"
+    pending = rs.get("pending_delivery") or {}
+    assert pending.get("downstream_checkpoint_node_id") == "env_start"
 
 
 def test_on_node_complete_clears_stale_downstream_block_on_advance(monkeypatch):

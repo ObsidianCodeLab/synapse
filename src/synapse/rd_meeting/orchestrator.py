@@ -89,6 +89,7 @@ from synapse.rd_meeting.validation import (
 )
 from synapse.rd_sop.manifest import (
     downstream_advance_block_reason,
+    first_downstream_block_in_nodes,
     next_node_id,
     node_output_artifacts,
 )
@@ -630,8 +631,10 @@ class MeetingRoomOrchestrator:
         if downstream_block_reason and requested_advance:
             advance = False
 
+        checkpoint_node_id = ""
         if advance:
             next_id = next_node_id(node_id)
+            skipped_ahead: list[str] = []
             if next_id:
                 next_id, skipped_ahead = _skip_disabled_nodes_forward(
                     next_id,
@@ -647,6 +650,19 @@ class MeetingRoomOrchestrator:
                         skipped_ahead,
                         next_id,
                     )
+                cleared_checkpoints = {
+                    str(x).strip()
+                    for x in (room_state.get("downstream_checkpoints_cleared") or [])
+                    if str(x).strip()
+                }
+                pending_skip = [
+                    nid for nid in skipped_ahead if nid not in cleared_checkpoints
+                ]
+                hit = first_downstream_block_in_nodes(pending_skip)
+                if hit:
+                    checkpoint_node_id, downstream_block_reason = hit
+                    advance = False
+                    next_id = None
             if next_id:
                 dev["current_node_id"] = next_id
                 dev["stage_id"] = stage_id_for_node_id(next_id)
@@ -688,6 +704,8 @@ class MeetingRoomOrchestrator:
             pending.setdefault("stage_id", stage_id_for_node_id(node_id))
             pending.setdefault("tokens_used", archived_tokens)
             pending.setdefault("duration_seconds", archived_seconds)
+            if checkpoint_node_id:
+                pending["downstream_checkpoint_node_id"] = checkpoint_node_id
             if not pending.get("review_payload"):
                 from synapse.rd_meeting.node_review import load_node_review
 
@@ -2579,6 +2597,16 @@ class MeetingRoomOrchestrator:
 
         rs = load_room_state(sid) or {}
         rs = dict(rs)
+        checkpoint_nid = str(pending.get("downstream_checkpoint_node_id") or "").strip()
+        if checkpoint_nid:
+            cleared = [
+                str(x).strip()
+                for x in (rs.get("downstream_checkpoints_cleared") or [])
+                if str(x).strip()
+            ]
+            if checkpoint_nid not in cleared:
+                cleared.append(checkpoint_nid)
+            rs["downstream_checkpoints_cleared"] = cleared
         rs.pop("pending_delivery", None)
         rs.pop("downstream_blocked", None)
         rs.pop("downstream_block_reason", None)

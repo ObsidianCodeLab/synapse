@@ -297,3 +297,24 @@ def test_save_task_exec_code_diff_file_rejects_deleted(tmp_path: Path, monkeypat
 
     with pytest.raises(ValueError, match="code_diff_deleted_not_editable"):
         save_task_exec_code_diff_file(scope_id, "T-1:App.py", "noop\n")
+
+
+def test_decode_git_quoted_path_unicode() -> None:
+    from synapse.rd_meeting.task_exec_code_diff import (
+        _parse_status_paths,
+        decode_git_quoted_path,
+        normalize_repo_rel_path,
+    )
+
+    octal_name = (
+        "\\345\\215\\225\\345\\205\\203\\346\\265\\213\\350\\257\\225"
+        "\\347\\224\\250\\344\\276\\213\\345\\210\\227\\350\\241\\250.md"
+    )
+    quoted = f'"src/tests/{octal_name}"'
+    decoded = decode_git_quoted_path(quoted)
+    assert decoded == "src/tests/单元测试用例列表.md"
+    assert normalize_repo_rel_path(quoted) == "src/tests/单元测试用例列表.md"
+
+    status_out = f'?? {quoted}\n'
+    rows = _parse_status_paths(status_out)
+    assert rows == [("added", "src/tests/单元测试用例列表.md")]

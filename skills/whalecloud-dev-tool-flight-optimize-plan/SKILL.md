@@ -14,6 +14,7 @@ label: 试飞优化方案
 
 - 研发会议室 `task_feedback`（试飞方案）节点；
 - 前序 `exception_check` 已产出 `试飞结果.md`（必需）；
+- **试飞优化内嵌再生**（`diff_analysis` 提交后试飞仍失败）：见下方「试飞优化内嵌模式」；
 - 由**浩鲸产品研发专家**（`whalecloud-rd-expert`）执行本技能。
 
 ## 研发会议室：工单目录读文档
@@ -27,7 +28,19 @@ label: 试飞优化方案
 | 代码提交日志 | `{WORK_ORDER_DIR}/archive/开发中/exception_check/代码提交日志.md` |
 | 函数级方案 | `{WORK_ORDER_DIR}/archive/需求设计/func_solution/函数级方案.md` |
 | 任务执行记录 | `{WORK_ORDER_DIR}/archive/开发中/task_exec/任务执行记录.md` |
-| **本节点产出** | `{WORK_ORDER_DIR}/archive/开发中/task_feedback/试飞优化方案.md` |
+| **试飞方案节点产出** | `{WORK_ORDER_DIR}/archive/开发中/task_feedback/试飞优化方案.md` |
+
+### 试飞优化内嵌模式（diff_analysis）
+
+当内嵌任务说明指定了 **OUTPUT 路径** 时（提交后试飞失败、方案再生）：
+
+| 用途 | 路径约定 |
+|------|----------|
+| **试飞结果（必读）** | 以内嵌说明中的路径为准，通常为 `archive/开发中/diff_analysis/试飞结果_第N轮.md` 或 `diff_analysis/inputs/试飞结果.md` |
+| **本节点产出** | 以内嵌说明为准，通常为 `archive/开发中/diff_analysis/试飞优化方案_第N轮.md` |
+| **禁止写入** | `task_feedback/`、`exception_check/` — 上游节点产物不可变 |
+
+试飞优化 CLI 读取方案时优先：`diff_analysis/试飞优化方案_第N轮.md` > `diff_analysis/inputs/试飞优化方案.md`（启动节点时自上游快照）。
 
 ---
 

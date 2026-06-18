@@ -1,5 +1,7 @@
 """diff_analysis_panel 单元测试。"""
 
+import pytest
+
 from synapse.rd_meeting.diff_analysis_panel import extract_markdown_section, extract_plan_items
 
 

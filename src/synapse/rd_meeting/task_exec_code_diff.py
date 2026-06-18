@@ -29,8 +29,55 @@ _TEST_FILE_RE = re.compile(
 )
 
 
+_GIT_OCTAL_ESCAPE_RE = re.compile(r"\\([0-7]{3})")
+
+
+def _unescape_git_quoted_body(body: str) -> str:
+    """解码 git status/diff 引号路径中的 C 风格转义（含 \\ddd 八进制 UTF-8 字节）。"""
+    raw = str(body or "")
+    if not raw:
+        return ""
+    out = bytearray()
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch != "\\" or i + 1 >= len(raw):
+            out.extend(ch.encode("utf-8"))
+            i += 1
+            continue
+        nxt = raw[i + 1]
+        if nxt in "01234567" and i + 3 < len(raw) and raw[i + 2] in "01234567" and raw[i + 3] in "01234567":
+            out.append(int(raw[i + 1 : i + 4], 8))
+            i += 4
+            continue
+        escape_map = {"n": ord("\n"), "t": ord("\t"), "b": ord("\b"), "r": ord("\r"), "\\": ord("\\"), '"': ord('"')}
+        if nxt in escape_map:
+            out.append(escape_map[nxt])
+            i += 2
+            continue
+        out.extend(ch.encode("utf-8"))
+        i += 1
+    try:
+        return out.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw
+
+
+def decode_git_quoted_path(path: str) -> str:
+    """解析 git porcelain 中带引号或八进制转义的路径（须在替换反斜杠之前调用）。"""
+    raw = str(path or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith('"') and raw.endswith('"') and len(raw) >= 2:
+        return _unescape_git_quoted_body(raw[1:-1])
+    if "\\" in raw and _GIT_OCTAL_ESCAPE_RE.search(raw):
+        return _unescape_git_quoted_body(raw)
+    return raw
+
+
 def normalize_repo_rel_path(path: str) -> str:
-    return PurePosixPath(str(path or "").replace("\\", "/")).as_posix().lstrip("./")
+    decoded = decode_git_quoted_path(path)
+    return PurePosixPath(decoded.replace("\\", "/")).as_posix().lstrip("./")
 
 
 def is_test_file(rel_path: str) -> bool:

@@ -153,13 +153,25 @@ def is_human_only_node(node_id: str) -> bool:
 
 
 # 节点完成后暂不推进下游（原因 → 展示/落盘）；用于下游 SOP 尚未就绪的临时门控。
-# 试飞优化（diff_analysis）由 CLI 评审面板（task_exec gate）门控，不在此重复阻断。
-NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {}
+# 配置在 manifest 的节点：正常完成时阻断；配置关闭被跳过时也会在 on_node_complete 跳过链上拦截。
+# 试飞优化（diff_analysis）由 CLI 评审面板门控，不在此重复阻断。
+NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {
+    "env_start": "任务检查检查点：确认后再继续下游 SOP",
+}
 
 
 def downstream_advance_block_reason(node_id: str) -> str:
     """若该节点完成后应阻断 SOP 推进，返回原因文案；否则为空。"""
     return NODE_DOWNSTREAM_ADVANCE_BLOCKED.get((node_id or "").strip(), "").strip()
+
+
+def first_downstream_block_in_nodes(node_ids: list[str]) -> tuple[str, str] | None:
+    """在节点 id 列表中找首个命中下游门控的节点，返回 (node_id, reason)。"""
+    for nid in node_ids:
+        reason = downstream_advance_block_reason(nid)
+        if reason:
+            return nid, reason
+    return None
 
 
 # 节点产出文档（只读展示；归档路径 archive/<stage_name>/<node_id>/）
@@ -182,7 +194,7 @@ NODE_OUTPUTS: dict[str, list[str]] = {
     "task_exec": ["任务执行记录.md"],
     "exception_check": ["代码提交日志.md", "试飞结果.md"],
     "task_feedback": ["试飞优化方案.md"],
-    "diff_analysis": ["试飞优化执行记录.md"],
+    "diff_analysis": ["试飞优化执行记录.md", "inputs/试飞优化方案.md", "inputs/试飞结果.md", "试飞结果_第N轮.md", "试飞优化方案_第N轮.md"],
     "env_start": ["任务检查报告.md"],
     "unit_test": ["测试案例说明.md"],
     "dev_process_review": ["开发流程评审.md"],
@@ -306,7 +318,13 @@ NODE_PRIOR_OUTPUT_RULES: dict[str, list[dict[str, Any]]] = {
             "source_node_id": "task_feedback",
             "artifacts": ["试飞优化方案.md"],
             "use_mode": "flow_required",
-            "note": "试飞优化须依据已评估的试飞优化方案",
+            "note": "启动试飞优化时快照至 diff_analysis/inputs/，本节点只读引用",
+        },
+        {
+            "source_node_id": "exception_check",
+            "artifacts": ["试飞结果.md", "代码提交日志.md"],
+            "use_mode": "flow_required",
+            "note": "启动试飞优化时快照至 diff_analysis/inputs/，首次试飞只读引用",
         },
     ],
     "env_start": [
@@ -318,9 +336,9 @@ NODE_PRIOR_OUTPUT_RULES: dict[str, list[dict[str, Any]]] = {
         },
         {
             "source_node_id": "diff_analysis",
-            "artifacts": ["试飞优化执行记录.md"],
+            "artifacts": ["试飞优化执行记录.md", "试飞结果_第N轮.md"],
             "use_mode": "flow_required",
-            "note": "任务检查须分析试飞优化产出",
+            "note": "任务检查须分析试飞优化产出及本节点提交后试飞结果",
         },
         {
             "source_node_id": "exception_check",

@@ -1680,12 +1680,10 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             build_skipped_diff_analysis_result,
             evaluate_flight_optimize_need,
             persist_skipped_diff_analysis,
-            write_skipped_flight_optimize_plan,
         )
 
         optimize_need = evaluate_flight_optimize_need(sid)
         if optimize_need == "not_needed":
-            write_skipped_flight_optimize_plan(sid, reason="代码提交试飞已全部通过")
             skip_result = build_skipped_diff_analysis_result(sid, reason="代码提交试飞已全部通过")
             persist_skipped_diff_analysis(sid, skip_result)
             append_history_event(

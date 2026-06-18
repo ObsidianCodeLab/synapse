@@ -6,9 +6,18 @@ import re
 from pathlib import Path
 from typing import Any
 
-from synapse.rd_meeting.diff_analysis_exec import PLAN_FILENAME, PLAN_NODE_ID
+from synapse.rd_meeting.diff_analysis_inputs import (
+    INPUT_PLAN_FILENAME,
+    diff_analysis_inputs_dir,
+    ensure_diff_analysis_input_snapshots,
+    list_plan_round_paths,
+    read_diff_analysis_input_flight,
+    read_diff_analysis_plan,
+    resolve_latest_flight_round,
+    sync_diff_analysis_commit_result,
+)
 from synapse.rd_meeting.flight_optimize_gate import evaluate_flight_optimize_need
-from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
+from synapse.rd_meeting.paths import archive_node_dir
 from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json
 from synapse.rd_meeting.system_node_display import (
     _load_pipeline_context_asset,
@@ -143,13 +152,15 @@ def _section_with_plan_items(
 
 
 def list_optimize_plan_sections(scope_id: str) -> list[dict[str, Any]]:
-    """各轮试飞优化方案的「优化研发计划」章节。"""
+    """各轮试飞优化方案的「优化研发计划」章节（读本节点 archive，不读 task_feedback）。"""
     sid = (scope_id or "").strip()
     sections: list[dict[str, Any]] = []
+    seen_sources: set[str] = set()
 
     for item in _plan_rounds_from_context(sid):
         rnd = int(item.get("round") or 0)
         md = str(item.get("markdown") or item.get("plan_md") or "").strip()
+        source = str(item.get("source") or "")
         section = extract_markdown_section(md, PLAN_SECTION_HEADING) if md else ""
         if section or extract_plan_items(md)[1]:
             sections.append(
@@ -157,36 +168,53 @@ def list_optimize_plan_sections(scope_id: str) -> list[dict[str, Any]]:
                     round_no=rnd,
                     title=f"第 {rnd} 轮修复建议" if rnd > 1 else "修复建议",
                     md=md,
-                    source=str(item.get("source") or ""),
+                    source=source,
                 )
             )
+            if source:
+                seen_sources.add(source)
 
-    current_path = archive_node_dir(sid, DEV_STAGE_NAME, PLAN_NODE_ID) / PLAN_FILENAME
-    current_md = _read_text(current_path)
-    current_round = max((s["round"] for s in sections), default=0) + 1
-    if current_md:
-        already = any(str(s.get("source") or "") == str(current_path) for s in sections)
-        if not already:
-            section = extract_markdown_section(current_md, PLAN_SECTION_HEADING)
-            if section or extract_plan_items(current_md)[1]:
-                sections.append(
-                    _section_with_plan_items(
-                        round_no=current_round,
-                        title="修复建议" if current_round <= 1 else f"第 {current_round} 轮修复建议",
-                        md=current_md,
-                        source=str(current_path),
-                    )
+    ensure_diff_analysis_input_snapshots(sid)
+    inputs_plan = diff_analysis_inputs_dir(sid) / INPUT_PLAN_FILENAME
+    inputs_md = _read_text(inputs_plan)
+    if inputs_md and str(inputs_plan) not in seen_sources:
+        if extract_markdown_section(inputs_md, PLAN_SECTION_HEADING) or extract_plan_items(inputs_md)[1]:
+            sections.append(
+                _section_with_plan_items(
+                    round_no=1,
+                    title="修复建议",
+                    md=inputs_md,
+                    source=str(inputs_plan),
                 )
+            )
+            seen_sources.add(str(inputs_plan))
+
+    for rnd, path in list_plan_round_paths(sid):
+        src = str(path)
+        if src in seen_sources:
+            continue
+        md = _read_text(path)
+        if not md.strip():
+            continue
+        if extract_markdown_section(md, PLAN_SECTION_HEADING) or extract_plan_items(md)[1]:
+            sections.append(
+                _section_with_plan_items(
+                    round_no=rnd,
+                    title="修复建议" if rnd <= 1 else f"第 {rnd} 轮修复建议",
+                    md=md,
+                    source=src,
+                )
+            )
+            seen_sources.add(src)
 
     sections.sort(key=lambda x: int(x.get("round") or 0))
     return sections
 
 
 def _latest_plan_markdown(scope_id: str) -> str:
-    """当前试飞优化方案全文（优先磁盘最新，其次 context 归档）。"""
+    """当前试飞优化方案全文（本节点 inputs / 各轮方案 / context 归档）。"""
     sid = (scope_id or "").strip()
-    path = archive_node_dir(sid, DEV_STAGE_NAME, PLAN_NODE_ID) / PLAN_FILENAME
-    md = _read_text(path)
+    _path, md = read_diff_analysis_plan(sid)
     if md.strip():
         return md
     rounds = _plan_rounds_from_context(sid)
@@ -205,7 +233,17 @@ def resolve_identified_issues_markdown(scope_id: str) -> str | None:
     return text or None
 
 
+def _load_diff_analysis_commit_assets(scope_id: str) -> dict[str, Any]:
+    assets = _load_pipeline_context_asset(scope_id, "diff_analysis_commit_assets")
+    return dict(assets) if isinstance(assets, dict) else {}
+
+
 def _initial_code_commit_display(scope_id: str) -> dict[str, Any] | None:
+    da_assets = _load_diff_analysis_commit_assets(scope_id)
+    if da_assets:
+        display = build_code_commit_display(da_assets)
+        if isinstance(display, dict):
+            return display
     assets = _load_code_commit_assets(scope_id)
     if not assets:
         return None
@@ -217,34 +255,41 @@ def resolve_flight_key_content(
     scope_id: str,
     payload: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """试飞优化关键内容：优先 diff_analysis 提交后试飞，否则代码提交节点首次试飞。"""
+    """试飞优化关键内容：优先本节点提交后试飞，否则 inputs 首次试飞快照。"""
     sid = (scope_id or "").strip()
     data = payload if isinstance(payload, dict) else {}
     commit_phase = str(data.get("commit_phase") or "").strip()
     code_commit = data.get("code_commit") if isinstance(data.get("code_commit"), dict) else None
 
     display: dict[str, Any] | None = None
-    source = "exception_check"
+    source = "diff_analysis_inputs"
     round_no = 1
 
     if code_commit and commit_phase in ("running", "done"):
         nested = code_commit.get("display")
-        if isinstance(nested, dict):
-            display = nested
-        else:
-            display = build_code_commit_display(code_commit)
+        display = nested if isinstance(nested, dict) else build_code_commit_display(code_commit)
         source = "diff_analysis_commit"
-        rounds = _plan_rounds_from_context(sid)
-        round_no = max((int(r.get("round") or 0) for r in rounds), default=0) + 1
+        try:
+            round_no = int(code_commit.get("optimization_round") or data.get("optimization_round") or 0)
+        except (TypeError, ValueError):
+            round_no = 0
+        if round_no <= 0:
+            rnd, _path = resolve_latest_flight_round(sid)
+            round_no = rnd if rnd > 0 else 1
         if commit_phase == "done":
             round_no = max(round_no, int(data.get("optimization_round") or 1))
     else:
         display = _initial_code_commit_display(sid)
+        if display:
+            source = "diff_analysis_commit" if _load_diff_analysis_commit_assets(sid) else "exception_check"
 
     if not display:
-        archive_text = _read_text(
-            archive_node_dir(sid, DEV_STAGE_NAME, "exception_check") / "试飞结果.md"
-        )
+        _path, archive_text = read_diff_analysis_input_flight(sid)
+        if not archive_text.strip():
+            archive_text = _read_text(
+                archive_node_dir(sid, DEV_STAGE_NAME, "exception_check") / "试飞结果.md"
+            )
+            source = "exception_check"
         return {
             "round": round_no,
             "source": source,
@@ -259,7 +304,9 @@ def resolve_flight_key_content(
 
     from synapse.rd_meeting.code_commit_assets import format_flight_result_report
 
-    assets_for_md = code_commit if code_commit else _load_code_commit_assets(sid)
+    assets_for_md = code_commit if code_commit else (
+        _load_diff_analysis_commit_assets(sid) or _load_code_commit_assets(sid)
+    )
     markdown = ""
     if isinstance(assets_for_md, dict) and assets_for_md:
         markdown = format_flight_result_report(assets_for_md, node_name="试飞结果").strip()
@@ -289,10 +336,8 @@ def build_optimize_comment_hint(scope_id: str, payload: dict[str, Any] | None) -
     if not body:
         return ""
 
-    problem_section = extract_markdown_section(
-        _read_text(archive_node_dir(scope_id, DEV_STAGE_NAME, PLAN_NODE_ID) / PLAN_FILENAME),
-        "已识别问题清单",
-    )
+    _plan_path, plan_full = read_diff_analysis_plan(scope_id)
+    problem_section = extract_markdown_section(plan_full, "已识别问题清单")
     parts: list[str] = []
     if problem_section:
         parts.append(problem_section)
@@ -309,8 +354,7 @@ def archive_plan_round_before_regen(scope_id: str, *, round_no: int) -> None:
         raw = {}
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
 
-    plan_path = archive_node_dir(sid, DEV_STAGE_NAME, PLAN_NODE_ID) / PLAN_FILENAME
-    plan_md = _read_text(plan_path)
+    plan_path, plan_md = read_diff_analysis_plan(sid)
     if not plan_md.strip():
         return
 
@@ -322,7 +366,7 @@ def archive_plan_round_before_regen(scope_id: str, *, round_no: int) -> None:
             "round": round_no,
             "markdown": plan_md,
             "plan_md": plan_md,
-            "source": str(plan_path),
+            "source": plan_path or str(diff_analysis_inputs_dir(sid) / INPUT_PLAN_FILENAME),
             "archived_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
         }
     )
@@ -334,17 +378,5 @@ def archive_plan_round_before_regen(scope_id: str, *, round_no: int) -> None:
 
 
 def sync_commit_flight_to_exception_check(scope_id: str, commit_result: dict[str, Any]) -> None:
-    """将 diff_analysis 提交后的试飞结果写回 exception_check 归档，供方案技能读取。"""
-    from synapse.rd_meeting.code_commit_assets import write_flight_result_archive
-
-    if not isinstance(commit_result, dict):
-        return
-    write_flight_result_archive(scope_id, DEV_STAGE_NAME, commit_result)
-    raw = read_meeting_pipeline_json(scope_id)
-    if isinstance(raw, dict):
-        ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
-        ctx["code_commit_assets"] = commit_result
-        raw["context"] = ctx
-        from synapse.rd_meeting.room_runtime import save_meeting_pipeline
-
-        save_meeting_pipeline(scope_id, raw)
+    """已废弃：试飞优化提交结果写入本节点 archive（保留别名避免旧引用中断）。"""
+    sync_diff_analysis_commit_result(scope_id, commit_result)

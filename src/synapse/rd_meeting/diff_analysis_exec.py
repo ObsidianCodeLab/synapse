@@ -22,7 +22,12 @@ from synapse.rd_meeting.cli_tools import (
 )
 from synapse.rd_meeting.config_store import load_meeting_room_config
 from synapse.rd_meeting.cursor_agent_cli import check_cursor_agent_cli
-from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
+from synapse.rd_meeting.diff_analysis_inputs import (
+    INPUT_PLAN_FILENAME,
+    ensure_diff_analysis_input_snapshots,
+    read_diff_analysis_plan,
+)
+from synapse.rd_meeting.paths import archive_node_dir
 from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
 from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import (
@@ -44,8 +49,7 @@ NODE_ID = "diff_analysis"
 DEV_STAGE_NAME = stage_name_for_id(4)
 RESULT_JSON = "diff_analysis_result.json"
 REPORT_MD = "试飞优化执行记录.md"
-PLAN_NODE_ID = "task_feedback"
-PLAN_FILENAME = "试飞优化方案.md"
+PLAN_FILENAME = INPUT_PLAN_FILENAME
 
 ScopeType = Literal["demand", "task"]
 
@@ -121,13 +125,7 @@ def _persist_state(scope_id: str, result_doc: dict[str, Any]) -> None:
 
 
 def _read_flight_optimize_plan(scope_id: str) -> tuple[str, str]:
-    path = archive_node_dir(scope_id, DEV_STAGE_NAME, PLAN_NODE_ID) / PLAN_FILENAME
-    if not path.is_file():
-        return "", ""
-    try:
-        return str(path), path.read_text(encoding="utf-8")
-    except OSError:
-        return str(path), ""
+    return read_diff_analysis_plan(scope_id)
 
 
 def _plan_requires_code_change(plan_md: str) -> bool:
@@ -499,11 +497,12 @@ def bootstrap_diff_analysis(
             "tasks": [],
         }
 
+    ensure_diff_analysis_input_snapshots(sid)
     plan_path, plan_md = _read_flight_optimize_plan(sid)
     if not plan_md.strip():
         return {
             "status": "failed",
-            "error": f"未找到试飞优化方案，请先完成试飞方案节点并落盘 {PLAN_FILENAME}",
+            "error": f"未找到试飞优化方案，请先完成试飞方案节点并落盘 {PLAN_FILENAME}（或 diff_analysis/inputs/ 快照）",
             "cli_tool": tool,
             "tasks": [],
         }
@@ -914,6 +913,13 @@ def trigger_diff_analysis_code_commit(
         overall = "failed" if flight_failed else "ok"
 
     finished_at = datetime.now().isoformat(timespec="seconds")
+    try:
+        opt_round = int(result_doc.get("optimization_round") or 1)
+    except (TypeError, ValueError):
+        opt_round = 1
+    if isinstance(commit_result, dict):
+        commit_result = dict(commit_result)
+        commit_result["optimization_round"] = opt_round
     result_doc.update(
         {
             "commit_phase": "done",
@@ -921,6 +927,7 @@ def trigger_diff_analysis_code_commit(
             "status": overall,
             "code_commit": commit_result,
             "flight_failed": flight_failed,
+            "optimization_round": opt_round,
             "error": (
                 str(commit_result.get("error") or flight.get("error") or "试飞仍未通过，不允许推进节点")
                 if flight_failed
