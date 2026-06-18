@@ -7,6 +7,7 @@ import re
 import socket
 import threading
 import time
+import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -2277,6 +2278,176 @@ def _filter_up_alarm_details(raw_list: object) -> list[dict]:
     return alarms
 
 
+_CPPCHECK_XML_PATTERN = re.compile(r"CppCheck.*\.xml", re.IGNORECASE)
+
+
+def _is_cppcheck_ci_node(node: dict) -> bool:
+    name_en = str(node.get("nodeNameEn") or "").strip().upper()
+    if name_en == "CPPCHECK":
+        return True
+    if str(node.get("nodeTypeId") or "").strip() == "24":
+        return True
+    return "CPPCHECK" in str(node.get("nodeName") or "").upper()
+
+
+def _normalize_cppcheck_attachment_url(url: str) -> str:
+    text = (url or "").strip().rstrip(",")
+    if not text:
+        return ""
+    if text.startswith("http://") or text.startswith("https://"):
+        return text
+    if text.startswith("/"):
+        return f"{DEV_IWHALECLOUD_BASE_URL}{text}"
+    return f"{DEV_IWHALECLOUD_BASE_URL}/{text.lstrip('/')}"
+
+
+def _find_cppcheck_xml_url(node: dict) -> str:
+    attachments = node.get("attachments") or []
+    if not isinstance(attachments, list):
+        return ""
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        for key in ("fullPath", "path"):
+            candidate = _normalize_cppcheck_attachment_url(str(att.get(key) or ""))
+            if candidate and _CPPCHECK_XML_PATTERN.search(candidate):
+                return candidate
+    return ""
+
+
+def _cppcheck_basename(path: str) -> str:
+    return path.replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _path_matches_cppcheck_file(target: str, candidate: str) -> bool:
+    a = target.replace("\\", "/").strip().lower()
+    b = candidate.replace("\\", "/").strip().lower()
+    if not a or not b:
+        return False
+    if a == b or a.endswith("/" + b) or b.endswith("/" + a):
+        return True
+    return _cppcheck_basename(a) == _cppcheck_basename(b)
+
+
+def _parse_cppcheck_xml(xml_text: str) -> list[dict]:
+    """解析 CppCheck XML，返回扁平 issue 列表。"""
+    if not (xml_text or "").strip():
+        return []
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as exc:
+        logger.warning("CppCheck XML 解析失败: %s", exc)
+        return []
+
+    issues: list[dict] = []
+    for err in root.iter("error"):
+        rule_id = str(err.get("id") or "").strip()
+        severity = str(err.get("severity") or "").strip()
+        message = str(err.get("verbose") or err.get("msg") or "").strip()
+        for loc in err.findall("location"):
+            file_name = str(loc.get("file") or "").strip()
+            if not file_name:
+                continue
+            line_raw = loc.get("line")
+            column_raw = loc.get("column")
+            try:
+                line = int(line_raw) if line_raw is not None else None
+            except (TypeError, ValueError):
+                line = None
+            try:
+                column = int(column_raw) if column_raw is not None else None
+            except (TypeError, ValueError):
+                column = None
+            issues.append(
+                {
+                    "ruleId": rule_id,
+                    "severity": severity,
+                    "message": message,
+                    "line": line,
+                    "column": column,
+                    "file": file_name,
+                }
+            )
+    return issues
+
+
+def _match_cppcheck_issues_for_file(
+    errors: list[dict],
+    file_name: str,
+    *,
+    severity: str = "error",
+) -> list[dict]:
+    severity_filter = severity.strip().lower()
+    matched: list[dict] = []
+    for err in errors:
+        if severity_filter and str(err.get("severity") or "").strip().lower() != severity_filter:
+            continue
+        if _path_matches_cppcheck_file(file_name, str(err.get("file") or "")):
+            matched.append(
+                {
+                    "line": err.get("line"),
+                    "column": err.get("column"),
+                    "ruleId": err.get("ruleId"),
+                    "severity": err.get("severity"),
+                    "message": err.get("message"),
+                }
+            )
+    return matched
+
+
+async def _load_cppcheck_errors(
+    xml_url: str,
+    *,
+    csrf: str = "",
+    cookies: str = "",
+    cache: dict[str, list[dict]] | None = None,
+) -> list[dict]:
+    url = (xml_url or "").strip()
+    if not url:
+        return []
+    if cache is not None and url in cache:
+        return cache[url]
+    xml_text = await _fetch_url_text(url, csrf=csrf, cookies=cookies)
+    errors = _parse_cppcheck_xml(xml_text) if xml_text else []
+    if cache is not None:
+        cache[url] = errors
+    return errors
+
+
+async def _enrich_cppcheck_code_check_entry(
+    node: dict,
+    entry: dict,
+    *,
+    csrf: str = "",
+    cookies: str = "",
+    cache: dict[str, list[dict]] | None = None,
+) -> None:
+    xml_url = _find_cppcheck_xml_url(node)
+    if not xml_url:
+        logger.warning("CPPCHECK 节点未找到 XML 附件: %s", node.get("nodeName"))
+        return
+
+    errors = await _load_cppcheck_errors(xml_url, csrf=csrf, cookies=cookies, cache=cache)
+    if not errors:
+        logger.warning("CppCheck XML 无有效错误记录: %s", xml_url)
+        return
+
+    alarms = entry.get("alarms")
+    if not isinstance(alarms, list):
+        return
+
+    for alarm in alarms:
+        if not isinstance(alarm, dict):
+            continue
+        file_name = str(alarm.get("fileName") or "").strip()
+        if not file_name:
+            alarm["issues"] = []
+            continue
+        alarm["issues"] = _match_cppcheck_issues_for_file(errors, file_name)
+
+    entry["resultMsg"] = _format_code_check_result_msg(entry.get("nodeStateDesc"), alarms)
+
+
 def _format_alarm_ccn_text(alarm: dict) -> str:
     ccn = alarm.get("ccnCount")
     bench = alarm.get("benchmarkCcnCount")
@@ -2287,9 +2458,31 @@ def _format_alarm_ccn_text(alarm: dict) -> str:
     return ""
 
 
+def _format_cppcheck_issue_text(alarm: dict, issue: dict) -> str:
+    file_name = _cppcheck_basename(str(alarm.get("fileName") or ""))
+    line = issue.get("line")
+    rule_id = str(issue.get("ruleId") or "").strip()
+    message = str(issue.get("message") or "").strip()
+    location = f"{file_name}:{line}" if line is not None else file_name
+    parts = [location]
+    if rule_id:
+        parts.append(rule_id)
+    if message:
+        parts.append(f"— {message}")
+    return " ".join(parts)
+
+
 def _format_code_check_result_msg(node_state_desc: object, alarms: list[dict]) -> str:
     lines = [str(node_state_desc).strip()]
     for alarm in alarms:
+        issues = alarm.get("issues")
+        if isinstance(issues, list) and issues:
+            for issue in issues:
+                if isinstance(issue, dict):
+                    detail = _format_cppcheck_issue_text(alarm, issue)
+                    if detail:
+                        lines.append(detail)
+            continue
         file_name = str(alarm.get("fileName") or "").strip()
         function_name = str(alarm.get("functionName") or "").strip()
         ccn_text = _format_alarm_ccn_text(alarm)
@@ -2472,6 +2665,7 @@ async def _format_ci_build_result_entries(nodes: list[dict], *, ci_flow_inst_id:
             logger.warning("format_ci_build_result_entries: 研发云未登录，跳过代码检查明细")
             return entries
 
+    cppcheck_cache: dict[str, list[dict]] = {}
     for step_zcm_id in _collect_code_check_step_zcm_ids(nodes):
         detail_nodes = await _get_node_instance_detail_by_step_zcm_id(
             step_zcm_id,
@@ -2480,7 +2674,16 @@ async def _format_ci_build_result_entries(nodes: list[dict], *, ci_flow_inst_id:
             cookies=cookies,
         )
         for node in detail_nodes:
-            _append(_format_code_check_build_entry(node))
+            entry = _format_code_check_build_entry(node)
+            if entry and _is_cppcheck_ci_node(node):
+                await _enrich_cppcheck_code_check_entry(
+                    node,
+                    entry,
+                    csrf=csrf,
+                    cookies=cookies,
+                    cache=cppcheck_cache,
+                )
+            _append(entry)
 
     return entries
 
@@ -2553,7 +2756,22 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
                 "resultMsg": "失败摘要 + 待整改函数列表",
                 "kind": "compile | code_check",
                 "nodeStateDesc": "失败原因（代码检查）",
-                "alarms": [{"fileName": "...", "functionName": "...", "errorArrow": "UP", ...}]
+                "alarms": [
+                    {
+                        "fileName": "...",
+                        "functionName": "...",
+                        "errorArrow": "UP",
+                        "issues": [
+                            {
+                                "line": 1137,
+                                "column": 2,
+                                "ruleId": "deptUnsuggestFunc",
+                                "severity": "error",
+                                "message": "find functions : strcpy/sprintf/vsprintf",
+                            }
+                        ],
+                    }
+                ]
             }
         ]
     }
