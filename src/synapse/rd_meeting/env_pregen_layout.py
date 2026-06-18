@@ -11,6 +11,7 @@ from typing import Any
 from synapse.rd_meeting.paths import (
     archive_node_dir,
     product_doc_root,
+    sandbox_code_dir,
     sandbox_engineering_dir,
 )
 from synapse.rd_sop.nodes import stage_id_for_node_id, stage_name_for_id
@@ -54,6 +55,14 @@ _DEV_SPEC_DEST_NAMES: frozenset[str] = frozenset(
         "PG研发规范.md",
         "Python研发规范.md",
     }
+)
+
+# 与 task_exec_code_diff.should_include_commit_file 排除项对齐
+_GITIGNORE_SECTION_MARKER = "# Synapse R&D local files (env pregen, do not commit)"
+_GITIGNORE_RD_LOCAL_PATTERNS: tuple[str, ...] = (
+    "AGENTS.md",
+    "agents.md",
+    "synapse_archive/",
 )
 
 
@@ -124,14 +133,103 @@ def resolve_engineering_targets(scope_id: str, wire_row: dict[str, Any]) -> list
             continue
         seen.add(key)
         eng = sandbox_engineering_dir(sid, module, code_path)
+        repo_name = str(repo.get("repo_name") or "").strip()
         targets.append(
             {
                 "module": module,
+                "repo_name": repo_name,
                 "code_path": code_path,
                 "engineering_root": str(eng),
             }
         )
     return targets
+
+
+def _resolve_git_repo_root(*paths: Path) -> Path | None:
+    """从候选路径向上解析 git 仓库根（``rev-parse --show-toplevel``）。"""
+    from synapse.rd_meeting.product_assets import _run_git
+
+    for path in paths:
+        if not path or not str(path).strip():
+            continue
+        candidate = Path(path)
+        if not candidate.exists():
+            continue
+        ok, detail = _run_git(
+            ["git", "-C", str(candidate), "rev-parse", "--show-toplevel"],
+            timeout=30.0,
+        )
+        if ok and detail.strip():
+            return Path(detail.strip())
+    return None
+
+
+def _gitignore_contains_pattern(lines: list[str], pattern: str) -> bool:
+    target = pattern.strip().lower()
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.lower() == target:
+            return True
+    return False
+
+
+def ensure_rd_local_gitignore(repo_root: Path) -> dict[str, Any]:
+    """确保仓库 ``.gitignore`` 忽略 ``synapse_archive/`` 与 ``AGENTS.md``。"""
+    entry: dict[str, Any] = {
+        "repo_root": str(repo_root),
+        "path": "",
+        "added": [],
+        "modified": False,
+        "status": "skipped",
+        "error": "",
+    }
+    if not repo_root.is_dir():
+        entry["error"] = "git 仓库根目录不存在"
+        return entry
+
+    git_dir = repo_root / ".git"
+    if not git_dir.exists():
+        entry["error"] = "非 git 仓库"
+        return entry
+
+    ignore_path = repo_root / ".gitignore"
+    entry["path"] = str(ignore_path)
+    existing = ""
+    if ignore_path.is_file():
+        try:
+            existing = ignore_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            entry["status"] = "failed"
+            entry["error"] = str(exc)
+            return entry
+
+    lines = existing.splitlines()
+    missing = [p for p in _GITIGNORE_RD_LOCAL_PATTERNS if not _gitignore_contains_pattern(lines, p)]
+    if not missing:
+        entry["status"] = "ok"
+        return entry
+
+    block_lines = ["", _GITIGNORE_SECTION_MARKER, *missing]
+    new_content = existing
+    if new_content and not new_content.endswith("\n"):
+        new_content += "\n"
+    new_content += "\n".join(block_lines)
+    if not new_content.endswith("\n"):
+        new_content += "\n"
+
+    try:
+        ignore_path.write_text(new_content, encoding="utf-8")
+    except OSError as exc:
+        entry["status"] = "failed"
+        entry["error"] = str(exc)
+        return entry
+
+    entry["added"] = missing
+    entry["modified"] = True
+    entry["status"] = "ok"
+    return entry
 
 
 def _copy_file_to_dest(src: Path, dest: Path) -> bool:
@@ -261,6 +359,7 @@ def bootstrap_engineering_layout(
 
     dev_src = dev_dir or resolve_dev_dir()
     any_ok = False
+    seen_git_roots: set[str] = set()
     for target in targets:
         eng = Path(str(target.get("engineering_root") or ""))
         if not str(eng):
@@ -268,12 +367,45 @@ def bootstrap_engineering_layout(
         eng.mkdir(parents=True, exist_ok=True)
         dev_row = copy_dev_templates_to_engineering(eng, dev_dir=dev_src)
         archive_row = copy_work_order_docs_to_engineering(sid, eng)
+        gitignore_row: dict[str, Any] = {
+            "status": "skipped",
+            "error": "未找到 git 仓库",
+            "path": "",
+            "added": [],
+            "modified": False,
+        }
+        repo_name = str(target.get("repo_name") or "").strip()
+        git_candidates: list[Path] = [eng]
+        if repo_name:
+            git_candidates.append(sandbox_code_dir(sid, repo_name))
+        git_root = _resolve_git_repo_root(*git_candidates)
+        if git_root is not None:
+            git_key = str(git_root.resolve())
+            if git_key in seen_git_roots:
+                gitignore_row = {
+                    "status": "ok",
+                    "error": "",
+                    "path": str(git_root / ".gitignore"),
+                    "added": [],
+                    "modified": False,
+                    "repo_root": git_key,
+                    "deduped": True,
+                }
+            else:
+                seen_git_roots.add(git_key)
+                gitignore_row = ensure_rd_local_gitignore(git_root)
         row_status = "failed"
         if dev_row.get("status") == "ok" or archive_row.get("status") in ("ok", "partial"):
             row_status = "ok" if dev_row.get("status") == "ok" and archive_row.get("status") == "ok" else "partial"
             any_ok = True
         elif dev_row.get("status") == "skipped" and archive_row.get("status") == "skipped":
             row_status = "skipped"
+        if gitignore_row.get("status") == "failed":
+            result["errors"].append(
+                f"{target.get('module')}: .gitignore — {gitignore_row.get('error')}"
+            )
+            if row_status == "ok":
+                row_status = "partial"
         result["layouts"].append(
             {
                 "module": target.get("module"),
@@ -281,6 +413,7 @@ def bootstrap_engineering_layout(
                 "engineering_root": str(eng),
                 "dev_templates": dev_row,
                 "work_order_docs": archive_row,
+                "gitignore": gitignore_row,
                 "status": row_status,
             }
         )

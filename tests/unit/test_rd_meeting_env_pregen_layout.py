@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from synapse.rd_meeting.env_pregen_layout import (
     bootstrap_engineering_layout,
     copy_dev_templates_to_engineering,
     copy_work_order_docs_to_engineering,
+    ensure_rd_local_gitignore,
     resolve_engineering_targets,
     strip_dev_version_suffix,
 )
@@ -22,6 +24,10 @@ def work_root(tmp_path, monkeypatch):
     root = tmp_path / "work"
     monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: root)
     return root
+
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
 
 
 def test_strip_dev_version_suffix():
@@ -131,3 +137,65 @@ def test_bootstrap_engineering_layout_end_to_end(work_root, tmp_path):
     eng = Path(assets["layouts"][0]["engineering_root"])
     assert (eng / "AGENTS.md").exists()
     assert (eng / "synapse_archive" / "需求分析" / "boundary" / "边界确认说明.md").exists()
+
+
+def test_ensure_rd_local_gitignore_appends_patterns(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "test")
+    (repo / "README.md").write_text("hello\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "init")
+
+    row = ensure_rd_local_gitignore(repo)
+    assert row["status"] == "ok"
+    assert row["modified"] is True
+    assert "AGENTS.md" in row["added"]
+    assert "synapse_archive/" in row["added"]
+
+    content = (repo / ".gitignore").read_text(encoding="utf-8")
+    assert "AGENTS.md" in content
+    assert "synapse_archive/" in content
+
+    again = ensure_rd_local_gitignore(repo)
+    assert again["status"] == "ok"
+    assert again["modified"] is False
+    assert again["added"] == []
+
+
+def test_bootstrap_engineering_layout_updates_gitignore(work_root, tmp_path) -> None:
+    scope_id = "D-gitignore"
+    dev_dir = tmp_path / "dev"
+    dev_dir.mkdir()
+    (dev_dir / "agents.md.template_202606").write_text("# tpl", encoding="utf-8")
+
+    repo_root = work_root / scope_id / "sandbox" / "demo"
+    repo_root.mkdir(parents=True)
+    _git(repo_root, "init")
+    _git(repo_root, "config", "user.email", "t@example.com")
+    _git(repo_root, "config", "user.name", "test")
+    (repo_root / "README.md").write_text("hello\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "init")
+
+    wire = {
+        "prod": "p1",
+        "repo_info": [
+            {
+                "repo_url": "https://git.example.com/demo.git",
+                "repo_module": "200|演示模块",
+                "code_path": "",
+            }
+        ],
+        "doc_process": [],
+    }
+    assets = bootstrap_engineering_layout(scope_id, wire, dev_dir=dev_dir)
+    layout = assets["layouts"][0]
+    assert layout["gitignore"]["status"] == "ok"
+    assert layout["gitignore"]["modified"] is True
+
+    ignore_path = repo_root / ".gitignore"
+    assert ignore_path.is_file()
+    assert "synapse_archive/" in ignore_path.read_text(encoding="utf-8")

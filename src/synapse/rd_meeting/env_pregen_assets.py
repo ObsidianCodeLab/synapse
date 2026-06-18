@@ -250,9 +250,19 @@ def format_env_pregen_report(assets: dict[str, Any], *, node_name: str) -> str:
             wo = row.get("work_order_docs") if isinstance(row.get("work_order_docs"), dict) else {}
             dev_files = dev_t.get("files") or []
             wo_files = wo.get("files") or []
+            gi = row.get("gitignore") if isinstance(row.get("gitignore"), dict) else {}
+            gi_note = ""
+            if gi.get("modified"):
+                added = gi.get("added") or []
+                gi_note = f"，.gitignore 已追加 {len(added)} 条"
+            elif gi.get("status") == "ok":
+                gi_note = "，.gitignore 已含过滤规则"
+            elif gi.get("status") == "failed":
+                gi_note = f"，.gitignore 失败（{gi.get('error')}）"
             lines.append(
                 f"  - `{row.get('engineering_root') or '—'}`："
                 f"AGENTS/规范 {len(dev_files)} 个，归档文档 {len(wo_files)} 个 — {row.get('status') or '—'}"
+                f"{gi_note}"
             )
 
     lines.extend(
