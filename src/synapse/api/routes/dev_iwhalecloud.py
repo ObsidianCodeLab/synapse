@@ -2225,7 +2225,7 @@ async def _fetch_ci_flow_node_instances(ci_flow_inst_id: str) -> list[dict]:
 
 def _is_compile_ci_node(node: dict) -> bool:
     name_en = str(node.get("nodeNameEn") or "").strip().upper()
-    if name_en == "COMPILE":
+    if name_en in {"COMPILE", "MAVENCOMPILE", "MAVEN_COMPILE"}:
         return True
     return str(node.get("nodeTypeId") or "").strip() == "22"
 
