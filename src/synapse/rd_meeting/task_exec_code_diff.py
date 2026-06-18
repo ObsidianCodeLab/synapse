@@ -77,7 +77,10 @@ def decode_git_quoted_path(path: str) -> str:
 
 def normalize_repo_rel_path(path: str) -> str:
     decoded = decode_git_quoted_path(path)
-    return PurePosixPath(decoded.replace("\\", "/")).as_posix().lstrip("./")
+    norm = PurePosixPath(decoded.replace("\\", "/")).as_posix()
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return norm
 
 
 def is_test_file(rel_path: str) -> bool:
