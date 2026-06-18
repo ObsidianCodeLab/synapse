@@ -2851,6 +2851,7 @@ const InterventionDialog = ({
                           nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
+                          readOnly
                         />
                       </div>
                     ) : (selectedNode.id === 'task_exec' || selectedNode.id === 'diff_analysis') &&

@@ -131,6 +131,8 @@ interface Props {
   nodeId?: CliExecNodeId;
   initialPayload?: TaskExecPayload | null;
   blocked?: boolean;
+  /** 历史只读：展示执行/优化结果，隐藏评审意见与裁决操作 */
+  readOnly?: boolean;
   /** 节点仍在 processing 时轮询 task-exec 增量结果 */
   live?: boolean;
   onDecided?: () => void;
@@ -610,6 +612,7 @@ export function TaskExecReviewPanel({
   nodeId = 'task_exec',
   initialPayload,
   blocked,
+  readOnly = false,
   live = false,
   onDecided,
 }: Props) {
@@ -1054,7 +1057,7 @@ export function TaskExecReviewPanel({
         </div>
       ) : null}
 
-      {!agentCliMissing && (!isRunning || commitRunning) ? (
+      {!readOnly && !agentCliMissing && (!isRunning || commitRunning) ? (
       <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-6">
         <label className="text-xs font-semibold text-foreground/80 flex items-center gap-1.5">
           <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
