@@ -609,8 +609,9 @@ export function App() {
   }, []);
 
   const fetchObIwcUserinfoPrefill = useCallback(async (includeSecrets: boolean) => {
+    // 引导浩鲸页：Tauri 固定连本机 18900，不受 dataMode / localStorage 影响
     const base = IS_TAURI
-      ? (dataMode === "remote" ? apiBaseUrl : "http://127.0.0.1:18900")
+      ? DEFAULT_LOCAL_API_BASE
       : (apiBaseUrl || window.location.origin);
     const q = includeSecrets ? "?include_secrets=1" : "";
     const sumRes = await fetch(
@@ -624,7 +625,7 @@ export function App() {
       return sumJ.data;
     }
     return null;
-  }, [apiBaseUrl, applyObIwcUserinfoPrefill, dataMode]);
+  }, [apiBaseUrl, applyObIwcUserinfoPrefill]);
 
   /** 核心智能体配置是否已完成所有任务项（用于点亮“下一步”按钮） */
   const [obCoreAgentReady, setObCoreAgentReady] = useState(false);
@@ -791,7 +792,7 @@ export function App() {
     setObIwcLocalDetectPassed(false);
     setObIwcLocalDetectHint(null);
     const base = IS_TAURI
-      ? (dataMode === "remote" ? apiBaseUrl : "http://127.0.0.1:18900")
+      ? DEFAULT_LOCAL_API_BASE
       : (apiBaseUrl || window.location.origin);
     const url = `${String(base).replace(/\/$/, "")}/api/dev/iwhalecloud/local-userinfo-exists`;
     (async () => {
@@ -836,9 +837,9 @@ export function App() {
     return () => {
       cancelled = true;
     };
-    // 仅依赖步骤与 API 基址；文案用当前 t()，不在语言切换时重复请求
+    // 仅依赖步骤；文案用当前 t()，不在语言切换时重复请求
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t intentionally omitted to avoid refetch on i18n change
-  }, [obStep, dataMode, apiBaseUrl, fetchObIwcUserinfoPrefill]);
+  }, [obStep, apiBaseUrl, fetchObIwcUserinfoPrefill]);
 
   useEffect(() => {
     if (obStep !== "ob-claude-code" || !IS_TAURI || !obClaudeShowLlmVideo) {
@@ -4520,7 +4521,6 @@ export function App() {
         if (earlyProbe) {
           log("✓ 后端已在运行（由 ob-welcome 提前启动）");
           setServiceStatus({ running: true, pid: null, pidFile: "" });
-          setDataMode("remote");
           httpReady = true;
           updateTask("service-start", { status: "done", detail: "已在运行" });
           logTask("启动后端服务", "done", "已在运行");
@@ -5014,7 +5014,6 @@ export function App() {
                             const res = await fetch("http://127.0.0.1:18900/api/health", { signal: AbortSignal.timeout(3000) });
                             if (res.ok) {
                               setServiceStatus({ running: true, pid: null, pidFile: "" });
-                              setDataMode("remote");
                               break;
                             }
                           } catch { /* not ready yet */ }
@@ -5279,7 +5278,7 @@ export function App() {
                               setObIwcValidated(true);
                               setObIwcError(null);
                             } else {
-                              const base = httpApiBase();
+                              const base = IS_TAURI ? DEFAULT_LOCAL_API_BASE : httpApiBase();
                               const loginBody = partialReverify
                                 ? {
                                     purpose: "normal",

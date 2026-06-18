@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import shutil
@@ -25,6 +26,12 @@ STREAM_JSON_LINE_LIMIT = 16 * 1024 * 1024
 
 FUNC_SOLUTION_REL = Path("synapse_archive") / "需求设计" / "func_solution" / "函数级方案.md"
 ACCEPTANCE_REL = Path("synapse_archive") / "需求分析" / "acceptance" / "验收标准.md"
+CLI_PHASE_LABELS = {
+    "develop": "开发",
+    "verify": "完成检测",
+    "fix": "纠偏",
+}
+CLI_HEARTBEAT_INTERVAL_SECONDS = 60
 
 
 async def _iter_subprocess_lines(
@@ -287,6 +294,12 @@ def format_workspace_trust_error_hint(workspace: Optional[str] = None) -> str:
         pass
     ws = (workspace or "").strip() or "(workspace)"
     return f"Cursor Agent 工作区未信任：{ws}。请在本机执行 agent login 后，用 --trust --force 试跑一次。"
+
+
+def format_round_title(*, round_num: int, phase: str = "develop") -> str:
+    """日志标题：区分开发轮 / 完成检测轮，避免 verify 日志误标为「开发」。"""
+    label = CLI_PHASE_LABELS.get((phase or "develop").strip().lower(), phase or "develop")
+    return f"=== 第 {round_num} 轮 Cursor {label} ==="
 
 
 def format_agent_argv_for_log(argv: list[str], *, prompt_placeholder: str = "<prompt>") -> str:
@@ -623,6 +636,7 @@ class CursorCLI:
         timeout: int = 600,
         model: Optional[str] = "composer-2.5",
         continue_session: bool = False,
+        resume_session_id: Optional[str] = None,
     ):
         self.agent_path = resolve_agent_executable(agent_path or cursor_path or "agent")
         code_dir = workspace or worktree
@@ -630,6 +644,7 @@ class CursorCLI:
         self.timeout = timeout
         self.model = model
         self.continue_session = continue_session
+        self.resume_session_id = (resume_session_id or "").strip() or None
 
     def build_argv(self, prompt: str, *, use_yolo: bool = False) -> list[str]:
         """构造 agent argv：所有 flag 在前，prompt 作为末尾 positional（官方推荐）。"""
@@ -644,7 +659,10 @@ class CursorCLI:
         model = (self.model or "").strip()
         if model and model.lower() != "auto":
             argv.extend(["--model", model])
-        if self.continue_session:
+        # 无头自动化优先 --resume <id>；--continue 在独立子进程 + 无 TTY 时易挂死（见 cursor-cli-headless.md §6.5）
+        if self.resume_session_id:
+            argv.extend(["--resume", self.resume_session_id])
+        elif self.continue_session:
             argv.append("--continue")
         argv.append(prompt)
         return argv
@@ -654,6 +672,7 @@ class CursorCLI:
         argv: list[str],
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
         on_stream_line: Optional[Callable[[str], None]] = None,
+        on_process_started: Optional[Callable[[int], None]] = None,
     ) -> CursorResult:
         try:
             process = await asyncio.create_subprocess_exec(
@@ -670,6 +689,9 @@ class CursorCLI:
                 for line in detail.splitlines():
                     on_stream_line(f"[stderr] {line}")
             return CursorResult(success=False, stderr=detail, exit_code=127)
+
+        if process.pid and on_process_started:
+            on_process_started(process.pid)
 
         stdout_chunks: list[str] = []
         stderr_chunks: list[str] = []
@@ -761,6 +783,7 @@ class CursorCLI:
         prompt: str,
         on_progress: Optional[Callable[[ProgressEvent], None]] = None,
         on_stream_line: Optional[Callable[[str], None]] = None,
+        on_process_started: Optional[Callable[[int], None]] = None,
     ) -> CursorResult:
         agent_err = validate_agent_executable(self.agent_path)
         if agent_err:
@@ -770,14 +793,18 @@ class CursorCLI:
             return CursorResult(success=False, stderr=agent_err, exit_code=127)
 
         argv = self.build_argv(prompt)
-        result = await self._run_agent_once(argv, on_progress, on_stream_line)
+        result = await self._run_agent_once(
+            argv, on_progress, on_stream_line, on_process_started=on_process_started
+        )
         if result.success or not is_workspace_trust_error(result.stderr):
             return result
 
         if on_stream_line:
             on_stream_line("[stderr] 检测到工作区信任失败，使用 --yolo 重试一次…")
         retry_argv = self.build_argv(prompt, use_yolo=True)
-        retry = await self._run_agent_once(retry_argv, on_progress, on_stream_line)
+        retry = await self._run_agent_once(
+            retry_argv, on_progress, on_stream_line, on_process_started=on_process_started
+        )
         if retry.success or not is_workspace_trust_error(retry.stderr):
             return retry
 
@@ -930,10 +957,21 @@ async def main() -> int:
     parser.add_argument("--fix-feedback", default=None, help="校验未通过项全文（纠偏轮必填）")
     parser.add_argument("--round", type=int, default=1, help="轮次号，写入日志（默认 1）")
     parser.add_argument(
+        "--phase",
+        choices=tuple(CLI_PHASE_LABELS),
+        default="develop",
+        help="轮次类型：develop=开发，verify=完成检测，fix=纠偏（仅影响日志标题）",
+    )
+    parser.add_argument(
         "--continue",
         dest="continue_session",
         action="store_true",
-        help="续接上一轮 Cursor Agent 会话（传给 agent --continue，继承对话上下文）",
+        help="续接最近一场 Cursor Agent 会话（agent --continue；无 TTY 自动化慎用）",
+    )
+    parser.add_argument(
+        "--resume-session-id",
+        default=None,
+        help="恢复指定会话（agent --resume <id>）；任务执行完成检测轮推荐用开发轮 result.session_id",
     )
     parser.add_argument("--log", required=True, help="日志输出文件路径（含完整 stream-json）")
     parser.add_argument(
@@ -957,12 +995,17 @@ async def main() -> int:
     validate_skill_paths(args.code_path, args.doc, args.acceptance_doc)
     target = _validate_args(args)
 
+    resume_session_id = (args.resume_session_id or "").strip() or None
+    if resume_session_id and args.continue_session:
+        raise SystemExit("错误：--resume-session-id 与 --continue 不可同时使用")
+
     cursor = CursorCLI(
         agent_path=args.agent_path,
         workspace=args.code_path,
         timeout=args.timeout,
         model=args.model,
         continue_session=args.continue_session,
+        resume_session_id=resume_session_id,
     )
 
     prompt = build_develop_prompt(
@@ -989,7 +1032,7 @@ async def main() -> int:
         return 1
 
     with FileProgressLogger(args.log, stream_to_stdout=echo) as logger:
-        logger.log(f"=== 第 {args.round} 轮 Cursor 开发 ===", echo=echo)
+        logger.log(format_round_title(round_num=args.round, phase=args.phase), echo=echo)
         logger.log(f"代码目录: {args.code_path}", echo=echo)
         if args.doc:
             logger.log(f"函数级方案: {args.doc}", echo=echo)
@@ -997,24 +1040,50 @@ async def main() -> int:
             logger.log(f"验收标准: {args.acceptance_doc}", echo=echo)
         if args.fix_feedback:
             logger.log("模式: 纠偏轮", echo=echo)
-        if args.continue_session:
-            logger.log("会话: --continue（续接上一轮 Cursor Agent）", echo=echo)
+        if resume_session_id:
+            logger.log(f"会话: --resume {resume_session_id}", echo=echo)
+        elif args.continue_session:
+            logger.log("会话: --continue（续接最近一场 Cursor Agent）", echo=echo)
         preview_argv = cursor.build_argv(prompt)
         logger.log(
             f"命令: {format_agent_argv_for_log(preview_argv)}",
             echo=echo,
         )
         logger.log(f"日志文件: {args.log}", echo=echo)
-        logger.log("--- Cursor CLI stream-json 开始 ---", echo=False)
 
         def on_progress(progress: ProgressEvent) -> None:
             logger.log_progress(progress, echo=echo)
 
-        result = await cursor.agent_stream(
-            prompt,
-            on_progress=on_progress,
-            on_stream_line=logger.make_stream_handler(),
-        )
+        def on_process_started(pid: int) -> None:
+            logger.log(f"agent 子进程已启动 pid={pid}", echo=echo)
+            logger.log("--- Cursor CLI stream-json 开始 ---", echo=False)
+
+        stop_heartbeat = asyncio.Event()
+
+        async def _heartbeat_while_agent_runs() -> None:
+            while True:
+                try:
+                    await asyncio.wait_for(stop_heartbeat.wait(), timeout=CLI_HEARTBEAT_INTERVAL_SECONDS)
+                    return
+                except TimeoutError:
+                    logger.log(
+                        "等待 Cursor Agent 响应中…（agent 子进程仍在运行，尚未收到 stream-json 输出）",
+                        echo=False,
+                    )
+
+        heartbeat_task = asyncio.create_task(_heartbeat_while_agent_runs())
+        try:
+            result = await cursor.agent_stream(
+                prompt,
+                on_progress=on_progress,
+                on_stream_line=logger.make_stream_handler(),
+                on_process_started=on_process_started,
+            )
+        finally:
+            stop_heartbeat.set()
+            heartbeat_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await heartbeat_task
 
         logger.log("--- Cursor CLI stream-json 结束 ---", echo=False)
         if result.success:

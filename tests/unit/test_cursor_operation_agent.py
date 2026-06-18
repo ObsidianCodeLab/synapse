@@ -51,6 +51,25 @@ def test_validate_agent_executable_ok_for_existing_file(tmp_path):
     assert co.validate_agent_executable(str(agent)) is None
 
 
+def test_format_round_title_distinguishes_verify_phase():
+    assert "完成检测" in co.format_round_title(round_num=1, phase="verify")
+    assert "开发" in co.format_round_title(round_num=1, phase="develop")
+
+
+def test_build_argv_prefers_resume_session_id_over_continue(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    cli = co.CursorCLI(
+        workspace=str(ws),
+        continue_session=True,
+        resume_session_id="sess-from-develop",
+    )
+    argv = cli.build_argv("verify task")
+    resume_idx = argv.index("--resume")
+    assert argv[resume_idx + 1] == "sess-from-develop"
+    assert "--continue" not in argv
+
+
 def test_build_argv_puts_prompt_last(tmp_path, monkeypatch):
     version_dir = tmp_path / "versions" / "2026.06.04-abc123"
     version_dir.mkdir(parents=True)

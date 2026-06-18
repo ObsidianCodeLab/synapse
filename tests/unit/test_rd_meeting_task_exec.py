@@ -297,6 +297,128 @@ def test_bootstrap_task_exec_runs_develop_and_verify_rounds(tmp_path, monkeypatc
     assert "T1" in md
 
 
+def test_bootstrap_task_exec_verify_skips_continue_when_develop_failed(tmp_path, monkeypatch):
+    scope_id = "te-verify-no-continue"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution").mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution" / "函数级方案.md").write_text(
+        "# 方案", encoding="utf-8"
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec._collect_work_orders",
+        lambda _st, _sid: [
+            {
+                "task_no": "T1",
+                "task_title": "子单",
+                "goal": "实现功能点",
+                "coverage": ["功能A"],
+                "sandbox_path": str(sandbox),
+                "product_module": "ZMDB",
+            }
+        ],
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
+
+    calls: list[dict] = []
+
+    def fake_cli_round(**kwargs):
+        calls.append(dict(kwargs))
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        target = str(kwargs.get("target") or "")
+        status = "failed" if "【任务执行 · 开发轮】" in target else "ok"
+        return {
+            "status": status,
+            "tokens_used": 1,
+            "duration_seconds": 1,
+            "log_path": str(log_path),
+            "error": "" if status == "ok" else "develop timeout",
+        }
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._run_cursor_cli_round", fake_cli_round)
+
+    bootstrap_task_exec("demand", scope_id)
+    assert len(calls) == 2
+    assert calls[0].get("phase") == "develop"
+    assert not calls[0].get("resume_session_id")
+    assert calls[1].get("phase") == "verify"
+    assert not calls[1].get("resume_session_id")
+
+
+def test_bootstrap_task_exec_verify_uses_resume_when_develop_ok(tmp_path, monkeypatch):
+    scope_id = "te-verify-continue"
+    sandbox = tmp_path / "sandbox" / "proj"
+    sandbox.mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution").mkdir(parents=True)
+    (sandbox / "synapse_archive" / "需求设计" / "func_solution" / "函数级方案.md").write_text(
+        "# 方案", encoding="utf-8"
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec._collect_work_orders",
+        lambda _st, _sid: [
+            {
+                "task_no": "T1",
+                "task_title": "子单",
+                "goal": "实现功能点",
+                "coverage": ["功能A"],
+                "sandbox_path": str(sandbox),
+                "product_module": "ZMDB",
+            }
+        ],
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._resolve_demand_no", lambda _st, _sid: "D1")
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_owned_work_item_task_exec", lambda *a, **k: True)
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.patch_userwork_summary", lambda **k: None)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.check_cursor_agent_cli",
+        lambda: {"installed": True, "logged_in": True, "ready": True},
+    )
+
+    calls: list[dict] = []
+
+    def fake_cli_round(**kwargs):
+        calls.append(dict(kwargs))
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("SYNAPSE_CURSOR_SUCCESS=1\n", encoding="utf-8")
+        target = str(kwargs.get("target") or "")
+        if "【任务执行 · 开发轮】" in target:
+            return {
+                "status": "ok",
+                "tokens_used": 1,
+                "duration_seconds": 1,
+                "log_path": str(log_path),
+                "error": "",
+                "session_id": "476cdea0-a615-48cb-8a62-78c3dd03561e",
+            }
+        return {
+            "status": "ok",
+            "tokens_used": 1,
+            "duration_seconds": 1,
+            "log_path": str(log_path),
+            "error": "",
+        }
+
+    monkeypatch.setattr("synapse.rd_meeting.task_exec._run_cursor_cli_round", fake_cli_round)
+
+    bootstrap_task_exec("demand", scope_id)
+    assert len(calls) == 2
+    assert calls[1].get("resume_session_id") == "476cdea0-a615-48cb-8a62-78c3dd03561e"
+    assert not calls[1].get("continue_session")
+
+
 def test_bootstrap_task_exec_persists_running_progress(tmp_path, monkeypatch):
     scope_id = "te-progress"
     sandbox = tmp_path / "sandbox" / "proj"

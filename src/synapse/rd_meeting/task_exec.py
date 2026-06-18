@@ -126,25 +126,28 @@ def build_cursor_round_commands(
     func_doc: str,
     accept_doc: str,
     continue_session: bool = False,
+    resume_session_id: str = "",
     model: str | None = None,
     log_path: str = "",
     timeout: int = DEFAULT_CLI_TIMEOUT_SECONDS,
 ) -> dict[str, str]:
     """生成任务执行轮次的完整 agent 命令与 Synapse 包装命令。"""
     mod = _load_cursor_operation_module()
+    resume_id = (resume_session_id or "").strip() or None
     prompt = mod.build_develop_prompt(
         code_path=code_path,
         target=target,
         doc_path=func_doc or None,
         acceptance_doc=accept_doc or None,
-        continue_session=continue_session,
+        continue_session=bool(continue_session or resume_id),
     )
     model_val = (model or DEFAULT_CURSOR_CLI_MODEL).strip() or DEFAULT_CURSOR_CLI_MODEL
     cursor = mod.CursorCLI(
         agent_path=resolve_agent_executable("agent"),
         workspace=code_path,
         model=model_val,
-        continue_session=continue_session,
+        continue_session=continue_session and not resume_id,
+        resume_session_id=resume_id,
     )
     agent_argv = cursor.build_argv(prompt)
     py_argv = [
@@ -164,7 +167,9 @@ def build_cursor_round_commands(
         py_argv.extend(["--doc", func_doc])
     if accept_doc:
         py_argv.extend(["--acceptance-doc", accept_doc])
-    if continue_session:
+    if resume_id:
+        py_argv.extend(["--resume-session-id", resume_id])
+    elif continue_session:
         py_argv.append("--continue")
     if model is not None:
         py_argv.extend(["--model", model_val])
@@ -502,6 +507,16 @@ def _parse_cursor_subprocess_output(stdout: str) -> dict[str, Any]:
     }
 
 
+def _resolve_develop_session_id(dev_result: dict[str, Any], dev_log: Path) -> str:
+    """从开发轮 CLI 结果或日志中提取 session_id，供完成检测轮 --resume 使用。"""
+    if dev_result.get("status") != "ok":
+        return ""
+    session_id = str(dev_result.get("session_id") or "").strip()
+    if session_id:
+        return session_id
+    return str(_parse_cli_round_metrics_from_log(dev_log).get("session_id") or "").strip()
+
+
 def _run_cursor_cli_round(
     *,
     code_path: str,
@@ -511,6 +526,8 @@ def _run_cursor_cli_round(
     log_path: Path,
     timeout: int = DEFAULT_CLI_TIMEOUT_SECONDS,
     continue_session: bool = False,
+    resume_session_id: str = "",
+    phase: str = "develop",
     model: str | None = None,
 ) -> dict[str, Any]:
     script = _cursor_operation_script()
@@ -524,9 +541,12 @@ def _run_cursor_cli_round(
         }
 
     started = time.monotonic()
+    resume_id = (resume_session_id or "").strip()
     logger.info(
-        "task_exec: cursor CLI round begin log=%s continue=%s model=%s",
+        "task_exec: cursor CLI round begin log=%s phase=%s resume=%s continue=%s model=%s",
         log_path,
+        phase,
+        resume_id or "-",
         continue_session,
         model,
     )
@@ -541,13 +561,17 @@ def _run_cursor_cli_round(
         str(log_path),
         "--timeout",
         str(timeout),
+        "--phase",
+        phase,
         "--no-echo-stream",
     ]
     if func_doc:
         argv.extend(["--doc", func_doc])
     if accept_doc:
         argv.extend(["--acceptance-doc", accept_doc])
-    if continue_session:
+    if resume_id:
+        argv.extend(["--resume-session-id", resume_id])
+    elif continue_session:
         argv.append("--continue")
     if model is not None:
         argv.extend(["--model", model])
@@ -1198,7 +1222,7 @@ def bootstrap_task_exec(
             target=verify_prompt,
             func_doc=func_doc,
             accept_doc=accept_doc,
-            continue_session=True,
+            continue_session=False,
             model=model_arg,
             log_path=str(verify_log),
             timeout=cli_timeout,
@@ -1260,6 +1284,7 @@ def bootstrap_task_exec(
             log_path=dev_log,
             model=model_arg,
             timeout=cli_timeout,
+            phase="develop",
         )
         _emit_task_exec_progress(
             sid,
@@ -1306,15 +1331,39 @@ def bootstrap_task_exec(
             live_log_path=str(verify_log),
         )
 
+        develop_session_id = _resolve_develop_session_id(dev_result, dev_log)
+        if dev_result.get("status") == "ok" and not develop_session_id:
+            logger.warning(
+                "task_exec: develop ok but no session_id in log; verify runs as new session task=%s",
+                task_no,
+            )
+        elif develop_session_id:
+            verify_cmds = build_cursor_round_commands(
+                code_path=sandbox_path,
+                target=verify_prompt,
+                func_doc=func_doc,
+                accept_doc=accept_doc,
+                resume_session_id=develop_session_id,
+                model=model_arg,
+                log_path=str(verify_log),
+                timeout=cli_timeout,
+            )
+            running_row = {
+                **running_row,
+                "verify_agent_command": verify_cmds.get("agent_command") or "",
+                "verify_python_command": verify_cmds.get("python_command") or "",
+            }
+
         verify_result = _run_cursor_cli_round(
             code_path=sandbox_path,
             target=verify_prompt,
             func_doc=func_doc,
             accept_doc=accept_doc,
             log_path=verify_log,
-            continue_session=True,
+            resume_session_id=develop_session_id,
             model=model_arg,
             timeout=cli_timeout,
+            phase="verify",
         )
 
         report_md = _extract_report_from_log(str(verify_result.get("log_path") or verify_log))
