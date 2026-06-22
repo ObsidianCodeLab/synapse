@@ -4538,7 +4538,7 @@ dependencies = [
 
 [[package]]
 name = "synapse-desktop"
-version = "1.26.0"
+version = "1.27.17"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
