@@ -91,6 +91,8 @@ jobs:
 
       - name: Build web frontend
         working-directory: apps/setup-center
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           npm ci
           npm run build:web
@@ -244,6 +246,8 @@ jobs:
 
       - name: Build web frontend for remote browser access
         working-directory: apps/setup-center
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           npm ci
           npm run build:web
@@ -259,6 +263,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p docs-site/.vitepress/dist
+          pip install -e ./synapse-plugin-sdk
           pip install -e ".[all]"
           pip install "pyinstaller>=6.18.0"
 
