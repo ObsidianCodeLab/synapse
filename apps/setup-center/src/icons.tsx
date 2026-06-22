@@ -41,6 +41,13 @@ function svg(
   );
 }
 
+export function IconDingTalk(p: IconProps = {}) {
+  return svg(p, <>
+    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+    <path d="M8 8h3l2 5-1 3h3l-2-5 2-3h-3L10 8H8z" />
+  </>);
+}
+
 // ─── Navigation / Sidebar ───
 
 export function IconChat(p: IconProps = {}) {

@@ -11,7 +11,9 @@ import {
   IconLaptop, IconPackage, IconClipboard, IconTerminal,
 } from "../icons";
 import logoUrl from "../assets/logo.png";
+import dingtalkLogoUrl from "../assets/platform_logos/dingtalk.svg";
 import { openExternalUrl } from "../platform";
+import { DingTalkQrModal } from "./DingTalkQrModal";
 
 export type SidebarProps = {
   collapsed: boolean;
@@ -115,6 +117,8 @@ export function Sidebar({
     }
     return app.title;
   };
+
+  const [dingtalkQrOpen, setDingtalkQrOpen] = useState(false);
 
   const [expandedGroups, setExpandedGroups] = useState<Record<NavGroupId, boolean>>({
     capabilities: false,
@@ -467,6 +471,14 @@ export function Sidebar({
               <IconGlobe size={11} />
               synapse.ai
             </span>
+            <span
+              onClick={() => setDingtalkQrOpen(true)}
+              title={t("sidebar.dingtalkQr", "钉钉群")}
+              style={{ cursor: "pointer", opacity: 1, color: "var(--accent, #5B8DEF)", display: "inline-flex", alignItems: "center", gap: 3 }}
+            >
+              <img src={dingtalkLogoUrl} alt="" style={{ width: 13, height: 13 }} />
+              <span style={{ fontSize: 11 }}>{t("sidebar.dingtalkQr", "钉钉群")}</span>
+            </span>
             {serviceRunning && (
               <>
                 <span
@@ -543,6 +555,13 @@ export function Sidebar({
             >
               <IconGlobe size={14} />
             </span>
+            <span
+              onClick={() => setDingtalkQrOpen(true)}
+              title={t("sidebar.dingtalkQr", "钉钉群")}
+              style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
+            >
+              <img src={dingtalkLogoUrl} alt="" style={{ width: 14, height: 14 }} />
+            </span>
             {serviceRunning && (
               <>
                 <span
@@ -594,6 +613,7 @@ export function Sidebar({
           </div>
         </div>
       )}
+      <DingTalkQrModal open={dingtalkQrOpen} onClose={() => setDingtalkQrOpen(false)} />
     </aside>
   );
 }
