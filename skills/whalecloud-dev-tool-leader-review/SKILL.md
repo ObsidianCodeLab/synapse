@@ -10,7 +10,9 @@ label: 研发组长评审
 
 1. **`leader_review.json`** — 结构化评审数据（机器可读，供前端评审面板与统一服务 API 消费）
 2. **`研发组长评审报告.html`** — 完整 HTML 评审报告（推送给团队负责人、产品负责人等多方评审人，可在浏览器独立打开）
-3. **`研发组长评审结论.md`** — 简要结论文档（归档到 SOP archive，供 NodeReview 门控使用）
+3. **`ai_review.md`** — AI 综合评审意见（AI 独立分析并落地形成评审结论，在人工评审前先行输出，作为评审参考）
+
+> **流程说明**：`ai_review.md` 是 AI 自主形成的评审意见，**不是**人工评审的最终结论。后续需通过前端评审中心完成各评审人（开发者自评 + 产品负责人 + 团队负责人）的逐一确认；**所有人通过后**，NodeReview 门控才落地 `研发组长评审结论.md`（最终归档文档）。禁止在人工评审完成前预先生成结论文档。
 
 ---
 
@@ -74,9 +76,13 @@ label: 研发组长评审
 
 1. **`leader_review.json`** — `schema_version: 1`，结构见下方（`write_file` UTF-8 写入）
 2. **`研发组长评审报告.html`** — 调用 `whalecloud-dev-tool-doc-generate`，`OUTPUT=研发组长评审报告.html`，`CONTEXT_JSON` 为 JSON 文件路径
-3. **`研发组长评审结论.md`** — 调用 `whalecloud-dev-tool-doc-generate`，`OUTPUT=研发组长评审结论.md`（供 NodeReview 门控使用，内容为 HTML 报告的摘要提炼）
+3. **`ai_review.md`** — AI 独立评审意见（`write_file` UTF-8 写入），包含综合评分、风险结论、逐章节评审意见，**在前端报告展示时同步呈现**
 
-**禁止** `submit_hitl_questionnaire(kind="interactive")`；人工通过 NodeReview 面板确认。
+**禁止**：
+- **禁止**在人工评审完成前输出 `研发组长评审结论.md`（该文件由 NodeReview 人工门控通过后才由系统生成）
+- **禁止** `submit_hitl_questionnaire(kind="interactive")`；人工通过前端「研发组长评审」专用面板完成评审确认
+
+> `研发组长评审结论.md` 的生成时机：前端评审中心所有评审人确认通过 → NodeReview 门控触发 → 系统自动从 `leader_review.json` + 各评审意见汇总生成。
 
 ---
 
@@ -164,7 +170,7 @@ label: 研发组长评审
   ],
   "output_files": {
     "html_report": "archive/研发实施/leader_review/研发组长评审报告.html",
-    "conclusion_md": "archive/研发实施/leader_review/研发组长评审结论.md"
+    "ai_review_md": "archive/研发实施/leader_review/ai_review.md"
   }
 }
 ```
@@ -231,11 +237,20 @@ Step 4 — 生成 HTML 报告（调用 whalecloud-dev-tool-doc-generate）
   4d. doc-generate 执行 scripts/fill_leader_review.py 落盘 HTML 文件
   4e. 确认文件存在且 > 5KB；若失败则中止
 
-Step 5 — 生成结论 MD（调用 whalecloud-dev-tool-doc-generate）
-  5a. OUTPUT = 研发组长评审结论.md
-  5b. OUTPUT_DIR = {ARCHIVE_DIR}
-  5c. doc-generate 执行通用 fill_markdown.py，从 leader_review.json 提取摘要落盘
-  
+Step 5 — 生成 AI 评审报告（write_file 直接写入，不调用 doc-generate）
+  5a. 基于已读取的全部产出物，独立形成 AI 评审意见，内容须包含：
+      ① 综合评分与风险判断（引用 overall_quality_score 与 overall_risk_level 说明评分依据）
+      ② 各阶段逐项评审意见（需求分析 / 需求设计 / 研发实施，每阶段 2-5 句，指出亮点与不足）
+      ③ 代码变更重点关注项（结合 diff_stats，指出高风险文件或模块）
+      ④ 测试与熵指标评价（结合 test_cases 通过率与 entropy_stats 合规情况）
+      ⑤ AI 综合意见与建议（2-5 句，明确给出「建议通过」或「建议返工」及理由）
+  5b. OUTPUT = ai_review.md，OUTPUT_DIR = {ARCHIVE_DIR}
+  5c. write_file 落盘（UTF-8），文件名固定为 ai_review.md
+  5d. 确认文件存在且 > 500B；若失败则中止
+  5e. 将 ai_review_md 路径写入 leader_review.json 的 output_files.ai_review_md 字段（更新 JSON）
+
+  **禁止**：在此 Step 输出 `研发组长评审结论.md`；结论文档由人工评审全部通过后方可生成。
+
 Step 6 — （可选）推送统一服务
   6a. 若传入 UNIFIED_SERVICE_URL：
       读取 HTML 文件内容 → POST {UNIFIED_SERVICE_URL}/rd_view_report_submit
@@ -245,7 +260,8 @@ Step 6 — （可选）推送统一服务
 Step 7 — 自检
   7a. leader_review.json 可被 json.load 解析（write_file 落 check.py + run_shell python）
   7b. 研发组长评审报告.html 文件大小 > 5KB，含需求标题关键字
-  7c. 研发组长评审结论.md 存在且非空
+  7c. ai_review.md 存在且 > 500B，包含「AI 评审意见」或「综合评分」关键字
+  7d. **确认** output_files.conclusion_md 字段不存在（该字段为禁止提前生成标志）
 ```
 
 ---
@@ -267,5 +283,7 @@ Step 7 — 自检
 | 部分节点产出缺失 | 标记 `included: false`，继续执行 |
 | json.load 校验失败 | **中止**，修正 JSON 后重试 |
 | HTML 文件 < 5KB 或生成失败 | **中止**，检查 fill_leader_review.py 错误信息后重试 |
+| ai_review.md 文件 < 500B 或生成失败 | **中止**，重新执行 Step 5，确保 AI 评审意见完整 |
 | UNIFIED_SERVICE_URL 接口超时 | **跳过推送**，记录日志，不影响本地产出 |
 | 调用 submit_hitl_questionnaire(kind="interactive") | **视为未完成**，禁止任何 interactive HITL |
+| 提前生成 研发组长评审结论.md | **视为违规**，删除该文件，等待人工评审全部通过后再生成 |

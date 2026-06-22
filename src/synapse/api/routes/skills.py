@@ -1288,12 +1288,9 @@ async def internal_skills_install(request: Request):
 
 def _broadcast_ws_event(action: str) -> None:
     """WebSocket 广播（fire-and-forget）。"""
-    try:
-        from synapse.api.routes.websocket import broadcast_event
+    from synapse.api.routes.websocket import fire_event
 
-        asyncio.ensure_future(broadcast_event("skills:changed", {"action": action}))
-    except Exception:
-        pass
+    fire_event("skills:changed", {"action": action})
 
 
 def _on_skills_changed_api(action: str) -> None:

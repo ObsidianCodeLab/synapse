@@ -55,7 +55,14 @@ interface CurrentUser {
 
 interface LeaderReviewSopPanelProps {
   synapseApiBase: string;
-  ticket:         Ticket;
+  /** 完整 ticket 对象（来自 OrderManagement）；与 demandNo/demandTitle/taskNos 二选一 */
+  ticket?:        Ticket;
+  /** 需求单号（与 ticket 二选一） */
+  demandNo?:      string;
+  /** 需求单标题（与 ticket 二选一） */
+  demandTitle?:   string;
+  /** 研发单号列表（与 ticket 二选一） */
+  taskNos?:       string[];
   currentUser:    CurrentUser;
   /** 点击「打开完整评审中心」跳转 */
   onOpenReviewCenter?: () => void;
@@ -158,6 +165,9 @@ function ReviewerRow({
 export function LeaderReviewSopPanel({
   synapseApiBase,
   ticket,
+  demandNo:  demandNoProp,
+  demandTitle: demandTitleProp,
+  taskNos:   taskNosProp,
   currentUser,
   onOpenReviewCenter,
   onTaskComplete,
@@ -174,8 +184,10 @@ export function LeaderReviewSopPanel({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const demandNo   = ticket.id;
-  const taskNos    = ticket.ownedWorkItems.map((w) => w.task_no);
+  // 支持两种调用方式：传 ticket 对象 或 直接传 demandNo/taskNos
+  const demandNo   = ticket?.id ?? demandNoProp ?? '';
+  const demandTitle = ticket?.title ?? demandTitleProp ?? demandNo;
+  const taskNos    = ticket ? ticket.ownedWorkItems.map((w) => w.task_no) : (taskNosProp ?? []);
   const isAllApproved = overallState === 'approved';
 
   // 拉取评审状态
@@ -205,7 +217,7 @@ export function LeaderReviewSopPanel({
     if (!reportRecord) {
       const data = buildRdReportDataFromDemand({
         demandNo:    demandNo,
-        demandTitle: ticket.title,
+        demandTitle: demandTitle,
         taskNos,
         assigneeName: currentUser.name,
       });
@@ -213,7 +225,7 @@ export function LeaderReviewSopPanel({
     } else {
       setReportHtml(reportRecord.report_html);
     }
-  }, [reportRecord, demandNo, ticket.title, currentUser.name]);
+  }, [reportRecord, demandNo, demandTitle, currentUser.name]);
 
   // 构造默认评审人列表（若报告未提交）
   const defaultReviewers = useMemo<ReviewerInfo[]>(() => {

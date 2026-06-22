@@ -200,7 +200,8 @@ NODE_OUTPUTS: dict[str, list[str]] = {
     "solution_consistency": ["方案一致性检查.md"],
     "risk_review": ["风险评审.md"],
     "entropy_review": ["控熵评审.md"],
-    "leader_review": ["研发组长评审结论.md"],
+    # leader_review 节点交付 AI 评审三件套；研发组长评审结论.md 由人工全员通过后系统生成
+    "leader_review": ["leader_review.json", "研发组长评审报告.html", "ai_review.md"],
 }
 
 

@@ -34,6 +34,7 @@ export type MeetingSkillCard = {
 /** 主控（小鲸）必备技能 */
 export const HOST_REQUIRED_SKILLS: RequiredSkillRule[] = [
   { displayName: '方案评审', skillIds: ['whalecloud-dev-tool-solution-review'] },
+  { displayName: '研发组长评审', skillIds: ['whalecloud-dev-tool-leader-review'] },
   { displayName: '人机问卷', skillIds: ['whalecloud-dev-tool-ask-user'] },
   { displayName: '文档生成', skillIds: ['whalecloud-dev-tool-doc-generate'] },
   { displayName: '研发工具共享脚本', skillIds: ['whalecloud-dev-tool-base-scripts'] },

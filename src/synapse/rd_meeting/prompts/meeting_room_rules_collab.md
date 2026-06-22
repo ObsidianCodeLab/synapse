@@ -14,7 +14,7 @@
 
 **`solution_review`**：运行 `whalecloud-dev-tool-solution-review` → 落盘 `solution_review.json` + `方案评审结论.md` → 自动进入 **方案评审**门控（用户选补丁、意见≥50字、通过/不通过）。
 
-**`leader_review`**：生成 `研发组长评审结论.md`（及「会议产出」清单内其他文件）→ 进入 **NodeReview**门控（确认或返工）。
+**`leader_review`**：运行 `whalecloud-dev-tool-leader-review` → 落盘 `leader_review.json` + `研发组长评审报告.html` + `ai_review.md`（AI 独立评审意见）→ 进入**研发组长评审**专用面板门控（展示报告、评审人员及评审进度；开发者自评通过后推送统一服务；全员通过后方可代码合并）。**禁止**在人工评审通过前生成 `研发组长评审结论.md`。
 
 能力超出「你的能力档案」或 JSON/schema 无法合规生成 → `submit_hitl_questionnaire(kind="exception", summary="…")`，提交即停（**唯一**允许的 HITL 场景）。
 
@@ -27,4 +27,4 @@
 |------|--------|
 | `func_solution` | `函数级方案.md`、`func_solution_review.json` |
 | `solution_review` | `方案评审结论.md`、`solution_review.json` |
-| `leader_review` | `研发组长评审结论.md` |
+| `leader_review` | `leader_review.json`、`研发组长评审报告.html`、`ai_review.md` |

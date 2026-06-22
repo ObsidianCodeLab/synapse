@@ -5,6 +5,7 @@ export type InterventionPanelKind =
   | 'func_solution_review'
   | 'task_exec'
   | 'node_review'
+  | 'leader_review_panel'
   | 'hitl'
   | 'prod_selection'
   | 'auto_split_choice';
@@ -15,7 +16,8 @@ const COLLAB_DEDICATED_PANEL: Record<string, InterventionPanelKind> = {
   func_solution: 'func_solution_review',
   task_exec: 'task_exec',
   diff_analysis: 'task_exec',
-  leader_review: 'node_review',
+  // leader_review 使用独立评审面板，区别于普通的 node_review 确认总结
+  leader_review: 'leader_review_panel',
 };
 
 export function collabDedicatedPanel(nodeId: string): InterventionPanelKind | null {
@@ -194,11 +196,12 @@ export function resolveMeetingInterventionPanel(
     panel === 'func_solution_review' ||
     panel === 'task_exec' ||
     panel === 'node_review' ||
+    panel === 'leader_review_panel' ||
     panel === 'hitl' ||
     panel === 'prod_selection' ||
     panel === 'auto_split_choice'
   ) {
-    return panel;
+    return panel as InterventionPanelKind;
   }
 
   const kind = (room.interventionKind || '').toLowerCase();

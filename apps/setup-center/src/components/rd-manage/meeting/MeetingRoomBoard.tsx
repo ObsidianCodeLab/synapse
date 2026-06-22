@@ -36,6 +36,7 @@ import { SolutionReviewPanel } from './SolutionReviewPanel';
 import { FuncSolutionReviewPanel } from './FuncSolutionReviewPanel';
 import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
+import { LeaderReviewSopPanel } from '../LeaderReviewSopPanel';
 import { MeetingProdSelectionPanel } from './panels/MeetingProdSelectionPanel';
 import { MeetingAutoSplitChoicePanel } from './panels/MeetingAutoSplitChoicePanel';
 import type {
@@ -2054,6 +2055,7 @@ const InterventionDialog = ({
       return nid === 'diff_analysis' ? '试飞优化评审' : '任务执行评审';
     }
     if (interventionPanel === 'node_review') return '结果待确认';
+    if (interventionPanel === 'leader_review_panel') return '研发组长评审';
     const k = (room?.interventionKind || '').toLowerCase();
     if (k === 'exception') return '异常待裁决';
     if (k === 'interactive') return '澄清待回复';
@@ -2760,6 +2762,17 @@ const InterventionDialog = ({
                   onDecided={() => setCenterTab('detail')}
                 />
               </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'leader_review_panel' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-[color:var(--panel)] p-6">
+                <LeaderReviewSopPanel
+                  synapseApiBase={synapseApiBase || ''}
+                  demandNo={room.ticketId}
+                  demandTitle={room.ticketTitle}
+                  taskNos={[]}
+                  currentUser={{ employee_id: 'local', name: '当前用户' }}
+                  onTaskComplete={() => setCenterTab('detail')}
+                />
+              </div>
             ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'hitl' && room.hitlFormSchema ? (
               <div className="h-full min-h-0 overflow-y-auto custom-scrollbar bg-[color:var(--panel)] p-6">
                 <div className="max-w-[920px] mx-auto">
@@ -2888,6 +2901,17 @@ const InterventionDialog = ({
                           initialPayload={room.funcSolutionReviewPayload ?? null}
                           blocked={room.funcSolutionBlocked}
                           readOnly
+                        />
+                      </div>
+                    ) : detailViewMode === 'review' && selectedNode.id === 'leader_review' ? (
+                      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-[color:var(--panel)] p-6">
+                        <LeaderReviewSopPanel
+                          key={`detail-lr-${room.id}`}
+                          synapseApiBase={synapseApiBase || ''}
+                          demandNo={room.ticketId}
+                          demandTitle={room.ticketTitle}
+                          taskNos={[]}
+                          currentUser={{ employee_id: 'local', name: '当前用户' }}
                         />
                       </div>
                     ) : detailViewMode === 'review' ? (
@@ -3025,6 +3049,7 @@ const InterventionDialog = ({
       <Modal
         title="重新处理"
         open={reprocessModalOpen}
+        closable={false}
         onCancel={() => {
           setReprocessModalOpen(false);
           setReprocessTargetNodeId(null);

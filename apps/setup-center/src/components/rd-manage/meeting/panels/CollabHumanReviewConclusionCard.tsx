@@ -26,7 +26,8 @@ type ConclusionView = {
 
 const CONCLUSION_MD_BY_NODE: Record<string, string> = {
   solution_review: '方案评审结论.md',
-  leader_review: '研发组长评审结论.md',
+  // leader_review 在评审过程中展示 AI 评审意见；人工全员通过后系统生成最终结论文档
+  leader_review: 'ai_review.md',
 };
 
 const STATUS_LABEL: Record<ReviewStatus, string> = {

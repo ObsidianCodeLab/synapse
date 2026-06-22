@@ -28,6 +28,7 @@ SYSTEM_PRESETS: list[AgentProfile] = [
             "whalecloud-dev-tool-doc-generate",
             "whalecloud-dev-tool-function-solution",
             "whalecloud-dev-tool-flight-optimize-plan",
+            "whalecloud-dev-tool-leader-review",
             "whalecloud-dev-tool-solution-review",
         ],
         skills_mode=SkillsMode.INCLUSIVE,
