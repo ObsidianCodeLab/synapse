@@ -263,6 +263,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p docs-site/.vitepress/dist
+          pip install -e ./synapse-plugin-sdk
           pip install -e ".[all]"
           pip install "pyinstaller>=6.18.0"
 
