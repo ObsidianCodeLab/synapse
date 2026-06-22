@@ -268,7 +268,11 @@ def _build_web_frontend(web_src: Path, web_dist: Path) -> None:
         run_cmd([npm, "install"], cwd=str(web_src))
 
     print("  Building web frontend (build:web)...")
-    run_cmd([npm, "run", "build:web"], cwd=str(web_src))
+    run_cmd(
+        [npm, "run", "build:web"],
+        cwd=str(web_src),
+        env={"NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=4096")},
+    )
 
 
 def check_pyinstaller():

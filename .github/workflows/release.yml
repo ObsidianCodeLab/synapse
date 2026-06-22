@@ -280,6 +280,8 @@ jobs:
           fi
 
       - name: Package Python backend (PyInstaller)
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: python build/build_backend.py
 
       - name: Copy backend to Tauri resources
