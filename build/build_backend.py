@@ -254,9 +254,21 @@ def normalize_macos_bundled_python(output_dir: Path) -> None:
         print("  [OK] Existing macOS bundled python launcher preserved")
 
 
+def _vite_heap_mb() -> int:
+    """Heap limit (MB) for the Node process that runs Vite."""
+    raw = os.environ.get("SYNAPSE_NODE_HEAP_MB", "").strip()
+    if raw:
+        try:
+            return max(2048, int(raw))
+        except ValueError:
+            pass
+    return 8192
+
+
 def _build_web_frontend(web_src: Path, web_dist: Path) -> None:
     """Build the web frontend (dist-web/) so packaged assets are always fresh."""
     npm = "npm.cmd" if sys.platform == "win32" else "npm"
+    node = "node.exe" if sys.platform == "win32" else "node"
     pkg_json = web_src / "package.json"
     if not pkg_json.exists():
         print(f"  [WARN] {pkg_json} not found, skipping web build")
@@ -267,11 +279,18 @@ def _build_web_frontend(web_src: Path, web_dist: Path) -> None:
         print("  Installing npm dependencies...")
         run_cmd([npm, "install"], cwd=str(web_src))
 
-    print("  Building web frontend (build:web)...")
+    vite_js = web_src / "node_modules" / "vite" / "bin" / "vite.js"
+    if not vite_js.is_file():
+        print(f"  [ERROR] Vite entry not found: {vite_js}")
+        sys.exit(1)
+
+    heap_mb = _vite_heap_mb()
+    print(f"  Building web frontend (vite build, node heap={heap_mb}MB)...")
+    # Invoke node with --max-old-space-size directly; NODE_OPTIONS via npm run is unreliable in CI.
     run_cmd(
-        [npm, "run", "build:web"],
+        [node, f"--max-old-space-size={heap_mb}", str(vite_js), "build"],
         cwd=str(web_src),
-        env={"NODE_OPTIONS": os.environ.get("NODE_OPTIONS", "--max-old-space-size=4096")},
+        env={"VITE_BUILD_TARGET": "web"},
     )
 
 

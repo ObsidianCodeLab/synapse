@@ -92,10 +92,10 @@ jobs:
       - name: Build web frontend
         working-directory: apps/setup-center
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          VITE_BUILD_TARGET: web
         run: |
           npm ci
-          npm run build:web
+          node --max-old-space-size=8192 node_modules/vite/bin/vite.js build
       
       - name: Install dependencies
         run: |
@@ -247,10 +247,10 @@ jobs:
       - name: Build web frontend for remote browser access
         working-directory: apps/setup-center
         env:
-          NODE_OPTIONS: --max-old-space-size=4096
+          VITE_BUILD_TARGET: web
         run: |
           npm ci
-          npm run build:web
+          node --max-old-space-size=8192 node_modules/vite/bin/vite.js build
 
       - name: Build user docs (VitePress)
         working-directory: docs-site
@@ -280,8 +280,6 @@ jobs:
           fi
 
       - name: Package Python backend (PyInstaller)
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
         run: python build/build_backend.py
 
       - name: Copy backend to Tauri resources
