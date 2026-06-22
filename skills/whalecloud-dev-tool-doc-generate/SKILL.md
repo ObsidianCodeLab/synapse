@@ -25,8 +25,9 @@ label: 文档生成工具
 | `templates/模块功能.md` | `模块功能.md` | 模块功能清单 |
 | `templates/函数级方案.md` | `函数级方案.md` | 函数级改造方案 |
 | `templates/试飞优化方案.md` | `试飞优化方案.md` | 试飞优化研发计划 |
+| `templates/研发组长评审报告.html` | `研发组长评审报告.html` | 研发组长综合评审 HTML 报告（由 `scripts/fill_leader_review.py` 填充） |
 
-新增模板：在 `templates/` 下放置 `{文件名}.md`，调用时设 `OUTPUT` 与文件名一致即可。
+新增模板：在 `templates/` 下放置 `{文件名}.md`，调用时设 `OUTPUT` 与文件名一致即可。HTML 模板额外需要对应的 `scripts/fill_*.py` 填充脚本。
 
 ---
 

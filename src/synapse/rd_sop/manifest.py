@@ -156,7 +156,6 @@ def is_human_only_node(node_id: str) -> bool:
 # 配置在 manifest 的节点：正常完成时阻断；配置关闭被跳过时也会在 on_node_complete 跳过链上拦截。
 # 试飞优化（diff_analysis）由 CLI 评审面板门控，不在此重复阻断。
 NODE_DOWNSTREAM_ADVANCE_BLOCKED: dict[str, str] = {
-    "unit_test": "任务检查检查点：确认后再继续下游 SOP",
 }
 
 

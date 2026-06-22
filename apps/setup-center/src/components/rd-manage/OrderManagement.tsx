@@ -82,6 +82,7 @@ import {
 import { ViewId } from '../../types';
 import { CollabHumanReviewConclusionCard } from './meeting/panels/CollabHumanReviewConclusionCard';
 import { MeetingNodeDetailPanel, type MeetingNodeVisualState } from './meeting/panels/MeetingNodeDetailPanel';
+import { LeaderReviewSopPanel } from './LeaderReviewSopPanel';
 import { Label } from '@/components/ui/label';
 import { SearchableVirtualSelect } from '@/components/product/SearchableVirtualSelect';
 import {
@@ -1633,37 +1634,20 @@ export const OrderManagement: React.FC<{
         );
       case 'leader_review':
         return (
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-slate-400">审批人列表</h4>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-800">
-                <div className="flex items-center gap-3">
-                  <Avatar className="bg-blue-500">张</Avatar>
-                  <div>
-                    <div className="text-sm text-slate-200">张三 (架构师)</div>
-                    <div className="text-xs text-slate-500">代码架构规范审查</div>
-                  </div>
-                </div>
-                {state === 'awaiting_human' ? <Badge status="warning" text="审核中" /> : <Badge status="success" text="已通过" />}
-              </div>
-              <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-800">
-                <div className="flex items-center gap-3">
-                  <Avatar className="bg-purple-500">李</Avatar>
-                  <div>
-                    <div className="text-sm text-slate-200">李四 (研发组长)</div>
-                    <div className="text-xs text-slate-500">业务逻辑综合审查</div>
-                  </div>
-                </div>
-                {state === 'awaiting_human' ? (
-                   <Button type="primary" size="small" className="bg-blue-600 text-xs border-none" onClick={() => handleJumpToMeeting()}>
-                     去研发会议室审批
-                   </Button>
-                ) : (
-                   <Badge status="success" text="已通过" />
-                )}
-              </div>
-            </div>
-          </div>
+          <LeaderReviewSopPanel
+            synapseApiBase={synapseApiBase || ''}
+            ticket={ticket}
+            currentUser={{ employee_id: 'local', name: '当前用户' }}
+            onOpenReviewCenter={onViewChange ? () => onViewChange('workbench_sandbox') : undefined}
+            onTaskComplete={() => {
+              // 标记需求单已完成
+              setTickets((prev) =>
+                prev.map((t) =>
+                  t.id === ticket.id ? { ...t, status: 'completed' as const } : t,
+                ),
+              );
+            }}
+          />
         );
       default:
         // Generic fallback for AI nodes

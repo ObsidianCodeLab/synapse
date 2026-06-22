@@ -47,6 +47,10 @@ const TeamViewView = lazy(() =>
   import("./views/rd-view/TeamViewView").then((m) => ({ default: m.TeamViewView })),
 );
 
+const LeaderReviewView = lazy(() =>
+  import("./views/rd-manage/LeaderReviewView").then((m) => ({ default: m.LeaderReviewView })),
+);
+
 import { FeedbackModal, type FeedbackPrefill } from "./views/FeedbackModal";
 import { IMConfigView } from "./views/IMConfigView";
 import { AgentSystemView } from "./views/AgentSystemView";
@@ -6406,7 +6410,7 @@ export function App() {
       return <MeetingRoomView synapseApiBase={httpApiBase()} />;
     }
     if (view === "workbench_sandbox") {
-      return <WorkbenchPlaceholderView titleKey="sidebar.workbenchSandbox" />;
+      return <LeaderReviewView synapseApiBase={httpApiBase()} />;
     }
     if (view === "workbench_team") {
       return <TeamViewView synapseApiBase={httpApiBase()} />;

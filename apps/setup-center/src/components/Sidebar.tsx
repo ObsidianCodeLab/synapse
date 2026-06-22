@@ -271,8 +271,8 @@ export function Sidebar({
             <div className={`navItem ${view === "workbench_meeting" ? "navItemActive" : ""}`} onClick={() => onViewChange("workbench_meeting")} role="button" tabIndex={0} title={t("sidebar.workbenchMeeting")}>
               <IconCalendar size={16} /> {!collapsed && <span>{t("sidebar.workbenchMeeting")}</span>}
             </div>
-            <div className={`navItem ${view === "workbench_sandbox" ? "navItemActive" : ""}`} onClick={() => onViewChange("workbench_sandbox")} role="button" tabIndex={0} title={t("sidebar.workbenchSandbox")}>
-              <IconTerminal size={16} /> {!collapsed && <span>{t("sidebar.workbenchSandbox")}</span>}
+            <div className={`navItem ${view === "workbench_sandbox" ? "navItemActive" : ""}`} onClick={() => onViewChange("workbench_sandbox")} role="button" tabIndex={0} title={t("sidebar.workbenchLeaderReview")}>
+              <IconShield size={16} /> {!collapsed && <span>{t("sidebar.workbenchLeaderReview")}</span>}
             </div>
             <div className={`navItem ${view === "workbench_team" ? "navItemActive" : ""}`} onClick={() => onViewChange("workbench_team")} role="button" tabIndex={0} title={t("sidebar.workbenchTeam")}>
               <IconUsers size={16} /> {!collapsed && <span>{t("sidebar.workbenchTeam")}</span>}

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>研发组长评审报告 — {{REQUIREMENT_NAME}}</title>
+<style>
+/* ─── 全局基础 ─────────────────────────────────────────── */
+:root {
+  --bg:        #0f1117;
+  --bg2:       #161b27;
+  --bg3:       #1e2433;
+  --border:    rgba(255,255,255,0.08);
+  --primary:   #6366f1;
+  --emerald:   #10b981;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --text:      #e2e8f0;
+  --muted:     #94a3b8;
+  --radius:    12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+a { color: var(--primary); text-decoration: none; }
+
+/* ─── 布局骨架 ──────────────────────────────────────────── */
+.page-wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+
+/* ─── 页眉 ──────────────────────────────────────────────── */
+.report-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 28px; margin-bottom: 36px;
+}
+.report-brand { display: flex; align-items: center; gap: 12px; }
+.report-brand .logo {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.report-brand h1 { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+.report-brand p  { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+.report-meta { text-align: right; }
+.report-meta p { font-size: .8rem; color: var(--muted); line-height: 1.9; }
+.report-meta strong { color: var(--text); }
+
+/* ─── 综合评分卡 ────────────────────────────────────────── */
+.score-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; margin-bottom: 36px;
+}
+.score-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 20px 16px;
+}
+.score-card .label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.score-card .value { font-size: 2rem; font-weight: 700; margin: 6px 0 4px; line-height: 1; }
+.score-card .sub   { font-size: .75rem; color: var(--muted); }
+.score-card.primary .value { color: var(--primary); }
+.score-card.green   .value { color: var(--emerald); }
+.score-card.amber   .value { color: var(--amber); }
+.score-card.red     .value { color: var(--red); }
+
+/* ─── 区块通用 ──────────────────────────────────────────── */
+section { margin-bottom: 40px; }
+.section-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1rem; font-weight: 700; color: var(--text);
+  margin-bottom: 16px;
+}
+.section-title .icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0;
+}
+
+/* ─── 卡片 ──────────────────────────────────────────────── */
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 24px;
+}
+.card + .card { margin-top: 12px; }
+
+/* ─── 结论摘要横幅 ─────────────────────────────────────── */
+.conclusion-banner {
+  background: linear-gradient(135deg, rgba(99,102,241,.15) 0%, rgba(139,92,246,.1) 100%);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: var(--radius); padding: 20px 24px;
+  margin-bottom: 36px;
+}
+.conclusion-banner p { color: var(--text); line-height: 1.8; }
+
+/* ─── 阶段产出时间线 ────────────────────────────────────── */
+.timeline { position: relative; padding-left: 20px; }
+.timeline::before {
+  content: ''; position: absolute; left: 6px; top: 0; bottom: 0;
+  width: 2px; background: var(--border);
+}
+.tl-item { position: relative; margin-bottom: 20px; }
+.tl-dot {
+  position: absolute; left: -20px; top: 5px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--primary); border: 2px solid var(--bg);
+}
+.tl-item.skipped .tl-dot { background: var(--muted); }
+.tl-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.tl-name { font-size: .9rem; font-weight: 600; color: var(--text); }
+.tl-badge {
+  font-size: .68rem; padding: 2px 8px; border-radius: 20px; font-weight: 500;
+}
+.tl-badge.done    { background: rgba(16,185,129,.15); color: var(--emerald); }
+.tl-badge.skipped { background: rgba(148,163,184,.1);  color: var(--muted); }
+.tl-summary { font-size: .83rem; color: var(--muted); line-height: 1.6; }
+
+/* ─── 代码变更 ─────────────────────────────────────────── */
+.diff-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.diff-table th, .diff-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.diff-table th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+.diff-stat { display: inline-flex; align-items: center; gap: 6px; }
+.diff-add  { color: var(--emerald); font-weight: 600; }
+.diff-del  { color: var(--red);     font-weight: 600; }
+
+/* ─── 测试用例 ─────────────────────────────────────────── */
+.test-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.test-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; font-size: .82rem;
+}
+.test-icon { font-size: 14px; flex-shrink: 0; }
+.test-name { flex: 1; color: var(--text); }
+.test-result { font-size: .72rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+.test-result.passed  { background: rgba(16,185,129,.15); color: var(--emerald); }
+.test-result.failed  { background: rgba(239,68,68,.15);  color: var(--red); }
+.test-result.skipped { background: rgba(148,163,184,.1);  color: var(--muted); }
+
+/* ─── 风险列表 ─────────────────────────────────────────── */
+.risk-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+}
+.risk-badge {
+  flex-shrink: 0; font-size: .7rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 6px; margin-top: 2px;
+}
+.risk-badge.high   { background: rgba(239,68,68,.15);   color: var(--red);     border: 1px solid rgba(239,68,68,.3); }
+.risk-badge.medium { background: rgba(245,158,11,.15); color: var(--amber);    border: 1px solid rgba(245,158,11,.3); }
+.risk-badge.low    { background: rgba(16,185,129,.12); color: var(--emerald);  border: 1px solid rgba(16,185,129,.3); }
+.risk-body h4 { font-size: .88rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.risk-body p  { font-size: .8rem;  color: var(--muted); line-height: 1.6; }
+.risk-body .mitigation { margin-top: 6px; font-size: .78rem; color: var(--emerald); }
+
+/* ─── 熵指标 ───────────────────────────────────────────── */
+.entropy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.entropy-item {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; text-align: center;
+}
+.entropy-item .e-val { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
+.entropy-item .e-label { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+/* ─── 评审人员 ─────────────────────────────────────────── */
+.reviewer-list { display: flex; flex-wrap: wrap; gap: 12px; }
+.reviewer-chip {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 40px; padding: 8px 16px 8px 8px;
+}
+.reviewer-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .9rem; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.reviewer-info .name { font-size: .85rem; font-weight: 600; color: var(--text); }
+.reviewer-info .role { font-size: .72rem; color: var(--muted); }
+
+/* ─── 页脚 ──────────────────────────────────────────────── */
+.report-footer {
+  margin-top: 60px; padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  font-size: .75rem; color: var(--muted);
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- 页眉 -->
+  <header class="report-header">
+    <div class="report-brand">
+      <div class="logo">🐳</div>
+      <div>
+        <h1>研发组长评审报告</h1>
+        <p>自动化研发全流程综合产出</p>
+      </div>
+    </div>
+    <div class="report-meta">
+      <p><strong>需求编号</strong>　{{DEMAND_NO}}</p>
+      <p><strong>需求标题</strong>　{{REQUIREMENT_NAME}}</p>
+      <p><strong>开发者</strong>　{{ASSIGNEE_NAME}}</p>
+      <p><strong>生成时间</strong>　{{GENERATED_AT}}</p>
+    </div>
+  </header>
+
+  <!-- 综合评分卡 -->
+  <div class="score-cards">
+    <div class="score-card {{SCORE_COLOR}}">
+      <div class="label">综合质量评分</div>
+      <div class="value">{{OVERALL_QUALITY_SCORE}}</div>
+      <div class="sub">满分 100 分</div>
+    </div>
+    <div class="score-card {{RISK_COLOR}}">
+      <div class="label">整体风险等级</div>
+      <div class="value">{{RISK_LEVEL_LABEL}}</div>
+      <div class="sub">{{RISK_LEVEL_DESC}}</div>
+    </div>
+    <div class="score-card green">
+      <div class="label">测试通过率</div>
+      <div class="value">{{TEST_PASS_RATE}}%</div>
+      <div class="sub">{{TEST_PASS_COUNT}} / {{TEST_TOTAL_COUNT}} 用例</div>
+    </div>
+    <div class="score-card primary">
+      <div class="label">代码变更行数</div>
+      <div class="value">{{TOTAL_LINES_CHANGED}}</div>
+      <div class="sub">+{{TOTAL_LINES_ADDED}} / -{{TOTAL_LINES_DELETED}}</div>
+    </div>
+  </div>
+
+  <!-- 综合结论横幅 -->
+  <div class="conclusion-banner">
+    <p>{{SUMMARY_CONCLUSION}}</p>
+  </div>
+
+  <!-- §1 阶段产出时间线 -->
+  <section>
+    <div class="section-title"><div class="icon">📋</div>研发阶段产出概览</div>
+    <div class="card">
+      <div class="timeline">
+        {{STAGE_SUMMARIES_HTML}}
+      </div>
+    </div>
+  </section>
+
+  <!-- §2 代码变更详情 -->
+  <section>
+    <div class="section-title"><div class="icon">💻</div>代码变更详情</div>
+    <div class="card">
+      <table class="diff-table">
+        <thead>
+          <tr>
+            <th>仓库</th><th>分支</th><th>提交数</th><th>新增行</th><th>删除行</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{DIFF_REPOS_ROWS_HTML}}
+        </tbody>
+      </table>
+      {{#if DIFF_SUMMARY}}
+      <p style="margin-top:14px;font-size:.83rem;color:var(--muted);">{{DIFF_SUMMARY}}</p>
+      {{/if}}
+    </div>
+  </section>
+
+  <!-- §3 测试用例 -->
+  <section>
+    <div class="section-title"><div class="icon">🧪</div>测试用例（{{TEST_TOTAL_COUNT}} 个）</div>
+    <div class="test-grid">
+      {{TEST_CASES_HTML}}
+    </div>
+  </section>
+
+  <!-- §4 风险项 -->
+  <section>
+    <div class="section-title"><div class="icon">⚠️</div>风险项（{{RISK_TOTAL_COUNT}} 项）</div>
+    {{RISK_ITEMS_HTML}}
+  </section>
+
+  <!-- §5 控熵指标 -->
+  <section>
+    <div class="section-title"><div class="icon">📊</div>控熵指标</div>
+    <div class="card">
+      <div class="entropy-grid">
+        <div class="entropy-item">
+          <div class="e-val">{{ENTROPY_AVG_COMPLEXITY}}</div>
+          <div class="e-label">平均复杂度</div>
+        </div>
+        <div class="entropy-item">
+          <div class="e-val">{{ENTROPY_MAX_COMPLEXITY}}</div>
+          <div class="e-label">最大方法复杂度</div>
+        </div>
+        <div class="entropy-item">
+          <div class="e-val">{{ENTROPY_DUPLICATE_LINES}}</div>
+          <div class="e-label">重复代码行数</div>
+        </div>
+        <div class="entropy-item">
+          <div class="e-val">{{ENTROPY_NEW_WARNINGS}}</div>
+          <div class="e-label">新增告警数</div>
+        </div>
+      </div>
+      {{#if ENTROPY_CONCLUSION}}
+      <p style="margin-top:16px;font-size:.83rem;color:var(--muted);">{{ENTROPY_CONCLUSION}}</p>
+      {{/if}}
+    </div>
+  </section>
+
+  <!-- §6 评审人员 -->
+  <section>
+    <div class="section-title"><div class="icon">👥</div>评审人员</div>
+    <div class="reviewer-list">
+      {{REVIEWERS_HTML}}
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer class="report-footer">
+    <span>由 Synapse 自动化研发助手生成</span>
+    <span>{{GENERATED_AT}}</span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,85 @@
+{
+  "_comment": "leader_review_context.skeleton.json — 研发组长评审报告 CONTEXT_JSON 骨架，所有顶层键必须出现，无数据时用空数组或空字符串",
+  "schema_version": 1,
+  "demand_no": "",
+  "requirement_name": "",
+  "assignee_name": "",
+  "generated_at": "",
+  "inputs": {
+    "req_clarify":          { "included": false, "path": null },
+    "module_func":          { "included": false, "path": null },
+    "acceptance":           { "included": false, "path": null },
+    "req_risk":             { "included": false, "path": null },
+    "func_solution":        { "included": false, "path": null },
+    "solution_review":      { "included": false, "path": null },
+    "entropy_gen":          { "included": false, "path": null },
+    "task_exec":            { "included": false, "path": null },
+    "diff_analysis":        { "included": false, "path": null },
+    "unit_test":            { "included": false, "path": null },
+    "dev_process_review":   { "included": false, "path": null },
+    "risk_review":          { "included": false, "path": null },
+    "entropy_review":       { "included": false, "path": null },
+    "solution_consistency": { "included": false, "path": null }
+  },
+  "summary": {
+    "scope_overview": "",
+    "key_changes": [],
+    "overall_risk_level": "low",
+    "overall_quality_score": 0,
+    "conclusion": ""
+  },
+  "stage_summaries": [
+    {
+      "stage": "",
+      "node_id": "",
+      "node_name": "",
+      "included": false,
+      "summary": ""
+    }
+  ],
+  "diff_stats": {
+    "repos": [
+      {
+        "repo_url": "",
+        "repo_name": "",
+        "branch": "",
+        "lines_added": 0,
+        "lines_deleted": 0,
+        "commit_count": 0,
+        "change_files": []
+      }
+    ],
+    "total_lines_added": 0,
+    "total_lines_deleted": 0,
+    "diff_summary": ""
+  },
+  "test_cases": [
+    { "name": "", "result": "passed" }
+  ],
+  "risk_items": [
+    {
+      "level": "low",
+      "title": "",
+      "description": "",
+      "mitigation": ""
+    }
+  ],
+  "entropy_stats": {
+    "avg_complexity": 0.0,
+    "max_complexity": 0,
+    "duplicate_lines": 0,
+    "new_warnings": 0,
+    "entropy_conclusion": ""
+  },
+  "reviewers": [
+    {
+      "employee_id": "",
+      "reviewer_name": "",
+      "role": "submitter"
+    }
+  ],
+  "output_files": {
+    "html_report": "",
+    "conclusion_md": ""
+  }
+}
