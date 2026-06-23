@@ -11,9 +11,6 @@ on:
         description: "要构建的 commit SHA 或分支（留空则用 tag 指向的 commit）"
         required: false
         default: ""
-  push:
-    tags:
-      - 'v*'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -170,23 +167,23 @@ jobs:
             args: ""
             suffix: "windows-x64"
           # Linux Ubuntu 22.04
-          - platform: ubuntu-22.04
-            bundles: "deb"
-            args: ""
-            suffix: "ubuntu22-amd64"
-          - platform: ubuntu-22.04-arm
-            bundles: "deb"
-            args: ""
-            suffix: "ubuntu22-arm64"
+          # - platform: ubuntu-22.04
+          #   bundles: "deb"
+          #   args: ""
+          #   suffix: "ubuntu22-amd64"
+          # - platform: ubuntu-22.04-arm
+          #   bundles: "deb"
+          #   args: ""
+          #   suffix: "ubuntu22-arm64"
           # Linux Ubuntu 24.04
-          - platform: ubuntu-24.04
-            bundles: "deb"
-            args: ""
-            suffix: "ubuntu24-amd64"
-          - platform: ubuntu-24.04-arm
-            bundles: "deb"
-            args: ""
-            suffix: "ubuntu24-arm64"
+          # - platform: ubuntu-24.04
+          #   bundles: "deb"
+          #   args: ""
+          #   suffix: "ubuntu24-amd64"
+          # - platform: ubuntu-24.04-arm
+          #   bundles: "deb"
+          #   args: ""
+          #   suffix: "ubuntu24-arm64"
           # macOS - Apple Silicon (arm64)
           - platform: macos-latest
             bundles: "app,dmg"
