@@ -224,7 +224,7 @@ function ReviewerCard({
       layout
       initial={{ opacity: 0, x: 12 }}
       animate={{ opacity: 1, x: 0 }}
-      className={`rounded-2xl border p-4 transition-colors ${
+      className={`flex flex-col rounded-2xl border p-4 transition-colors ${
         isApproved
           ? 'border-emerald-500/25 bg-emerald-500/6'
           : isRejected
@@ -232,89 +232,57 @@ function ReviewerCard({
           : 'border-white/8 bg-white/3'
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        {/* 头像 + 信息 */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar
-              size={42}
-              style={{
-                backgroundColor: avatarColor(reviewer.role),
-                flexShrink: 0,
-                fontSize: 16,
-                fontWeight: 600,
-              }}
-            >
-              {(reviewer.reviewer_name || reviewer.employee_id).slice(0, 1)}
-            </Avatar>
-            {isApproved && (
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0f172a]">
-                <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-              </span>
-            )}
-            {isRejected && (
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 ring-2 ring-[#0f172a]">
-                <XCircle className="h-2.5 w-2.5 text-white" />
-              </span>
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-slate-100">
-                {reviewer.reviewer_name || reviewer.employee_id}
-              </span>
-              {isSelf && (
-                <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-medium text-indigo-300">
-                  本人
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-slate-400 mt-0.5">{roleLabel}</div>
-          </div>
-        </div>
-
-        {/* 状态 / 操作 */}
-        <div className="shrink-0">
-          {isApproved ? (
-            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
-              <CheckCircle2 className="h-4 w-4" />
-              已通过
-            </div>
-          ) : isRejected ? (
-            <div className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
-              <XCircle className="h-4 w-4" />
-              已拒绝
-            </div>
-          ) : isSelf ? (
-            rejectMode ? null : (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  size="small"
-                  onClick={() => setRejectMode(true)}
-                  className="rounded-lg border-red-500/40 text-red-400 text-xs hover:bg-red-500/10"
-                >
-                  拒绝
-                </Button>
-                <Button
-                  type="primary"
-                  size="small"
-                  loading={approving}
-                  icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-                  onClick={onApprove}
-                  className="rounded-lg border-none bg-emerald-600 hover:bg-emerald-500 text-xs"
-                >
-                  通过
-                </Button>
-              </div>
-            )
-          ) : (
-            <div className="flex items-center gap-1.5 text-slate-400 text-xs">
-              <Clock className="h-3.5 w-3.5 animate-pulse" />
-              待评审
-            </div>
+      {/* 人员信息（独占一行，不与操作按钮挤在一起） */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="relative shrink-0">
+          <Avatar
+            size={42}
+            style={{
+              backgroundColor: avatarColor(reviewer.role),
+              flexShrink: 0,
+              fontSize: 16,
+              fontWeight: 600,
+            }}
+          >
+            {(reviewer.reviewer_name || reviewer.employee_id).slice(0, 1)}
+          </Avatar>
+          {isApproved && (
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0f172a]">
+              <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+            </span>
+          )}
+          {isRejected && (
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 ring-2 ring-[#0f172a]">
+              <XCircle className="h-2.5 w-2.5 text-white" />
+            </span>
           )}
         </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-slate-100 truncate">
+              {reviewer.reviewer_name || reviewer.employee_id}
+            </span>
+            {isSelf && (
+              <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-medium text-indigo-300 shrink-0">
+                本人
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 mt-0.5">{roleLabel}</div>
+        </div>
       </div>
+
+      {/* 评审意见展示 */}
+      {(isApproved || isRejected) && reviewer.comments && (
+        <div className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400 italic break-words">
+          "{reviewer.comments}"
+        </div>
+      )}
+      {(isApproved || isRejected) && reviewer.reviewed_at && (
+        <div className="mt-1 text-[10px] text-slate-600">
+          {reviewer.reviewed_at.slice(0, 16)}
+        </div>
+      )}
 
       {/* 拒绝理由输入 */}
       <AnimatePresence>
@@ -351,15 +319,45 @@ function ReviewerCard({
         )}
       </AnimatePresence>
 
-      {/* 评审意见展示 */}
-      {(isApproved || isRejected) && reviewer.comments && (
-        <div className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400 italic">
-          "{reviewer.comments}"
-        </div>
-      )}
-      {(isApproved || isRejected) && reviewer.reviewed_at && (
-        <div className="mt-1.5 text-[10px] text-slate-600">
-          {reviewer.reviewed_at.slice(0, 16)}
+      {/* 状态 / 操作：右下角独立一行 */}
+      {!rejectMode && (
+        <div className="mt-3 flex justify-end">
+          {isApproved ? (
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+              已通过
+            </div>
+          ) : isRejected ? (
+            <div className="flex items-center gap-1.5 text-red-400 text-xs font-medium">
+              <XCircle className="h-4 w-4" />
+              已拒绝
+            </div>
+          ) : isSelf ? (
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="small"
+                onClick={() => setRejectMode(true)}
+                className="rounded-lg border-red-500/40 text-red-400 text-xs hover:bg-red-500/10"
+              >
+                拒绝
+              </Button>
+              <Button
+                type="primary"
+                size="small"
+                loading={approving}
+                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                onClick={onApprove}
+                className="rounded-lg border-none bg-emerald-600 hover:bg-emerald-500 text-xs"
+              >
+                通过
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+              <Clock className="h-3.5 w-3.5 animate-pulse" />
+              待评审
+            </div>
+          )}
         </div>
       )}
     </motion.div>
