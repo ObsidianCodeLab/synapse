@@ -230,6 +230,14 @@
   --err: #ff6b6b;
 }
 
+/* ── Button: 消除浏览器默认 outline / focus ring ── */
+button {
+  outline: none;
+}
+button:focus-visible {
+  outline: none;
+}
+
 /* ── Scrollbar: hidden by default, visible on hover ── */
 * {
   scrollbar-width: thin;
@@ -975,7 +983,7 @@ a:hover {
   line-height: 1.35;
 }
 
-input:not([data-slot]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.rd-meeting-worker-picker__input),
+input:not([data-slot]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.rd-meeting-worker-picker__input):not(.ant-select-selection-search-input):not(.rd-leader-review-picker-input),
 select:not([data-slot]),
 textarea:not([data-slot]) {
   width: 100%;
@@ -1001,7 +1009,7 @@ textarea:not([data-slot]) {
   resize: vertical;
 }
 
-input:not([data-slot]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.rd-meeting-worker-picker__input):focus,
+input:not([data-slot]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.rd-meeting-worker-picker__input):not(.ant-select-selection-search-input):focus,
 select:not([data-slot]):focus,
 textarea:not([data-slot]):focus {
   border-color: var(--brand);
@@ -1024,7 +1032,7 @@ textarea:not([data-slot]):focus {
 
 /* (legacy btnSmall override removed; see status section) */
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert) {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn) {
   border: 0;
   cursor: pointer;
   border-radius: 14px;
@@ -1037,7 +1045,7 @@ button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNati
   transition: background 0.15s, border-color 0.15s;
 }
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
   background: var(--bg-app);
   border-color: var(--muted2);
 }
@@ -5642,6 +5650,291 @@ button.rd-meeting-config-switch--on:hover {
 .rd-meeting-config-drawer .rd-meeting-config-switch--off:hover,
 button.rd-meeting-config-switch--off:hover {
   background: #64748b !important;
+}
+
+/* 研发组长评审：内联控件 / 操作按钮 — 勿套用全局 button 灰框 */
+button.rd-leader-review-inline-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 9999px;
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  box-shadow: none;
+  outline: none;
+}
+button.rd-leader-review-inline-btn:focus,
+button.rd-leader-review-inline-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+button.rd-leader-review-action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: normal;
+  line-height: 1.25;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.15s, filter 0.15s;
+  box-shadow: none;
+  outline: none;
+}
+button.rd-leader-review-action-btn:focus,
+button.rd-leader-review-action-btn:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+button.rd-leader-review-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+textarea[data-slot="rd-leader-review-comment"]:focus {
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* 研发组长评审：填写意见弹窗 */
+.rd-leader-review-comment-modal .ant-modal-content {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.rd-leader-review-comment-modal-panel {
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--panel2) 94%, #1e1b4b) 0%,
+    color-mix(in srgb, var(--panel2) 98%, #0a0f1a) 100%
+  );
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(99, 102, 241, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.rd-leader-review-comment-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.rd-leader-review-comment-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(59, 130, 246, 0.25));
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: rgba(199, 210, 254, 0.95);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.18);
+}
+.rd-leader-review-comment-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.rd-leader-review-comment-modal-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+}
+button.rd-leader-review-comment-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  transition: background 0.15s, color 0.15s;
+}
+button.rd-leader-review-comment-modal-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+.rd-leader-review-comment-modal-body {
+  padding: 16px 18px 12px;
+}
+textarea.rd-leader-review-comment-modal-textarea,
+textarea[data-slot="rd-leader-review-comment"].rd-leader-review-comment-modal-textarea {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  box-sizing: border-box;
+  resize: none;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.65;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.15s, background 0.15s;
+}
+textarea.rd-leader-review-comment-modal-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 13px;
+}
+textarea.rd-leader-review-comment-modal-textarea:focus {
+  border-color: rgba(99, 102, 241, 0.55) !important;
+  background: rgba(0, 0, 0, 0.42) !important;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.25),
+    0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+  outline: none !important;
+}
+.rd-leader-review-comment-modal-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 0 2px;
+}
+.rd-leader-review-comment-modal-hint {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: 0.02em;
+}
+.rd-leader-review-comment-modal-count {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.38);
+}
+.rd-leader-review-comment-modal-count--warn {
+  color: rgba(251, 191, 36, 0.9);
+}
+.rd-leader-review-comment-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+button.rd-leader-review-comment-modal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  letter-spacing: normal;
+  transition: filter 0.15s, opacity 0.15s, background 0.15s;
+}
+button.rd-leader-review-comment-modal-btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+button.rd-leader-review-comment-modal-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.92);
+}
+button.rd-leader-review-comment-modal-btn--primary {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+button.rd-leader-review-comment-modal-btn--primary:hover {
+  filter: brightness(1.08);
+}
+
+/* 研发组长评审：添加评审人（原生 input，placeholder 与光标天然对齐） */
+.rd-leader-review-picker {
+  width: 100%;
+}
+input.rd-leader-review-picker-input,
+input[data-slot="rd-leader-review-picker-input"] {
+  display: block;
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 11px;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-size: 12px;
+  line-height: normal;
+  outline: none;
+  box-shadow: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input.rd-leader-review-picker-input::placeholder,
+input[data-slot="rd-leader-review-picker-input"]::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  line-height: normal;
+  opacity: 1;
+}
+input.rd-leader-review-picker-input:focus,
+input[data-slot="rd-leader-review-picker-input"]:focus {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: none;
+  outline: none;
+}
+ul.rd-leader-review-picker-dropdown {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--panel2) 96%, #0a0f1a);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+button.rd-leader-review-picker-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  box-shadow: none;
+  transition: background 0.12s;
+}
+button.rd-leader-review-picker-option:hover {
+  background: rgba(56, 189, 248, 0.14);
 }
 
 /* 研发会议室：节点卡片角标操作（终止 / 跨节点重处理）— 勿套用全局 button 灰框/灰底 */

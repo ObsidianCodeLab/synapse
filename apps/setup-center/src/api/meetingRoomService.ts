@@ -813,6 +813,29 @@ export async function submitTaskExecCommit(
   );
 }
 
+/** 研发组长评审面板数据（归档 HTML + userwork 研发单号） */
+export interface LeaderReviewPanelPayload {
+  room_id:            string;
+  scope_id:           string;
+  demand_no:          string;
+  report_html:        string;
+  task_nos:           string[];
+  prod:               string;
+  artifacts_ready:    boolean;
+  validation_errors?: string[];
+}
+
+export async function fetchLeaderReviewPanel(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<LeaderReviewPanelPayload> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<LeaderReviewPanelPayload>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/leader-review`,
+  );
+}
+
 export interface TaskExecCodeDiffFile {
   id: string;
   path: string;

@@ -11,6 +11,7 @@ InterventionPanel = Literal[
     "func_solution_review",
     "task_exec",
     "node_review",
+    "leader_review_panel",
     "hitl",
     "prod_selection",
     "auto_split_choice",
@@ -22,7 +23,7 @@ _COLLAB_DEDICATED_PANEL: dict[str, InterventionPanel] = {
     "func_solution": "func_solution_review",
     "task_exec": "task_exec",
     "diff_analysis": "task_exec",
-    "leader_review": "node_review",
+    "leader_review": "leader_review_panel",
 }
 
 
@@ -106,6 +107,8 @@ def resolve_intervention_panel(
         return "hitl"
 
     if kind == "result_confirm" or pending.get("review_payload"):
+        if nid == "leader_review":
+            return "leader_review_panel"
         return "node_review"
 
     if is_collab_sop_type(sop) and dedicated and kind in ("solution_review", "func_solution_review", "result_confirm", "gate", ""):
@@ -117,6 +120,10 @@ def resolve_intervention_panel(
             kind == "func_solution_review" or pending.get("func_solution_review_payload")
         ):
             return "func_solution_review"
+        if dedicated == "leader_review_panel" and (
+            kind == "result_confirm" or kind == "leader_review" or nid == "leader_review"
+        ):
+            return "leader_review_panel"
         if dedicated == "node_review" and (kind == "result_confirm" or pending.get("review_payload")):
             return "node_review"
 

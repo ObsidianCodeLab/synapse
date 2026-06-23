@@ -1637,6 +1637,7 @@ export const OrderManagement: React.FC<{
           <LeaderReviewSopPanel
             synapseApiBase={synapseApiBase || ''}
             ticket={ticket}
+            prod={ticket.prod}
             currentUser={{ employee_id: 'local', name: '当前用户' }}
             onOpenReviewCenter={onViewChange ? () => onViewChange('workbench_sandbox') : undefined}
             onTaskComplete={() => {

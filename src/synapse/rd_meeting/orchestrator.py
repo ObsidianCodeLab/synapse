@@ -1374,6 +1374,111 @@ class MeetingRoomOrchestrator:
             **gate,
         }
 
+    async def enter_leader_review_gate(
+        self,
+        *,
+        scope_type: str,
+        scope_id: str,
+        room_id: str,
+        node_id: str,
+        report_body: str,
+        tokens_used: int,
+        duration_seconds: int,
+        stage_id: int,
+        ticket_title: str,
+        skipped_nodes: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """研发组长评审：校验三件套后进入 LeaderReviewSopPanel（非 node_review 确认总结）。"""
+        from synapse.rd_meeting.leader_review_gate import (
+            build_leader_review_gate_payload,
+            load_leader_review_html,
+            validate_leader_review_artifacts,
+        )
+
+        sid = scope_id.strip()
+        set_phase(sid, "result_gate")
+        ok, val_errors = validate_leader_review_artifacts(sid)
+        if not ok:
+            gate = self.mark_human_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                reason=(
+                    f"{node_display_name(node_id)} 自动化研发报告未就绪："
+                    + "; ".join(val_errors)
+                ),
+                ticket_title=ticket_title,
+                hitl_form_schema=resolve_hitl_schema_for_gate(
+                    resolve_node_binding(node_id),
+                    dynamic_schema=None,
+                    reason="; ".join(val_errors),
+                    intervention_kind="exception",
+                ),
+                pending_delivery={
+                    "node_id": node_id,
+                    "report_body": report_body,
+                    "await_confirm": False,
+                    "tokens_used": tokens_used,
+                    "duration_seconds": duration_seconds,
+                    "stage_id": stage_id,
+                    "leader_review_gate": build_leader_review_gate_payload(sid),
+                },
+                intervention_kind="exception",
+            )
+            set_phase(sid, "exception_gate")
+            return {
+                "status": "human_intervention",
+                "node_id": node_id,
+                "exception": True,
+                "validation_errors": val_errors,
+                **gate,
+            }
+
+        report_html = load_leader_review_html(sid)
+        pending: dict[str, Any] = {
+            "node_id": node_id,
+            "report_body": report_body,
+            "await_confirm": True,
+            "tokens_used": tokens_used,
+            "duration_seconds": duration_seconds,
+            "stage_id": stage_id,
+            "leader_review_gate": build_leader_review_gate_payload(sid),
+        }
+        if report_html:
+            pending["report_html"] = report_html
+        gate = self.mark_human_gate(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            node_id=node_id,
+            reason=f"{node_display_name(node_id)} 待研发组长评审（查看自动化报告并完成多方评审）",
+            ticket_title=ticket_title,
+            hitl_form_schema=None,
+            pending_delivery=pending,
+            intervention_kind="leader_review",
+        )
+        append_history_event(
+            sid,
+            {
+                "event": "leader_review_gate",
+                "room_id": room_id,
+                "node_id": node_id,
+                "text": f"{node_display_name(node_id)} 待研发组长评审",
+                "intervention_kind": "leader_review",
+                "tokens_used": tokens_used,
+                "duration_seconds": duration_seconds,
+                "log_type": "info",
+            },
+        )
+        return {
+            "status": "human_intervention",
+            "node_id": node_id,
+            "skipped_nodes": skipped_nodes or None,
+            "pending_confirm": True,
+            **gate,
+        }
+
     def enter_task_exec_gate(
         self,
         *,
@@ -2062,6 +2167,7 @@ class MeetingRoomOrchestrator:
     ) -> dict[str, Any]:
         """human_confirm 且会中问卷已满足：装配 node_review 并进入 result_confirm 门控。"""
         from synapse.rd_meeting.func_solution_review import uses_func_solution_gate
+        from synapse.rd_meeting.leader_review_gate import uses_leader_review_gate
         from synapse.rd_meeting.solution_review import uses_solution_review_gate
 
         if uses_solution_review_gate(node_id):
@@ -2088,6 +2194,19 @@ class MeetingRoomOrchestrator:
                 duration_seconds=duration_seconds,
                 stage_id=stage_id,
                 ticket_title=ticket_title,
+            )
+        if uses_leader_review_gate(node_id):
+            return await self.enter_leader_review_gate(
+                scope_type=scope_type,
+                scope_id=scope_id,
+                room_id=room_id,
+                node_id=node_id,
+                report_body=report_body,
+                tokens_used=tokens_used,
+                duration_seconds=duration_seconds,
+                stage_id=stage_id,
+                ticket_title=ticket_title,
+                skipped_nodes=skipped_nodes,
             )
 
         sid = scope_id.strip()

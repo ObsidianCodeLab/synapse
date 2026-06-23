@@ -920,6 +920,34 @@ async def get_solution_review(room_id: str) -> dict:
     )
 
 
+@router.get("/api/dev/meeting-rooms/{room_id}/leader-review")
+async def get_leader_review_panel(room_id: str) -> dict:
+    """研发组长评审面板：归档 HTML 报告 + userwork 研发单号 + prod。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.leader_review_gate import load_leader_review_panel_payload
+
+    payload = load_leader_review_panel_payload(sid)
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    # pending 内可能带完整 HTML（与磁盘一致时优先用 API 聚合结果）
+    pending_html = str(pending.get("report_html") or "").strip()
+    if pending_html and not payload.get("report_html"):
+        payload["report_html"] = pending_html
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "demand_no": sid,
+            **payload,
+            "intervention_kind": room_state.get("intervention_kind"),
+            "pending_node_id": pending.get("node_id"),
+        }
+    )
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/solution-review/decision")
 async def submit_solution_review_decision(
     room_id: str,

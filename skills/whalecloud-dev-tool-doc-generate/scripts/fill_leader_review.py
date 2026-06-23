@@ -248,6 +248,7 @@ def fill(context: dict, template_text: str) -> str:
     # 占位符替换表
     replacements: dict[str, str] = {
         "DEMAND_NO":               he(context.get("demand_no", "")),
+        "TASK_NOS":                he(", ".join(str(t) for t in (context.get("task_nos") or []) if str(t).strip()) or "-"),
         "REQUIREMENT_NAME":        he(context.get("requirement_name", "")),
         "ASSIGNEE_NAME":           he(context.get("assignee_name", "")),
         "GENERATED_AT":            he(generated_at),

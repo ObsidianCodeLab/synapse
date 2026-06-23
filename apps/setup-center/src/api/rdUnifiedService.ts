@@ -33,6 +33,12 @@ export const RD_UNIFIED_PATHS = {
   destroyProd: "/dev/iwhalecloud/synapse/destroy_prod",
   /** 引导验证通过后登记处理人（后端 login / devservice-ip 也会调用） */
   rdViewAssigneeSave: "/dev/iwhalecloud/synapse/rd_view_assignee_save",
+  /** 研发组长评审报告（与产品管理相同：Tauri 直连统一服务 :10001） */
+  rdViewReportSubmit: "/dev/iwhalecloud/synapse/rd_view_report_submit",
+  rdViewReportSearch: "/dev/iwhalecloud/synapse/rd_view_report_search",
+  rdViewReportReview: "/dev/iwhalecloud/synapse/rd_view_report_review",
+  rdViewReportReviewerAdd: "/dev/iwhalecloud/synapse/rd_view_report_reviewer_add",
+  rdViewReportReviewersResolve: "/dev/iwhalecloud/synapse/rd_view_report_reviewers_resolve",
   entropyAnalysis: "/dev/iwhalecloud/synapse/entropy-analysis",
   entropyDetail: "/dev/iwhalecloud/synapse/entropy-detail",
 } as const;
@@ -465,6 +471,9 @@ export type IwhalecloudUserinfoSummary = {
   employee_id: string;
   access_token: string;
   has_access_token: boolean;
+  department?: string;
+  team?: string;
+  position?: string;
 };
 
 /** 本地 userinfo 摘要（含 Git Access Token，供引导与新建产品预填） */
@@ -475,6 +484,51 @@ export async function fetchIwhalecloudUserinfoSummary(
     synapseApiBase,
     "/api/dev/iwhalecloud/userinfo-summary",
   );
+}
+
+/**
+ * POST 研发统一服务 rd_view 类接口（与产品管理 getProdInfo 同路径）。
+ * 仅 Tauri：读 devservice.ip + proxyFetch → :10001。
+ */
+export async function postRdViewUnifiedData<T>(
+  _synapseApiBase: string,
+  relativePath: string,
+  body: unknown,
+  timeoutSecs = 60,
+): Promise<T> {
+  if (!IS_TAURI) {
+    throw new Error("rd_unified_tauri_only");
+  }
+  const host = await getDevserviceHost();
+  if (!host) {
+    throw new Error("missing_devservice_ip");
+  }
+  const resp = await postRdUnifiedJson<DevServiceResponse>(host, relativePath, body, timeoutSecs);
+  if (resp.code !== 0) {
+    throw new Error(resp.message || "rd_view_unified_failed");
+  }
+  return (resp.data ?? {}) as T;
+}
+
+/** 用本机 userinfo 登记处理人（解析审查人员前 best-effort 同步） */
+export async function syncRdViewAssigneeFromLocalUserinfo(synapseApiBase: string): Promise<void> {
+  if (!IS_TAURI) return;
+  const host = await getDevserviceHost();
+  if (!host) return;
+  const info = await fetchIwhalecloudUserinfoSummary(synapseApiBase);
+  const assigneeId = (info.employee_id || "").trim();
+  if (!assigneeId) return;
+  try {
+    await postRdUnifiedJson<DevServiceResponse>(host, RD_UNIFIED_PATHS.rdViewAssigneeSave, {
+      assignee_id: assigneeId,
+      assignee: (info.name || assigneeId).trim(),
+      department: (info.department || "").trim(),
+      team: (info.team || "").trim(),
+      position: (info.position || "").trim(),
+    });
+  } catch {
+    /* 登记失败不阻断后续 resolve */
+  }
 }
 
 /** POST 研发统一服务（Tauri `http_proxy_request`） */

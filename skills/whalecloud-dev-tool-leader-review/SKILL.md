@@ -161,19 +161,28 @@ label: 研发组长评审
     "new_warnings": 0,
     "entropy_conclusion": "控熵合规"
   },
-  "reviewers": [
-    {
-      "employee_id": "开发者工号",
-      "reviewer_name": "开发者姓名",
-      "role": "submitter"
-    }
-  ],
+  "reviewers": [],
   "output_files": {
     "html_report": "archive/研发实施/leader_review/研发组长评审报告.html",
     "ai_review_md": "archive/研发实施/leader_review/ai_review.md"
   }
 }
 ```
+
+### 审查人员（禁止 AI 生成）
+
+`leader_review.json` 中 **`reviewers` 固定留空数组 `[]`**。审查人员由前端/统一服务在自评提交时解析，**智能体不得臆造工号或姓名**。
+
+解析接口：`POST /dev/iwhalecloud/synapse/rd_view_report_reviewers_resolve`
+
+| 角色 | 来源 | 过滤规则 |
+|------|------|----------|
+| `submitter` | 当前用户（`SYNAPSE_RD_VIEW_ASSIGNEE`） | 始终保留 |
+| `team_lead` | 同 `department` + 同 `team` 且 `position=团队负责人` | 若即本人则剔除 |
+| `product_lead` | `prod_info.owner` 解析后关联 ASSIGNEE | 若即本人则剔除 |
+| `internal`（可选） | 同部门同团队非团队负责人、非本人 | 提交后手动添加 |
+
+依赖：`assignee_id`（当前工号）、`prod`（产品标识，解析产品负责人时必填）、`rd_view_assignee_save` 已同步组织信息。
 
 ### overall_risk_level 取值规则
 
@@ -254,7 +263,8 @@ Step 5 — 生成 AI 评审报告（write_file 直接写入，不调用 doc-gene
 Step 6 — （可选）推送统一服务
   6a. 若传入 UNIFIED_SERVICE_URL：
       读取 HTML 文件内容 → POST {UNIFIED_SERVICE_URL}/rd_view_report_submit
-      payload: { demand_no, submitter_id: assignee_id, report_html, diff_analysis, reviewers }
+      payload: { demand_no, submitter_id, report_html, diff_analysis }
+      **reviewers 由桌面端 resolve 接口解析后写入，AI 不在此步骤填充**
   6b. 若接口不通或未传入：跳过，仅落盘本地文件
 
 Step 7 — 自检

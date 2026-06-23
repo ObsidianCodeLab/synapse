@@ -158,7 +158,15 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
 
   if (panel === 'node_review' || kind === 'result_confirm') {
     const fromReview = (room.reviewPayload?.node_id || '').trim();
+    const targetNid = pendingNid || fromReview || current;
+    if (targetNid === 'leader_review') {
+      return 'leader_review';
+    }
     return fromReview || pendingNid || current;
+  }
+
+  if (panel === 'leader_review_panel' || kind === 'leader_review') {
+    return pendingNid || current || 'leader_review';
   }
 
   if (kind === 'interactive' || kind === 'exception' || room.hitlFormSchema) {
@@ -191,6 +199,12 @@ export function resolveMeetingInterventionPanel(
   if (room.status !== 'human_intervention' || room.hitlLocked) return null;
 
   const panel = (room.interventionPanel || '').trim();
+  if (
+    panel === 'node_review' &&
+    ((nodeId || room.currentNode || '').trim() === 'leader_review')
+  ) {
+    return 'leader_review_panel';
+  }
   if (
     panel === 'solution_review' ||
     panel === 'func_solution_review' ||
@@ -244,6 +258,9 @@ export function resolveMeetingInterventionPanel(
   }
 
   if (kind === 'result_confirm' || room.reviewPayload) {
+    if (nid === 'leader_review') {
+      return 'leader_review_panel';
+    }
     return 'node_review';
   }
 

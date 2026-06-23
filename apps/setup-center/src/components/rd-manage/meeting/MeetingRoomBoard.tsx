@@ -203,6 +203,21 @@ interface MeetingRoom {
   systemNodeDisplay?: Record<string, unknown> | null;
   /** 协作流全量刷新世代（重处理后递增，触发按节点 re-fetch） */
   chatEpoch?: number;
+  /** leader_review 节点归档 HTML 报告 */
+  leaderReviewReportHtml?: string;
+}
+
+
+function extractTaskNosFromRoom(room: MeetingRoom): string[] {
+  const fromTasks = (room.taskExecPayload?.tasks ?? [])
+    .map((t) => String(t.task_no || '').trim())
+    .filter(Boolean);
+  if (fromTasks.length > 0) return fromTasks;
+  const codeCommit = room.taskExecPayload?.code_commit as { tasks?: Array<{ task_no?: string }> } | null | undefined;
+  const fromCommit = (codeCommit?.tasks ?? [])
+    .map((t) => String(t.task_no || '').trim())
+    .filter(Boolean);
+  return fromCommit;
 }
 
 
@@ -408,6 +423,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         task_exec_payload?: TaskExecPayload;
         diff_analysis_payload?: TaskExecPayload;
         report_body?: string;
+        report_html?: string;
       }
     | undefined;
   const interventionKind =
@@ -545,6 +561,10 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
     nodeRecovery:
       (live.node_recovery as MeetingNodeRecovery | undefined) ?? room.nodeRecovery ?? null,
     systemNodeDisplay: nextSystemNodeDisplay ?? null,
+    leaderReviewReportHtml:
+      pendingDelivery?.report_html != null
+        ? String(pendingDelivery.report_html).trim() || undefined
+        : room.leaderReviewReportHtml,
   };
 }
 
@@ -958,6 +978,9 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
     chatSopKey: sopScopeKey(item.stage_id ?? 0, item.current_node_id || 'pending'),
     skippedNodeIds: item.skipped_node_ids ?? [],
     nodeRecovery: item.node_recovery ?? null,
+    leaderReviewReportHtml: String(
+      (item.room_state?.pending_delivery as { report_html?: string } | undefined)?.report_html || '',
+    ).trim() || undefined,
   };
 }
 
@@ -2763,12 +2786,15 @@ const InterventionDialog = ({
                 />
               </div>
             ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'leader_review_panel' ? (
-              <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-[color:var(--panel)] p-6">
+              <div className="min-h-0 flex-1 overflow-hidden">
                 <LeaderReviewSopPanel
                   synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
                   demandNo={room.ticketId}
                   demandTitle={room.ticketTitle}
-                  taskNos={[]}
+                  taskNos={extractTaskNosFromRoom(room)}
+                  prod={String((room.systemNodeDisplay as { prod?: string } | null)?.prod ?? '').trim() || undefined}
+                  initialReportHtml={room.leaderReviewReportHtml}
                   currentUser={{ employee_id: 'local', name: '当前用户' }}
                   onTaskComplete={() => setCenterTab('detail')}
                 />
@@ -2904,13 +2930,16 @@ const InterventionDialog = ({
                         />
                       </div>
                     ) : detailViewMode === 'review' && selectedNode.id === 'leader_review' ? (
-                      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar bg-[color:var(--panel)] p-6">
+                      <div className="min-h-0 flex-1 overflow-hidden">
                         <LeaderReviewSopPanel
                           key={`detail-lr-${room.id}`}
                           synapseApiBase={synapseApiBase || ''}
+                          roomId={room.id}
                           demandNo={room.ticketId}
                           demandTitle={room.ticketTitle}
-                          taskNos={[]}
+                          taskNos={extractTaskNosFromRoom(room)}
+                          prod={String((room.systemNodeDisplay as { prod?: string } | null)?.prod ?? '').trim() || undefined}
+                          initialReportHtml={room.leaderReviewReportHtml}
                           currentUser={{ employee_id: 'local', name: '当前用户' }}
                         />
                       </div>

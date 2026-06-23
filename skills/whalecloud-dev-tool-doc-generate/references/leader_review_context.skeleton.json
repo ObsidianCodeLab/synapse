@@ -2,6 +2,7 @@
   "_comment": "leader_review_context.skeleton.json — 研发组长评审报告 CONTEXT_JSON 骨架，所有顶层键必须出现，无数据时用空数组或空字符串",
   "schema_version": 1,
   "demand_no": "",
+  "task_nos": [],
   "requirement_name": "",
   "assignee_name": "",
   "generated_at": "",

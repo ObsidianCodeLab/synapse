@@ -1,79 +1,123 @@
 /**
- * 研发组长评审报告服务：提交、查询、评审接口封装
+ * 研发组长评审报告服务
  *
- * 对应后端路由 /api/dev/iwhalecloud/synapse/rd_view_report_*
+ * 与产品管理一致：评审报告 CRUD 直连研发统一服务（devservice.ip:10001），
+ * 不经 Synapse serve 转发。仅 code_merge / task_complete 仍走本机 Synapse API。
+ *
+ * 后端字段说明（SynapseService 侧）：
+ *   submitter_id / employee_id → 工号
+ *   conclusion                 → pending / approved / rejected
+ *   role                       → submitter / team_lead / product_lead / internal
  */
+import {
+  RD_UNIFIED_PATHS,
+  postRdViewUnifiedData,
+  syncRdViewAssigneeFromLocalUserinfo,
+} from '@/api/rdUnifiedService';
 
-// ── 数据类型 ───────────────────────────────────────────────────────────────
+// ── 角色常量 ──────────────────────────────────────────────────────────────────
 
-export interface ReviewerInfo {
-  reviewer_id:    string;
-  reviewer_name:  string;
-  reviewer_role:  string;
-  is_self_review: boolean;
+export const REVIEWER_ROLE_LABEL: Record<string, string> = {
+  submitter:    '开发者（自评）',
+  team_lead:    '团队负责人',
+  product_lead: '产品负责人',
+  internal:     '系统内部评审员',
+};
+
+// ── 数据类型 ──────────────────────────────────────────────────────────────────
+
+/** 单个评审人条目（来自后端） */
+export interface Reviewer {
+  id?:           number;
+  report_id:     string;
+  demand_no:     string;
+  employee_id:   string;
+  reviewer_name: string;
+  /** submitter | team_lead | product_lead | internal */
+  role:          string;
+  /** pending | approved | rejected */
+  conclusion:    'pending' | 'approved' | 'rejected';
+  comments:      string | null;
+  reviewed_at:   string | null;
 }
 
-export interface ReportReviewer {
-  id:             number;
-  report_id:      number;
-  demand_no:      string;
-  reviewer_id:    string;
-  reviewer_name:  string;
-  reviewer_role:  string;
-  review_state:   'pending' | 'approved' | 'rejected';
-  review_comment: string;
-  review_time:    string | null;
-  is_self_review: number;
-  push_sent:      number;
-}
-
+/** 报告主体（来自后端） */
 export interface ReportRecord {
-  id:               number;
-  demand_no:        string;
-  task_no:          string;
-  assignee_id:      string;
-  assignee_name:    string;
-  report_title:     string;
-  report_html:      string;
-  diff_summary:     string;
-  diff_detail:      string;
-  submit_time:      string;
-  remote_report_id: string | null;
-  overall_state:    'pending' | 'approved' | 'rejected';
+  report_id:      string;
+  demand_no:      string;
+  submitter_id:   string;
+  submitter_name: string;
+  /** pending | approved | rejected */
+  review_status:  'pending' | 'approved' | 'rejected';
+  report_html:    string;
+  diff_analysis:  unknown;
+  created_at:     string;
+  updated_at:     string;
+  reviewers:      Reviewer[];
+}
+
+/** 提交报告时传入的评审人信息 */
+export interface ReviewerInfo {
+  employee_id:   string;
+  reviewer_name: string;
+  /** submitter | team_lead | product_lead | internal */
+  role:          string;
 }
 
 export interface ReportSubmitResult {
-  report_id:        number;
-  remote_report_id: string | null;
-  report_title:     string;
-  unified_result:   unknown;
+  report_id:  string;
+  demand_no:  string;
+  reviewers:  Reviewer[];
 }
 
 export interface ReportSearchResult {
+  /** null 表示尚未提交报告 */
   report:        ReportRecord | null;
-  reviewers:     ReportReviewer[];
   overall_state: 'not_submitted' | 'pending' | 'approved' | 'rejected';
 }
 
-export interface ReportReviewResult {
-  ok:             boolean;
-  review_state:   string;
-  unified_result: unknown;
-  all_approved:   boolean;
+export interface ReviewResult {
+  report_id:     string;
+  review_status: string;
+  reviewers:     Reviewer[];
 }
+
+export interface AddReviewerResult {
+  report_id:  string;
+  reviewer:   Reviewer;
+}
+
+/** 审查人员解析结果（统一服务 DB 关联，非 AI 生成） */
+export interface ReviewersResolveResult {
+  submitter:         ReviewerInfo;
+  team_lead:         ReviewerInfo | null;
+  product_lead:      ReviewerInfo | null;
+  internal_options:  ReviewerInfo[];
+  default_reviewers: ReviewerInfo[];
+}
+
+function normalizeReviewerInfo(raw: Partial<ReviewerInfo>): ReviewerInfo {
+  return {
+    employee_id:   String(raw.employee_id ?? '').trim(),
+    reviewer_name: String(raw.reviewer_name ?? raw.employee_id ?? '').trim(),
+    role:          String(raw.role ?? 'internal').trim(),
+  };
+}
+
+// ── 网络层 ────────────────────────────────────────────────────────────────────
 
 type SynapseWire = {
   errorcode?: number;
-  message?: string;
-  data?: unknown;
+  message?:   string;
+  data?:      unknown;
 };
 
 async function postJson<T>(base: string, path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${base.replace(/\/$/, "")}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
+  const res = await fetch(`${base.replace(/\/$/, '')}${path}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(60_000),
   });
   const j = (await res.json()) as SynapseWire;
   if (j.errorcode !== 0 && j.errorcode !== undefined) {
@@ -82,109 +126,247 @@ async function postJson<T>(base: string, path: string, body: unknown): Promise<T
   return (j.data ?? j) as T;
 }
 
-// ── 接口函数 ──────────────────────────────────────────────────────────────
+function normalizeReviewer(r: Partial<Reviewer>): Reviewer {
+  return {
+    id:            r.id,
+    report_id:     r.report_id ?? '',
+    demand_no:     r.demand_no ?? '',
+    employee_id:   r.employee_id ?? '',
+    reviewer_name: r.reviewer_name ?? r.employee_id ?? '',
+    role:          r.role ?? 'internal',
+    conclusion:    (r.conclusion as Reviewer['conclusion']) ?? 'pending',
+    comments:      r.comments ?? null,
+    reviewed_at:   r.reviewed_at ?? null,
+  };
+}
+
+function normalizeReport(raw: Partial<ReportRecord>): ReportRecord {
+  return {
+    report_id:      raw.report_id ?? '',
+    demand_no:      raw.demand_no ?? '',
+    submitter_id:   raw.submitter_id ?? '',
+    submitter_name: raw.submitter_name ?? '',
+    review_status:  (raw.review_status as ReportRecord['review_status']) ?? 'pending',
+    report_html:    raw.report_html ?? '',
+    diff_analysis:  raw.diff_analysis ?? null,
+    created_at:     raw.created_at ?? '',
+    updated_at:     raw.updated_at ?? '',
+    reviewers:      Array.isArray(raw.reviewers)
+      ? (raw.reviewers as Partial<Reviewer>[]).map(normalizeReviewer)
+      : [],
+  };
+}
+
+// ── 接口函数 ──────────────────────────────────────────────────────────────────
 
 /**
- * 提交研发报告：用户自评通过后调用
+ * 提交研发报告（首次自评触发）
+ * 同时批量录入初始评审人（开发者 + 产品负责人 + 团队负责人）
  */
 export async function submitRdViewReport(
-  synapseApiBase: string,
-  params: {
-    demand_no:     string;
-    task_nos:      string[];
-    assignee_id:   string;
-    assignee_name: string;
-    report_title?: string;
-    report_html:   string;
-    diff_summary:  string;
-    diff_detail:   string;
-    reviewers:     ReviewerInfo[];
-  },
-): Promise<ReportSubmitResult> {
-  return postJson<ReportSubmitResult>(
-    synapseApiBase,
-    "/api/dev/iwhalecloud/synapse/rd_view_report_submit",
-    params,
-  );
-}
-
-/**
- * 查询报告及评审状态（含从统一服务同步最新评审进度）
- */
-export async function searchRdViewReport(
-  synapseApiBase: string,
-  demand_no: string,
-  assignee_id: string,
-): Promise<ReportSearchResult> {
-  return postJson<ReportSearchResult>(
-    synapseApiBase,
-    "/api/dev/iwhalecloud/synapse/rd_view_report_search",
-    { demand_no, assignee_id },
-  );
-}
-
-/**
- * 本机用户提交评审结论
- */
-export async function reviewRdViewReport(
-  synapseApiBase: string,
+  apiBase: string,
   params: {
     demand_no:      string;
-    reviewer_id:    string;
-    review_state:   'approved' | 'rejected';
-    review_comment: string;
+    submitter_id:   string;
+    submitter_name: string;
+    report_html:    string;
+    diff_analysis?: unknown;
+    reviewers:      ReviewerInfo[];
   },
-): Promise<ReportReviewResult> {
-  return postJson<ReportReviewResult>(
-    synapseApiBase,
-    "/api/dev/iwhalecloud/synapse/rd_view_report_review",
+): Promise<ReportSubmitResult> {
+  const raw = await postRdViewUnifiedData<Partial<ReportSubmitResult>>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportSubmit,
     params,
   );
+  return {
+    report_id: raw.report_id ?? '',
+    demand_no: raw.demand_no ?? params.demand_no,
+    reviewers: Array.isArray(raw.reviewers)
+      ? (raw.reviewers as Partial<Reviewer>[]).map(normalizeReviewer)
+      : [],
+  };
 }
 
 /**
- * 任务完成：代码合并成功后更新 userwork.json 中需求单/研发单状态为「已完成」
+ * 查询报告及评审人状态
+ * 返回 null report 表示尚未提交
  */
-export async function markTaskComplete(
-  synapseApiBase: string,
-  params: {
-    demand_no: string;
-    task_nos:  string[];
-  },
-): Promise<{ ok: boolean; updated_demand: boolean; updated_tasks: string[] }> {
-  return postJson(
-    synapseApiBase,
-    "/api/dev/iwhalecloud/rd_view_report_task_complete",
-    params,
+export async function searchRdViewReport(
+  apiBase:   string,
+  demand_no: string,
+): Promise<ReportSearchResult> {
+  type RawSearch = { report_id?: string; [k: string]: unknown } | null;
+  const raw = await postRdViewUnifiedData<RawSearch>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportSearch,
+    { demand_no },
   );
+  if (!raw || !raw.report_id) {
+    return { report: null, overall_state: 'not_submitted' };
+  }
+  const report = normalizeReport(raw as Partial<ReportRecord>);
+  const status = report.review_status;
+  const overall: ReportSearchResult['overall_state'] =
+    status === 'approved' ? 'approved'
+    : status === 'rejected' ? 'rejected'
+    : report.reviewers.length === 0 ? 'not_submitted'
+    : 'pending';
+  return { report, overall_state: overall };
 }
 
 /**
- * 代码合并：调用 Playwright 在研发云上执行代码合并
+ * 提交单个评审人的评审结论（自评 / 其他评审人）
+ */
+export async function reviewRdViewReport(
+  apiBase: string,
+  params: {
+    report_id:   string;
+    demand_no:   string;
+    employee_id: string;
+    conclusion:  'approved' | 'rejected';
+    comments?:   string;
+  },
+): Promise<ReviewResult> {
+  const raw = await postRdViewUnifiedData<Partial<ReviewResult>>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportReview,
+    params,
+  );
+  return {
+    report_id:     raw.report_id ?? params.report_id,
+    review_status: raw.review_status ?? 'pending',
+    reviewers:     Array.isArray(raw.reviewers)
+      ? (raw.reviewers as Partial<Reviewer>[]).map(normalizeReviewer)
+      : [],
+  };
+}
+
+/**
+ * 追加评审人（动态添加）
+ * 对应新接口 /api/dev/iwhalecloud/synapse/rd_view_report_reviewer_add
+ */
+export async function addReviewer(
+  apiBase: string,
+  params: {
+    report_id:     string;
+    demand_no:     string;
+    employee_id:   string;
+    reviewer_name: string;
+    role:          string;
+  },
+): Promise<AddReviewerResult> {
+  const raw = await postRdViewUnifiedData<Partial<AddReviewerResult>>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportReviewerAdd,
+    params,
+  );
+  return {
+    report_id: raw.report_id ?? params.report_id,
+    reviewer:  raw.reviewer ? normalizeReviewer(raw.reviewer as Partial<Reviewer>) : normalizeReviewer(params),
+  };
+}
+
+/**
+ * 解析审查人员：团队负责人 / 产品负责人 / 可选内部人员（非 AI 生成）
+ */
+export async function resolveReportReviewers(
+  apiBase: string,
+  params: {
+    assignee_id: string;
+    prod?:       string;
+  },
+): Promise<ReviewersResolveResult> {
+  await syncRdViewAssigneeFromLocalUserinfo(apiBase);
+  const raw = await postRdViewUnifiedData<Partial<ReviewersResolveResult>>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportReviewersResolve,
+    params,
+  );
+  const submitter = normalizeReviewerInfo(raw.submitter ?? {
+    employee_id: params.assignee_id,
+    reviewer_name: params.assignee_id,
+    role: 'submitter',
+  });
+  const teamLead = raw.team_lead ? normalizeReviewerInfo(raw.team_lead) : null;
+  const productLead = raw.product_lead ? normalizeReviewerInfo(raw.product_lead) : null;
+  const internalOptions = Array.isArray(raw.internal_options)
+    ? raw.internal_options.map((item) => normalizeReviewerInfo(item as Partial<ReviewerInfo>))
+    : [];
+  const defaultReviewers = Array.isArray(raw.default_reviewers)
+    ? raw.default_reviewers.map((item) => normalizeReviewerInfo(item as Partial<ReviewerInfo>))
+    : [submitter, ...(teamLead ? [teamLead] : []), ...(productLead ? [productLead] : [])];
+  return {
+    submitter,
+    team_lead: teamLead,
+    product_lead: productLead,
+    internal_options: internalOptions,
+    default_reviewers: defaultReviewers,
+  };
+}
+
+/**
+ * 代码合并
  */
 export async function triggerCodeMerge(
-  synapseApiBase: string,
+  apiBase: string,
   params: {
     username: string;
     password: string;
     taskNo:   string;
   },
 ): Promise<{ success: boolean; message: string }> {
-  const base = synapseApiBase.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/dev/iwhalecloud/code_merge`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-    signal: AbortSignal.timeout(180_000),
+  type MergeWire = { errorcode?: number; message?: string };
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/api/dev/iwhalecloud/code_merge`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(params),
+    signal:  AbortSignal.timeout(180_000),
   });
-  const j = (await res.json()) as SynapseWire;
+  const j = (await res.json()) as MergeWire;
   if (j.errorcode !== 0 && j.errorcode !== undefined) {
-    return { success: false, message: j.message || "code_merge_failed" };
+    return { success: false, message: j.message || 'code_merge_failed' };
   }
-  return { success: true, message: "合并成功" };
+  return { success: true, message: '合并成功' };
 }
 
-// ── HTML 报告生成器 ───────────────────────────────────────────────────────
+/**
+ * 任务完成（代码合并成功后更新 userwork.json 状态）
+ */
+export async function markTaskComplete(
+  apiBase: string,
+  params: { demand_no: string; task_nos: string[] },
+): Promise<{ ok: boolean }> {
+  return postJson(apiBase, '/api/dev/iwhalecloud/rd_view_report_task_complete', params);
+}
+
+// ── HTML 报告生成器 ───────────────────────────────────────────────────────────
+
+export interface SopNodeStat {
+  nodeId:          string;
+  nodeName:        string;
+  stageName:       string;
+  summary:         string;
+  /** 研发质量评分 0-100 */
+  qualityScore:    number;
+  /** 需求一致性评分 0-100 */
+  consistencyScore: number;
+  /** 人工介入次数 */
+  humanIntervCount: number;
+  /** 重试次数 */
+  retryCount:       number;
+  /** passed | warning | failed | skipped */
+  status:          'passed' | 'warning' | 'failed' | 'skipped';
+  artifacts:       string[];
+}
+
+export interface DiffFileEntry {
+  path:       string;
+  insertions: number;
+  deletions:  number;
+  /** added | modified | deleted */
+  changeType: 'added' | 'modified' | 'deleted';
+}
 
 export interface RdReportData {
   demandNo:      string;
@@ -192,313 +374,434 @@ export interface RdReportData {
   taskNos:       string[];
   assigneeName:  string;
   generateTime:  string;
-  /** SOP 各阶段关键产出摘要 */
-  stageSummaries: Array<{
-    stageName: string;
-    nodeId:    string;
-    nodeName:  string;
-    summary:   string;
-  }>;
-  /** 代码差异分析 */
+  /** 研发质量总分 0-100 */
+  overallScore:  number;
+  /** low | medium | high */
+  riskLevel:     'low' | 'medium' | 'high';
+  riskSummary:   string;
+  sopNodes:      SopNodeStat[];
   diffSummary:   string;
+  diffFiles:     DiffFileEntry[];
   diffStats: {
-    filesChanged:  number;
-    insertions:    number;
-    deletions:     number;
+    filesChanged: number;
+    insertions:   number;
+    deletions:    number;
   };
-  /** 测试案例 */
   testCases: Array<{
     name:   string;
     result: 'passed' | 'failed' | 'skipped';
   }>;
-  /** 风险评审结论 */
-  riskLevel:     'low' | 'medium' | 'high';
-  riskSummary:   string;
-  /** 熵指标 */
   entropyStats: {
-    avgComplexity:    number;
-    maxComplexity:    number;
-    duplicateLines:   number;
-    newWarnings:      number;
+    avgComplexity:  number;
+    maxComplexity:  number;
+    duplicateLines: number;
+    newWarnings:    number;
   };
 }
 
-/**
- * 生成自动化研发报告 HTML 字符串
- *
- * 该 HTML 用于在 leader_review 节点展示给评审人，
- * 以及推送给团队负责人 / 产品负责人。
- */
+function esc(s: string | number): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** 与 setup-center 全局 custom-scrollbar 一致的滚动条样式（iframe 内无法继承外层 CSS） */
+const REPORT_SCROLLBAR_STYLE = `<style id="synapse-report-scrollbar">
+*{scrollbar-width:thin;scrollbar-color:transparent transparent}
+*:hover{scrollbar-color:rgba(255,255,255,0.12) transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:transparent;border-radius:3px}
+*:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12)}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.35)}
+</style>`;
+
+/** 将旧版/归档报告标题统一为「自动化研发报告」 */
+export function patchReportHtmlTitle(html: string): string {
+  if (!html?.trim()) return html;
+  let result = html;
+  result = result.replace(
+    /<title>\s*研发组长评审报告([^<]*)<\/title>/gi,
+    '<title>自动化研发报告$1</title>',
+  );
+  result = result.replace(
+    /(<h1[^>]*>)\s*研发组长评审报告\s*(<\/h1>)/gi,
+    '$1自动化研发报告$2',
+  );
+  return result;
+}
+
+/** 向 iframe 报告 HTML 注入与下方评审面板一致的滚动条样式 */
+export function injectReportHtmlScrollbarStyles(html: string): string {
+  if (!html?.trim() || html.includes('synapse-report-scrollbar')) return html;
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${REPORT_SCROLLBAR_STYLE}\n</head>`);
+  }
+  return `${REPORT_SCROLLBAR_STYLE}${html}`;
+}
+
+/** 展示前统一处理归档/远程 HTML（标题、研发单号、滚动条） */
+export function prepareReportHtmlForDisplay(html: string, taskNos: string[]): string {
+  if (!html?.trim()) return html;
+  return injectReportHtmlScrollbarStyles(
+    patchReportHtmlTitle(patchReportHtmlTaskNos(html, taskNos)),
+  );
+}
+
+/** 向已有 HTML 报告补写研发单号（模板或旧版报告可能缺失该字段） */
+export function patchReportHtmlTaskNos(html: string, taskNos: string[]): string {
+  if (!html?.trim()) return html;
+  const label = taskNos.map((t) => t.trim()).filter(Boolean).join(', ') || '-';
+  const safe = esc(label);
+
+  // 已有非空研发单号则跳过
+  const hasTaskNo = /研发单(?:号)?[^<]{0,24}<[^>]*>\s*[^<\-\s][^<]*/.test(html)
+    || /🔧 研发单 <strong[^>]*>[^<-][^<]*/.test(html);
+  if (hasTaskNo) return html;
+
+  if (html.includes('🔧 研发单')) {
+    return html.replace(
+      new RegExp('(<span>🔧 研发单 <strong[^>]*>)[^<]*(</strong></span>)'),
+      `$1${safe}$2`,
+    );
+  }
+  if (html.includes('{{TASK_NOS}}')) {
+    return html.replace(/\{\{TASK_NOS\}\}/g, safe);
+  }
+  if (html.includes('<strong>研发单号</strong>')) {
+    return html.replace(
+      /(<p><strong>研发单号<\/strong>\s*[^<]*<\/p>)/,
+      `<p><strong>研发单号</strong>　${safe}</p>`,
+    );
+  }
+  if (html.includes('<strong>需求编号</strong>')) {
+    return html.replace(
+      /(<p><strong>需求编号<\/strong>[^<]*<\/p>)/,
+      `$1\n      <p><strong>研发单号</strong>　${safe}</p>`,
+    );
+  }
+  return html;
+}
+
+function scoreColor(score: number): string {
+  if (score >= 85) return '#22c55e';
+  if (score >= 70) return '#f59e0b';
+  return '#ef4444';
+}
+
+function scoreGrade(score: number): string {
+  if (score >= 90) return 'A';
+  if (score >= 80) return 'B';
+  if (score >= 70) return 'C';
+  if (score >= 60) return 'D';
+  return 'F';
+}
+
+function statusBadge(status: SopNodeStat['status']): string {
+  const map = {
+    passed:  ['✅', '#22c55e', '#052e16'],
+    warning: ['⚠️', '#f59e0b', '#1c1108'],
+    failed:  ['❌', '#ef4444', '#1c0505'],
+    skipped: ['⏭️', '#64748b', '#0f172a'],
+  };
+  const [icon, color, bg] = map[status] ?? map.skipped;
+  return `<span style="background:${bg};color:${color};border:1px solid ${color}44;padding:2px 8px;border-radius:999px;font-size:11px;white-space:nowrap">${icon} ${status}</span>`;
+}
+
 export function generateRdReportHtml(data: RdReportData): string {
   const riskColor = { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' }[data.riskLevel];
   const riskLabel = { low: '低风险', medium: '中风险', high: '高风险' }[data.riskLevel];
+  const gradeColor = scoreColor(data.overallScore);
 
-  const testTotal   = data.testCases.length;
-  const testPassed  = data.testCases.filter((t) => t.result === 'passed').length;
-  const testFailed  = data.testCases.filter((t) => t.result === 'failed').length;
-  const testRate    = testTotal > 0 ? Math.round((testPassed / testTotal) * 100) : 0;
+  const testTotal  = data.testCases.length;
+  const testPassed = data.testCases.filter((t) => t.result === 'passed').length;
+  const testRate   = testTotal > 0 ? Math.round((testPassed / testTotal) * 100) : 0;
+  const testRateColor = testRate === 100 ? '#22c55e' : testRate >= 80 ? '#f59e0b' : '#ef4444';
 
-  const stageSummaryRows = data.stageSummaries
-    .map(
-      (s) => `<tr>
-        <td class="px-4 py-3 text-sm font-medium text-slate-300">${escHtml(s.stageName)}</td>
-        <td class="px-4 py-3 text-sm text-slate-200">${escHtml(s.nodeName)}</td>
-        <td class="px-4 py-3 text-sm text-slate-400">${escHtml(s.summary)}</td>
-      </tr>`,
-    )
-    .join("\n");
+  // SOP 节点行
+  const sopRows = data.sopNodes.map((n, i) => `
+    <tr style="border-bottom:1px solid #1e293b;${i % 2 === 1 ? 'background:rgba(255,255,255,0.015)' : ''}">
+      <td style="padding:12px 16px;font-size:12px;color:#94a3b8;white-space:nowrap">${esc(n.stageName)}</td>
+      <td style="padding:12px 16px">
+        <div style="font-size:13px;font-weight:600;color:#e2e8f0">${esc(n.nodeName)}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;font-family:monospace">${esc(n.nodeId)}</div>
+      </td>
+      <td style="padding:12px 16px;font-size:12px;color:#94a3b8;line-height:1.6">${esc(n.summary)}</td>
+      <td style="padding:12px 16px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${scoreColor(n.qualityScore)};font-variant-numeric:tabular-nums">${n.qualityScore}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:1px">质量</div>
+      </td>
+      <td style="padding:12px 16px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:${scoreColor(n.consistencyScore)};font-variant-numeric:tabular-nums">${n.consistencyScore}</div>
+        <div style="font-size:10px;color:#64748b;margin-top:1px">一致性</div>
+      </td>
+      <td style="padding:12px 16px;text-align:center">
+        ${n.humanIntervCount > 0
+          ? `<span style="background:#1c1108;color:#f59e0b;border:1px solid #f59e0b44;padding:2px 8px;border-radius:999px;font-size:11px">${n.humanIntervCount}次介入</span>`
+          : `<span style="color:#334155;font-size:12px">—</span>`}
+        ${n.retryCount > 0
+          ? `<div style="margin-top:4px"><span style="background:#1c0505;color:#ef4444;border:1px solid #ef444444;padding:2px 8px;border-radius:999px;font-size:11px">${n.retryCount}次重试</span></div>`
+          : ''}
+      </td>
+      <td style="padding:12px 16px;text-align:center">${statusBadge(n.status)}</td>
+    </tr>`).join('');
 
-  const testRows = data.testCases
-    .map((tc) => {
-      const icon = tc.result === 'passed' ? '✅' : tc.result === 'failed' ? '❌' : '⏭️';
-      const cls  = tc.result === 'passed' ? 'text-green-400' : tc.result === 'failed' ? 'text-red-400' : 'text-slate-400';
-      return `<tr>
-        <td class="px-4 py-2 text-sm text-slate-300">${escHtml(tc.name)}</td>
-        <td class="px-4 py-2 text-sm ${cls}">${icon} ${tc.result}</td>
-      </tr>`;
-    })
-    .join("\n");
+  // 代码文件行
+  const diffRows = data.diffFiles.map((f) => {
+    const typeColor = f.changeType === 'added' ? '#22c55e' : f.changeType === 'deleted' ? '#ef4444' : '#f59e0b';
+    const typeLabel = f.changeType === 'added' ? '新增' : f.changeType === 'deleted' ? '删除' : '修改';
+    return `
+    <tr style="border-bottom:1px solid #1e293b">
+      <td style="padding:8px 16px;font-family:monospace;font-size:12px;color:#cbd5e1">${esc(f.path)}</td>
+      <td style="padding:8px 16px;text-align:center">
+        <span style="background:${typeColor}18;color:${typeColor};border:1px solid ${typeColor}44;padding:1px 6px;border-radius:4px;font-size:11px">${typeLabel}</span>
+      </td>
+      <td style="padding:8px 16px;text-align:right;color:#22c55e;font-family:monospace;font-size:12px">+${f.insertions}</td>
+      <td style="padding:8px 16px;text-align:right;color:#ef4444;font-family:monospace;font-size:12px">-${f.deletions}</td>
+    </tr>`;
+  }).join('');
+
+  // 测试行
+  const testRows = data.testCases.map((tc) => {
+    const [icon, color] = tc.result === 'passed' ? ['✅', '#22c55e'] : tc.result === 'failed' ? ['❌', '#ef4444'] : ['⏭️', '#64748b'];
+    return `<tr style="border-bottom:1px solid #1e293b">
+      <td style="padding:8px 16px;font-size:13px;color:#cbd5e1">${esc(tc.name)}</td>
+      <td style="padding:8px 16px;color:${color};font-size:12px">${icon} ${tc.result}</td>
+    </tr>`;
+  }).join('');
+
+  // 综合评分环形图 SVG（纯 CSS 模拟）
+  const scoreArc = Math.round(data.overallScore * 2.83); // circumference ≈ 283
 
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>自动化研发报告 · ${escHtml(data.demandNo)}</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>自动化研发报告 · ${esc(data.demandNo)}</title>
 <style>
-  body { font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
-  .gradient-header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f172a 100%); }
-  .glass-card { background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-  .stat-value { font-variant-numeric: tabular-nums; }
-  @media print { .no-print { display: none !important; } }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'PingFang SC','Microsoft YaHei','Inter',sans-serif;background:#060d1a;color:#e2e8f0;min-height:100vh;font-size:14px;line-height:1.6}
+.glass{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(12px)}
+.section{margin-bottom:24px;border-radius:16px;overflow:hidden}
+.section-head{padding:16px 24px;border-bottom:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:10px}
+.section-head h2{font-size:15px;font-weight:600;color:#f1f5f9}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#475569;padding:10px 16px;text-align:left;background:rgba(0,0,0,0.3)}
+.stat-card{border-radius:16px;padding:20px 24px;display:flex;flex-direction:column;gap:6px}
+.ring-wrap{position:relative;width:90px;height:90px;flex-shrink:0}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+@media print{body{background:#fff;color:#111}.glass{border:1px solid #e5e7eb}}
+*{scrollbar-width:thin;scrollbar-color:transparent transparent}
+*:hover{scrollbar-color:rgba(255,255,255,0.12) transparent}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:transparent;border-radius:3px}
+*:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.12)}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.35)}
 </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
+<body>
 
-<!-- 顶部 Banner -->
-<div class="gradient-header px-8 py-10 border-b border-slate-800/60">
-  <div class="max-w-5xl mx-auto">
-    <div class="flex items-center gap-3 mb-3">
-      <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center">
-        <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400 fill-current"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      </div>
+<!-- ── Banner ─────────────────────────────────────────────────────────────── -->
+<div style="background:linear-gradient(135deg,#0a0f1e 0%,#0d1b3e 45%,#070f1f 100%);padding:40px 40px 32px;border-bottom:1px solid #1e3a5f">
+  <div style="max-width:1100px;margin:0 auto">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap">
       <div>
-        <div class="text-xs text-slate-400 uppercase tracking-widest font-semibold">智能研发 · 自动化报告</div>
-        <h1 class="text-2xl font-bold text-white">${escHtml(data.demandTitle || data.demandNo)}</h1>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <div>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:#4a8fc4;font-weight:600">Synapse · 自动化研发报告</div>
+            <h1 style="font-size:24px;font-weight:700;color:#f0f9ff;margin-top:2px">${esc(data.demandTitle || data.demandNo)}</h1>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:#64748b">
+          <span>📋 需求单 <strong style="color:#94a3b8;font-family:monospace">${esc(data.demandNo)}</strong></span>
+          <span>🔧 研发单 <strong style="color:#94a3b8;font-family:monospace">${esc(data.taskNos.join(', ') || '-')}</strong></span>
+          <span>👤 提交人 <strong style="color:#94a3b8">${esc(data.assigneeName)}</strong></span>
+          <span>🕐 生成时间 <strong style="color:#94a3b8">${esc(data.generateTime)}</strong></span>
+        </div>
       </div>
-    </div>
-    <div class="flex flex-wrap gap-4 text-sm text-slate-400 mt-4">
-      <span>📋 需求单号：<span class="text-slate-200 font-mono">${escHtml(data.demandNo)}</span></span>
-      <span>🔧 研发单：<span class="text-slate-200 font-mono">${escHtml(data.taskNos.join(', ') || '-')}</span></span>
-      <span>👤 提交人：<span class="text-slate-200">${escHtml(data.assigneeName)}</span></span>
-      <span>🕐 生成时间：<span class="text-slate-200">${escHtml(data.generateTime)}</span></span>
+
+      <!-- 综合评分环 -->
+      <div style="text-align:center;flex-shrink:0">
+        <div class="ring-wrap" style="width:110px;height:110px">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle cx="55" cy="55" r="45" fill="none" stroke="#1e293b" stroke-width="10"/>
+            <circle cx="55" cy="55" r="45" fill="none" stroke="${gradeColor}" stroke-width="10"
+              stroke-dasharray="${scoreArc} 283" stroke-linecap="round" style="transition:stroke-dasharray .6s ease"/>
+          </svg>
+          <div class="ring-label">
+            <div style="font-size:26px;font-weight:800;color:${gradeColor};line-height:1">${data.overallScore}</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px">综合评分</div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="tag" style="color:${gradeColor};border-color:${gradeColor}44;background:${gradeColor}12;font-size:14px">
+            Grade ${scoreGrade(data.overallScore)}
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- 核心指标卡片 -->
-<div class="max-w-5xl mx-auto px-8 py-8">
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-    <!-- 风险等级 -->
-    <div class="glass-card rounded-2xl p-5 text-center">
-      <div class="text-3xl mb-1" style="color:${riskColor}">●</div>
-      <div class="text-lg font-bold stat-value" style="color:${riskColor}">${riskLabel}</div>
-      <div class="text-xs text-slate-500 mt-1">综合风险</div>
+<!-- ── 核心指标卡 ──────────────────────────────────────────────────────────── -->
+<div style="max-width:1100px;margin:0 auto;padding:28px 40px 0">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px">
+
+    <div class="glass stat-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#475569">综合风险</div>
+      <div style="font-size:28px;font-weight:800;color:${riskColor}">${riskLabel}</div>
+      <div style="font-size:12px;color:#64748b">${esc(data.riskSummary || '—').substring(0, 40)}${data.riskSummary?.length > 40 ? '…' : ''}</div>
     </div>
-    <!-- 代码变更 -->
-    <div class="glass-card rounded-2xl p-5 text-center">
-      <div class="text-3xl font-bold text-blue-400 stat-value">${data.diffStats.filesChanged}</div>
-      <div class="text-xs text-slate-400 mt-1">
-        <span class="text-green-400">+${data.diffStats.insertions}</span>
-        <span class="mx-1 text-slate-600">/</span>
-        <span class="text-red-400">-${data.diffStats.deletions}</span>
+
+    <div class="glass stat-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#475569">代码变更</div>
+      <div style="font-size:28px;font-weight:800;color:#60a5fa;font-variant-numeric:tabular-nums">${data.diffStats.filesChanged}</div>
+      <div style="font-size:12px;color:#64748b">
+        <span style="color:#34d399">+${data.diffStats.insertions}</span>
+        <span style="color:#475569;margin:0 4px">/</span>
+        <span style="color:#f87171">-${data.diffStats.deletions}</span>
+        &nbsp;行
       </div>
-      <div class="text-xs text-slate-500 mt-1">文件变更</div>
     </div>
-    <!-- 测试通过率 -->
-    <div class="glass-card rounded-2xl p-5 text-center">
-      <div class="text-3xl font-bold stat-value ${testRate === 100 ? 'text-green-400' : testRate >= 80 ? 'text-yellow-400' : 'text-red-400'}">${testRate}%</div>
-      <div class="text-xs text-slate-400 mt-1">${testPassed}/${testTotal} 通过</div>
-      <div class="text-xs text-slate-500 mt-1">测试通过率</div>
+
+    <div class="glass stat-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#475569">测试通过率</div>
+      <div style="font-size:28px;font-weight:800;color:${testRateColor};font-variant-numeric:tabular-nums">${testRate}%</div>
+      <div style="font-size:12px;color:#64748b">${testPassed} / ${testTotal} 用例通过</div>
     </div>
-    <!-- 最大复杂度 -->
-    <div class="glass-card rounded-2xl p-5 text-center">
-      <div class="text-3xl font-bold stat-value ${data.entropyStats.maxComplexity <= 10 ? 'text-green-400' : 'text-yellow-400'}">${data.entropyStats.maxComplexity}</div>
-      <div class="text-xs text-slate-400 mt-1">均值 ${data.entropyStats.avgComplexity}</div>
-      <div class="text-xs text-slate-500 mt-1">最大复杂度</div>
+
+    <div class="glass stat-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#475569">最大代码复杂度</div>
+      <div style="font-size:28px;font-weight:800;color:${data.entropyStats.maxComplexity <= 10 ? '#34d399' : '#f59e0b'};font-variant-numeric:tabular-nums">${data.entropyStats.maxComplexity}</div>
+      <div style="font-size:12px;color:#64748b">均值 ${data.entropyStats.avgComplexity} · 新增告警 ${data.entropyStats.newWarnings}</div>
+    </div>
+
+    <div class="glass stat-card">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#475569">重复代码行</div>
+      <div style="font-size:28px;font-weight:800;color:${data.entropyStats.duplicateLines === 0 ? '#34d399' : data.entropyStats.duplicateLines < 20 ? '#f59e0b' : '#ef4444'};font-variant-numeric:tabular-nums">${data.entropyStats.duplicateLines}</div>
+      <div style="font-size:12px;color:#64748b">阈值 ≤ 20 行</div>
+    </div>
+
+  </div>
+
+  <!-- ── SOP 节点评审明细 ───────────────────────────────────────────────── -->
+  <div class="section glass" style="margin-bottom:24px">
+    <div class="section-head">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#818cf8" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+      <h2>SOP 研发流水线 · 节点评审明细</h2>
+      <span class="tag" style="color:#818cf8;border-color:#818cf844;background:#818cf812;margin-left:auto">${data.sopNodes.length} 节点</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>阶段</th><th>节点</th><th>关键摘要</th>
+            <th style="text-align:center;width:80px">质量分</th>
+            <th style="text-align:center;width:80px">一致性</th>
+            <th style="text-align:center;width:110px">人工介入</th>
+            <th style="text-align:center;width:90px">状态</th>
+          </tr>
+        </thead>
+        <tbody>${sopRows || '<tr><td colspan="7" style="padding:24px;text-align:center;color:#475569">（暂无节点数据）</td></tr>'}</tbody>
+      </table>
     </div>
   </div>
 
-  <!-- SOP 流水线摘要 -->
-  <div class="glass-card rounded-2xl overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-700/50">
-      <h2 class="text-base font-semibold text-white flex items-center gap-2">
-        <svg viewBox="0 0 24 24" class="w-4 h-4 text-purple-400 fill-current"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-        研发流水线各阶段摘要
-      </h2>
-    </div>
-    <table class="w-full">
-      <thead>
-        <tr class="bg-slate-800/40">
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide w-28">阶段</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide w-36">节点</th>
-          <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wide">关键内容摘要</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-800/40">
-        ${stageSummaryRows}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 代码差异分析 -->
-  <div class="glass-card rounded-2xl overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-700/50">
-      <h2 class="text-base font-semibold text-white flex items-center gap-2">
-        <svg viewBox="0 0 24 24" class="w-4 h-4 text-cyan-400 fill-current"><path d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-        代码差异分析
-      </h2>
-    </div>
-    <div class="px-6 py-5">
-      <div class="flex gap-6 mb-4 text-sm">
-        <span class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>
-          文件变更 <strong class="text-white">${data.diffStats.filesChanged}</strong>
-        </span>
-        <span class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
-          新增行 <strong class="text-green-400">+${data.diffStats.insertions}</strong>
-        </span>
-        <span class="flex items-center gap-2">
-          <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
-          删除行 <strong class="text-red-400">-${data.diffStats.deletions}</strong>
-        </span>
-      </div>
-      <div class="bg-slate-900/60 rounded-xl p-4 text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed border border-slate-700/30">
-${escHtml(data.diffSummary || '（暂无差异摘要）')}
+  <!-- ── 代码差异分析 ───────────────────────────────────────────────────── -->
+  <div class="section glass" style="margin-bottom:24px">
+    <div class="section-head">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#22d3ee" stroke-width="2"><path d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+      <h2>代码差异分析</h2>
+      <div style="margin-left:auto;display:flex;gap:12px;font-size:12px">
+        <span><span style="color:#22c55e">+${data.diffStats.insertions}</span> 新增</span>
+        <span><span style="color:#ef4444">-${data.diffStats.deletions}</span> 删除</span>
+        <span style="color:#60a5fa">${data.diffStats.filesChanged} 文件</span>
       </div>
     </div>
+    ${data.diffSummary ? `<div style="padding:16px 24px">
+      <div style="background:rgba(0,0,0,0.4);border:1px solid #1e293b;border-radius:10px;padding:16px;font-family:monospace;font-size:12px;color:#94a3b8;white-space:pre-wrap;line-height:1.7">${esc(data.diffSummary)}</div>
+    </div>` : ''}
+    ${data.diffFiles.length > 0 ? `<table>
+      <thead><tr><th>文件路径</th><th style="width:80px">变更类型</th><th style="width:80px;text-align:right">新增</th><th style="width:80px;text-align:right">删除</th></tr></thead>
+      <tbody>${diffRows}</tbody>
+    </table>` : ''}
   </div>
 
-  <!-- 测试案例 -->
-  ${testTotal > 0 ? `<div class="glass-card rounded-2xl overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
-      <h2 class="text-base font-semibold text-white flex items-center gap-2">
-        <svg viewBox="0 0 24 24" class="w-4 h-4 text-green-400 fill-current"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        测试案例
-      </h2>
-      <span class="text-xs px-2.5 py-1 rounded-full ${testRate === 100 ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">
-        ${testPassed}/${testTotal} 通过
-      </span>
+  <!-- ── 测试案例 ────────────────────────────────────────────────────────── -->
+  ${testTotal > 0 ? `<div class="section glass" style="margin-bottom:24px">
+    <div class="section-head">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4ade80" stroke-width="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <h2>测试案例</h2>
+      <span class="tag" style="color:${testRateColor};border-color:${testRateColor}44;background:${testRateColor}12;margin-left:auto">${testPassed}/${testTotal} 通过</span>
     </div>
-    <table class="w-full">
-      <thead>
-        <tr class="bg-slate-800/40">
-          <th class="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase">测试名称</th>
-          <th class="px-4 py-2 text-left text-xs font-semibold text-slate-400 uppercase w-28">结果</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-800/40">${testRows}</tbody>
+    <table>
+      <thead><tr><th>测试名称</th><th style="width:120px">结果</th></tr></thead>
+      <tbody>${testRows}</tbody>
     </table>
   </div>` : ''}
 
-  <!-- 风险评审 -->
-  <div class="glass-card rounded-2xl overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-700/50">
-      <h2 class="text-base font-semibold text-white flex items-center gap-2">
-        <svg viewBox="0 0 24 24" class="w-4 h-4 fill-current" style="color:${riskColor}"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        风险评审结论
-      </h2>
-    </div>
-    <div class="px-6 py-5">
-      <div class="flex items-center gap-3 mb-3">
-        <span class="px-3 py-1 rounded-full text-xs font-semibold" style="background:${riskColor}22;color:${riskColor}">${riskLabel}</span>
-      </div>
-      <p class="text-sm text-slate-300 leading-relaxed">${escHtml(data.riskSummary || '（暂无风险说明）')}</p>
-    </div>
-  </div>
-
-  <!-- 熵指标 -->
-  <div class="glass-card rounded-2xl overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-slate-700/50">
-      <h2 class="text-base font-semibold text-white">控熵指标</h2>
-    </div>
-    <div class="px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-      <div>
-        <div class="text-2xl font-bold text-blue-400 stat-value">${data.entropyStats.avgComplexity}</div>
-        <div class="text-xs text-slate-500 mt-1">平均复杂度</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold stat-value ${data.entropyStats.maxComplexity <= 10 ? 'text-green-400' : 'text-yellow-400'}">${data.entropyStats.maxComplexity}</div>
-        <div class="text-xs text-slate-500 mt-1">最大复杂度</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold stat-value ${data.entropyStats.duplicateLines === 0 ? 'text-green-400' : data.entropyStats.duplicateLines < 20 ? 'text-yellow-400' : 'text-red-400'}">${data.entropyStats.duplicateLines}</div>
-        <div class="text-xs text-slate-500 mt-1">重复代码行</div>
-      </div>
-      <div>
-        <div class="text-2xl font-bold stat-value ${data.entropyStats.newWarnings === 0 ? 'text-green-400' : 'text-red-400'}">${data.entropyStats.newWarnings}</div>
-        <div class="text-xs text-slate-500 mt-1">新增告警</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 底部签章 -->
-  <div class="text-center text-xs text-slate-600 mt-12 pb-8">
-    <div>本报告由 Synapse 自动化研发系统生成 · ${escHtml(data.generateTime)}</div>
-    <div class="mt-1 opacity-50">需求单：${escHtml(data.demandNo)} · 仅供内部评审参考</div>
+  <!-- ── 底部签章 ────────────────────────────────────────────────────────── -->
+  <div style="text-align:center;padding:32px 0 48px;font-size:11px;color:#1e3a5f">
+    <div>本报告由 <strong style="color:#334155">Synapse 自动化研发系统</strong> 生成 · ${esc(data.generateTime)}</div>
+    <div style="margin-top:4px;opacity:.6">需求单：${esc(data.demandNo)} · 仅供内部评审参考，请勿对外发布</div>
   </div>
 </div>
 </body>
 </html>`;
 }
 
-function escHtml(str: string): string {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-/**
- * 根据 userwork.json 中的需求单信息、SOP 数据构造报告数据（前端调用）
- *
- * 注：各字段均为示例展示用途；生产环境中应从 SOP 归档文档中读取实际内容。
- */
+/** 构造示例报告数据（正式生产中应从 SOP 归档读取） */
 export function buildRdReportDataFromDemand(params: {
-  demandNo:     string;
-  demandTitle:  string;
-  taskNos:      string[];
-  assigneeName: string;
+  demandNo:      string;
+  demandTitle:   string;
+  taskNos:       string[];
+  assigneeName:  string;
   diffSummary?:  string;
-  diffDetail?:   string;
+  diffFiles?:    DiffFileEntry[];
+  sopNodes?:     SopNodeStat[];
 }): RdReportData {
   const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const defaultNodes: SopNodeStat[] = [
+    { nodeId: 'req_clarify',   nodeName: '需求澄清',   stageName: '需求分析', summary: '已完成需求澄清，确认功能范围与约束',     qualityScore: 90, consistencyScore: 92, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['需求澄清.md'] },
+    { nodeId: 'module_func',   nodeName: '模块功能',   stageName: '需求分析', summary: '功能模块拆分完成，改造边界清晰',         qualityScore: 88, consistencyScore: 90, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['模块功能.md'] },
+    { nodeId: 'acceptance',    nodeName: '验收标准',   stageName: '需求分析', summary: '验收标准已定义，覆盖核心功能点',         qualityScore: 85, consistencyScore: 87, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['验收标准.md'] },
+    { nodeId: 'func_solution', nodeName: '函数级方案', stageName: '需求设计', summary: '接口契约与数据结构经人工评审通过',       qualityScore: 87, consistencyScore: 89, humanIntervCount: 1, retryCount: 0, status: 'passed',  artifacts: ['函数级方案.md'] },
+    { nodeId: 'task_exec',     nodeName: '任务执行',   stageName: '研发实施', summary: '自动化开发完成，全部功能点已实现',       qualityScore: 82, consistencyScore: 85, humanIntervCount: 2, retryCount: 1, status: 'passed',  artifacts: ['任务执行记录.md'] },
+    { nodeId: 'unit_test',     nodeName: '测试案例',   stageName: '研发实施', summary: '单元测试覆盖核心逻辑，通过率 100%',      qualityScore: 95, consistencyScore: 93, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['测试案例说明.md'] },
+    { nodeId: 'risk_review',   nodeName: '风险评审',   stageName: '代码走查', summary: 'AI 综合评定：低风险，可推进合并',         qualityScore: 88, consistencyScore: 86, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['风险评审.md'] },
+    { nodeId: 'entropy_review',nodeName: '控熵评审',   stageName: '代码走查', summary: '控熵指标合规，无新增告警',               qualityScore: 90, consistencyScore: 88, humanIntervCount: 0, retryCount: 0, status: 'passed',  artifacts: ['控熵评审.md'] },
+  ];
+  const nodes = params.sopNodes ?? defaultNodes;
+  const avgScore = Math.round(nodes.reduce((s, n) => s + (n.qualityScore + n.consistencyScore) / 2, 0) / Math.max(nodes.length, 1));
   return {
     demandNo:     params.demandNo,
     demandTitle:  params.demandTitle,
     taskNos:      params.taskNos,
     assigneeName: params.assigneeName,
     generateTime: now,
-    stageSummaries: [
-      { stageName: '需求分析', nodeId: 'req_clarify',   nodeName: '需求澄清',   summary: '已完成需求澄清，确认功能范围与约束' },
-      { stageName: '需求分析', nodeId: 'module_func',   nodeName: '模块功能',   summary: '拆分功能模块，明确改造边界' },
-      { stageName: '需求分析', nodeId: 'acceptance',    nodeName: '验收标准',   summary: '各功能点验收标准已定义' },
-      { stageName: '需求设计', nodeId: 'func_solution', nodeName: '函数级方案', summary: '函数级接口契约与数据结构已评审通过' },
-      { stageName: '需求研发', nodeId: 'task_exec',     nodeName: '任务执行',   summary: '自动化开发完成，全部功能点已实现' },
-      { stageName: '需求研发', nodeId: 'unit_test',     nodeName: '测试案例',   summary: '单元测试覆盖核心逻辑，通过率 100%' },
-      { stageName: '代码走查', nodeId: 'risk_review',   nodeName: '风险评审',   summary: 'AI 综合评定：低风险，可推进合并' },
-      { stageName: '代码走查', nodeId: 'entropy_review',nodeName: '控熵评审',   summary: '控熵文件与代码改动一致，无新增告警' },
-    ],
-    diffSummary:  params.diffSummary || '（代码差异摘要将在正式提交后自动生成）',
-    diffDetail:   params.diffDetail  || '{}',
-    diffStats:    { filesChanged: 0, insertions: 0, deletions: 0 },
-    testCases:    [],
+    overallScore: avgScore,
     riskLevel:    'low',
     riskSummary:  '经 AI 自动评审，本次改造未引入高风险变更，可进入评审阶段。',
+    sopNodes:     nodes,
+    diffSummary:  params.diffSummary ?? '（代码差异摘要将在正式提交后自动生成）',
+    diffFiles:    params.diffFiles ?? [],
+    diffStats:    { filesChanged: (params.diffFiles ?? []).length, insertions: 0, deletions: 0 },
+    testCases:    [],
     entropyStats: { avgComplexity: 0, maxComplexity: 0, duplicateLines: 0, newWarnings: 0 },
   };
 }
+
+// 保留旧别名兼容 OrderManagement.tsx
+export type { ReportRecord as LegacyReportRecord };
+export type { Reviewer as ReportReviewer };
+export type { ReviewerInfo as LegacyReviewerInfo };
