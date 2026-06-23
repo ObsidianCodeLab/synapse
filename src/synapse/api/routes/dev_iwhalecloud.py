@@ -6014,21 +6014,54 @@ def code_merge(body: CodeMergeRequest):
             page.set_default_timeout(merge_timeout_ms)
             page.set_default_navigation_timeout(merge_timeout_ms)
 
-            page.goto(DEV_IWHALECLOUD_BASE_URL)
-            logger.info("打开研发云界面成功")
+            # 优先使用已保存的 session 直接跳转，完全跳过登录/SSO 流程
+            sess = _load_iwhalecloud_session()
+            if not sess or not (sess.get("token") or "").strip() or not (sess.get("cookies") or "").strip():
+                return error_response(
+                    401,
+                    "未找到有效的研发云会话，请先通过登录接口 /api/dev/iwhalecloud/login 完成登录",
+                )
+            csrf_token = sess["token"].strip()
+            cookies_str = sess["cookies"].strip()
+            logger.info("已加载 iwhalecloud_session，注入 Cookie 和 x-csrf-token")
 
-            page.fill('#edt_username', body.username)
-            page.fill('#edt_pwd', body.password)
-            logger.info("填写用户名和密码成功")
+            # 将 "name=value; ..." 字符串解析为 Playwright add_cookies 所需格式
+            parsed_cookies: list[dict] = []
+            for pair in cookies_str.split(";"):
+                pair = pair.strip()
+                if not pair:
+                    continue
+                name, _, value = pair.partition("=")
+                parsed_cookies.append({
+                    "name": name.strip(),
+                    "value": value.strip(),
+                    "domain": "dev.iwhalecloud.com",
+                    "path": "/",
+                })
+            if parsed_cookies:
+                context.add_cookies(parsed_cookies)
+            # extra headers 确保每个请求都带 csrf token
+            context.set_extra_http_headers({"x-csrf-token": csrf_token})
 
-            page.click('.loginBtn')
-            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
-            logger.info("登录成功")
-
-            page.locator('span.my-todo-item-pending-count[data-type="WORK_ITEM"]').click(
+            # 直接跳转门户主页；domcontentloaded 避免被持久长连接阻塞
+            page.goto(
+                f"{DEV_IWHALECLOUD_BASE_URL}/portal/main.html",
+                wait_until="domcontentloaded",
                 timeout=merge_timeout_ms,
             )
-            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("直接跳转门户，当前 URL: %s", page.url)
+
+            # 跳转后若落在登录/SSO 页，说明 session 已过期
+            if "login" in page.url or "sso" in page.url.lower():
+                return error_response(
+                    401,
+                    "研发云会话已过期，请重新调用 /api/dev/iwhalecloud/login 刷新登录",
+                )
+
+            # 点击左侧"事务管理"菜单导航（SPA 用 query param 而非 hash 路由）
+            page.wait_for_selector("text=事务管理", timeout=30_000)
+            page.locator("text=事务管理").first.click()
+            page.wait_for_selector("input.task-search-text", timeout=30_000)
             logger.info("进入事务管理界面成功")
 
             page.locator("input.task-search-text").fill(body.taskNo)
