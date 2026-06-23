@@ -55,8 +55,6 @@ import {
   reviewRdViewReport,
   triggerCodeMerge,
   markTaskComplete,
-  generateRdReportHtml,
-  buildRdReportDataFromDemand,
   REVIEWER_ROLE_LABEL,
   type Reviewer,
   type ReportRecord,
@@ -439,7 +437,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   const loadDemands = useCallback(async () => {
     setDemandsLoading(true);
     try {
-      const payload = await fetchRdManageDemands(base, { allowMockFallback: true });
+      const payload = await fetchRdManageDemands(base, { allowMockFallback: false });
       const leaderReviewDemands = (payload.list ?? []).filter(
         (d) =>
           d.sop_node === '研发组长评审' ||
@@ -450,6 +448,9 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       if (!selectedNo && leaderReviewDemands.length > 0) {
         setSelectedNo(leaderReviewDemands[0].demand_no);
       }
+    } catch (err: unknown) {
+      toast.error(`加载工单列表失败：${err instanceof Error ? err.message : String(err)}`);
+      setDemands([]);
     } finally {
       setDemandsLoading(false);
     }
@@ -469,17 +470,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
 
     try {
       const res = await searchRdViewReport(base, demandNo);
-
-      let html = res.report?.report_html || '';
-      if (!html) {
-        const data = buildRdReportDataFromDemand({
-          demandNo,
-          demandTitle: demand.demand_title,
-          taskNos,
-          assigneeName: currentUser.name,
-        });
-        html = generateRdReportHtml(data);
-      }
+      const html = res.report?.report_html?.trim() || '';
 
       setReviewState({
         demandNo,
@@ -497,7 +488,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       }
       setReviewState((prev) => prev ? { ...prev, loading: false } : null);
     }
-  }, [base, currentUser, demands]);
+  }, [base, demands]);
 
   useEffect(() => {
     if (!selectedNo) return;
@@ -510,6 +501,10 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   // 自评 / 通过
   const handleApprove = async () => {
     if (!reviewState) return;
+    if (!reviewState.reportRecord?.report_id && !reviewState.reportHtml.trim()) {
+      toast.warning('报告尚未生成，请先在流水线完成研发组长评审归档');
+      return;
+    }
     setApproving(true);
     try {
       let reportId = reviewState.reportRecord?.report_id;

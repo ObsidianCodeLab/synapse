@@ -38,13 +38,11 @@ import {
   resolveReportReviewers,
   triggerCodeMerge,
   markTaskComplete,
-  generateRdReportHtml,
-  buildRdReportDataFromDemand,
   prepareReportHtmlForDisplay,
-  injectReportHtmlScrollbarStyles,
   REVIEWER_ROLE_LABEL,
   type Reviewer,
   type ReportRecord,
+  type ReportReviewerPatchItem,
   type ReviewerInfo,
   type ReviewersResolveResult,
 } from '@/api/rdViewReportService';
@@ -737,19 +735,70 @@ export function LeaderReviewSopPanel({
     }
   }, [synapseApiBase, demandNo]);
 
-  // ── 生成报告 HTML ────────────────────────────────────────────────────────────
+  /** 与下方评审表同源，用于回填报告 HTML §6 评审人员章节 */
+  const reportReviewersForHtml = useMemo((): ReportReviewerPatchItem[] => {
+    if (reviewers.length > 0) {
+      return reviewers.map((rv) => ({
+        employee_id:   rv.employee_id,
+        reviewer_name: rv.reviewer_name || rv.employee_id,
+        role:          rv.role,
+        conclusion:    rv.conclusion,
+        comments:      rv.comments,
+      }));
+    }
+
+    const rows: ReportReviewerPatchItem[] = [];
+    const seen = new Set<string>();
+
+    const push = (info: ReviewerInfo, conclusion: ReportReviewerPatchItem['conclusion'] = 'pending') => {
+      const eid = info.employee_id?.trim();
+      if (!eid || seen.has(eid)) return;
+      seen.add(eid);
+      rows.push({
+        employee_id:   eid,
+        reviewer_name: info.reviewer_name || eid,
+        role:          info.role,
+        conclusion,
+      });
+    };
+
+    push(
+      {
+        employee_id:   effectiveUser.employee_id,
+        reviewer_name: effectiveUser.name,
+        role:          'submitter',
+      },
+      selfDisplayConclusion,
+    );
+
+    if (resolved?.team_lead) push(resolved.team_lead);
+    if (resolved?.product_lead) push(resolved.product_lead);
+    for (const pr of pendingReviewers) push(pr);
+
+    return rows;
+  }, [reviewers, effectiveUser, resolved, pendingReviewers, selfDisplayConclusion]);
+
+  // ── 生成报告 HTML（含 §6 评审人员回填） ─────────────────────────────────────
   useEffect(() => {
-    const patch = (html: string) => prepareReportHtmlForDisplay(html, taskNos);
+    const patch = (html: string) => prepareReportHtmlForDisplay(html, taskNos, reportReviewersForHtml);
     const archivedHtml = panelReportHtml || initialReportHtml || '';
     if (report?.report_html) {
       setReportHtml(patch(report.report_html));
     } else if (archivedHtml.trim()) {
       setReportHtml(patch(archivedHtml));
     } else {
-      const data = buildRdReportDataFromDemand({ demandNo, demandTitle, taskNos, assigneeName: effectiveUser.name });
-      setReportHtml(injectReportHtmlScrollbarStyles(generateRdReportHtml(data)));
+      setReportHtml('');
     }
-  }, [report, panelReportHtml, initialReportHtml, demandNo, demandTitle, taskNos, effectiveUser.name]);
+  }, [
+    report,
+    panelReportHtml,
+    initialReportHtml,
+    demandNo,
+    demandTitle,
+    taskNos,
+    effectiveUser.name,
+    reportReviewersForHtml,
+  ]);
 
   // ── 首次加载 + 轮询（已提交后每 20s 刷新） ─────────────────────────────────
   useEffect(() => {
@@ -772,6 +821,10 @@ export function LeaderReviewSopPanel({
   // ── 自评处理器（由 ReviewTable 中「评审推送」按钮触发） ─────────────────────
   const handleSelfReview = useCallback(async () => {
     const comment = selfDraftComment;
+    if (!report?.report_id && !reportHtml.trim()) {
+      toast.warning('报告尚未归档，请等待流水线生成研发组长评审报告');
+      return;
+    }
     setSelfDisplayConclusion('approved');
     setSelfReviewing(true);
     try {

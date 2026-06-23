@@ -443,12 +443,91 @@ export function injectReportHtmlScrollbarStyles(html: string): string {
   return `${REPORT_SCROLLBAR_STYLE}${html}`;
 }
 
-/** 展示前统一处理归档/远程 HTML（标题、研发单号、滚动条） */
-export function prepareReportHtmlForDisplay(html: string, taskNos: string[]): string {
+/** 回填报告 §6「评审人员」章节的条目（与 fill_leader_review.py 结构对齐，并含评审结论） */
+export type ReportReviewerPatchItem = {
+  employee_id?:   string;
+  reviewer_name:  string;
+  role:             string;
+  conclusion?:      Reviewer['conclusion'];
+  comments?:        string | null;
+};
+
+const REVIEWER_AVATAR_COLOR: Record<string, string> = {
+  submitter:    '#6366f1',
+  team_lead:    '#3b82f6',
+  product_lead: '#f59e0b',
+  internal:     '#8b5cf6',
+};
+
+const REVIEWER_CONCLUSION_STYLE: Record<
+  NonNullable<ReportReviewerPatchItem['conclusion']>,
+  { text: string; color: string }
+> = {
+  approved: { text: '已通过', color: '#22c55e' },
+  rejected: { text: '已驳回', color: '#ef4444' },
+  pending:  { text: '待评审', color: '#94a3b8' },
+};
+
+/** 生成与归档 HTML 模板一致的 reviewer-chip 列表（含评审状态） */
+export function buildReviewersSectionHtml(reviewers: ReportReviewerPatchItem[]): string {
+  return reviewers.map((rv) => {
+    const name = (rv.reviewer_name || rv.employee_id || '').trim() || '—';
+    const role = rv.role || 'internal';
+    const roleLabel = REVIEWER_ROLE_LABEL[role] ?? role;
+    const color = REVIEWER_AVATAR_COLOR[role] ?? '#64748b';
+    const initial = esc(name.slice(0, 1) || '?');
+    const conclusion = rv.conclusion ?? 'pending';
+    const status = REVIEWER_CONCLUSION_STYLE[conclusion];
+    const comment = (rv.comments || '').trim();
+    const titleAttr = comment ? ` title="${esc(comment)}"` : '';
+    const commentLine = comment
+      ? `<div class="review-comment" style="margin-top:4px;font-size:.68rem;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(comment)}</div>`
+      : '';
+    return `
+        <div class="reviewer-chip"${titleAttr}>
+          <div class="reviewer-avatar" style="background:${color}">${initial}</div>
+          <div class="reviewer-info">
+            <div class="name">${esc(name)}</div>
+            <div class="role">${esc(roleLabel)}</div>
+            <div class="review-status" style="margin-top:3px;font-size:.68rem;font-weight:600;color:${status.color};">${esc(status.text)}</div>
+            ${commentLine}
+          </div>
+        </div>`;
+  }).join('\n');
+}
+
+/**
+ * 将评审人员及评审结论回填进报告 HTML 的「§6 评审人员」章节。
+ * 在每次 search/resolve 刷新后调用，使 iframe 与下方评审表保持一致。
+ */
+export function patchReportHtmlReviewers(html: string, reviewers: ReportReviewerPatchItem[]): string {
   if (!html?.trim()) return html;
-  return injectReportHtmlScrollbarStyles(
-    patchReportHtmlTitle(patchReportHtmlTaskNos(html, taskNos)),
-  );
+  const inner = reviewers.length > 0
+    ? buildReviewersSectionHtml(reviewers)
+    : '<p style="margin:0;font-size:.8rem;color:#64748b;">暂无评审人员</p>';
+
+  const reviewerListRe = /(<div class="reviewer-list"\s*>)([\s\S]*?)(<\/div>)/i;
+  if (reviewerListRe.test(html)) {
+    return html.replace(reviewerListRe, `$1\n${inner}\n      $3`);
+  }
+  if (html.includes('{{REVIEWERS_HTML}}')) {
+    return html.replace(/\{\{REVIEWERS_HTML\}\}/g, inner);
+  }
+  return html;
+}
+
+/** 展示前统一处理归档/远程 HTML（标题、研发单号、评审人员、滚动条） */
+export function prepareReportHtmlForDisplay(
+  html: string,
+  taskNos: string[],
+  reviewers?: ReportReviewerPatchItem[],
+): string {
+  if (!html?.trim()) return html;
+  let result = patchReportHtmlTitle(patchReportHtmlTaskNos(html, taskNos));
+  if (reviewers !== undefined) {
+    result = patchReportHtmlReviewers(result, reviewers);
+  }
+  return injectReportHtmlScrollbarStyles(result);
 }
 
 /** 向已有 HTML 报告补写研发单号（模板或旧版报告可能缺失该字段） */
