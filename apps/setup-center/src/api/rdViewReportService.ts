@@ -522,14 +522,32 @@ const REVIEWER_AVATAR_COLOR: Record<string, string> = {
 
 const REVIEWER_CONCLUSION_STYLE: Record<
   NonNullable<ReportReviewerPatchItem['conclusion']>,
-  { text: string; color: string }
+  { text: string; color: string; bg: string; border: string }
 > = {
-  approved: { text: '已通过', color: '#22c55e' },
-  rejected: { text: '已驳回', color: '#ef4444' },
-  pending:  { text: '待评审', color: '#94a3b8' },
+  approved: { text: '已通过', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)' },
+  rejected: { text: '已驳回', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)' },
+  pending:  { text: '待评审', color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.28)' },
 };
 
-/** 生成与归档 HTML 模板一致的 reviewer-chip 列表（含评审状态） */
+/** 报告 §6 评审人员卡片样式（注入 iframe HTML） */
+const REPORT_REVIEWER_SECTION_STYLE = `<style id="synapse-reviewer-section-style">
+.reviewer-list{display:block!important;padding:4px 0}
+.synapse-reviewer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:14px}
+.synapse-reviewer-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;background:linear-gradient(155deg,rgba(15,23,42,0.92),rgba(30,41,59,0.62));border:1px solid rgba(255,255,255,0.09);box-shadow:0 4px 18px rgba(0,0,0,0.28);transition:border-color .2s,transform .2s,box-shadow .2s}
+.synapse-reviewer-card:hover{border-color:rgba(99,102,241,0.38);box-shadow:0 10px 28px rgba(99,102,241,0.14);transform:translateY(-1px)}
+.synapse-reviewer-card__top{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.synapse-reviewer-card__avatar{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;flex-shrink:0;box-shadow:0 4px 14px rgba(0,0,0,0.35)}
+.synapse-reviewer-card__meta{flex:1;min-width:0;padding-top:2px}
+.synapse-reviewer-card__name{font-size:14px;font-weight:600;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.synapse-reviewer-card__role{display:inline-flex;margin-top:4px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;color:#94a3b8;background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.18)}
+.synapse-reviewer-card__status{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:600;letter-spacing:.03em;border:1px solid;flex-shrink:0;margin-left:auto;margin-top:2px}
+.synapse-reviewer-card__status-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;box-shadow:0 0 6px currentColor}
+.synapse-reviewer-card__comment{font-size:11px;color:#94a3b8;line-height:1.6;background:rgba(0,0,0,0.28);border-radius:8px;padding:8px 10px;border-left:2px solid rgba(99,102,241,0.5);word-break:break-word}
+.synapse-reviewer-card__eid{font-size:10px;color:#475569;font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em}
+.synapse-reviewer-empty{margin:0;padding:20px;text-align:center;font-size:13px;color:#64748b;background:rgba(15,23,42,0.5);border:1px dashed rgba(148,163,184,0.25);border-radius:12px}
+</style>`;
+
+/** 生成评审人员卡片 HTML（§6 章节回填） */
 export function buildReviewersSectionHtml(reviewers: ReportReviewerPatchItem[]): string {
   return reviewers.map((rv) => {
     const name = (rv.reviewer_name || rv.employee_id || '').trim() || '—';
@@ -540,21 +558,38 @@ export function buildReviewersSectionHtml(reviewers: ReportReviewerPatchItem[]):
     const conclusion = rv.conclusion ?? 'pending';
     const status = REVIEWER_CONCLUSION_STYLE[conclusion];
     const comment = (rv.comments || '').trim();
-    const titleAttr = comment ? ` title="${esc(comment)}"` : '';
-    const commentLine = comment
-      ? `<div class="review-comment" style="margin-top:4px;font-size:.68rem;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(comment)}</div>`
+    const eid = (rv.employee_id || '').trim();
+    const commentBlock = comment
+      ? `<div class="synapse-reviewer-card__comment">${esc(comment)}</div>`
+      : '';
+    const eidBlock = eid
+      ? `<div class="synapse-reviewer-card__eid">工号 ${esc(eid)}</div>`
       : '';
     return `
-        <div class="reviewer-chip"${titleAttr}>
-          <div class="reviewer-avatar" style="background:${color}">${initial}</div>
-          <div class="reviewer-info">
-            <div class="name">${esc(name)}</div>
-            <div class="role">${esc(roleLabel)}</div>
-            <div class="review-status" style="margin-top:3px;font-size:.68rem;font-weight:600;color:${status.color};">${esc(status.text)}</div>
-            ${commentLine}
+        <div class="synapse-reviewer-card">
+          <div class="synapse-reviewer-card__top">
+            <div class="synapse-reviewer-card__avatar" style="background:linear-gradient(135deg,${color},${color}cc)">${initial}</div>
+            <div class="synapse-reviewer-card__meta">
+              <div class="synapse-reviewer-card__name">${esc(name)}</div>
+              <span class="synapse-reviewer-card__role">${esc(roleLabel)}</span>
+            </div>
+            <span class="synapse-reviewer-card__status" style="color:${status.color};background:${status.bg};border-color:${status.border}">
+              <span class="synapse-reviewer-card__status-dot"></span>${esc(status.text)}
+            </span>
           </div>
+          ${commentBlock}
+          ${eidBlock}
         </div>`;
   }).join('\n');
+}
+
+/** 向报告 HTML 注入 §6 评审人员卡片样式 */
+export function injectReportReviewerSectionStyles(html: string): string {
+  if (!html?.trim() || html.includes('synapse-reviewer-section-style')) return html;
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${REPORT_REVIEWER_SECTION_STYLE}\n</head>`);
+  }
+  return `${REPORT_REVIEWER_SECTION_STYLE}${html}`;
 }
 
 /**
@@ -564,15 +599,20 @@ export function buildReviewersSectionHtml(reviewers: ReportReviewerPatchItem[]):
 export function patchReportHtmlReviewers(html: string, reviewers: ReportReviewerPatchItem[]): string {
   if (!html?.trim()) return html;
   const inner = reviewers.length > 0
-    ? buildReviewersSectionHtml(reviewers)
-    : '<p style="margin:0;font-size:.8rem;color:#64748b;">暂无评审人员</p>';
+    ? `<div class="synapse-reviewer-grid">\n${buildReviewersSectionHtml(reviewers)}\n      </div>`
+    : '<p class="synapse-reviewer-empty">暂无评审人员</p>';
 
   const reviewerListRe = /(<div class="reviewer-list"\s*>)([\s\S]*?)(<\/div>)/i;
   if (reviewerListRe.test(html)) {
     return html.replace(reviewerListRe, `$1\n${inner}\n      $3`);
   }
   if (html.includes('{{REVIEWERS_HTML}}')) {
-    return html.replace(/\{\{REVIEWERS_HTML\}\}/g, inner);
+    return html.replace(
+      /\{\{REVIEWERS_HTML\}\}/g,
+      reviewers.length > 0
+        ? `<div class="synapse-reviewer-grid">${buildReviewersSectionHtml(reviewers)}</div>`
+        : '<p class="synapse-reviewer-empty">暂无评审人员</p>',
+    );
   }
   return html;
 }
@@ -588,6 +628,7 @@ export function prepareReportHtmlForDisplay(
   if (reviewers !== undefined) {
     result = patchReportHtmlReviewers(result, reviewers);
   }
+  result = injectReportReviewerSectionStyles(result);
   return injectReportHtmlScrollbarStyles(result);
 }
 

@@ -596,6 +596,7 @@ export function LeaderReviewSopPanel({
   const [selfDraftComment, setSelfDraftComment] = useState('');
   /** 是否已推送（提交后禁用所有交互） */
   const [pushed, setPushed] = useState(false);
+  const [statusRefreshing, setStatusRefreshing] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** 已自动解析过的 assignee|prod，避免 prod 异步到位后重复请求 */
   const reviewersAutoKeyRef = useRef<string | null>(null);
@@ -734,6 +735,23 @@ export function LeaderReviewSopPanel({
       if (!silent) setLoading(false);
     }
   }, [synapseApiBase, demandNo]);
+
+  /** 刷新评审状态 + 重新解析评审人员列表（不触发全屏 loading） */
+  const handleRefreshReview = useCallback(async () => {
+    if (statusRefreshing) return;
+    setStatusRefreshing(true);
+    try {
+      await Promise.all([
+        fetchStatus(true),
+        loadResolvedReviewers(true),
+      ]);
+      toast.success('评审状态已刷新');
+    } catch {
+      // fetchStatus / loadResolvedReviewers 内部已有错误提示
+    } finally {
+      setStatusRefreshing(false);
+    }
+  }, [statusRefreshing, fetchStatus, loadResolvedReviewers]);
 
   /** 与下方评审表同源，用于回填报告 HTML §6 评审人员章节 */
   const reportReviewersForHtml = useMemo((): ReportReviewerPatchItem[] => {
@@ -1063,12 +1081,15 @@ export function LeaderReviewSopPanel({
           <div className={`px-2.5 py-0.5 rounded-full border text-[11px] font-medium shrink-0 ${overallBadge.cls}`}>
             {overallBadge.label}
           </div>
-          <Tooltip title="刷新评审状态">
+          <Tooltip title="刷新评审状态与评审人员列表">
             <button
-              onClick={() => { void fetchStatus(); void loadResolvedReviewers(true); }}
-              className="text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              type="button"
+              disabled={statusRefreshing}
+              onClick={() => { void handleRefreshReview(); }}
+              className="rd-leader-review-refresh-btn"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className={`h-3.5 w-3.5 shrink-0 ${statusRefreshing ? 'animate-spin' : ''}`} />
+              <span>{statusRefreshing ? '刷新中…' : '刷新'}</span>
             </button>
           </Tooltip>
           {isSubmitted && (
