@@ -135,6 +135,8 @@ interface Props {
   readOnly?: boolean;
   /** 节点仍在 processing 时轮询 task-exec 增量结果 */
   live?: boolean;
+  /** 会议室已结束（代码已合并）：禁止重处理/优化 */
+  roomCompleted?: boolean;
   onDecided?: () => void;
 }
 
@@ -614,6 +616,7 @@ export function TaskExecReviewPanel({
   blocked,
   readOnly = false,
   live = false,
+  roomCompleted = false,
   onDecided,
 }: Props) {
   const copy = NODE_COPY[nodeId] ?? NODE_COPY.task_exec;
@@ -715,6 +718,10 @@ export function TaskExecReviewPanel({
   };
 
   const onOptimize = async () => {
+    if (roomCompleted) {
+      message.warning('任务已完成，无法重新处理');
+      return;
+    }
     const text = comment.trim();
     if (!text) {
       message.warning('请填写优化处理意见');
@@ -773,6 +780,7 @@ export function TaskExecReviewPanel({
     !commitRunning &&
     (!isDiffAnalysis || commitDone);
   const optimizeDisabled =
+    roomCompleted ||
     submitting ||
     isRunning ||
     agentCliMissing ||
@@ -816,6 +824,10 @@ export function TaskExecReviewPanel({
   }, [awaitCommitConfirm]);
 
   const onAgentReady = async () => {
+    if (roomCompleted) {
+      message.warning('任务已完成，无法重新处理');
+      return;
+    }
     setReprocessing(true);
     try {
       await reprocessMeetingRoom(

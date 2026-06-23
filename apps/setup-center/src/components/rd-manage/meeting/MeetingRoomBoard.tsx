@@ -23,6 +23,7 @@ import {
   type MeetingRoomConfigPayload,
   type MeetingRoomParticipantWire,
 } from '../../../api/meetingRoomService';
+import { markDemandMergeComplete } from '../../../api/rdViewReportService';
 import {
   buildConfiguredRoomRoster,
   liveAgentsById,
@@ -1980,6 +1981,7 @@ const InterventionDialog = ({
   onMergeNodeChat,
   onProdSubmitted,
   onResetInitSuccess,
+  onLeaderReviewComplete,
   onViewNodeChange,
   synapseApiBase,
 }: { 
@@ -1997,6 +1999,7 @@ const InterventionDialog = ({
   onMergeNodeChat?: (nodeId: string, logs: LogEntry[]) => void;
   onProdSubmitted?: (detail: MeetingRoomDetail) => void;
   onResetInitSuccess?: (roomId: string) => void;
+  onLeaderReviewComplete?: (ctx: { demandNo: string; taskNos: string[] }) => void | Promise<void>;
   synapseApiBase?: string;
 }) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -2011,6 +2014,7 @@ const InterventionDialog = ({
   const [reprocessReason, setReprocessReason] = useState('');
 
   const openReprocessModal = (nodeId: string) => {
+    if (room?.status === 'completed') return;
     setReprocessTargetNodeId(nodeId);
     setReprocessReason('');
     setReprocessModalOpen(true);
@@ -2128,7 +2132,10 @@ const InterventionDialog = ({
     room?.status === 'human_intervention' ||
     room?.status === 'stopped';
 
+  const roomCompleted = room?.status === 'completed';
+
   const canReprocessCodeCommitNode = (nodeId: string) => {
+    if (roomCompleted) return false;
     if (!room || nodeId !== 'exception_check') return false;
     if (room.runInProgress || room.reprocessingNodeId || room.stoppingRun) return false;
     if (stageIdForNodeId(nodeId) !== stageIdForNodeId(room.currentNode)) return false;
@@ -2139,7 +2146,8 @@ const InterventionDialog = ({
   };
 
   const canReprocessHistoricalNode = (nodeId: string, nodeType: string) =>
-    canReprocessCodeCommitNode(nodeId) ||
+    !roomCompleted &&
+    (canReprocessCodeCommitNode(nodeId) ||
     Boolean(
       room &&
       reprocessableRoomStatus &&
@@ -2150,10 +2158,11 @@ const InterventionDialog = ({
       nodeType !== 'system' &&
       stageIdForNodeId(nodeId) === stageIdForNodeId(room.currentNode) &&
       getNodeStateGlobal(room, nodeId, disabledSopNodeIds) === 'completed',
-    );
+    )));
 
   const canReprocess = Boolean(
     room &&
+    !roomCompleted &&
     selectedNode &&
     !room.runInProgress &&
     !room.reprocessingNodeId &&
@@ -2166,6 +2175,7 @@ const InterventionDialog = ({
 
   const canRecover = Boolean(
     room &&
+    !roomCompleted &&
     selectedNode &&
     selectedNode.id === room.currentNode &&
     room.status === 'stopped' &&
@@ -2750,6 +2760,7 @@ const InterventionDialog = ({
                   nodeId={cliExecNodeId}
                   initialPayload={room.taskExecPayload ?? null}
                   blocked={room.taskExecBlocked}
+                  roomCompleted={roomCompleted}
                   onDecided={() => setCenterTab('detail')}
                 />
               </div>
@@ -2796,7 +2807,10 @@ const InterventionDialog = ({
                   prod={String((room.systemNodeDisplay as { prod?: string } | null)?.prod ?? '').trim() || undefined}
                   initialReportHtml={room.leaderReviewReportHtml}
                   currentUser={{ employee_id: 'local', name: '当前用户' }}
-                  onTaskComplete={() => setCenterTab('detail')}
+                  onTaskComplete={async (ctx) => {
+                    await onLeaderReviewComplete?.(ctx);
+                    setCenterTab('detail');
+                  }}
                 />
               </div>
             ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'hitl' && room.hitlFormSchema ? (
@@ -2891,6 +2905,7 @@ const InterventionDialog = ({
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
                           readOnly
+                          roomCompleted={roomCompleted}
                         />
                       </div>
                     ) : (selectedNode.id === 'task_exec' || selectedNode.id === 'diff_analysis') &&
@@ -2904,6 +2919,7 @@ const InterventionDialog = ({
                           nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
+                          roomCompleted={roomCompleted}
                           live
                         />
                       </div>
@@ -3408,6 +3424,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleReprocess = (nodeId: string, reason?: string) => {
     if (!activeRoom || activeRoom.reprocessingNodeId || activeRoom.stoppingRun) return;
+    if (activeRoom.status === 'completed') {
+      toast.error('任务已完成，无法重新处理');
+      return;
+    }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
@@ -3494,6 +3514,20 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
         }
       });
   };
+
+  const handleLeaderReviewComplete = useCallback(
+    async (ctx: { demandNo: string; taskNos: string[] }) => {
+      const base = (synapseApiBase || '').trim();
+      if (!base || !activeRoom) return;
+      await markDemandMergeComplete(base, { demand_no: ctx.demandNo, task_nos: ctx.taskNos });
+      const detail = await fetchMeetingRoomDetail(base, activeRoom.id);
+      const updatedRoom = mapDetailToRoom(detail);
+      updatedRoom.brief = '任务已完成，代码已合并';
+      setActiveRoom(updatedRoom);
+      setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
+    },
+    [synapseApiBase, activeRoom],
+  );
 
   const handleResetInitSuccess = useCallback(
     (roomId: string) => {
@@ -3599,6 +3633,7 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
           onMergeNodeChat={handleMergeNodeChat}
           onProdSubmitted={handleProdSubmitted}
           onResetInitSuccess={handleResetInitSuccess}
+          onLeaderReviewComplete={handleLeaderReviewComplete}
           synapseApiBase={synapseApiBase}
         />
 

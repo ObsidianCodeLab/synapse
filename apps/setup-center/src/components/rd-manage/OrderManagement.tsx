@@ -49,6 +49,7 @@ import {
   type RdManageDemandsPayload,
   type WorkOrderDbMetricsPayload,
 } from '../../api/rdManageService';
+import { markDemandMergeComplete } from '../../api/rdViewReportService';
 import {
   fetchMeetingRooms,
   fetchMeetingSummary,
@@ -1640,12 +1641,25 @@ export const OrderManagement: React.FC<{
             prod={ticket.prod}
             currentUser={{ employee_id: 'local', name: '当前用户' }}
             onOpenReviewCenter={onViewChange ? () => onViewChange('workbench_sandbox') : undefined}
-            onTaskComplete={() => {
-              // 标记需求单已完成
+            onTaskComplete={async ({ demandNo, taskNos }) => {
+              const base = (synapseApiBase || '').trim();
+              if (base) {
+                await markDemandMergeComplete(base, { demand_no: demandNo, task_nos: taskNos });
+              }
+              const taskSet = new Set(taskNos);
               setTickets((prev) =>
-                prev.map((t) =>
-                  t.id === ticket.id ? { ...t, status: 'completed' as const } : t,
-                ),
+                prev.map((t) => {
+                  if (t.id !== ticket.id) return t;
+                  return {
+                    ...t,
+                    status: 'completed' as const,
+                    ownedWorkItems: (t.ownedWorkItems ?? []).map((wi) => (
+                      taskSet.size === 0 || taskSet.has(wi.task_no)
+                        ? { ...wi, state: '提交完成' as OwnedWorkItemState }
+                        : wi
+                    )),
+                  };
+                }),
               );
             }}
           />

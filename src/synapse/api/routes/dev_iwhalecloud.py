@@ -6000,101 +6000,96 @@ class CodeMergeRequest(BaseModel):
     password: str = Field(..., description="密码")
     taskNo: str = Field(..., description="任务单号")
 
+
 @router.post("/api/dev/iwhalecloud/code_merge")
 def code_merge(body: CodeMergeRequest):
+    merge_timeout_ms = DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS
     with sync_playwright() as p:
-        # 启动浏览器（headless=True 表示后台运行，不显示界面）
         browser = p.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
         try:
-            # 设置请求超时时间为60秒
-            context.set_default_timeout(60_000)
-            page.set_default_timeout(60_000)
-            page.set_default_navigation_timeout(60_000)
+            context.set_default_timeout(merge_timeout_ms)
+            page.set_default_timeout(merge_timeout_ms)
+            page.set_default_navigation_timeout(merge_timeout_ms)
 
-            # 访问登录页面
             page.goto(DEV_IWHALECLOUD_BASE_URL)
-            print("打开研发云界面成功")
+            logger.info("打开研发云界面成功")
 
-            # 定位并填写表单
             page.fill('#edt_username', body.username)
             page.fill('#edt_pwd', body.password)
-            print("填写用户名和密码成功")
+            logger.info("填写用户名和密码成功")
 
-            # 点击登录按钮，进入研发平台界面
             page.click('.loginBtn')
-            page.wait_for_load_state("networkidle")
-            print("登录成功")
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("登录成功")
 
-            # 点击任务单数，进入事务管理界面
-            page.locator('span.my-todo-item-pending-count[data-type="WORK_ITEM"]').click()
-            page.wait_for_load_state("networkidle")
-            print("进入事务管理界面成功")
+            page.locator('span.my-todo-item-pending-count[data-type="WORK_ITEM"]').click(
+                timeout=merge_timeout_ms,
+            )
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("进入事务管理界面成功")
 
-            # 回填 任务单号，搜索任务
             page.locator("input.task-search-text").fill(body.taskNo)
             page.locator(".search-click-task").click()
-            page.wait_for_load_state("networkidle")
-            print("搜索任务成功")
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("搜索任务成功")
 
-            # 点击任务标题，进入任务详情界面
             num = re.sub(r"[^\d]", "", str(body.taskNo))
-            page.locator(f'div.task-title[data-taskno="{num}"]').click()
-            page.wait_for_load_state("networkidle")
-            print("进入任务详情界面成功")
+            page.locator(f'div.task-title[data-taskno="{num}"]').click(timeout=merge_timeout_ms)
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("进入任务详情界面成功")
 
-            # 点击代码分支，进入代码分支界面
-            page.locator('#details-content-tabs a[href="#codeBranchTab"]').click()
-            page.wait_for_load_state("networkidle")
-            print("进入代码分支界面成功")
+            page.locator('#details-content-tabs a[href="#codeBranchTab"]').click(timeout=merge_timeout_ms)
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("进入代码分支界面成功")
 
-            # 任务详情-代码分支页面-点击创建合并请求
-            page.locator("button.merge-branch-btn").click()
-            page.wait_for_load_state("networkidle")
-            print("任务详情-代码分支页面-点击创建合并请求成功")
+            page.locator("button.merge-branch-btn").click(timeout=merge_timeout_ms)
+            page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+            logger.info("任务详情-代码分支页面-点击创建合并请求成功")
 
-            # 合并对比在 iframe 内，先等 iframe 出现再点（page.locator 无法穿透 iframe）
-            _wait_git_iframe(page)
+            _wait_git_iframe(page, timeout_ms=merge_timeout_ms)
             git_frame = _git_embed_frame(page)
 
-            # 合并分支界面-第一次点击创建合并请求
-            git_frame.locator("button.ui.button.primary.show-form").filter(has_text="创建合并请求").click()
-            _wait_git_frame_network_idle(page)
-            print("合并分支界面-第一次点击创建合并请求成功")
+            git_frame.locator("button.ui.button.primary.show-form").filter(has_text="创建合并请求").click(
+                timeout=merge_timeout_ms,
+            )
+            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+            logger.info("合并分支界面-第一次点击创建合并请求成功")
 
-            # 合并分支界面-第二次点击创建合并请求（表单仍在同一 Git iframe 内）
-            git_frame.locator("form#new-issue").get_by_role("button", name="创建合并请求").click()
-            _wait_git_frame_network_idle(page)
-            print("合并分支界面-第二次点击创建合并请求成功")
+            git_frame.locator("form#new-issue").get_by_role("button", name="创建合并请求").click(
+                timeout=merge_timeout_ms,
+            )
+            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+            logger.info("合并分支界面-第二次点击创建合并请求成功")
 
-            # 研发云合并检查异步跑在 Git 页内；只刷新嵌入 iframe，避免 page.reload 关掉门户内多 Tab
             time.sleep(10)
             _reload_git_iframe_only(page)
-            print("研发云代码合并检查等待结束，已仅刷新合并分支（Git iframe）")
+            logger.info("研发云代码合并检查等待结束，已仅刷新合并分支（Git iframe）")
 
-            # reload 后 iframe 会重建，需重新等待再操作 Git 内按钮
-            _wait_git_iframe(page)
+            _wait_git_iframe(page, timeout_ms=merge_timeout_ms)
             git_frame = _git_embed_frame(page)
 
-            # 合并分支界面-第一次点击创建合并提交（研发云合并检查通过）
-            git_frame.get_by_role("button", name="创建合并提交").click()
-            _wait_git_frame_network_idle(page)
-            print("合并分支界面-第一次点击创建合并提交成功")
+            git_frame.get_by_role("button", name="创建合并提交").click(timeout=merge_timeout_ms)
+            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+            logger.info("合并分支界面-第一次点击创建合并提交成功")
 
-            # 合并分支界面-第二次点击创建合并提交
-            git_frame.locator('form[action*="/merge"] button[type="submit"][name="do"][value="merge"]').click()
-            _wait_git_frame_network_idle(page)
-            print("合并分支界面-第二次点击创建合并提交成功")
+            git_frame.locator('form[action*="/merge"] button[type="submit"][name="do"][value="merge"]').click(
+                timeout=merge_timeout_ms,
+            )
+            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+            logger.info("合并分支界面-第二次点击创建合并提交成功")
 
-            # 界面出现「已合并」表示成功，否则视为合并失败
-            if _wait_for_merge_success(page, total_timeout_ms=120_000):
+            if _wait_for_merge_success(page, total_timeout_ms=merge_timeout_ms):
                 return success_response(message="代码合并成功")
-            return error_response(500, message=f"代码合并失败，请到研发云上根据单号[{body.taskNo}]查看原因")
+            return error_response(
+                500,
+                message=f"代码合并失败，请到研发云上根据单号[{body.taskNo}]查看原因",
+            )
 
         except Exception as e:
-            logger.exception("研发单[{body.taskNo}]代码合并异常: %s", e)
+            logger.exception("研发单[%s]代码合并异常: %s", body.taskNo, e)
             return error_response(500, message=f"研发单[{body.taskNo}]代码合并异常: {str(e)}")
         finally:
             browser.close()
@@ -6434,6 +6429,93 @@ async def update_order_info(body: UpdateOrderSopLocalProcessStateRequest) -> dic
                 "updated_at": datetime.now().isoformat(timespec="seconds"),
             }
             _atomic_write_json_file(path, payload)
+
+    return success_response(None, "success")
+
+
+class MarkDemandMergeCompleteRequest(BaseModel):
+    demand_no: str = Field(..., description="需求单号")
+    task_nos: list[str] = Field(
+        default_factory=list,
+        description="已合并的研发单号；为空则更新该需求下全部 owned_work_items",
+    )
+
+
+@router.post("/api/dev/iwhalecloud/mark_demand_merge_complete")
+async def mark_demand_merge_complete(body: MarkDemandMergeCompleteRequest) -> dict:
+    """
+    代码合并成功后：需求单 local_process_state → 已完成；
+    指定研发单 state → 提交完成；并同步 dev.status / 会议室为 completed。
+    """
+    from filelock import FileLock
+
+    from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
+    from synapse.rd_meeting.orchestrator import cancel_room_run
+    from synapse.rd_meeting.room_runtime import sync_room_state_from_dev
+
+    demand_no = str(body.demand_no or "").strip()
+    if not demand_no:
+        return error_response(400, message="demand_no required")
+
+    task_nos = [_snapshot_norm_id(t) for t in (body.task_nos or [])]
+    task_nos = [t for t in task_nos if t]
+    task_set = set(task_nos) if task_nos else None
+
+    path = _owner_order_file_name()
+    if path.is_file():
+        lock = FileLock(str(_owner_order_file_lock_path()), timeout=30)
+        with lock:
+            try:
+                raw = path.read_text(encoding="utf-8")
+                prev = json.loads(raw)
+                if isinstance(prev, dict) and isinstance(prev.get("list"), list):
+                    modified = False
+                    for demand in prev["list"]:
+                        if not isinstance(demand, dict) or demand.get("demand_no") != demand_no:
+                            continue
+                        demand["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
+                        modified = True
+                        owned = demand.get("owned_work_items")
+                        if isinstance(owned, list):
+                            for item in owned:
+                                if not isinstance(item, dict):
+                                    continue
+                                tn = _snapshot_norm_id(item.get("task_no"))
+                                if task_set is None or tn in task_set:
+                                    item["state"] = OWNED_WORK_ITEM_STATE_COMMIT_DONE
+                        break
+                    if modified:
+                        payload = {
+                            "list": prev["list"],
+                            "updated_at": datetime.now().isoformat(timespec="seconds"),
+                        }
+                        _atomic_write_json_file(path, payload)
+            except (OSError, json.JSONDecodeError):
+                pass
+
+    dev = load_dev_status(demand_no)
+    if dev:
+        dev["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
+        save_dev_status(demand_no, dev)
+        mr = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
+        room_id = str(mr.get("room_id") or "").strip()
+        scope = dev.get("scope") if isinstance(dev.get("scope"), dict) else {}
+        scope_type = str(scope.get("type") or "demand")
+        if scope_type not in ("demand", "task"):
+            scope_type = "demand"
+        if room_id:
+            try:
+                cancel_room_run(room_id)
+            except Exception:
+                logger.exception("cancel_room_run failed room_id=%s", room_id)
+            sync_room_state_from_dev(
+                demand_no,
+                room_id=room_id,
+                scope_type=scope_type,  # type: ignore[arg-type]
+                stage_id=int(dev.get("stage_id") or 0),
+                current_node_id=str(dev.get("current_node_id") or ""),
+                local_process_state=OWNED_WORK_ITEM_STATE_COMPLETED,
+            )
 
     return success_response(None, "success")
 

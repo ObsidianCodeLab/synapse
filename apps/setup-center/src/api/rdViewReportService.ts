@@ -2,7 +2,7 @@
  * 研发组长评审报告服务
  *
  * 与产品管理一致：评审报告 CRUD 直连研发统一服务（devservice.ip:10001），
- * 不经 Synapse serve 转发。仅 code_merge / task_complete 仍走本机 Synapse API。
+ * 不经 Synapse serve 转发。code_merge / mark_demand_merge_complete 仍走本机 Synapse API。
  *
  * 后端字段说明（SynapseService 侧）：
  *   submitter_id / employee_id → 工号
@@ -367,7 +367,7 @@ export async function resolveReportReviewers(
 }
 
 /**
- * 代码合并
+ * 代码合并（单个研发单）
  */
 export async function triggerCodeMerge(
   apiBase: string,
@@ -382,7 +382,7 @@ export async function triggerCodeMerge(
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(params),
-    signal:  AbortSignal.timeout(180_000),
+    signal:  AbortSignal.timeout(600_000),
   });
   const j = (await res.json()) as MergeWire;
   if (j.errorcode !== 0 && j.errorcode !== undefined) {
@@ -391,14 +391,48 @@ export async function triggerCodeMerge(
   return { success: true, message: '合并成功' };
 }
 
+/** 依次合并需求单下全部研发单 */
+export async function triggerCodeMergeAll(
+  apiBase: string,
+  params: {
+    username: string;
+    password: string;
+    taskNos:  string[];
+  },
+): Promise<{ success: boolean; message: string; failedTaskNo?: string }> {
+  const taskNos = params.taskNos.map((t) => t.trim()).filter(Boolean);
+  if (taskNos.length === 0) {
+    return { success: false, message: '未找到研发单号' };
+  }
+  for (const taskNo of taskNos) {
+    const res = await triggerCodeMerge(apiBase, {
+      username: params.username,
+      password: params.password,
+      taskNo,
+    });
+    if (!res.success) {
+      return { success: false, message: res.message, failedTaskNo: taskNo };
+    }
+  }
+  return { success: true, message: '全部研发单合并成功' };
+}
+
 /**
- * 任务完成（代码合并成功后更新 userwork.json 状态）
+ * 代码合并成功后：需求单标记已完成，研发单标记提交完成，并同步会议室状态。
  */
+export async function markDemandMergeComplete(
+  apiBase: string,
+  params: { demand_no: string; task_nos: string[] },
+): Promise<{ ok: boolean }> {
+  return postJson(apiBase, '/api/dev/iwhalecloud/mark_demand_merge_complete', params);
+}
+
+/** @deprecated 使用 markDemandMergeComplete */
 export async function markTaskComplete(
   apiBase: string,
   params: { demand_no: string; task_nos: string[] },
 ): Promise<{ ok: boolean }> {
-  return postJson(apiBase, '/api/dev/iwhalecloud/rd_view_report_task_complete', params);
+  return markDemandMergeComplete(apiBase, params);
 }
 
 // ── HTML 报告生成器 ───────────────────────────────────────────────────────────

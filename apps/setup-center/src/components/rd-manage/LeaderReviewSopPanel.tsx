@@ -36,8 +36,8 @@ import {
   reviewRdViewReport,
   addReviewer,
   resolveReportReviewers,
-  triggerCodeMerge,
-  markTaskComplete,
+  triggerCodeMergeAll,
+  markDemandMergeComplete,
   prepareReportHtmlForDisplay,
   REVIEWER_ROLE_LABEL,
   type Reviewer,
@@ -58,6 +58,11 @@ interface CurrentUser {
   name:        string;
 }
 
+interface LeaderReviewTaskCompleteContext {
+  demandNo: string;
+  taskNos:  string[];
+}
+
 interface LeaderReviewSopPanelProps {
   synapseApiBase:    string;
   /** 会议室 ID：有则拉取归档报告与 userwork 研发单号 */
@@ -72,7 +77,8 @@ interface LeaderReviewSopPanelProps {
   initialReportHtml?: string;
   currentUser:       CurrentUser;
   onOpenReviewCenter?: () => void;
-  onTaskComplete?:   () => void;
+  /** 全部研发单合并成功后回调：应持久化需求单/研发单状态并刷新 UI */
+  onTaskComplete?:     (ctx: LeaderReviewTaskCompleteContext) => void | Promise<void>;
 }
 
 // ── 常量 ──────────────────────────────────────────────────────────────────────
@@ -944,7 +950,6 @@ export function LeaderReviewSopPanel({
           const { stopMeetingRoom } = await import('@/api/meetingRoomService');
           await stopMeetingRoom(synapseApiBase, roomId);
           toast.success('评审已终止，SOP 节点已置为失败');
-          onTaskComplete?.();
         } catch (e) {
           setSelfDisplayConclusion('pending');
           toast.error(`终止失败：${e instanceof Error ? e.message : String(e)}`);
@@ -955,18 +960,37 @@ export function LeaderReviewSopPanel({
 
   // ── 代码合并 ─────────────────────────────────────────────────────────────────
   const handleMerge = useCallback(async () => {
-    const firstTask = taskNos[0] || '';
-    if (!firstTask) { toast.warning('未找到研发单号，无法执行合并'); return; }
+    if (taskNos.length === 0) {
+      toast.warning('未找到研发单号，无法执行合并');
+      return;
+    }
     setMerging(true);
     try {
-      const res = await triggerCodeMerge(synapseApiBase, { username: effectiveUser.employee_id, password: '', taskNo: firstTask });
-      if (res.success) {
-        await markTaskComplete(synapseApiBase, { demand_no: demandNo, task_nos: taskNos }).catch(() => {});
-        toast.success('代码合并成功，任务已完成！');
-        onTaskComplete?.();
-      } else {
-        toast.error(`合并失败：${res.message}`);
+      const res = await triggerCodeMergeAll(synapseApiBase, {
+        username: effectiveUser.employee_id,
+        password: '',
+        taskNos,
+      });
+      if (!res.success) {
+        toast.error(
+          res.failedTaskNo
+            ? `研发单 ${res.failedTaskNo} 合并失败：${res.message}`
+            : `合并失败：${res.message}`,
+        );
+        return;
       }
+      if (onTaskComplete) {
+        await onTaskComplete({ demandNo, taskNos });
+      } else {
+        await markDemandMergeComplete(synapseApiBase, { demand_no: demandNo, task_nos: taskNos });
+      }
+      toast.success(
+        taskNos.length > 1
+          ? `全部 ${taskNos.length} 个研发单已合并，任务已完成！`
+          : '代码合并成功，任务已完成！',
+      );
+    } catch (e) {
+      toast.error(`状态更新失败：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setMerging(false);
     }

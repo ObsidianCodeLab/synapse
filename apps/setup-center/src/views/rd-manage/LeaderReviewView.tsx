@@ -50,8 +50,8 @@ import {
   searchRdViewReport,
   reviewRdViewReport,
   listReviewDemandsByReviewer,
-  triggerCodeMerge,
-  markTaskComplete,
+  triggerCodeMergeAll,
+  markDemandMergeComplete,
   REVIEWER_ROLE_LABEL,
   type Reviewer,
   type ReportRecord,
@@ -599,26 +599,34 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
         /* 合并路径按需读快照，列表不依赖 userwork */
       }
     }
-    const firstTask = taskNos[0] || '';
-    if (!firstTask) { toast.warning('未找到研发单号'); return; }
+    if (taskNos.length === 0) { toast.warning('未找到研发单号'); return; }
     setMerging(true);
     try {
-      const res = await triggerCodeMerge(base, {
+      const res = await triggerCodeMergeAll(base, {
         username: currentUser.employee_id,
         password: '',
-        taskNo:   firstTask,
+        taskNos,
       });
-      if (res.success) {
-        // 更新 userwork.json 任务状态
-        await markTaskComplete(base, {
-          demand_no: reviewState.demandNo,
-          task_nos:  taskNos,
-        }).catch(() => {});
-        toast.success('代码合并完成，任务已标记为已完成！');
-        await loadDemands();
-      } else {
-        toast.error(`合并失败：${res.message}`);
+      if (!res.success) {
+        toast.error(
+          res.failedTaskNo
+            ? `研发单 ${res.failedTaskNo} 合并失败：${res.message}`
+            : `合并失败：${res.message}`,
+        );
+        return;
       }
+      await markDemandMergeComplete(base, {
+        demand_no: reviewState.demandNo,
+        task_nos:  taskNos,
+      });
+      toast.success(
+        taskNos.length > 1
+          ? `全部 ${taskNos.length} 个研发单已合并，任务已标记为已完成！`
+          : '代码合并完成，任务已标记为已完成！',
+      );
+      await loadDemands();
+    } catch (err: unknown) {
+      toast.error(`状态更新失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setMerging(false);
     }
