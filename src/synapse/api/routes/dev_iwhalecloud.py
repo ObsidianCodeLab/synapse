@@ -6097,9 +6097,24 @@ def code_merge(body: CodeMergeRequest):
             _wait_git_iframe(page, timeout_ms=merge_timeout_ms)
             fr = _wait_for_git_child_frame(page, timeout_ms=merge_timeout_ms)
 
-            # ---- 判断两种情况 ----
-            # 情况1：compare 页，有 show-form 按钮，需要创建合并请求
+            # ---- 判断三种情况 ----
+            # 情况0：PR 已合并，分支已删，compare 页两端 commit 相同（"New Pull Request"）→ 直接返回成功
+            # 情况1：compare 页，有"创建合并请求"show-form 按钮，需要创建合并请求
             # 情况2：compare 页但 PR 已存在，有 "View Pull Request" 按钮，需先跳到 PR 详情页
+            #
+            # 情况0 判断：show-form 按钮文本含 "New Pull Request"（而非"创建合并请求"）
+            already_merged = False
+            try:
+                btn_text = fr.locator("button.ui.button.primary.show-form").first.inner_text(timeout=5_000)
+                if "New Pull Request" in btn_text:
+                    already_merged = True
+            except Exception:
+                pass
+
+            if already_merged:
+                logger.info("PR 已合并（compare 两端 commit 相同，show-form 显示 New Pull Request），直接返回成功")
+                return success_response(message="代码合并成功（PR 已合并）")
+
             has_view_pr = False
             try:
                 fr.locator("a.ui.compact.button.primary").filter(has_text="View Pull Request").wait_for(
@@ -6129,6 +6144,17 @@ def code_merge(body: CodeMergeRequest):
                 except Exception:
                     pass
                 logger.info("合并分支界面-已跳转到 PR 详情页")
+                # 检查 PR 是否已合并（Merged 状态下不需要再操作）
+                try:
+                    pr_state = fr.evaluate("""() => {
+                        const el = document.querySelector('.issue-state-label, .purple.label');
+                        return el ? el.textContent.trim() : null;
+                    }""")
+                    if pr_state and "merged" in pr_state.lower():
+                        logger.info("PR 已处于 Merged 状态，无需再次合并，直接返回成功")
+                        return success_response(message="代码合并成功（PR 已合并）")
+                except Exception:
+                    pass
             else:
                 # 情况1：无 PR，点 show-form 填表单创建
                 fr.locator("button.ui.button.primary.show-form").filter(has_text="创建合并请求").click(
@@ -6151,6 +6177,12 @@ def code_merge(body: CodeMergeRequest):
                 fr = _wait_for_git_child_frame(page, timeout_ms=merge_timeout_ms)
 
             # ---- 创建合并提交（两种情况在此汇合）----
+            # 兜底：若 PR 已合并（无 Create merge commit 按钮），直接返回成功
+            merge_btn_count = fr.locator("button.ui.button:has-text('Create merge commit')").count()
+            if merge_btn_count == 0:
+                logger.info("未找到 Create merge commit 按钮（PR 可能已合并），直接返回成功")
+                return success_response(message="代码合并成功（PR 已合并）")
+
             # 第一步：点击展开合并表单（纯 JS DOM 展开，把 form 插入 DOM）
             fr.locator("button.ui.button:has-text('Create merge commit')").first.click(
                 timeout=merge_timeout_ms,
