@@ -14,6 +14,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NODE_OPTIONS: --max-old-space-size=8192
   RELEASE_TAG: ${{ (github.event_name == 'workflow_dispatch' && inputs.tag != '' && inputs.tag) || github.ref_name }}
   CHECKOUT_REF: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref != '' && inputs.ref) || (github.event_name == 'workflow_dispatch' && inputs.tag != '' && inputs.tag) || github.ref_name }}
 
@@ -92,7 +93,7 @@ jobs:
           VITE_BUILD_TARGET: web
         run: |
           npm ci
-          node --max-old-space-size=8192 node_modules/vite/bin/vite.js build
+          npx vite build
       
       - name: Install dependencies
         run: |
@@ -247,7 +248,7 @@ jobs:
           VITE_BUILD_TARGET: web
         run: |
           npm ci
-          node --max-old-space-size=8192 node_modules/vite/bin/vite.js build
+          npx vite build
 
       - name: Build user docs (VitePress)
         working-directory: docs-site
