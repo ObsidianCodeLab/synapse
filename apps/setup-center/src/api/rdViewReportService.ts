@@ -76,6 +76,48 @@ export interface ReportSearchResult {
   overall_state: 'not_submitted' | 'pending' | 'approved' | 'rejected';
 }
 
+/** 评审中心左侧工单项（来源 rd_view_reviewer + rd_view_report 联查） */
+export interface ReviewCenterDemandItem {
+  report_id:      string;
+  demand_no:      string;
+  demand_title:   string;
+  submitter_id:   string;
+  submitter_name: string;
+  review_status:  'pending' | 'approved' | 'rejected';
+  my_role:        string;
+  my_conclusion:  'pending' | 'approved' | 'rejected';
+  created_at:     string;
+  updated_at:     string;
+}
+
+export interface ReviewCenterDemandListPayload {
+  list:  ReviewCenterDemandItem[];
+  total: number;
+}
+
+function normalizeReviewCenterDemandItem(raw: Partial<ReviewCenterDemandItem>): ReviewCenterDemandItem {
+  const demandNo = String(raw.demand_no ?? '').trim();
+  const submitterName = String(raw.submitter_name ?? raw.submitter_id ?? '').trim();
+  let demandTitle = String(raw.demand_title ?? '').trim();
+  if (!demandTitle) {
+    demandTitle = submitterName ? `${submitterName} · #${demandNo}` : demandNo;
+  }
+  const conclusion = raw.my_conclusion as ReviewCenterDemandItem['my_conclusion'];
+  const status = raw.review_status as ReviewCenterDemandItem['review_status'];
+  return {
+    report_id:      String(raw.report_id ?? '').trim(),
+    demand_no:      demandNo,
+    demand_title:   demandTitle,
+    submitter_id:   String(raw.submitter_id ?? '').trim(),
+    submitter_name: submitterName,
+    review_status:  status === 'approved' || status === 'rejected' ? status : 'pending',
+    my_role:        String(raw.my_role ?? 'internal').trim(),
+    my_conclusion:  conclusion === 'approved' || conclusion === 'rejected' ? conclusion : 'pending',
+    created_at:     String(raw.created_at ?? ''),
+    updated_at:     String(raw.updated_at ?? ''),
+  };
+}
+
 export interface ReviewResult {
   report_id:     string;
   review_status: string;
@@ -213,6 +255,25 @@ export async function searchRdViewReport(
     : report.reviewers.length === 0 ? 'not_submitted'
     : 'pending';
   return { report, overall_state: overall };
+}
+
+/**
+ * 按当前评审人工号查询关联评审工单（rd_view_reviewer × rd_view_report）
+ */
+export async function listReviewDemandsByReviewer(
+  apiBase: string,
+  params: { employee_id: string },
+): Promise<ReviewCenterDemandListPayload> {
+  type RawPayload = { list?: Partial<ReviewCenterDemandItem>[]; total?: number };
+  const raw = await postRdViewUnifiedData<RawPayload>(
+    apiBase,
+    RD_UNIFIED_PATHS.rdViewReportListByReviewer,
+    { employee_id: params.employee_id.trim() },
+  );
+  const list = Array.isArray(raw.list)
+    ? raw.list.map((item) => normalizeReviewCenterDemandItem(item))
+    : [];
+  return { list, total: typeof raw.total === 'number' ? raw.total : list.length };
 }
 
 /**

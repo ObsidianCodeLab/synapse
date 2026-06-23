@@ -2,7 +2,7 @@
  * LeaderReviewView — 研发组长评审中心
  *
  * 替代原「代码沙盒」占位视图，提供惊艳的多方协同评审体验：
- *   · 左侧：当前用户所有「研发组长评审」阶段的工单列表
+ *   · 左侧：当前用户作为评审人关联的工单列表（统一服务 rd_view_reviewer）
  *   · 中间：完整 HTML 报告 iframe 嵌入预览
  *   · 右侧：评审人员状态 + 操作面板，含自动轮询
  *   · 底部全局状态：所有人通过后显示代码合并入口
@@ -42,23 +42,21 @@ import {
 } from 'lucide-react';
 
 import {
-  fetchRdManageDemands,
-  type DemandListItem,
-  type OwnedWorkItem,
-} from '../../api/rdManageService';
-import {
   fetchIwhalecloudUserinfoSummary,
 } from '../../api/rdUnifiedService';
+import { fetchRdManageDemands } from '../../api/rdManageService';
 import {
   submitRdViewReport,
   searchRdViewReport,
   reviewRdViewReport,
+  listReviewDemandsByReviewer,
   triggerCodeMerge,
   markTaskComplete,
   REVIEWER_ROLE_LABEL,
   type Reviewer,
   type ReportRecord,
   type ReviewerInfo,
+  type ReviewCenterDemandItem,
 } from '../../api/rdViewReportService';
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
@@ -99,6 +97,18 @@ function avatarColor(role: string) {
   return ROLE_COLOR[role] || '#64748b';
 }
 
+const MY_CONCLUSION_LABEL: Record<ReviewCenterDemandItem['my_conclusion'], string> = {
+  pending:  '待我评审',
+  approved: '我已通过',
+  rejected: '我已拒绝',
+};
+
+const MY_CONCLUSION_STYLE: Record<ReviewCenterDemandItem['my_conclusion'], string> = {
+  pending:  'bg-amber-500/15 text-amber-300',
+  approved: 'bg-emerald-500/15 text-emerald-300',
+  rejected: 'bg-red-500/15 text-red-300',
+};
+
 // ── 子组件：左侧工单列表 ──────────────────────────────────────────────────────
 
 function DemandListPanel({
@@ -107,14 +117,17 @@ function DemandListPanel({
   onSelect,
   loading,
 }: {
-  demands:  DemandListItem[];
+  demands:  ReviewCenterDemandItem[];
   selected: string | null;
   onSelect: (no: string) => void;
   loading:  boolean;
 }) {
   const [search, setSearch] = useState('');
   const filtered = (demands ?? []).filter((d) =>
-    !search || d.demand_no.includes(search) || d.demand_title.includes(search),
+    !search ||
+    d.demand_no.includes(search) ||
+    d.demand_title.includes(search) ||
+    d.submitter_name.includes(search),
   );
 
   return (
@@ -140,14 +153,15 @@ function DemandListPanel({
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-500">
-            {search ? '无匹配结果' : '暂无研发组长评审工单'}
+            {search ? '无匹配结果' : '暂无关联评审工单'}
           </div>
         ) : (
           filtered.map((d) => {
             const isActive = d.demand_no === selected;
+            const roleLabel = REVIEWER_ROLE_LABEL[d.my_role] ?? d.my_role;
             return (
               <motion.button
-                key={d.demand_no}
+                key={`${d.demand_no}-${d.report_id}`}
                 layout
                 onClick={() => onSelect(d.demand_no)}
                 className={`w-full text-left rounded-xl px-3.5 py-3 transition-all duration-150 border ${
@@ -156,18 +170,22 @@ function DemandListPanel({
                     : 'border-white/6 bg-white/3 hover:bg-white/6 hover:border-white/12'
                 }`}
               >
-                <div className="text-xs font-mono text-slate-400 mb-0.5">
-                  #{d.demand_no}
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <div className="text-xs font-mono text-slate-400">#{d.demand_no}</div>
+                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${MY_CONCLUSION_STYLE[d.my_conclusion]}`}>
+                    {MY_CONCLUSION_LABEL[d.my_conclusion]}
+                  </span>
                 </div>
                 <div className="text-sm font-medium text-slate-200 line-clamp-2 leading-snug">
                   {d.demand_title}
                 </div>
                 <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <span>{d.demand_create_time?.slice(0, 10)}</span>
-                  {d.owned_work_items?.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-white/6">
-                      {d.owned_work_items.length} 研发单
-                    </span>
+                  <span>{roleLabel}</span>
+                  {d.updated_at && (
+                    <>
+                      <span>·</span>
+                      <span>{d.updated_at.slice(0, 10)}</span>
+                    </>
                   )}
                 </div>
               </motion.button>
@@ -413,7 +431,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   const base = (synapseApiBase || 'http://127.0.0.1:18900').replace(/\/$/, '');
 
   const [demandsLoading, setDemandsLoading] = useState(true);
-  const [demands,        setDemands]        = useState<DemandListItem[]>([]);
+  const [demands,        setDemands]        = useState<ReviewCenterDemandItem[]>([]);
   const [selectedNo,     setSelectedNo]     = useState<string | null>(null);
   const [currentUser,    setCurrentUser]    = useState<CurrentUser>({ employee_id: 'local', name: '当前用户' });
   const [reviewState,    setReviewState]    = useState<DemandReviewState | null>(null);
@@ -433,36 +451,36 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       .catch(() => {});
   }, [base]);
 
-  // 拉取处于「研发组长评审」阶段的工单
+  // 从统一服务 rd_view_reviewer 表拉取当前用户关联的评审工单
   const loadDemands = useCallback(async () => {
+    const employeeId = currentUser.employee_id.trim();
+    if (!employeeId || employeeId === 'local') return;
+
     setDemandsLoading(true);
     try {
-      const payload = await fetchRdManageDemands(base, { allowMockFallback: false });
-      const leaderReviewDemands = (payload.list ?? []).filter(
-        (d) =>
-          d.sop_node === '研发组长评审' ||
-          d.sop_node === 'leader_review' ||
-          d.local_process_state === '处理中',
-      );
-      setDemands(leaderReviewDemands);
-      if (!selectedNo && leaderReviewDemands.length > 0) {
-        setSelectedNo(leaderReviewDemands[0].demand_no);
-      }
+      const payload = await listReviewDemandsByReviewer(base, { employee_id: employeeId });
+      const items = payload.list ?? [];
+      setDemands(items);
+      setSelectedNo((prev) => {
+        if (prev && items.some((d) => d.demand_no === prev)) return prev;
+        return items[0]?.demand_no ?? null;
+      });
     } catch (err: unknown) {
-      toast.error(`加载工单列表失败：${err instanceof Error ? err.message : String(err)}`);
+      toast.error(`加载评审工单失败：${err instanceof Error ? err.message : String(err)}`);
       setDemands([]);
     } finally {
       setDemandsLoading(false);
     }
-  }, [base, selectedNo]);
+  }, [base, currentUser.employee_id]);
 
-  useEffect(() => { void loadDemands(); }, []);
+  useEffect(() => {
+    void loadDemands();
+  }, [loadDemands]);
 
   // 当选中工单变化时，加载评审状态
   const loadReviewState = useCallback(async (demandNo: string, silent = false) => {
     const demand = demands.find((d) => d.demand_no === demandNo);
     if (!demand) return;
-    const taskNos = demand.owned_work_items?.map((w) => w.task_no) || [];
 
     if (!silent) {
       setReviewState((prev) => prev ? { ...prev, loading: true } : null);
@@ -475,7 +493,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       setReviewState({
         demandNo,
         demandTitle:  demand.demand_title,
-        taskNos,
+        taskNos:      [],
         reportRecord: res.report,
         reviewers:    res.report?.reviewers ?? [],
         overallState: res.overall_state,
@@ -536,6 +554,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       });
       toast.success('评审意见已提交');
       await loadReviewState(reviewState.demandNo);
+      await loadDemands();
     } catch (err: unknown) {
       toast.error(`操作失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -561,6 +580,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
       });
       toast.warning('已提交拒绝意见');
       await loadReviewState(reviewState.demandNo);
+      await loadDemands();
     } catch (err: unknown) {
       toast.error(`操作失败：${err instanceof Error ? err.message : String(err)}`);
     }
@@ -569,7 +589,19 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   // 代码合并
   const handleMerge = async () => {
     if (!reviewState) return;
-    const firstTask = reviewState.taskNos[0] || '';
+    let taskNos = reviewState.taskNos;
+    if (!taskNos.length) {
+      try {
+        const snap = await fetchRdManageDemands(base, { allowMockFallback: false });
+        const row = snap.list.find((d) => d.demand_no === reviewState.demandNo);
+        taskNos = (row?.owned_work_items ?? [])
+          .map((w) => String(w.task_no || '').trim())
+          .filter(Boolean);
+      } catch {
+        /* 合并路径按需读快照，列表不依赖 userwork */
+      }
+    }
+    const firstTask = taskNos[0] || '';
     if (!firstTask) { toast.warning('未找到研发单号'); return; }
     setMerging(true);
     try {
@@ -582,7 +614,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
         // 更新 userwork.json 任务状态
         await markTaskComplete(base, {
           demand_no: reviewState.demandNo,
-          task_nos:  reviewState.taskNos,
+          task_nos:  taskNos,
         }).catch(() => {});
         toast.success('代码合并完成，任务已标记为已完成！');
         await loadDemands();
@@ -595,6 +627,9 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   };
 
   const isAllApproved = reviewState?.overallState === 'approved';
+  const isSubmitter = (reviewState?.reviewers ?? []).some(
+    (r) => r.employee_id === currentUser.employee_id && r.role === 'submitter',
+  );
   const stateConf = reviewState ? STATE_CONFIG[reviewState.overallState] : null;
 
   const passCount = (reviewState?.reviewers ?? []).filter((r) => r.conclusion === 'approved').length;
@@ -746,9 +781,9 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
               )}
             </div>
 
-            {/* 底部：全员通过 → 代码合并 */}
+            {/* 底部：开发者全员通过后 → 代码合并 */}
             <AnimatePresence>
-              {isAllApproved && (
+              {isAllApproved && isSubmitter && (
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}

@@ -36,6 +36,7 @@ export const RD_UNIFIED_PATHS = {
   /** 研发组长评审报告（与产品管理相同：Tauri 直连统一服务 :10001） */
   rdViewReportSubmit: "/dev/iwhalecloud/synapse/rd_view_report_submit",
   rdViewReportSearch: "/dev/iwhalecloud/synapse/rd_view_report_search",
+  rdViewReportListByReviewer: "/dev/iwhalecloud/synapse/rd_view_report_list_by_reviewer",
   rdViewReportReview: "/dev/iwhalecloud/synapse/rd_view_report_review",
   rdViewReportReviewerAdd: "/dev/iwhalecloud/synapse/rd_view_report_reviewer_add",
   rdViewReportReviewersResolve: "/dev/iwhalecloud/synapse/rd_view_report_reviewers_resolve",
