@@ -5931,6 +5931,17 @@ def _find_git_child_frame(page: Page):
             return fr
     return None
 
+
+def _wait_for_git_child_frame(page: Page, timeout_ms: int = 30_000):
+    """轮询等待 Git 嵌入帧 URL 就绪（iframe attached 后 frame.url 还需片刻才同步）。"""
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        fr = _find_git_child_frame(page)
+        if fr is not None:
+            return fr
+        page.wait_for_timeout(300)
+    raise RuntimeError(f"等待 Git 嵌入 iframe 超时（{timeout_ms}ms）")
+
 def _wait_git_frame_network_idle(page: Page, timeout_ms: int = 120_000) -> None:
     """
     在 Git iframe 内操作后应等「子帧」网络空闲。
@@ -6082,37 +6093,112 @@ def code_merge(body: CodeMergeRequest):
             page.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
             logger.info("任务详情-代码分支页面-点击创建合并请求成功")
 
+            # _wait_git_iframe 等 DOM 节点挂载，_wait_for_git_child_frame 再等 frame.url 同步就绪
             _wait_git_iframe(page, timeout_ms=merge_timeout_ms)
-            git_frame = _git_embed_frame(page)
+            fr = _wait_for_git_child_frame(page, timeout_ms=merge_timeout_ms)
 
-            git_frame.locator("button.ui.button.primary.show-form").filter(has_text="创建合并请求").click(
+            # ---- 判断两种情况 ----
+            # 情况1：compare 页，有 show-form 按钮，需要创建合并请求
+            # 情况2：compare 页但 PR 已存在，有 "View Pull Request" 按钮，需先跳到 PR 详情页
+            has_view_pr = False
+            try:
+                fr.locator("a.ui.compact.button.primary").filter(has_text="View Pull Request").wait_for(
+                    state="visible", timeout=5_000
+                )
+                has_view_pr = True
+            except Exception:
+                pass
+
+            if has_view_pr:
+                # 情况2：已有 PR，通过点击链接跳转（保持 gitea iframe session，禁用 goto 以防 session 失效）
+                pr_href = fr.locator("a.ui.compact.button.primary").first.get_attribute("href")
+                pr_url = f"https://git-nj.iwhalecloud.com{pr_href}"
+                logger.info("已有合并请求，点击跳转 PR 详情页: %s", pr_url)
+                compare_frame_url = fr.url
+                fr.locator("a.ui.compact.button.primary").first.click(timeout=merge_timeout_ms)
+                # 等 frame URL 变成 /pulls/（frame 内部导航，session cookie 保持连续）
+                deadline_ts = time.monotonic() + merge_timeout_ms / 1000
+                while time.monotonic() < deadline_ts:
+                    fr_now = _find_git_child_frame(page)
+                    if fr_now and "/pulls/" in (fr_now.url or "").lower() and fr_now.url != compare_frame_url:
+                        fr = fr_now
+                        break
+                    page.wait_for_timeout(300)
+                try:
+                    fr.wait_for_load_state("networkidle", timeout=merge_timeout_ms)
+                except Exception:
+                    pass
+                logger.info("合并分支界面-已跳转到 PR 详情页")
+            else:
+                # 情况1：无 PR，点 show-form 填表单创建
+                fr.locator("button.ui.button.primary.show-form").filter(has_text="创建合并请求").click(
+                    timeout=merge_timeout_ms,
+                )
+                _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+                logger.info("合并分支界面-第一次点击创建合并请求成功")
+
+                fr.locator("form#new-issue").get_by_role("button", name="创建合并请求").click(
+                    timeout=merge_timeout_ms,
+                )
+                _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
+                logger.info("合并分支界面-第二次点击创建合并请求成功")
+
+                time.sleep(10)
+                _reload_git_iframe_only(page)
+                logger.info("研发云代码合并检查等待结束，已仅刷新合并分支（Git iframe）")
+
+                # 刷新后重新定位 frame（等 frame.url 同步就绪）
+                fr = _wait_for_git_child_frame(page, timeout_ms=merge_timeout_ms)
+
+            # ---- 创建合并提交（两种情况在此汇合）----
+            # 第一步：点击展开合并表单（纯 JS DOM 展开，把 form 插入 DOM）
+            fr.locator("button.ui.button:has-text('Create merge commit')").first.click(
                 timeout=merge_timeout_ms,
             )
-            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
-            logger.info("合并分支界面-第一次点击创建合并请求成功")
+            logger.info("合并分支界面-第一次点击创建合并提交成功（展开表单）")
+            page.wait_for_timeout(1500)  # 等 JS 渲染 form
 
-            git_frame.locator("form#new-issue").get_by_role("button", name="创建合并请求").click(
-                timeout=merge_timeout_ms,
+            # 第二步：从 form 里读取 _csrf、head_commit_id 等字段
+            form_data = fr.evaluate("""() => {
+                const form = document.querySelector('form[action*="/merge"]');
+                if (!form) return null;
+                const result = {};
+                for (const el of form.elements) {
+                    if (el.name) result[el.name] = el.value;
+                }
+                return {action: form.action, fields: result};
+            }""")
+            if not form_data:
+                raise RuntimeError("合并分支界面-展开后未找到 merge form，无法提交")
+
+            # 第三步：用 Playwright APIRequestContext 提交（带完整 gitea session cookie，避免 fetch 绕过 iframe session）
+            fields = form_data["fields"]
+            resp = context.request.post(
+                form_data["action"],
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Referer": fr.url,
+                    "Origin": "https://git-nj.iwhalecloud.com",
+                },
+                form={
+                    "_csrf": fields.get("_csrf", ""),
+                    "head_commit_id": fields.get("head_commit_id", ""),
+                    "merge_when_checks_succeed": fields.get("merge_when_checks_succeed", "false"),
+                    "force_merge": fields.get("force_merge", "false"),
+                    "do": "merge",
+                    "merge_title_field": fields.get("merge_title_field", ""),
+                    "merge_message_field": fields.get("merge_message_field", ""),
+                },
             )
-            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
-            logger.info("合并分支界面-第二次点击创建合并请求成功")
-
-            time.sleep(10)
-            _reload_git_iframe_only(page)
-            logger.info("研发云代码合并检查等待结束，已仅刷新合并分支（Git iframe）")
-
-            _wait_git_iframe(page, timeout_ms=merge_timeout_ms)
-            git_frame = _git_embed_frame(page)
-
-            git_frame.get_by_role("button", name="创建合并提交").click(timeout=merge_timeout_ms)
-            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
-            logger.info("合并分支界面-第一次点击创建合并提交成功")
-
-            git_frame.locator('form[action*="/merge"] button[type="submit"][name="do"][value="merge"]').click(
-                timeout=merge_timeout_ms,
+            resp_body = resp.text()
+            logger.info(
+                "合并分支界面-合并请求已提交，状态码=%s，响应=%s",
+                resp.status,
+                resp_body[:200],
             )
-            _wait_git_frame_network_idle(page, timeout_ms=merge_timeout_ms)
-            logger.info("合并分支界面-第二次点击创建合并提交成功")
+            if resp.status not in (200, 201, 302):
+                raise RuntimeError(f"合并请求失败，HTTP {resp.status}：{resp_body[:300]}")
+            logger.info("合并分支界面-第二次点击创建合并提交成功（提交表单）")
 
             if _wait_for_merge_success(page, total_timeout_ms=merge_timeout_ms):
                 return success_response(message="代码合并成功")
