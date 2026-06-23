@@ -57,7 +57,8 @@ import {
   markTaskComplete,
   generateRdReportHtml,
   buildRdReportDataFromDemand,
-  type ReportReviewer,
+  REVIEWER_ROLE_LABEL,
+  type Reviewer,
   type ReportRecord,
   type ReviewerInfo,
 } from '../../api/rdViewReportService';
@@ -74,7 +75,7 @@ interface DemandReviewState {
   demandTitle:  string;
   taskNos:      string[];
   reportRecord: ReportRecord | null;
-  reviewers:    ReportReviewer[];
+  reviewers:    Reviewer[];
   overallState: 'not_submitted' | 'pending' | 'approved' | 'rejected';
   reportHtml:   string;
   loading:      boolean;
@@ -90,10 +91,10 @@ const STATE_CONFIG = {
 } as const;
 
 const ROLE_COLOR: Record<string, string> = {
-  '开发者':       '#6366f1',
-  '产品负责人':   '#f59e0b',
-  '团队负责人':   '#3b82f6',
-  '系统内部人员': '#8b5cf6',
+  submitter:    '#6366f1',
+  product_lead: '#f59e0b',
+  team_lead:    '#3b82f6',
+  internal:     '#8b5cf6',
 };
 
 function avatarColor(role: string) {
@@ -114,7 +115,7 @@ function DemandListPanel({
   loading:  boolean;
 }) {
   const [search, setSearch] = useState('');
-  const filtered = demands.filter((d) =>
+  const filtered = (demands ?? []).filter((d) =>
     !search || d.demand_no.includes(search) || d.demand_title.includes(search),
   );
 
@@ -189,7 +190,7 @@ function ReviewerCard({
   onReject,
   approving,
 }: {
-  reviewer:  ReportReviewer;
+  reviewer:  Reviewer;
   isSelf:    boolean;
   onApprove: () => void;
   onReject:  (comment: string) => void;
@@ -197,9 +198,10 @@ function ReviewerCard({
 }) {
   const [rejectMode, setRejectMode] = useState(false);
   const [comment, setComment]       = useState('');
-  const isPending  = reviewer.review_state === 'pending';
-  const isApproved = reviewer.review_state === 'approved';
-  const isRejected = reviewer.review_state === 'rejected';
+  const isPending  = reviewer.conclusion === 'pending';
+  const isApproved = reviewer.conclusion === 'approved';
+  const isRejected = reviewer.conclusion === 'rejected';
+  const roleLabel  = REVIEWER_ROLE_LABEL[reviewer.role] ?? reviewer.role;
 
   return (
     <motion.div
@@ -221,13 +223,13 @@ function ReviewerCard({
             <Avatar
               size={42}
               style={{
-                backgroundColor: avatarColor(reviewer.reviewer_role),
+                backgroundColor: avatarColor(reviewer.role),
                 flexShrink: 0,
                 fontSize: 16,
                 fontWeight: 600,
               }}
             >
-              {(reviewer.reviewer_name || reviewer.reviewer_id).slice(0, 1)}
+              {(reviewer.reviewer_name || reviewer.employee_id).slice(0, 1)}
             </Avatar>
             {isApproved && (
               <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#0f172a]">
@@ -243,7 +245,7 @@ function ReviewerCard({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-slate-100">
-                {reviewer.reviewer_name || reviewer.reviewer_id}
+                {reviewer.reviewer_name || reviewer.employee_id}
               </span>
               {isSelf && (
                 <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-medium text-indigo-300">
@@ -251,7 +253,7 @@ function ReviewerCard({
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">{reviewer.reviewer_role}</div>
+            <div className="text-xs text-slate-400 mt-0.5">{roleLabel}</div>
           </div>
         </div>
 
@@ -334,14 +336,14 @@ function ReviewerCard({
       </AnimatePresence>
 
       {/* 评审意见展示 */}
-      {(isApproved || isRejected) && reviewer.review_comment && (
+      {(isApproved || isRejected) && reviewer.comments && (
         <div className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400 italic">
-          "{reviewer.review_comment}"
+          "{reviewer.comments}"
         </div>
       )}
-      {(isApproved || isRejected) && reviewer.review_time && (
+      {(isApproved || isRejected) && reviewer.reviewed_at && (
         <div className="mt-1.5 text-[10px] text-slate-600">
-          {reviewer.review_time.slice(0, 16)}
+          {reviewer.reviewed_at.slice(0, 16)}
         </div>
       )}
     </motion.div>
@@ -438,7 +440,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
     setDemandsLoading(true);
     try {
       const payload = await fetchRdManageDemands(base, { allowMockFallback: true });
-      const leaderReviewDemands = payload.list.filter(
+      const leaderReviewDemands = (payload.list ?? []).filter(
         (d) =>
           d.sop_node === '研发组长评审' ||
           d.sop_node === 'leader_review' ||
@@ -466,7 +468,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
     }
 
     try {
-      const res = await searchRdViewReport(base, demandNo, currentUser.employee_id);
+      const res = await searchRdViewReport(base, demandNo);
 
       let html = res.report?.report_html || '';
       if (!html) {
@@ -484,7 +486,7 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
         demandTitle:  demand.demand_title,
         taskNos,
         reportRecord: res.report,
-        reviewers:    res.reviewers,
+        reviewers:    res.report?.reviewers ?? [],
         overallState: res.overall_state,
         reportHtml:   html,
         loading:      false,
@@ -510,32 +512,32 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
     if (!reviewState) return;
     setApproving(true);
     try {
-      if (!reviewState.reportRecord) {
-        // 首次：先提交报告
-        await submitRdViewReport(base, {
-          demand_no:    reviewState.demandNo,
-          task_nos:     reviewState.taskNos,
-          assignee_id:  currentUser.employee_id,
-          assignee_name: currentUser.name,
-          report_html:  reviewState.reportHtml,
-          diff_summary: '',
-          diff_detail:  '{}',
-          reviewers:    [
-            {
-              reviewer_id:    currentUser.employee_id,
-              reviewer_name:  currentUser.name,
-              reviewer_role:  '开发者',
-              is_self_review: true,
-            },
-          ],
+      let reportId = reviewState.reportRecord?.report_id;
+      if (!reportId) {
+        const reviewers: ReviewerInfo[] = [{
+          employee_id:   currentUser.employee_id,
+          reviewer_name: currentUser.name,
+          role:          'submitter',
+        }];
+        const submitResult = await submitRdViewReport(base, {
+          demand_no:      reviewState.demandNo,
+          submitter_id:   currentUser.employee_id,
+          submitter_name: currentUser.name,
+          report_html:    reviewState.reportHtml,
+          reviewers,
         });
+        reportId = submitResult.report_id;
+        if (!reportId) {
+          throw new Error('报告提交成功但未返回 report_id');
+        }
         toast.success('报告已提交到统一服务');
       }
       await reviewRdViewReport(base, {
-        demand_no:      reviewState.demandNo,
-        reviewer_id:    currentUser.employee_id,
-        review_state:   'approved',
-        review_comment: '评审通过',
+        report_id:   reportId,
+        demand_no:   reviewState.demandNo,
+        employee_id: currentUser.employee_id,
+        conclusion:  'approved',
+        comments:    '评审通过',
       });
       toast.success('评审意见已提交');
       await loadReviewState(reviewState.demandNo);
@@ -549,12 +551,18 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   // 拒绝
   const handleReject = async (comment: string) => {
     if (!reviewState) return;
+    const reportId = reviewState.reportRecord?.report_id;
+    if (!reportId) {
+      toast.warning('请先提交报告后再评审');
+      return;
+    }
     try {
       await reviewRdViewReport(base, {
-        demand_no:      reviewState.demandNo,
-        reviewer_id:    currentUser.employee_id,
-        review_state:   'rejected',
-        review_comment: comment || '评审未通过',
+        report_id:   reportId,
+        demand_no:   reviewState.demandNo,
+        employee_id: currentUser.employee_id,
+        conclusion:  'rejected',
+        comments:    comment || '评审未通过',
       });
       toast.warning('已提交拒绝意见');
       await loadReviewState(reviewState.demandNo);
@@ -594,8 +602,8 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
   const isAllApproved = reviewState?.overallState === 'approved';
   const stateConf = reviewState ? STATE_CONFIG[reviewState.overallState] : null;
 
-  const passCount = reviewState?.reviewers.filter((r) => r.review_state === 'approved').length ?? 0;
-  const totalCount = reviewState?.reviewers.length ?? 0;
+  const passCount = (reviewState?.reviewers ?? []).filter((r) => r.conclusion === 'approved').length;
+  const totalCount = reviewState?.reviewers?.length ?? 0;
 
   return (
     <div className="flex h-full overflow-hidden bg-[#09090f] text-slate-100">
@@ -689,12 +697,12 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
                 </button>
               </div>
 
-              {reviewState.reviewers.length > 0 ? (
-                reviewState.reviewers.map((rv) => (
+              {(reviewState.reviewers ?? []).length > 0 ? (
+                (reviewState.reviewers ?? []).map((rv) => (
                   <ReviewerCard
-                    key={rv.id}
+                    key={rv.id ?? rv.employee_id}
                     reviewer={rv}
-                    isSelf={rv.reviewer_id === currentUser.employee_id}
+                    isSelf={rv.employee_id === currentUser.employee_id}
                     onApprove={handleApprove}
                     onReject={handleReject}
                     approving={approving}
