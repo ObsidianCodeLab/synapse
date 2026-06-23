@@ -2185,8 +2185,11 @@ def summarize_ci_pipeline_steps(nodes: list[dict]) -> dict[str, str]:
         for node in nodes
         if not _is_compile_ci_node(node) and not _is_skipped_ci_overview_node(node)
     ]
+    compile_result = _ci_step_state_from_nodes(compile_nodes)
+    if compile_result == 'pending':
+        compile_result = "ok"
     return {
-        "compile": _ci_step_state_from_nodes(compile_nodes),
+        "compile": compile_result,
         "flight": _ci_step_state_from_nodes(flight_nodes),
     }
 
@@ -2851,30 +2854,37 @@ async def get_ci_flow_build_status(body: GetCiFlowBuildStatusRequest) -> dict:
         merged = _merge_flow_build_status(per_flow_items)
 
         pipeline_steps = {"compile": "pending", "flight": "pending"}
-        primary_inst_id = ""
-        primary_run_state: object = None
+        pending_inst_ids = []
+        # 这边检测处理中的flow
         for latest in latest_by_flow.values():
             inst_id = str(latest.get("ciFlowInstId") or "").strip()
             if not inst_id:
                 continue
             run_state = latest.get("ciFlowInstRunState")
             if _is_build_running_state(run_state):
-                primary_inst_id = inst_id
-                primary_run_state = run_state
+                pending_inst_ids.append(inst_id)
                 break
-            if not primary_inst_id:
-                primary_inst_id = inst_id
-                primary_run_state = run_state
-        if primary_inst_id:
-            overview_nodes = await _fetch_ci_flow_node_instances(primary_inst_id)
-            if overview_nodes:
-                pipeline_steps = summarize_ci_pipeline_steps(overview_nodes)
-            elif _is_build_failed_state(primary_run_state):
-                pipeline_steps = {"compile": "failed", "flight": "failed"}
-            elif _is_build_success_state(primary_run_state):
-                pipeline_steps = {"compile": "ok", "flight": "ok"}
+            
+        if len(pending_inst_ids) > 0:
+            pipeline_steps = {"compile": "pending", "flight": "pending"}
+            return success_response({"taskId": body.taskId, **merged, "pipelineSteps": pipeline_steps})
 
-        return success_response({"taskId": body.taskId, **merged, "pipelineSteps": pipeline_steps})
+        # 这边要采集数据
+        overview_nodes = []
+        for latest in latest_by_flow.values():
+            inst_id = str(latest.get("ciFlowInstId") or "").strip()
+            if not inst_id:
+                continue
+            run_state = latest.get("ciFlowInstRunState")
+            if _is_build_failed_state(run_state):
+                # 如果有一个flow，则调用_fetch_ci_flow_node_instances获取失败的状态
+                overview_nodes.extend(await _fetch_ci_flow_node_instances(inst_id))
+            
+        if len(overview_nodes) > 0:
+            pipeline_steps = summarize_ci_pipeline_steps(overview_nodes)
+            return success_response({"taskId": body.taskId, **merged, "pipelineSteps": pipeline_steps})
+
+        return success_response({"taskId": body.taskId, **merged, "pipelineSteps": {"compile": "ok", "flight": "ok"}})
     except Exception as e:
         logger.exception("获取构建状态失败: %s", e)
         return error_response(502, f"获取构建状态失败: {e}")
