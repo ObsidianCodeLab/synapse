@@ -12,6 +12,7 @@ from synapse.rd_meeting.code_commit_assets import (
     _flight_poll_applies_to_task_row,
     _flight_poll_progress_message,
     _flight_result_is_fresh,
+    _normalize_build_results,
     _normalize_flight_data,
     _resolve_code_commit_pipeline_steps,
     _resolve_overall_status,
@@ -483,6 +484,42 @@ def test_summarize_build_result_msg_preserves_compile_errors_from_long_log():
     assert "iDays" in summary
     assert "make:" in summary
     assert "chmod: cannot access" not in summary
+
+
+def test_summarize_build_result_msg_extracts_maven_errors():
+    noise = "[INFO] Scanning for projects...\n" + ("[INFO] Building module\n" * 5000)
+    errors = (
+        "[ERROR] COMPILATION ERROR : \n"
+        "[ERROR] /path/Foo.java:[79,18] cannot find symbol\n"
+        "[ERROR]   symbol:   method isEmptyString(java.lang.String)\n"
+        "[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.1:compile "
+        "(default-compile) on project foo: Compilation failure\n"
+        "[ERROR] -> [Help 1]\n"
+        "org.apache.maven.lifecycle.LifecycleExecutionException: Failed to execute goal\n"
+    )
+    log = noise + errors
+    summary = _summarize_build_result_msg(log)
+    assert "【Maven 编译错误摘录】" in summary
+    assert "cannot find symbol" in summary
+    assert "Failed to execute goal" in summary
+    assert "Scanning for projects" not in summary
+    assert "LifecycleExecutionException" not in summary
+
+
+def test_normalize_build_results_summarizes_compile_logs():
+    long_maven = "[INFO] Maven\n" + ("[INFO] download\n" * 100) + (
+        "[ERROR] Failed to execute goal maven-compiler-plugin: compile failure\n"
+        "[ERROR] /x/Y.java:[1,1] error\n"
+    )
+    rows = _normalize_build_results(
+        [
+            {"kind": "compile", "resultType": "编译", "resultMsg": long_maven},
+            {"kind": "code_check", "resultType": "ESLint", "resultMsg": "增量检查<br>file.js"},
+        ]
+    )
+    assert len(rows) == 2
+    assert rows[0]["resultMsg"].startswith("【Maven 编译错误摘录】")
+    assert rows[1]["resultMsg"] == "增量检查<br>file.js"
 
 
 def test_format_flight_result_report_uses_compile_error_excerpt():
