@@ -424,6 +424,14 @@ export function App() {
       setView(nextView);
     });
   }, []);
+  /** 顶部栏：重新打开首次安装引导（等同 Ctrl+Shift+O，桌面端） */
+  const enterOnboardingFromTopbar = useCallback(() => {
+    setObStep("ob-welcome");
+    setObDetectedService(null);
+    void obProbeRunningService();
+    obLoadEnvCheck();
+    setView("onboarding");
+  }, []);
   // ── Hash-based deep link routing ──
   useEffect(() => {
     const onHashChange = () => {
@@ -6672,6 +6680,7 @@ export function App() {
             await startLocalServiceWithConflictCheck(effectiveWsId);
           }}
           onRefreshAll={async () => { await refreshAll(); try { await refreshStatus(undefined, undefined, true); } catch {} }}
+          onEnterOnboarding={IS_TAURI ? enterOnboardingFromTopbar : undefined}
           onSetTheme={(theme) => setThemePref(theme)}
           themePrefState={themePrefState}
           isWeb={IS_WEB || IS_CAPACITOR}

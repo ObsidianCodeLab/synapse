@@ -419,6 +419,7 @@
     "remoteUrl": "Remote URL",
     "copyRemoteUrl": "Copy remote access URL",
     "ipNotFound": "Cannot detect LAN IP. Use ipconfig / ifconfig to check",
+    "enterOnboarding": "Setup onboarding",
     "notifications": "Notifications ({{count}} pending)",
     "notificationsTitle": "Notifications",
     "notificationsUnread": "{{count}} messages to review",
