@@ -673,9 +673,25 @@ class SkillLoader:
 
         - skills.json 存在且有 external_allowlist -> 直接使用（用户显式选择）
         - skills.json 不存在（external_allowlist is None）-> 用全部外部技能 - DEFAULT_DISABLED_SKILLS
+        - 研发工具技能始终并入有效 allowlist，不受 skills.json 勾选影响
         """
+        from synapse.utils.whaleclouddevtool import ensure_whalecloud_dev_tools_in_allowlist
+
+        try:
+            from synapse.config import settings
+
+            project_root = Path(settings.project_root)
+        except Exception:
+            project_root = None
+
+        known_ids = list(self._loaded_skills.keys())
+
         if external_allowlist is not None:
-            return external_allowlist
+            return ensure_whalecloud_dev_tools_in_allowlist(
+                external_allowlist,
+                project_root=project_root,
+                known_skill_ids=known_ids,
+            )
 
         if not DEFAULT_DISABLED_SKILLS:
             return None
@@ -685,7 +701,11 @@ class SkillLoader:
             for sid, skill in self._loaded_skills.items()
             if not getattr(skill.metadata, "system", False)
         }
-        return all_external - DEFAULT_DISABLED_SKILLS
+        return ensure_whalecloud_dev_tools_in_allowlist(
+            all_external - DEFAULT_DISABLED_SKILLS,
+            project_root=project_root,
+            known_skill_ids=known_ids,
+        )
 
     def prune_external_by_allowlist(
         self,
@@ -697,8 +717,9 @@ class SkillLoader:
 
         约定：
         - system 技能永远保留且启用
+        - 研发工具技能永远保留且启用（不受 skills.json 勾选影响）
         - external_allowlist 为 None → 不做限制（全部启用）
-        - external_allowlist 为 set() → 禁用所有外部技能
+        - external_allowlist 为 set() → 禁用所有外部技能（研发工具除外）
 
         不在 allowlist 中的外部技能：
         - 被 agent_referenced_skills 引用 → 保留但标记 disabled=True
@@ -710,6 +731,8 @@ class SkillLoader:
                 self.registry.set_disabled(name, False)
             return 0
 
+        from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_entry
+
         keep_extra = agent_referenced_skills or set()
         removed = 0
         disabled_count = 0
@@ -719,6 +742,13 @@ class SkillLoader:
                     self.registry.set_disabled(name, False)
                     continue
             except Exception:
+                pass
+
+            meta = getattr(skill, "metadata", None)
+            tool_name = getattr(meta, "tool_name", None) if meta else None
+            category = getattr(meta, "category", None) if meta else getattr(skill, "category", None)
+            if is_whalecloud_dev_tool_entry(name, tool_name=tool_name, category=category):
+                self.registry.set_disabled(name, False)
                 continue
 
             if name in external_allowlist:

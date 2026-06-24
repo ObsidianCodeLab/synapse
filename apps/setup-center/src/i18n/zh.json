@@ -659,6 +659,7 @@
     "system": "系统技能",
     "systemRequiredToggle": "系统技能为必选，始终启用",
     "rdBaseScriptsLockHint": "共享脚本为研发工具必选依赖，始终启用且不可卸载",
+    "rdDevToolsLockHint": "研发工具为系统强制依赖，始终启用且不可卸载",
     "external": "外部技能",
     "devToolShortLabel": "研发工具",
     "enabled": "启用",

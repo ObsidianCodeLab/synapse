@@ -9,7 +9,6 @@ import { invoke, IS_TAURI } from "../../platform";
 import type { SkillInfo, SkillConfigField, EnvMap } from "../../types";
 import { envSet } from "../../utils";
 import {
-  isWhalecloudBaseScriptsSkillId,
   isWhalecloudDevToolSkill,
   rdToolDisplayLabel,
   withRdBaseScriptsSkillIds,
@@ -343,7 +342,9 @@ export function DevToolsSkillPanel({
       }));
       setSkills(list);
       const draft: Record<string, boolean> = {};
-      for (const s of list) draft[s.skillId] = s.enabled !== false;
+      for (const s of list) {
+        draft[s.skillId] = isWhalecloudDevToolSkill(s) ? true : s.enabled !== false;
+      }
       setEnabledDraft(draft);
       setEnabledDirty(false);
       return true;
@@ -416,7 +417,7 @@ export function DevToolsSkillPanel({
 
   const handleToggleEnabled = useCallback((skill: SkillInfo) => {
     if (skill.system) return;
-    if (isWhalecloudBaseScriptsSkillId(skill.skillId)) return;
+    if (isWhalecloudDevToolSkill(skill)) return;
     const cur = enabledDraft[skill.skillId] ?? (skill.enabled !== false);
     setEnabledDraft((prev) => ({ ...prev, [skill.skillId]: !cur }));
     setEnabledDirty(true);
@@ -428,7 +429,7 @@ export function DevToolsSkillPanel({
     try {
       const externalAllowlist = withRdBaseScriptsSkillIds(
         skills
-          .filter((s) => !s.system && (enabledDraft[s.skillId] ?? (s.enabled !== false)))
+          .filter((s) => !s.system && (isWhalecloudDevToolSkill(s) || (enabledDraft[s.skillId] ?? (s.enabled !== false))))
           .map((s) => s.skillId),
       );
       const content = {
@@ -798,7 +799,7 @@ export function DevToolsSkillPanel({
               onToggleEnabled={() => handleToggleEnabled(skill)}
               onViewDetail={() => void handleViewDetail(skill)}
               onUninstall={
-                !skill.system && !isWhalecloudBaseScriptsSkillId(skill.skillId)
+                !skill.system && !isWhalecloudDevToolSkill(skill)
                   ? () => requestUninstall(skill)
                   : undefined
               }
@@ -807,8 +808,8 @@ export function DevToolsSkillPanel({
               onEnvChange={onEnvChange}
               onSaveConfig={() => void handleSaveConfig(skill)}
               saving={saving}
-              lockEnabled={isWhalecloudBaseScriptsSkillId(skill.skillId)}
-              lockEnabledHint={t("skills.rdBaseScriptsLockHint")}
+              lockEnabled={isWhalecloudDevToolSkill(skill)}
+              lockEnabledHint={t("skills.rdDevToolsLockHint")}
             />
           </div>
         ))}
@@ -823,7 +824,7 @@ export function DevToolsSkillPanel({
           isEditing={detailEditing}
           editContent={detailEditContent}
           savingContent={detailSaving}
-          isSystem={detailSkill.system || isWhalecloudBaseScriptsSkillId(detailSkill.skillId)}
+          isSystem={detailSkill.system || isWhalecloudDevToolSkill(detailSkill)}
           serviceRunning={serviceRunning}
           onClose={handleCloseDetail}
           onStartEdit={() => { setDetailEditing(true); setDetailEditContent(detailContent); }}
@@ -831,7 +832,7 @@ export function DevToolsSkillPanel({
           onEditChange={setDetailEditContent}
           onSave={() => void handleSaveContent()}
           onUninstall={
-            !detailSkill.system && !isWhalecloudBaseScriptsSkillId(detailSkill.skillId)
+            !detailSkill.system && !isWhalecloudDevToolSkill(detailSkill)
               ? () => requestUninstall(detailSkill)
               : undefined
           }
