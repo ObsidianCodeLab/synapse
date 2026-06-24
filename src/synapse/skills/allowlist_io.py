@@ -172,9 +172,14 @@ def remove_skill_ids(skill_ids: set[str]) -> Path | None:
         if not isinstance(current, list):
             return None
 
-        remaining = {str(x).strip() for x in current if str(x).strip()} - {
-            s.strip() for s in skill_ids if s
+        from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_skill_id
+
+        to_remove = {
+            s.strip()
+            for s in skill_ids
+            if s and not is_whalecloud_dev_tool_skill_id(s.strip())
         }
+        remaining = {str(x).strip() for x in current if str(x).strip()} - to_remove
         _atomic_write_json(path, _compose_content(remaining))
 
     logger.info("[skills.json] remove %d skill id(s): %s", len(skill_ids), sorted(skill_ids))

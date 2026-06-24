@@ -44,29 +44,23 @@ def compute_load_only_ids() -> set[str] | None:
         None 表示保持全量 ``load_all``；非空集合则只 parse 这些 id。
     """
     from synapse.agents.factory import ESSENTIAL_SYSTEM_SKILLS
+    from synapse.skills.allowlist_io import read_allowlist
     from synapse.skills.load_scope import get_skill_load_extra_ids, normalize_skill_dir_id
+    from synapse.utils.whaleclouddevtool import ensure_whalecloud_dev_tools_in_allowlist
 
     ids = {normalize_skill_dir_id(x) for x in ESSENTIAL_SYSTEM_SKILLS}
     extra = get_skill_load_extra_ids()
     if extra:
         ids |= extra
 
-    cfg_path = settings.project_root / "data" / "skills.json"
-    external_allowlist: set[str] | None = None
-    if cfg_path.exists():
-        try:
-            raw = cfg_path.read_text(encoding="utf-8")
-            cfg = json.loads(raw) if raw.strip() else {}
-            al = cfg.get("external_allowlist", None)
-            if isinstance(al, list):
-                external_allowlist = {
-                    normalize_skill_dir_id(x) for x in al if str(x).strip()
-                }
-        except Exception as exc:
-            logger.warning("compute_load_only_ids: read skills.json failed: %s", exc)
+    _, external_allowlist = read_allowlist()
 
     if external_allowlist is not None:
-        ids |= external_allowlist
+        effective = ensure_whalecloud_dev_tools_in_allowlist(
+            {normalize_skill_dir_id(x) for x in external_allowlist},
+            project_root=settings.project_root,
+        )
+        ids |= effective or set()
         return ids
 
     if extra:

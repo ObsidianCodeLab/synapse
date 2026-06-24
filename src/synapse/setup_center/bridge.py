@@ -991,7 +991,7 @@ def list_skills(workspace_dir: str) -> None:
     # 外部技能启用状态（Setup Center 用于展示“可启用/禁用”的开关）
     # 文件：<workspace>/data/skills.json
     # - 不存在 / 无 external_allowlist => 外部技能全部启用（兼容历史行为）
-    # - external_allowlist: [] => 禁用所有外部技能
+    # - external_allowlist: [] => 禁用所有外部技能（研发工具除外，见 compute_effective_allowlist）
     external_allowlist: set[str] | None = None
     try:
         cfg_path = wd / "data" / "skills.json"
@@ -1006,6 +1006,9 @@ def list_skills(workspace_dir: str) -> None:
 
     loader = SkillLoader()
     loader.load_all(base_path=wd)
+    effective_allowlist = loader.compute_effective_allowlist(external_allowlist)
+    from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_entry
+
     skills = loader.registry.list_all()
     out = []
     for s in skills:
@@ -1029,8 +1032,13 @@ def list_skills(workspace_dir: str) -> None:
                 "description_i18n": getattr(s, "description_i18n", None) or None,
                 "system": bool(getattr(s, "system", False)),
                 "enabled": bool(getattr(s, "system", False))
-                or (external_allowlist is None)
-                or (sid in external_allowlist),
+                or (effective_allowlist is None)
+                or (sid in effective_allowlist)
+                or is_whalecloud_dev_tool_entry(
+                    sid,
+                    tool_name=getattr(s, "tool_name", None),
+                    category=getattr(s, "category", None),
+                ),
                 "tool_name": getattr(s, "tool_name", None),
                 "category": getattr(s, "category", None),
                 "path": skill_path,

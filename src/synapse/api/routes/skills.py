@@ -250,7 +250,18 @@ async def list_skills(request: Request, rescan: bool = False):
 
         is_system = bool(skill.system)
         sid = getattr(skill, "skill_id", skill.name)
-        is_enabled = is_system or effective_allowlist is None or sid in effective_allowlist
+        from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_entry
+
+        is_enabled = (
+            is_system
+            or effective_allowlist is None
+            or sid in effective_allowlist
+            or is_whalecloud_dev_tool_entry(
+                sid,
+                tool_name=getattr(skill, "tool_name", None),
+                category=getattr(skill, "category", None),
+            )
+        )
 
         relative_path = None
         if skill.skill_path:
@@ -909,6 +920,11 @@ async def uninstall_skill(request: Request):
     skill_id = (body.get("skill_id") or "").strip()
     if not skill_id:
         return {"error": "skill_id is required"}
+
+    from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_skill_id
+
+    if is_whalecloud_dev_tool_skill_id(skill_id):
+        return {"error": "研发工具技能为系统强制依赖，不可卸载"}
 
     try:
         from synapse.config import settings
