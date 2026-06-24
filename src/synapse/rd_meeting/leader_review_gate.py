@@ -97,13 +97,12 @@ def load_leader_review_task_nos(scope_id: str) -> list[str]:
 
 
 def is_demand_merge_completed(scope_id: str, task_nos: list[str] | None = None) -> bool:
-    """需求单 local_process_state=已完成 且目标研发单均为提交完成/已完成。"""
+    """需求单 local_process_state=已完成 且目标研发单均为已完成。"""
     sid = (scope_id or "").strip()
     if not sid:
         return False
     try:
         from synapse.api.routes.dev_iwhalecloud import (
-            OWNED_WORK_ITEM_STATE_COMMIT_DONE,
             OWNED_WORK_ITEM_STATE_COMPLETED,
             _normalize_owned_work_item_state,
             _snapshot_norm_id,
@@ -126,7 +125,7 @@ def is_demand_merge_completed(scope_id: str, task_nos: list[str] | None = None) 
                 continue
             checked = True
             state = _normalize_owned_work_item_state(item.get("state"))
-            if state not in (OWNED_WORK_ITEM_STATE_COMMIT_DONE, OWNED_WORK_ITEM_STATE_COMPLETED):
+            if state != OWNED_WORK_ITEM_STATE_COMPLETED:
                 return False
         return checked if targets else True
     except Exception as exc:

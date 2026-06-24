@@ -742,7 +742,7 @@ export function LeaderReviewSopPanel({
         const localDone = (row?.local_process_state || '').trim() === '已完成';
         const tasksDone = (row?.owned_work_items ?? []).every((w) => {
           const st = (w.state || '').trim();
-          return st === '提交完成' || st === '已完成';
+          return st === '已完成';
         });
         if (localDone && tasksDone && (row?.owned_work_items?.length ?? 0) > 0) {
           setMergeCompleted(true);

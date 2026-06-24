@@ -421,7 +421,7 @@ export async function triggerCodeMergeAll(
 }
 
 /**
- * 代码合并成功后：需求单标记已完成，研发单标记提交完成，并同步会议室状态。
+ * 代码合并成功后：需求单标记已完成，研发单标记已完成，并同步会议室状态。
  */
 export async function markDemandMergeComplete(
   apiBase: string,

@@ -6069,7 +6069,7 @@ def _apply_demand_merge_complete(demand_no: str, task_nos: list[str] | None = No
                                     continue
                                 tn = _snapshot_norm_id(item.get("task_no"))
                                 if task_set is None or tn in task_set:
-                                    item["state"] = OWNED_WORK_ITEM_STATE_COMMIT_DONE
+                                    item["state"] = OWNED_WORK_ITEM_STATE_COMPLETED
                         break
                     if modified:
                         payload = {
@@ -6727,7 +6727,7 @@ class MarkDemandMergeCompleteRequest(BaseModel):
 async def mark_demand_merge_complete(body: MarkDemandMergeCompleteRequest) -> dict:
     """
     代码合并成功后：需求单 local_process_state → 已完成；
-    指定研发单 state → 提交完成；并同步 dev.status / 会议室为 completed。
+    指定研发单 state → 已完成；并同步 dev.status / 会议室为 completed。
     """
     demand_no = str(body.demand_no or "").strip()
     if not demand_no:

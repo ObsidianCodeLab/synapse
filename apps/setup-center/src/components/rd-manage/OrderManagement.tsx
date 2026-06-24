@@ -1655,7 +1655,7 @@ export const OrderManagement: React.FC<{
                     status: 'completed' as const,
                     ownedWorkItems: (t.ownedWorkItems ?? []).map((wi) => (
                       taskSet.size === 0 || taskSet.has(wi.task_no)
-                        ? { ...wi, state: '提交完成' as OwnedWorkItemState }
+                        ? { ...wi, state: '已完成' as OwnedWorkItemState }
                         : wi
                     )),
                   };
