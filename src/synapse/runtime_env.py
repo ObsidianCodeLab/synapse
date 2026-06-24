@@ -1281,3 +1281,39 @@ def inject_module_paths_runtime() -> int:
         _register_dll_directories(os)
 
     return len(injected)
+
+
+def ensure_playwright_browsers_path() -> None:
+    """为 Playwright 设置 ``PLAYWRIGHT_BROWSERS_PATH``（PyInstaller / Tauri 打包环境）。
+
+    ``dev_iwhalecloud`` 登录验证等路径会直接 ``sync_playwright()``，不会经过
+    ``BrowserManager``，因此需在进程启动时或 launch 前显式配置浏览器路径。
+    """
+    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        return
+
+    from synapse.tools.browser.manager import _find_bundled_browser_executable
+
+    if _find_bundled_browser_executable():
+        return
+
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass:
+        for pw_name in ("playwright-browsers", "playwright-browser"):
+            bundled = Path(meipass) / pw_name
+            if bundled.is_dir():
+                os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(bundled)
+                logger.info("PLAYWRIGHT_BROWSERS_PATH=%s", bundled)
+                return
+
+
+def playwright_chromium_launch_kwargs(*, headless: bool = True) -> dict[str, object]:
+    """返回 ``playwright.chromium.launch()`` 的 kwargs，兼容开发与打包环境。"""
+    ensure_playwright_browsers_path()
+    from synapse.tools.browser.manager import _find_bundled_browser_executable
+
+    kwargs: dict[str, object] = {"headless": headless}
+    exe = _find_bundled_browser_executable()
+    if exe:
+        kwargs["executable_path"] = exe
+    return kwargs

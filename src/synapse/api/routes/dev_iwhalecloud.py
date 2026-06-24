@@ -494,8 +494,34 @@ def _tcp_probe(host: str, port: int, timeout: float = 3.0) -> tuple[bool, str | 
         return False, str(e)
 
 
+def _launch_iwhalecloud_chromium(p, *, headless: bool = True):
+    """启动 Playwright Chromium（打包版使用内置浏览器路径）。"""
+    from synapse.runtime_env import playwright_chromium_launch_kwargs
+
+    return p.chromium.launch(**playwright_chromium_launch_kwargs(headless=headless))
+
+
+def _playwright_login_error_message(exc: BaseException) -> str:
+    text = str(exc).strip()
+    lowered = text.lower()
+    if "executable doesn't exist" in lowered or "playwright install" in lowered:
+        return (
+            "未找到 Chromium 浏览器内核（Playwright）。"
+            "请重新安装 Synapse 桌面版，或联系管理员检查打包资源是否完整。"
+        )
+    if "connection closed" in lowered or "target closed" in lowered:
+        return f"浏览器启动失败：{text}"
+    return f"用户密码验证出错: {text}"
+
+
 def _crypt_helper():
-    from foundation.helper.CryptHelper import CryptHelper
+    try:
+        from foundation.helper.CryptHelper import CryptHelper
+    except ModuleNotFoundError as exc:
+        raise FileNotFoundError(
+            "未找到 foundation 加密模块（CryptHelper）。"
+            "请确认桌面端 channel-deps 已安装，或重新安装 Synapse 桌面版。"
+        ) from exc
 
     return CryptHelper()
 
@@ -5326,7 +5352,7 @@ def _get_demand_by_user_portal_cookies_sync(username: str, password: str) -> tup
     逻辑与 _fetch_token_and_cookies_sync 内 Playwright 段一致，独立实现，避免改动原函数。
     """
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = _launch_iwhalecloud_chromium(p, headless=True)
         context = browser.new_context()
         page = context.new_page()
         page.set_default_timeout(DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS)
@@ -6147,7 +6173,7 @@ class CodeMergeRequest(BaseModel):
 def code_merge(body: CodeMergeRequest):
     merge_timeout_ms = DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = _launch_iwhalecloud_chromium(p, headless=True)
         context = browser.new_context()
         page = context.new_page()
 
@@ -6799,136 +6825,140 @@ def login(body: LoginRequest):
     except ValueError as e:
         return error_response(400, str(e))
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
-        page.set_default_timeout(DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS)
-        page.set_default_navigation_timeout(DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS)
+    try:
+        with sync_playwright() as p:
+            browser = _launch_iwhalecloud_chromium(p, headless=True)
+            context = browser.new_context()
+            page = context.new_page()
+            page.set_default_timeout(DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS)
+            page.set_default_navigation_timeout(DEV_IWHALECLOUD_LOGIN_PLAYWRIGHT_TIMEOUT_MS)
 
-        csrf_token: dict[str, str | None] = {"value": None}
-        logged_user_id: dict[str, int | None] = {"value": None}
+            csrf_token: dict[str, str | None] = {"value": None}
+            logged_user_id: dict[str, int | None] = {"value": None}
 
-        def on_request(req) -> None:
-            if csrf_token["value"]:
-                return
-            h = req.headers
-            t = h.get("x-csrf-token") or h.get("X-CSRF-Token")
-            if t:
-                csrf_token["value"] = t
+            def on_request(req) -> None:
+                if csrf_token["value"]:
+                    return
+                h = req.headers
+                t = h.get("x-csrf-token") or h.get("X-CSRF-Token")
+                if t:
+                    csrf_token["value"] = t
 
-        def on_response(resp) -> None:
-            # 登录后浏览器会自动触发 /portal/logged 请求，响应 JSON 中包含 userId
-            if logged_user_id["value"] is not None:
-                return
-            try:
-                url = resp.url
-            except Exception:
-                return
-            if "/portal/logged" not in (url or ""):
-                return
-            try:
-                data = resp.json()
-            except Exception:
-                return
-            if isinstance(data, dict):
-                uid = data.get("userId")
-                if isinstance(uid, int):
-                    logged_user_id["value"] = uid
-
-        page.on("request", on_request)
-        page.on("response", on_response)
-
-        try:
-            page.goto(DEV_IWHALECLOUD_BASE_URL)
-            page.fill("#edt_username", username)
-            page.fill("#edt_pwd", password)
-            page.click(".loginBtn")
-            page.wait_for_load_state("networkidle")
-            page.reload(wait_until="networkidle")
-
-            logger.debug("login employee_id=%s page_url=%s", username, page.url)
-
-            if "main.html" not in page.url:
-                return error_response(401, "账号或密码错误")
-
-            # 等一小会儿让 /portal/logged 响应落地（通常会自动触发）
-            for _ in range(30):
+            def on_response(resp) -> None:
+                # 登录后浏览器会自动触发 /portal/logged 请求，响应 JSON 中包含 userId
                 if logged_user_id["value"] is not None:
-                    break
-                page.wait_for_timeout(100)
-
-            captured = csrf_token["value"]
-            # userinfo.token = 研发云 API Authorization（用户申请/表单填写），
-            # 勿与 Playwright 抓到的门户 x-csrf-token（captured）混用——后者写入 iwhalecloud_session.json。
-            token_out = (body.token or "").strip() or str((file_user or {}).get("token") or "").strip()
-            if captured:
+                    return
                 try:
-                    cookies_hdr = _cookies_to_header(context.cookies())
-                    _save_iwhalecloud_session(captured, cookies_hdr)
-                except Exception as exc:
-                    logger.warning("login 写入 iwhalecloud_session 失败: %s", exc)
-            access_out = (body.access_token or "").strip() or str(
-                (file_user or {}).get("access_token") or ""
-            ).strip()
-            if body.purpose == "guide":
-                name_out = body.name if body.name is not None else ""
-            elif body.purpose == "password_change":
-                name_out = body.name if body.name is not None else (file_user or {}).get("name") or ""
-            else:
-                name_out = (file_user or {}).get("name") or ""
+                    url = resp.url
+                except Exception:
+                    return
+                if "/portal/logged" not in (url or ""):
+                    return
+                try:
+                    data = resp.json()
+                except Exception:
+                    return
+                if isinstance(data, dict):
+                    uid = data.get("userId")
+                    if isinstance(uid, int):
+                        logged_user_id["value"] = uid
 
-            prev = file_user or {}
-            if body.purpose == "guide":
-                dept_out = (body.department or "").strip()
-                team_out = (body.team or "").strip()
-                pos_out = (body.position or "").strip()
-            else:
-                dept_out = (body.department or "").strip() or str(prev.get("department") or "").strip()
-                team_out = (body.team or "").strip() or str(prev.get("team") or "").strip()
-                pos_out = (body.position or "").strip() or str(prev.get("position") or "").strip()
+            page.on("request", on_request)
+            page.on("response", on_response)
 
-            ok, err = _save_userinfo_encrypted(
-                name=name_out,
-                employee_id=username,
-                password=password,
-                token=token_out,
-                access_token=access_out,
-                user_id=logged_user_id["value"],
-                department=dept_out,
-                team=team_out,
-                position=pos_out,
-            )
-            if not ok:
-                return error_response(500, err or "保存用户信息失败")
+            try:
+                page.goto(DEV_IWHALECLOUD_BASE_URL)
+                page.fill("#edt_username", username)
+                page.fill("#edt_pwd", password)
+                page.click(".loginBtn")
+                page.wait_for_load_state("networkidle")
+                page.reload(wait_until="networkidle")
 
-            from synapse.rd_meeting.rd_view_assignee import sync_rd_view_assignee_to_unified_service
+                logger.debug("login employee_id=%s page_url=%s", username, page.url)
 
-            assignee_sync = sync_rd_view_assignee_to_unified_service(
-                assignee_id=username,
-                assignee=name_out,
-                department=dept_out,
-                team=team_out,
-                position=pos_out,
-            )
+                if "main.html" not in page.url:
+                    return error_response(401, "账号或密码错误")
 
-            return success_response(
-                {
-                    "token": token_out,
-                    "access_token": access_out,
-                    "assignee_sync": assignee_sync,
-                },
-                "验证通过",
-            )
-        except FileNotFoundError as e:
-            return error_response(500, str(e))
-        except ValueError as e:
-            return error_response(500, str(e))
-        except Exception as exc:
-            logger.exception("登录验证出错: %s", exc)
-            return error_response(500, f"用户密码验证出错: {exc}")
-        finally:
-            browser.close()
+                # 等一小会儿让 /portal/logged 响应落地（通常会自动触发）
+                for _ in range(30):
+                    if logged_user_id["value"] is not None:
+                        break
+                    page.wait_for_timeout(100)
+
+                captured = csrf_token["value"]
+                # userinfo.token = 研发云 API Authorization（用户申请/表单填写），
+                # 勿与 Playwright 抓到的门户 x-csrf-token（captured）混用——后者写入 iwhalecloud_session.json。
+                token_out = (body.token or "").strip() or str((file_user or {}).get("token") or "").strip()
+                if captured:
+                    try:
+                        cookies_hdr = _cookies_to_header(context.cookies())
+                        _save_iwhalecloud_session(captured, cookies_hdr)
+                    except Exception as exc:
+                        logger.warning("login 写入 iwhalecloud_session 失败: %s", exc)
+                access_out = (body.access_token or "").strip() or str(
+                    (file_user or {}).get("access_token") or ""
+                ).strip()
+                if body.purpose == "guide":
+                    name_out = body.name if body.name is not None else ""
+                elif body.purpose == "password_change":
+                    name_out = body.name if body.name is not None else (file_user or {}).get("name") or ""
+                else:
+                    name_out = (file_user or {}).get("name") or ""
+
+                prev = file_user or {}
+                if body.purpose == "guide":
+                    dept_out = (body.department or "").strip()
+                    team_out = (body.team or "").strip()
+                    pos_out = (body.position or "").strip()
+                else:
+                    dept_out = (body.department or "").strip() or str(prev.get("department") or "").strip()
+                    team_out = (body.team or "").strip() or str(prev.get("team") or "").strip()
+                    pos_out = (body.position or "").strip() or str(prev.get("position") or "").strip()
+
+                ok, err = _save_userinfo_encrypted(
+                    name=name_out,
+                    employee_id=username,
+                    password=password,
+                    token=token_out,
+                    access_token=access_out,
+                    user_id=logged_user_id["value"],
+                    department=dept_out,
+                    team=team_out,
+                    position=pos_out,
+                )
+                if not ok:
+                    return error_response(500, err or "保存用户信息失败")
+
+                from synapse.rd_meeting.rd_view_assignee import sync_rd_view_assignee_to_unified_service
+
+                assignee_sync = sync_rd_view_assignee_to_unified_service(
+                    assignee_id=username,
+                    assignee=name_out,
+                    department=dept_out,
+                    team=team_out,
+                    position=pos_out,
+                )
+
+                return success_response(
+                    {
+                        "token": token_out,
+                        "access_token": access_out,
+                        "assignee_sync": assignee_sync,
+                    },
+                    "验证通过",
+                )
+            except FileNotFoundError as e:
+                return error_response(500, str(e))
+            except ValueError as e:
+                return error_response(500, str(e))
+            except Exception as exc:
+                logger.exception("登录验证出错: %s", exc)
+                return error_response(500, _playwright_login_error_message(exc))
+            finally:
+                browser.close()
+    except Exception as exc:
+        logger.exception("登录验证出错(Playwright 启动): %s", exc)
+        return error_response(500, _playwright_login_error_message(exc))
 
 
 def _cookies_to_header(cookies: list[dict]) -> str:
@@ -6979,7 +7009,7 @@ def _fetch_token_and_cookies_sync(username: str, password: str) -> tuple[str, st
     with sync_playwright() as p:
         # 启动 Chromium 浏览器实例。
         # headless=False: 有界面模式，便于本地观察登录过程；如改为 True 则后台无界面运行。
-        browser = p.chromium.launch(headless=True)
+        browser = _launch_iwhalecloud_chromium(p, headless=True)
         # 创建独立浏览器上下文，相当于一个全新的临时浏览器会话（隔离 cookie/localStorage）。
         context = browser.new_context()
         # 在当前上下文中打开一个新页面（Tab）。

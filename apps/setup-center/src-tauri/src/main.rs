@@ -3762,13 +3762,10 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
         cmd.env("SYNAPSE_MODULE_PATHS", extra_path);
     }
 
-    // Playwright 浏览器二进制路径
-    // 优先级: 打包内置 > 旧版外置模块安装路径
-    // 注: browser 模块已内置到 core 包，Python 端会自动检测 _MEIPASS/playwright-browsers/
-    // 这里作为兜底，兼容旧版外置安装
-    let browsers_dir = modules_dir().join("browser").join("browsers");
-    if browsers_dir.exists() {
-        cmd.env("PLAYWRIGHT_BROWSERS_PATH", &browsers_dir);
+    // Playwright 浏览器二进制（打包内置 core）
+    let bundled_pw = bundled_backend_dir().join("_internal").join("playwright-browsers");
+    if bundled_pw.exists() {
+        cmd.env("PLAYWRIGHT_BROWSERS_PATH", &bundled_pw);
     }
 
     // detach + redirect io
