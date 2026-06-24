@@ -3,7 +3,7 @@
 # Invoked by release workflows; may be fetched from main at runtime when checkout is an old tag.
 set -euo pipefail
 
-MACOS_CODESIGN_SCRIPT_VERSION="v3-macos-keychain-repack"
+MACOS_CODESIGN_SCRIPT_VERSION="v3.1-pkcs12-pem-repack"
 
 RESOURCE_DIR="${RESOURCE_DIR:-apps/setup-center/src-tauri/resources}"
 ENTITLEMENTS="${ENTITLEMENTS:-apps/setup-center/src-tauri/Entitlements.plist}"
@@ -55,27 +55,93 @@ rm -f "$OPENSSL_ERR"
 echo "PKCS12 preflight passed (OpenSSL)."
 
 # OpenSSL 3 can decrypt many PKCS12 variants that macOS Security.framework rejects.
-# Re-export with 3DES + SHA1 MAC so `security import` succeeds on GitHub runners.
+# Extract to PEM first, then export with 3DES + SHA1 MAC for `security import`.
 P12_KEYCHAIN="${P12_PATH}.keychain.p12"
-echo "Repackaging PKCS12 for macOS keychain compatibility..."
+WORK_DIR="${RUNNER_TEMP:-/tmp}/p12-repack"
+mkdir -p "$WORK_DIR"
+PEM_BUNDLE="${WORK_DIR}/bundle.pem"
 REPACK_ERR=$(mktemp)
-repack_ok=0
-if openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" -legacy \
-  -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
-  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
-  repack_ok=1
-elif openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" \
-  -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
-  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
-  repack_ok=1
-fi
-if [ "$repack_ok" -ne 1 ]; then
-  echo "ERROR: failed to repackage PKCS12 for macOS keychain."
-  sed 's/^/  openssl: /' "$REPACK_ERR" >&2 || true
-  rm -f "$REPACK_ERR"
+
+echo "Repackaging PKCS12 for macOS keychain compatibility..."
+extract_ok=0
+KEY_PEM="${WORK_DIR}/key.pem"
+CERT_PEM="${WORK_DIR}/cert.pem"
+
+try_extract_bundle() {
+  local legacy_flag="$1"
+  rm -f "$PEM_BUNDLE"
+  openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" $legacy_flag \
+    -nodes -out "$PEM_BUNDLE" 2>"$REPACK_ERR"
+}
+
+try_extract_split() {
+  local legacy_flag="$1"
+  rm -f "$KEY_PEM" "$CERT_PEM"
+  openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" $legacy_flag \
+    -nocerts -nodes -out "$KEY_PEM" 2>"$REPACK_ERR" && \
+  openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" $legacy_flag \
+    -nokeys -out "$CERT_PEM" 2>"$REPACK_ERR"
+}
+
+for legacy_flag in "-legacy" ""; do
+  if [ -n "$legacy_flag" ]; then
+    echo "  Trying PKCS12 extract (${legacy_flag}, bundle)..."
+  else
+    echo "  Trying PKCS12 extract (default, bundle)..."
+  fi
+  if try_extract_bundle "$legacy_flag"; then
+    if grep -q "BEGIN.*PRIVATE KEY" "$PEM_BUNDLE" && grep -q "BEGIN CERTIFICATE" "$PEM_BUNDLE"; then
+      extract_ok=1
+      break
+    fi
+    echo "  Bundle PEM is missing private key or certificate block."
+  else
+    sed 's/^/    openssl: /' "$REPACK_ERR" >&2 || true
+  fi
+
+  if [ -n "$legacy_flag" ]; then
+    echo "  Trying PKCS12 extract (${legacy_flag}, split key/cert)..."
+  else
+    echo "  Trying PKCS12 extract (default, split key/cert)..."
+  fi
+  if try_extract_split "$legacy_flag"; then
+    if [ -s "$KEY_PEM" ] && [ -s "$CERT_PEM" ]; then
+      PEM_BUNDLE=""
+      extract_ok=2
+      break
+    fi
+    echo "  Split extract produced empty key or certificate file."
+  else
+    sed 's/^/    openssl: /' "$REPACK_ERR" >&2 || true
+  fi
+done
+
+if [ "$extract_ok" -eq 0 ]; then
+  echo "ERROR: failed to extract private key and certificate from PKCS12."
+  echo "  Ensure the .p12 includes both the Developer ID certificate and its private key."
+  echo "  Re-export from Keychain Access: select cert + private key → Export 2 items → .p12"
+  rm -f "$REPACK_ERR" "$PEM_BUNDLE" "$KEY_PEM" "$CERT_PEM"
   exit 1
 fi
-rm -f "$REPACK_ERR"
+
+if [ "$extract_ok" -eq 2 ]; then
+  if ! openssl pkcs12 -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
+    -inkey "$KEY_PEM" -in "$CERT_PEM" \
+    -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
+    echo "ERROR: failed to export macOS-compatible PKCS12 (split key/cert)."
+    sed 's/^/  openssl: /' "$REPACK_ERR" >&2 || true
+    rm -f "$REPACK_ERR" "$KEY_PEM" "$CERT_PEM"
+    exit 1
+  fi
+elif ! openssl pkcs12 -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
+  -in "$PEM_BUNDLE" \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
+  echo "ERROR: failed to export macOS-compatible PKCS12 (bundle)."
+  sed 's/^/  openssl: /' "$REPACK_ERR" >&2 || true
+  rm -f "$REPACK_ERR" "$PEM_BUNDLE"
+  exit 1
+fi
+rm -f "$REPACK_ERR" "$PEM_BUNDLE" "$KEY_PEM" "$CERT_PEM"
 REPACK_SIZE=$(wc -c < "$P12_KEYCHAIN" | tr -d ' ')
 echo "Repackaged PKCS12 size=${REPACK_SIZE} bytes"
 

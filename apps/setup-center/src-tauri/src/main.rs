@@ -1727,6 +1727,47 @@ fn wait_for_port_free(port: u16, timeout_ms: u64) -> bool {
     false
 }
 
+/// 探测端口上是否已有健康的 Synapse HTTP 后端（供端口占用时复用）。
+fn probe_synapse_health(port: u16) -> Option<u32> {
+    let client = match reqwest::blocking::Client::builder()
+        .no_proxy()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log_to_file(&format!("[health_probe] client build failed: {e}"));
+            return None;
+        }
+    };
+    let url = format!("http://127.0.0.1:{}/api/health", port);
+    let resp = match client.get(&url).send() {
+        Ok(r) if r.status().is_success() => r,
+        Ok(r) => {
+            log_to_file(&format!("[health_probe] non-success {}: {}", url, r.status()));
+            return None;
+        }
+        Err(e) => {
+            log_to_file(&format!("[health_probe] request failed {}: {e}", url));
+            return None;
+        }
+    };
+    let json: serde_json::Value = match resp.json() {
+        Ok(v) => v,
+        Err(e) => {
+            log_to_file(&format!("[health_probe] json parse failed: {e}"));
+            return None;
+        }
+    };
+    if json.get("service").and_then(|v| v.as_str()) != Some("synapse") {
+        log_to_file(&format!("[health_probe] unexpected service field: {:?}", json.get("service")));
+        return None;
+    }
+    json.get("pid")
+        .and_then(|v| v.as_u64())
+        .map(|p| p as u32)
+}
+
 /// 尝试通过 HTTP API 优雅关闭 Python 服务（POST /api/shutdown），
 /// 然后等待进程退出。如果 API 调用失败或超时则回退到 kill。
 /// `port`: 可选端口号，默认 18900
@@ -3692,6 +3733,14 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
     // Python 端也有重试，但尽早发现可以给用户更明确的提示。
     let effective_port = read_workspace_api_port(&workspace_id).unwrap_or(18900);
     if !check_port_available(effective_port) {
+        // 若已有 Synapse 后端在监听（如开发 synapse serve），直接复用，避免空等 10s 端口释放。
+        if let Some(pid) = probe_synapse_health(effective_port) {
+            log_to_file(&format!(
+                "[service_start] port {} occupied but Synapse health OK (pid={}), reusing existing backend",
+                effective_port, pid
+            ));
+            return Ok(build_service_status(&workspace_id, true, Some(pid), pf));
+        }
         // 端口被占用，等待最多 10 秒（处理 TIME_WAIT 等场景）
         if !wait_for_port_free(effective_port, 10_000) {
             return Err(format!(

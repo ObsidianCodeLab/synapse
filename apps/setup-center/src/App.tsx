@@ -800,39 +800,59 @@ export function App() {
       : (apiBaseUrl || window.location.origin);
     const url = `${String(base).replace(/\/$/, "")}/api/dev/iwhalecloud/local-userinfo-exists`;
     (async () => {
+      const backendHint = t(
+        "onboarding.iwhalecloud.localDetectBackendHint",
+        "无法连接后端，请确认服务已启动后刷新本页，或直接填写下方信息并点击「验证」。",
+      );
+      const noCredentialHint = t(
+        "onboarding.iwhalecloud.localDetectNoCredentialHint",
+        "未检测到本地已保存凭据，请填写下方信息并点击「验证」。",
+      );
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (cancelled) return;
-        if (!res.ok) {
-          setObIwcLocalDetectHint(
-            t("onboarding.iwhalecloud.localDetectBackendHint", "无法连接后端，请确认服务已启动后刷新本页，或直接填写下方信息并点击「验证」。"),
-          );
-          return;
-        }
-        const j = (await res.json()) as { errorcode?: number; data?: { exists?: boolean } };
-        if (cancelled) return;
-        if (j?.errorcode === 0 && j?.data?.exists === true) {
-          setObIwcLocalDetectPassed(true);
-          setObIwcLocalDetectHint(null);
-          setObIwcValidated(false);
-          setObIwcReverifyAll(false);
-          setObIwcNeedsOrgInfo(false);
+        // 后端可能在欢迎页才异步启动；轮询最多 ~30s，避免单次 8s 超时误判。
+        for (let attempt = 0; attempt < 15; attempt++) {
+          if (cancelled) return;
           try {
-            await fetchObIwcUserinfoPrefill(true);
+            const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+            if (cancelled) return;
+            if (!res.ok) {
+              if (attempt < 14) {
+                await new Promise((r) => setTimeout(r, 2000));
+                continue;
+              }
+              setObIwcLocalDetectHint(backendHint);
+              return;
+            }
+            const j = (await res.json()) as { errorcode?: number; data?: { exists?: boolean } };
+            if (cancelled) return;
+            if (j?.errorcode === 0 && j?.data?.exists === true) {
+              setObIwcLocalDetectPassed(true);
+              setObIwcLocalDetectHint(null);
+              setObIwcValidated(false);
+              setObIwcReverifyAll(false);
+              setObIwcNeedsOrgInfo(false);
+              try {
+                const prefill = await fetchObIwcUserinfoPrefill(true);
+                if (!prefill && !cancelled) {
+                  // 凭据文件存在但摘要拉取失败时解锁表单，避免空白锁定
+                  setObIwcReverifyAll(true);
+                }
+              } catch {
+                if (!cancelled) setObIwcReverifyAll(true);
+              }
+              return;
+            }
+            setObIwcLocalDetectPassed(false);
+            setObIwcLocalDetectHint(noCredentialHint);
+            return;
           } catch {
-            /* 摘要可选 */
+            if (attempt < 14) {
+              await new Promise((r) => setTimeout(r, 2000));
+              continue;
+            }
+            if (!cancelled) setObIwcLocalDetectHint(backendHint);
+            return;
           }
-        } else {
-          setObIwcLocalDetectPassed(false);
-          setObIwcLocalDetectHint(
-            t("onboarding.iwhalecloud.localDetectNoCredentialHint", "未检测到本地已保存凭据，请填写下方信息并点击「验证」。"),
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setObIwcLocalDetectHint(
-            t("onboarding.iwhalecloud.localDetectBackendHint", "无法连接后端，请确认服务已启动后刷新本页，或直接填写下方信息并点击「验证」。"),
-          );
         }
       } finally {
         if (!cancelled) setObIwcLocalDetecting(false);
@@ -4977,34 +4997,34 @@ export function App() {
               <Button
                 size="lg"
                 className="mt-2 px-10 rounded-xl text-[15px]"
-                onClick={async () => {
-                  let earlyStartWsId = currentWorkspaceId || "";
-                  try {
-                    const wsList = await invoke<WorkspaceSummary[]>("list_workspaces");
-                    if (!wsList.length) {
-                      const wsId = "default";
-                      await invoke("create_workspace", { name: t("onboarding.defaultWorkspace"), id: wsId, setCurrent: true });
-                      await invoke("set_current_workspace", { id: wsId });
-                      setCurrentWorkspaceId(wsId);
-                      setWorkspaces([{ id: wsId, name: t("onboarding.defaultWorkspace"), path: "", isCurrent: true }]);
-                      earlyStartWsId = wsId;
-                    } else {
-                      setWorkspaces(wsList);
-                      if (!currentWorkspaceId && wsList.length > 0) {
-                        setCurrentWorkspaceId(wsList[0].id);
+                onClick={() => {
+                  // 立即跳转，避免 await 工作区/后端 IPC 阻塞 UI（开发时 18900 被占用会空等 ~10s）
+                  setObStep("ob-iwhalecloud");
+                  void (async () => {
+                    let earlyStartWsId = currentWorkspaceId || "";
+                    try {
+                      const wsList = await invoke<WorkspaceSummary[]>("list_workspaces");
+                      if (!wsList.length) {
+                        const wsId = "default";
+                        await invoke("create_workspace", { name: t("onboarding.defaultWorkspace"), id: wsId, setCurrent: true });
+                        await invoke("set_current_workspace", { id: wsId });
+                        setCurrentWorkspaceId(wsId);
+                        setWorkspaces([{ id: wsId, name: t("onboarding.defaultWorkspace"), path: "", isCurrent: true }]);
+                        earlyStartWsId = wsId;
+                      } else {
+                        setWorkspaces(wsList);
+                        if (!currentWorkspaceId && wsList.length > 0) {
+                          setCurrentWorkspaceId(wsList[0].id);
+                        }
+                        earlyStartWsId = currentWorkspaceId || wsList[0]?.id || "";
                       }
-                      earlyStartWsId = currentWorkspaceId || wsList[0]?.id || "";
+                    } catch (e) {
+                      logger.warn("App", "ob: create default workspace failed", { error: String(e) });
                     }
-                  } catch (e) {
-                    logger.warn("App", "ob: create default workspace failed", { error: String(e) });
-                  }
 
-                  // Kick off backend startup in background so HTTP API is
-                  // likely ready by the time the user reaches ob-llm.
-                  if (IS_TAURI && earlyStartWsId) {
-                    const wsId = earlyStartWsId;
-                    const effectiveVenv = venvDir || (info ? joinPath(info.synapseRootDir, "venv") : "");
-                    (async () => {
+                    if (IS_TAURI && earlyStartWsId) {
+                      const wsId = earlyStartWsId;
+                      const effectiveVenv = venvDir || (info ? joinPath(info.synapseRootDir, "venv") : "");
                       try {
                         const backendInfo = await invoke<{
                           bundled: boolean; venvReady: boolean; exePath: string;
@@ -5025,10 +5045,8 @@ export function App() {
                       } catch (e) {
                         logger.warn("App", "ob: early backend start failed, will retry in ob-progress", { error: String(e) });
                       }
-                    })();
-                  }
-
-                  setObStep("ob-iwhalecloud");
+                    }
+                  })();
                 }}
               >
                 {t("onboarding.welcome.start")}
