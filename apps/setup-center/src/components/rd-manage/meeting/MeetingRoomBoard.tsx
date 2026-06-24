@@ -3518,7 +3518,12 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
   const handleLeaderReviewComplete = useCallback(
     async (ctx: { demandNo: string; taskNos: string[] }) => {
       const base = (synapseApiBase || '').trim();
-      if (!base || !activeRoom) return;
+      if (!base) {
+        throw new Error('Synapse API 未配置，无法回写合并完成状态');
+      }
+      if (!activeRoom) {
+        throw new Error('会议室状态未就绪，无法回写合并完成状态');
+      }
       await markDemandMergeComplete(base, { demand_no: ctx.demandNo, task_nos: ctx.taskNos });
       const detail = await fetchMeetingRoomDetail(base, activeRoom.id);
       const updatedRoom = mapDetailToRoom(detail);

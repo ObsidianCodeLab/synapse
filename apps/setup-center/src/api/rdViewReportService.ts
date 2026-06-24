@@ -375,6 +375,7 @@ export async function triggerCodeMerge(
     username: string;
     password: string;
     taskNo:   string;
+    demand_no?: string;
   },
 ): Promise<{ success: boolean; message: string }> {
   type MergeWire = { errorcode?: number; message?: string };
@@ -398,6 +399,7 @@ export async function triggerCodeMergeAll(
     username: string;
     password: string;
     taskNos:  string[];
+    demand_no?: string;
   },
 ): Promise<{ success: boolean; message: string; failedTaskNo?: string }> {
   const taskNos = params.taskNos.map((t) => t.trim()).filter(Boolean);
@@ -409,6 +411,7 @@ export async function triggerCodeMergeAll(
       username: params.username,
       password: params.password,
       taskNo,
+      demand_no: params.demand_no,
     });
     if (!res.success) {
       return { success: false, message: res.message, failedTaskNo: taskNo };

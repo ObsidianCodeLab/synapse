@@ -341,6 +341,7 @@ function ReviewTable({
   onMerge,
   isAllApproved,
   merging,
+  mergeCompleted,
   isSubmitted,
 }: {
   rows:                TableRow[];
@@ -357,6 +358,7 @@ function ReviewTable({
   onMerge:             () => void;
   isAllApproved:       boolean;
   merging:             boolean;
+  mergeCompleted:      boolean;
   isSubmitted:         boolean;
 }) {
   const [commentModalKey, setCommentModalKey] = useState<string | null>(null);
@@ -497,7 +499,16 @@ function ReviewTable({
 
       {/* 底部操作区 */}
       <div className="flex items-center justify-end gap-2 pt-1">
-        {isAllApproved ? (
+        {mergeCompleted ? (
+          <button
+            type="button"
+            disabled
+            className="rd-leader-review-action-btn bg-emerald-600/40 text-emerald-100 cursor-not-allowed opacity-90"
+          >
+            <Star className="h-3.5 w-3.5 shrink-0" />
+            代码已合并完成
+          </button>
+        ) : isAllApproved ? (
           <button
             type="button"
             onClick={onMerge}
@@ -580,6 +591,7 @@ export function LeaderReviewSopPanel({
   const [loading,          setLoading]          = useState(true);
   const [selfReviewing,    setSelfReviewing]    = useState(false);
   const [merging,          setMerging]          = useState(false);
+  const [mergeCompleted,   setMergeCompleted]   = useState(false);
   const [adding,           setAdding]           = useState(false);
   const [report,           setReport]           = useState<ReportRecord | null>(null);
   const [overallState,     setOverallState]     = useState<'not_submitted' | 'pending' | 'approved' | 'rejected'>('not_submitted');
@@ -706,6 +718,9 @@ export function LeaderReviewSopPanel({
         if (data.prod?.trim()) {
           setPanelProd(data.prod.trim());
         }
+        if (data.merge_completed) {
+          setMergeCompleted(true);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -724,6 +739,14 @@ export function LeaderReviewSopPanel({
           .filter(Boolean);
         if (nos.length > 0) setPanelTaskNos(nos);
         if (!prodProp && row?.prod?.trim()) setPanelProd(row.prod.trim());
+        const localDone = (row?.local_process_state || '').trim() === '已完成';
+        const tasksDone = (row?.owned_work_items ?? []).every((w) => {
+          const st = (w.state || '').trim();
+          return st === '提交完成' || st === '已完成';
+        });
+        if (localDone && tasksDone && (row?.owned_work_items?.length ?? 0) > 0) {
+          setMergeCompleted(true);
+        }
       })
       .catch(() => {});
   }, [synapseApiBase, demandNo, roomId, ticket, taskNosProp, prodProp]);
@@ -970,6 +993,7 @@ export function LeaderReviewSopPanel({
         username: effectiveUser.employee_id,
         password: '',
         taskNos,
+        demand_no: demandNo,
       });
       if (!res.success) {
         toast.error(
@@ -984,6 +1008,7 @@ export function LeaderReviewSopPanel({
       } else {
         await markDemandMergeComplete(synapseApiBase, { demand_no: demandNo, task_nos: taskNos });
       }
+      setMergeCompleted(true);
       toast.success(
         taskNos.length > 1
           ? `全部 ${taskNos.length} 个研发单已合并，任务已完成！`
@@ -1160,6 +1185,7 @@ export function LeaderReviewSopPanel({
           onMerge={handleMerge}
           isAllApproved={isAllApproved}
           merging={merging}
+          mergeCompleted={mergeCompleted}
           isSubmitted={isSubmitted}
         />
       </div>

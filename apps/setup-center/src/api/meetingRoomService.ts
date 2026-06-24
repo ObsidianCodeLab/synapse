@@ -823,6 +823,8 @@ export interface LeaderReviewPanelPayload {
   prod:               string;
   artifacts_ready:    boolean;
   validation_errors?: string[];
+  /** 代码已合并且 userwork 已标记完成 */
+  merge_completed?:   boolean;
 }
 
 export async function fetchLeaderReviewPanel(

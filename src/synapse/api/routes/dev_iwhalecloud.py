@@ -6006,10 +6006,141 @@ def _wait_for_merge_success(page: Page, total_timeout_ms: int = 120_000) -> bool
         time.sleep(0.35)
     return False
 
+def _find_demand_no_for_task_no(task_no: str) -> str | None:
+    """按研发单号反查所属需求单号（userwork.json）。"""
+    tn = _snapshot_norm_id(task_no)
+    if not tn:
+        return None
+    snap = load_owner_order_snapshot_from_file()
+    if not snap or not isinstance(snap.get("list"), list):
+        return None
+    for demand in snap["list"]:
+        if not isinstance(demand, dict):
+            continue
+        owned = demand.get("owned_work_items")
+        if not isinstance(owned, list):
+            continue
+        for item in owned:
+            if isinstance(item, dict) and _snapshot_norm_id(item.get("task_no")) == tn:
+                return _snapshot_norm_id(demand.get("demand_no"))
+    return None
+
+
+def _apply_demand_merge_complete(demand_no: str, task_nos: list[str] | None = None) -> bool:
+    """
+    代码合并成功后回写 userwork / dev.status / 会议室。
+    返回 True 表示 userwork 中命中需求单并完成写入。
+    """
+    from filelock import FileLock
+
+    from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
+    from synapse.rd_meeting.orchestrator import cancel_room_run
+    from synapse.rd_meeting.room_runtime import sync_room_state_from_dev
+
+    dn = _snapshot_norm_id(demand_no)
+    if not dn:
+        return False
+
+    normalized_tasks = [_snapshot_norm_id(t) for t in (task_nos or [])]
+    normalized_tasks = [t for t in normalized_tasks if t]
+    task_set = set(normalized_tasks) if normalized_tasks else None
+
+    userwork_updated = False
+    path = _owner_order_file_name()
+    if path.is_file():
+        lock = FileLock(str(_owner_order_file_lock_path()), timeout=30)
+        with lock:
+            try:
+                raw = path.read_text(encoding="utf-8")
+                prev = json.loads(raw)
+                if isinstance(prev, dict) and isinstance(prev.get("list"), list):
+                    modified = False
+                    for demand in prev["list"]:
+                        if not isinstance(demand, dict):
+                            continue
+                        if _snapshot_norm_id(demand.get("demand_no")) != dn:
+                            continue
+                        demand["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
+                        modified = True
+                        owned = demand.get("owned_work_items")
+                        if isinstance(owned, list):
+                            for item in owned:
+                                if not isinstance(item, dict):
+                                    continue
+                                tn = _snapshot_norm_id(item.get("task_no"))
+                                if task_set is None or tn in task_set:
+                                    item["state"] = OWNED_WORK_ITEM_STATE_COMMIT_DONE
+                        break
+                    if modified:
+                        payload = {
+                            "list": prev["list"],
+                            "updated_at": datetime.now().isoformat(timespec="seconds"),
+                        }
+                        _atomic_write_json_file(path, payload)
+                        userwork_updated = True
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.warning("apply_demand_merge_complete userwork 写入失败: %s", exc)
+
+    if not userwork_updated:
+        return False
+
+    dev = load_dev_status(dn)
+    if dev:
+        dev["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
+        save_dev_status(dn, dev)
+        mr = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
+        room_id = str(mr.get("room_id") or "").strip()
+        scope = dev.get("scope") if isinstance(dev.get("scope"), dict) else {}
+        scope_type = str(scope.get("type") or "demand")
+        if scope_type not in ("demand", "task"):
+            scope_type = "demand"
+        if room_id:
+            try:
+                cancel_room_run(room_id)
+            except Exception:
+                logger.exception("cancel_room_run failed room_id=%s", room_id)
+            sync_room_state_from_dev(
+                dn,
+                room_id=room_id,
+                scope_type=scope_type,  # type: ignore[arg-type]
+                stage_id=int(dev.get("stage_id") or 0),
+                current_node_id=str(dev.get("current_node_id") or ""),
+                local_process_state=OWNED_WORK_ITEM_STATE_COMPLETED,
+            )
+    logger.info(
+        "代码合并状态已回写 userwork demand_no=%s task_nos=%s",
+        dn,
+        sorted(task_set) if task_set else "all",
+    )
+    return True
+
+
+def _apply_demand_merge_complete_for_task(*, task_no: str, demand_no: str = "") -> bool:
+    """Playwright 合并成功后按研发单号回写（可带 demand_no 加速命中）。"""
+    dn = _snapshot_norm_id(demand_no) or _find_demand_no_for_task_no(task_no)
+    if not dn:
+        logger.warning("未找到研发单 %s 对应的需求单，跳过 userwork 回写", task_no)
+        return False
+    tn = _snapshot_norm_id(task_no)
+    return _apply_demand_merge_complete(dn, [tn] if tn else None)
+
+
+def _code_merge_success_response(body: "CodeMergeRequest", message: str) -> dict:
+    """合并 Playwright 流程成功后统一回写本地状态并返回 API 响应。"""
+    applied = _apply_demand_merge_complete_for_task(
+        task_no=body.taskNo,
+        demand_no=str(getattr(body, "demand_no", "") or ""),
+    )
+    if not applied:
+        logger.warning("代码合并 Playwright 成功但 userwork 未更新 task_no=%s", body.taskNo)
+    return success_response(message=message)
+
+
 class CodeMergeRequest(BaseModel):
     username: str = Field(..., description="用户名")
     password: str = Field(..., description="密码")
     taskNo: str = Field(..., description="任务单号")
+    demand_no: str = Field("", description="需求单号（可选；省略时按 taskNo 反查 userwork）")
 
 
 @router.post("/api/dev/iwhalecloud/code_merge")
@@ -6113,7 +6244,7 @@ def code_merge(body: CodeMergeRequest):
 
             if already_merged:
                 logger.info("PR 已合并（compare 两端 commit 相同，show-form 显示 New Pull Request），直接返回成功")
-                return success_response(message="代码合并成功（PR 已合并）")
+                return _code_merge_success_response(body, "代码合并成功（PR 已合并）")
 
             has_view_pr = False
             try:
@@ -6152,7 +6283,7 @@ def code_merge(body: CodeMergeRequest):
                     }""")
                     if pr_state and "merged" in pr_state.lower():
                         logger.info("PR 已处于 Merged 状态，无需再次合并，直接返回成功")
-                        return success_response(message="代码合并成功（PR 已合并）")
+                        return _code_merge_success_response(body, "代码合并成功（PR 已合并）")
                 except Exception:
                     pass
             else:
@@ -6181,7 +6312,7 @@ def code_merge(body: CodeMergeRequest):
             merge_btn_count = fr.locator("button.ui.button:has-text('Create merge commit')").count()
             if merge_btn_count == 0:
                 logger.info("未找到 Create merge commit 按钮（PR 可能已合并），直接返回成功")
-                return success_response(message="代码合并成功（PR 已合并）")
+                return _code_merge_success_response(body, "代码合并成功（PR 已合并）")
 
             # 第一步：点击展开合并表单（纯 JS DOM 展开，把 form 插入 DOM）
             fr.locator("button.ui.button:has-text('Create merge commit')").first.click(
@@ -6233,7 +6364,7 @@ def code_merge(body: CodeMergeRequest):
             logger.info("合并分支界面-第二次点击创建合并提交成功（提交表单）")
 
             if _wait_for_merge_success(page, total_timeout_ms=merge_timeout_ms):
-                return success_response(message="代码合并成功")
+                return _code_merge_success_response(body, "代码合并成功")
             return error_response(
                 500,
                 message=f"代码合并失败，请到研发云上根据单号[{body.taskNo}]查看原因",
@@ -6598,76 +6729,16 @@ async def mark_demand_merge_complete(body: MarkDemandMergeCompleteRequest) -> di
     代码合并成功后：需求单 local_process_state → 已完成；
     指定研发单 state → 提交完成；并同步 dev.status / 会议室为 completed。
     """
-    from filelock import FileLock
-
-    from synapse.rd_meeting.dev_status import load_dev_status, save_dev_status
-    from synapse.rd_meeting.orchestrator import cancel_room_run
-    from synapse.rd_meeting.room_runtime import sync_room_state_from_dev
-
     demand_no = str(body.demand_no or "").strip()
     if not demand_no:
         return error_response(400, message="demand_no required")
 
     task_nos = [_snapshot_norm_id(t) for t in (body.task_nos or [])]
     task_nos = [t for t in task_nos if t]
-    task_set = set(task_nos) if task_nos else None
 
-    path = _owner_order_file_name()
-    if path.is_file():
-        lock = FileLock(str(_owner_order_file_lock_path()), timeout=30)
-        with lock:
-            try:
-                raw = path.read_text(encoding="utf-8")
-                prev = json.loads(raw)
-                if isinstance(prev, dict) and isinstance(prev.get("list"), list):
-                    modified = False
-                    for demand in prev["list"]:
-                        if not isinstance(demand, dict) or demand.get("demand_no") != demand_no:
-                            continue
-                        demand["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
-                        modified = True
-                        owned = demand.get("owned_work_items")
-                        if isinstance(owned, list):
-                            for item in owned:
-                                if not isinstance(item, dict):
-                                    continue
-                                tn = _snapshot_norm_id(item.get("task_no"))
-                                if task_set is None or tn in task_set:
-                                    item["state"] = OWNED_WORK_ITEM_STATE_COMMIT_DONE
-                        break
-                    if modified:
-                        payload = {
-                            "list": prev["list"],
-                            "updated_at": datetime.now().isoformat(timespec="seconds"),
-                        }
-                        _atomic_write_json_file(path, payload)
-            except (OSError, json.JSONDecodeError):
-                pass
-
-    dev = load_dev_status(demand_no)
-    if dev:
-        dev["local_process_state"] = OWNED_WORK_ITEM_STATE_COMPLETED
-        save_dev_status(demand_no, dev)
-        mr = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
-        room_id = str(mr.get("room_id") or "").strip()
-        scope = dev.get("scope") if isinstance(dev.get("scope"), dict) else {}
-        scope_type = str(scope.get("type") or "demand")
-        if scope_type not in ("demand", "task"):
-            scope_type = "demand"
-        if room_id:
-            try:
-                cancel_room_run(room_id)
-            except Exception:
-                logger.exception("cancel_room_run failed room_id=%s", room_id)
-            sync_room_state_from_dev(
-                demand_no,
-                room_id=room_id,
-                scope_type=scope_type,  # type: ignore[arg-type]
-                stage_id=int(dev.get("stage_id") or 0),
-                current_node_id=str(dev.get("current_node_id") or ""),
-                local_process_state=OWNED_WORK_ITEM_STATE_COMPLETED,
-            )
-
+    ok = _apply_demand_merge_complete(demand_no, task_nos or None)
+    if not ok:
+        return error_response(404, message=f"未找到需求单 {demand_no} 或 userwork 回写失败")
     return success_response(None, "success")
 
 

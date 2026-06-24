@@ -96,6 +96,44 @@ def load_leader_review_task_nos(scope_id: str) -> list[str]:
         return []
 
 
+def is_demand_merge_completed(scope_id: str, task_nos: list[str] | None = None) -> bool:
+    """需求单 local_process_state=已完成 且目标研发单均为提交完成/已完成。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return False
+    try:
+        from synapse.api.routes.dev_iwhalecloud import (
+            OWNED_WORK_ITEM_STATE_COMMIT_DONE,
+            OWNED_WORK_ITEM_STATE_COMPLETED,
+            _normalize_owned_work_item_state,
+            _snapshot_norm_id,
+        )
+        from synapse.rd_meeting.init_context import get_userwork_row
+
+        row = get_userwork_row("demand", sid) or {}
+        if _snapshot_norm_id(row.get("local_process_state")) != OWNED_WORK_ITEM_STATE_COMPLETED:
+            return False
+        owned = row.get("owned_work_items")
+        if not isinstance(owned, list) or not owned:
+            return False
+        targets = {_snapshot_norm_id(t) for t in (task_nos or []) if _snapshot_norm_id(t)}
+        checked = False
+        for item in owned:
+            if not isinstance(item, dict):
+                continue
+            tn = _snapshot_norm_id(item.get("task_no"))
+            if targets and tn not in targets:
+                continue
+            checked = True
+            state = _normalize_owned_work_item_state(item.get("state"))
+            if state not in (OWNED_WORK_ITEM_STATE_COMMIT_DONE, OWNED_WORK_ITEM_STATE_COMPLETED):
+                return False
+        return checked if targets else True
+    except Exception as exc:
+        logger.warning("is_demand_merge_completed failed scope=%s: %s", sid, exc)
+        return False
+
+
 def load_leader_review_panel_payload(scope_id: str) -> dict[str, Any]:
     """供前端 LeaderReviewSopPanel 拉取：归档 HTML + 研发单号 + prod。"""
     sid = (scope_id or "").strip()
@@ -108,10 +146,12 @@ def load_leader_review_panel_payload(scope_id: str) -> dict[str, Any]:
         prod = str(row.get("prod") or "").strip()
     except Exception:
         prod = ""
+    task_nos = load_leader_review_task_nos(sid)
     return {
         "report_html": load_leader_review_html(sid),
-        "task_nos": load_leader_review_task_nos(sid),
+        "task_nos": task_nos,
         "prod": prod,
         "artifacts_ready": ok,
         "validation_errors": errors,
+        "merge_completed": is_demand_merge_completed(sid, task_nos),
     }
