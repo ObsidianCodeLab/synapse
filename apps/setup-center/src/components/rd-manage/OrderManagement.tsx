@@ -134,6 +134,8 @@ export interface Ticket {
   ownedWorkItems: OwnedWorkItem[];
   /** userwork.json 中的 prod（统一服务产品标识） */
   prod?: string;
+  /** userwork.json 中的 local_process_state（智能研发完成 / 智能归档完成筛选） */
+  localProcessState?: string;
 }
 
 /** 工单卡片 / SOP 顶栏：有 prod 显示产品名，否则「未指定产品」 */
@@ -341,6 +343,7 @@ function mapDemandListItemToTicket(d: DemandListItem, flags: Record<string, bool
     currentStage: 0,
     ownedWorkItems: owned,
     prod: (d.prod || '').trim() || undefined,
+    localProcessState: local || undefined,
   };
 }
 
@@ -620,7 +623,13 @@ export const OrderManagement: React.FC<{
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [ticketFilter, setTicketFilter] = useState<
-    'prepare' | 'pending' | 'processing' | 'full_manual' | 'all'
+    | 'prepare'
+    | 'pending'
+    | 'processing'
+    | 'full_manual'
+    | 'rd_completed'
+    | 'archived'
+    | 'all'
   >('all');
   const [searchQuery, setSearchQuery] = useState('');
   /** 看板数据是否已完成首次拉取（用于区分「加载中」与「快照为空」） */
@@ -943,9 +952,7 @@ export const OrderManagement: React.FC<{
   const applyBoardPayload = useCallback(
     async (data: RdManageDemandsPayload) => {
       setDemandListRaw(data.list || []);
-      const list = (data.list || []).filter(
-        (d) => effectiveLocalProcessState(d) !== "archived",
-      );
+      const list = data.list || [];
       const orderIds = collectOrderIdsForHitlFlags(list);
       let flags: Record<string, boolean> = {};
       try {
@@ -1031,6 +1038,8 @@ export const OrderManagement: React.FC<{
       if (ticketFilter === 'processing') return t.status === 'processing' || t.status === 'error';
       if (ticketFilter === 'full_manual') return t.status === 'full_manual';
       if (ticketFilter === 'prepare') return t.status === 'prepare';
+      if (ticketFilter === 'rd_completed') return (t.localProcessState || '').trim() === '已完成';
+      if (ticketFilter === 'archived') return (t.localProcessState || '').trim() === 'archived';
       return true;
     });
   }, [tickets, ticketFilter, searchQuery]);
@@ -1039,6 +1048,14 @@ export const OrderManagement: React.FC<{
   const processingCount = useMemo(() => tickets.filter(t => t.status === 'processing' || t.status === 'error').length, [tickets]);
   const prepareCount = useMemo(() => tickets.filter(t => t.status === 'prepare').length, [tickets]);
   const fullManualCount = useMemo(() => tickets.filter((t) => t.status === 'full_manual').length, [tickets]);
+  const rdCompletedCount = useMemo(
+    () => tickets.filter((t) => (t.localProcessState || '').trim() === '已完成').length,
+    [tickets],
+  );
+  const archivedCount = useMemo(
+    () => tickets.filter((t) => (t.localProcessState || '').trim() === 'archived').length,
+    [tickets],
+  );
 
   const activeTicket = useMemo(() => tickets.find(t => t.id === activeTicketId) || tickets[0] || null, [activeTicketId, tickets]);
 
@@ -1799,6 +1816,43 @@ export const OrderManagement: React.FC<{
                   <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
                     ticketFilter === filter.id 
                       ? 'bg-background text-foreground shadow-sm' 
+                      : 'bg-muted/40 text-muted-foreground/70'
+                  }`}>
+                    {filter.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-1 flex w-full min-w-0 flex-wrap items-center justify-between gap-1">
+              {([
+                {
+                  id: 'rd_completed' as const,
+                  label: t('rdManageOrder.boardFilterRdCompleted'),
+                  count: rdCompletedCount,
+                  color: 'text-emerald-600 dark:text-emerald-400',
+                },
+                {
+                  id: 'archived' as const,
+                  label: t('rdManageOrder.boardFilterArchived'),
+                  count: archivedCount,
+                  color: 'text-slate-600 dark:text-slate-400',
+                },
+              ]).map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setTicketFilter(prev => (prev === filter.id ? 'all' : filter.id))}
+                  className={`group relative flex min-w-0 flex-1 shrink items-center justify-center gap-0.5 rounded-full px-1.5 py-1 transition-all duration-200 ${
+                    ticketFilter === filter.id
+                      ? 'bg-muted/50 shadow-sm ring-1 ring-border/50'
+                      : 'hover:bg-muted/30'
+                  }`}
+                >
+                  <span className={`whitespace-nowrap text-xs font-medium transition-colors ${ticketFilter === filter.id ? filter.color : 'text-muted-foreground group-hover:text-foreground/80'}`}>
+                    {filter.label}
+                  </span>
+                  <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] transition-colors ${
+                    ticketFilter === filter.id
+                      ? 'bg-background text-foreground shadow-sm'
                       : 'bg-muted/40 text-muted-foreground/70'
                   }`}>
                     {filter.count}

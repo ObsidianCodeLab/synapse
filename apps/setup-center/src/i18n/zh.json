@@ -2793,6 +2793,8 @@
     "userinfoMissing": "未找到本地登录凭据，请先完成研发云引导登录",
     "boardFilterHitl": "人工介入",
     "boardFilterFullManual": "全人工",
+    "boardFilterRdCompleted": "智能研发完成",
+    "boardFilterArchived": "智能归档完成",
     "badgeHitl": "需人工介入",
     "badgeFullManual": "全人工（外部）",
     "panelHitlTitle": "人工介入",
