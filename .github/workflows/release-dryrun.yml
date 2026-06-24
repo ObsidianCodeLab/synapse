@@ -211,7 +211,8 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         shell: bash
         run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
+          CERT_B64="$(printf '%s' "$APPLE_CERTIFICATE" | tr -d '[:space:]')"
+          if [ -z "$CERT_B64" ]; then
             echo "No APPLE_CERTIFICATE configured, skipping codesign."
             exit 0
           fi
@@ -219,13 +220,18 @@ jobs:
           IDENTITY="${APPLE_SIGNING_IDENTITY}"
           ENTITLEMENTS="apps/setup-center/src-tauri/Entitlements.plist"
 
-          echo "Importing certificate to keychain..."
+          echo "Importing certificate to keychain (base64 length: ${#CERT_B64})..."
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          printf '%s' "$CERT_B64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          if [ ! -s "$RUNNER_TEMP/certificate.p12" ]; then
+            echo "ERROR: decoded certificate.p12 is empty."
+            echo "APPLE_CERTIFICATE must be a single-line base64 of the .p12 file (no PEM headers)."
+            exit 1
+          fi
           security import $RUNNER_TEMP/certificate.p12 -k "$KEYCHAIN_PATH" \
             -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
