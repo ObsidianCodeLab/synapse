@@ -2158,7 +2158,7 @@ const InterventionDialog = ({
       nodeType !== 'system' &&
       stageIdForNodeId(nodeId) === stageIdForNodeId(room.currentNode) &&
       getNodeStateGlobal(room, nodeId, disabledSopNodeIds) === 'completed',
-    )));
+    ));
 
   const canReprocess = Boolean(
     room &&
