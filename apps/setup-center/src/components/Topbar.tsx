@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { LogOut, Square, ClipboardCopy, Compass } from "lucide-react";
+import { LogOut, Square, ClipboardCopy, Compass, Signpost } from "lucide-react";
 import { toast } from "sonner";
 import { openExternalUrl } from "../platform";
 import { copyToClipboard } from "../utils/clipboard";
@@ -43,6 +43,8 @@ export type TopbarProps = {
   onConnect: () => void;
   onStart: () => Promise<void>;
   onRefreshAll: () => Promise<void>;
+  /** 桌面端：从主界面重新进入首次安装引导页 */
+  onEnterOnboarding?: () => void;
   onSetTheme: (theme: Theme) => void;
   themePrefState: Theme;
   isWeb?: boolean;
@@ -72,7 +74,7 @@ export function Topbar({
   wsQuickName, setWsQuickName,
   onCreateWorkspace,
   serviceRunning, endpointCount, dataMode, busy,
-  onDisconnect, onConnect, onStart, onRefreshAll,
+  onDisconnect, onConnect, onStart, onRefreshAll, onEnterOnboarding,
   onSetTheme, themePrefState, isWeb, onLogout, webAccessUrl, apiBaseUrl,
   onToggleMobileSidebar, serverName, onServerManager,
   envDraft, setEnvDraft, restartService, askConfirm,
@@ -384,6 +386,20 @@ export function Topbar({
             </TooltipTrigger>
             <TooltipContent side="bottom">{t("topbar.refresh")}</TooltipContent>
           </Tooltip>
+
+          {onEnterOnboarding && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon-sm" onClick={onEnterOnboarding} disabled={!!busy}>
+                    <Signpost size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{t("topbar.enterOnboarding")}</TooltipContent>
+              </Tooltip>
+            </>
+          )}
 
           <div className="h-4 w-px bg-border" />
 

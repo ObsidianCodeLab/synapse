@@ -451,9 +451,13 @@ def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         if str(item.get("kind") or "").strip() in {"compile", "code_check"} and item.get("resultMsg"):
+            kind = str(item.get("kind") or "").strip()
             row = {
                 "resultType": str(item.get("resultType") or item.get("nodeName") or "检查项").strip(),
-                "resultMsg": str(item.get("resultMsg") or "").strip(),
+                "resultMsg": _maybe_summarize_compile_result_msg(
+                    str(item.get("resultMsg") or "").strip(),
+                    kind=kind,
+                ),
             }
             for key in ("kind", "nodeState", "nodeStateDesc", "alarms"):
                 if key in item:
@@ -479,12 +483,14 @@ def _normalize_build_results(raw_items: list[Any]) -> list[dict[str, Any]]:
                     rows.append({"resultType": result_type, "resultMsg": result_msg})
             continue
         result_type = str(item.get("resultType") or item.get("nodeName") or "检查项").strip()
+        kind = str(item.get("kind") or "").strip()
         result_msg = str(
             item.get("resultMsg")
             or item.get("url")
             or item.get("runResult")
             or ""
         ).strip()
+        result_msg = _maybe_summarize_compile_result_msg(result_msg, kind=kind)
         if not (result_type or result_msg):
             continue
         row: dict[str, Any] = {"resultType": result_type, "resultMsg": result_msg}
@@ -793,12 +799,57 @@ _BUILD_RESULT_ERROR_MARKERS = (
     "cc1plus:",
 )
 
+_MAVEN_LOG_MARKERS = (
+    "[info] maven",
+    "scanning for projects",
+    "maven-compiler-plugin",
+    "maven execution request",
+)
+
+
+def _looks_like_maven_log(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(marker in lowered for marker in _MAVEN_LOG_MARKERS)
+
+
+def _extract_maven_error_excerpt(text: str) -> str:
+    """Maven 全量日志中仅保留 [ERROR] 行（含 Compilation failure / Failed to execute goal）。"""
+    error_lines = [line for line in str(text or "").splitlines() if line.startswith("[ERROR]")]
+    return "\n".join(error_lines).strip()
+
+
+def _maybe_summarize_compile_result_msg(msg: str, *, kind: str = "") -> str:
+    """写入 pipeline 前压缩编译日志；代码检查 HTML 摘要保持原样。"""
+    text = str(msg or "").strip()
+    if not text or str(kind or "").strip() == "code_check":
+        return text
+    if str(kind or "").strip() == "compile" or _looks_like_maven_log(text):
+        return _summarize_build_result_msg(text)
+    lowered = text.lower()
+    if any(marker in lowered for marker in _BUILD_RESULT_ERROR_MARKERS):
+        return _summarize_build_result_msg(text)
+    if len(text) > 4000 and ("g++" in lowered or "make:" in lowered or "cc1plus:" in lowered):
+        return _summarize_build_result_msg(text)
+    return text
+
 
 def _summarize_build_result_msg(msg: str, *, max_chars: int = 4000) -> str:
     """压缩过长 CI 构建日志，优先保留编译/链接错误行（通常在日志末尾）。"""
     text = str(msg or "").strip()
     if not text:
         return ""
+
+    if text.startswith(("【Maven 编译错误摘录】", "【编译/构建错误摘录】")):
+        return text if len(text) <= max_chars else text[:max_chars]
+
+    if _looks_like_maven_log(text):
+        maven_excerpt = _extract_maven_error_excerpt(text)
+        if maven_excerpt:
+            prefix = "【Maven 编译错误摘录】\n"
+            body = maven_excerpt
+            if len(prefix) + len(body) > max_chars:
+                body = body[: max_chars - len(prefix)]
+            return prefix + body
 
     lines = text.splitlines()
     error_lines = [

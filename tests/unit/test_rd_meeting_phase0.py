@@ -32,6 +32,13 @@ def test_should_list_processing(synapse_work_home):
     assert should_list_in_meeting_rooms(data) is False
 
 
+def test_should_list_excludes_archived(synapse_work_home):
+    data = default_dev_status(scope_type="demand", scope_id="21878318", local_process_state="archived")
+    data["pipeline_enabled"] = True
+    data["meeting_room"] = {"active": True}
+    assert should_list_in_meeting_rooms(data) is False
+
+
 def test_scan_skips_userwork_file(synapse_work_home):
     (synapse_work_home / "userwork.json").write_text("{}", encoding="utf-8")
     d1 = synapse_work_home / "21878317"

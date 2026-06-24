@@ -412,7 +412,6 @@ const PlanReviewCard: React.FC<{
             collapsed={draft.collapsed}
             onToggle={() => onChange({ ...draft, collapsed: !draft.collapsed })}
           />
-          {readOnly ? null : <ApproveToggle approved={approved} onToggle={toggleApprove} />}
         </div>
       </div>
 
@@ -450,29 +449,6 @@ const PlanReviewCard: React.FC<{
 
           {plan.content_markdown ? (
             <PlanTransformationContent markdown={plan.content_markdown} />
-          ) : null}
-
-          {!readOnly && !approved ? (
-            <div className="flex flex-wrap items-center gap-2 border-t border-border/30 pt-3">
-              <Button
-                size="small"
-                danger={deprecated}
-                type={deprecated ? 'primary' : 'default'}
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-                onClick={requestDeprecate}
-              >
-                {deprecated ? '继续填写废弃原因' : '废弃'}
-              </Button>
-              <Button
-                size="small"
-                danger={needsChange}
-                type={needsChange ? 'primary' : 'default'}
-                icon={<MessageSquareWarning className="h-3.5 w-3.5" />}
-                onClick={requestChanges}
-              >
-                {needsChange ? '继续填写意见' : '请求变更'}
-              </Button>
-            </div>
           ) : null}
 
           {readOnly && (needsChange || deprecated) && draft.comment.trim() ? (
@@ -529,6 +505,36 @@ const PlanReviewCard: React.FC<{
                   })
                 }
               />
+            </div>
+          ) : null}
+
+          {!readOnly ? (
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/25 bg-white/[0.02] px-3 py-2.5">
+              {!approved ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="small"
+                    danger={deprecated}
+                    type={deprecated ? 'primary' : 'default'}
+                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                    onClick={requestDeprecate}
+                  >
+                    {deprecated ? '继续填写废弃原因' : '废弃'}
+                  </Button>
+                  <Button
+                    size="small"
+                    danger={needsChange}
+                    type={needsChange ? 'primary' : 'default'}
+                    icon={<MessageSquareWarning className="h-3.5 w-3.5" />}
+                    onClick={requestChanges}
+                  >
+                    {needsChange ? '继续填写意见' : '请求变更'}
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">阅读完毕，可在此确认或取消通过</span>
+              )}
+              <ApproveToggle approved={approved} onToggle={toggleApprove} />
             </div>
           ) : null}
         </div>
@@ -751,7 +757,7 @@ export function FuncSolutionReviewPanel({
             </Title>
             <Text type="secondary" className="text-[12px]">
               每条改造方案展示<strong>改造内容</strong>与<strong>设计逻辑</strong>；
-              右上角「通过」胶囊按钮一键确认；不通过可「废弃」（完全移除）或「请求变更」（覆盖修订）并填写意见
+              阅读后在方案底部点击「通过」确认；不通过可「废弃」（完全移除）或「请求变更」（覆盖修订）并填写意见
             </Text>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-black/20 px-4 py-2">
