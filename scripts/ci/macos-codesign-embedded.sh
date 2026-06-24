@@ -3,7 +3,7 @@
 # Invoked by release workflows; may be fetched from main at runtime when checkout is an old tag.
 set -euo pipefail
 
-MACOS_CODESIGN_SCRIPT_VERSION="v2-pkcs12-preflight"
+MACOS_CODESIGN_SCRIPT_VERSION="v3-macos-keychain-repack"
 
 RESOURCE_DIR="${RESOURCE_DIR:-apps/setup-center/src-tauri/resources}"
 ENTITLEMENTS="${ENTITLEMENTS:-apps/setup-center/src-tauri/Entitlements.plist}"
@@ -52,7 +52,32 @@ if ! openssl pkcs12 -info -in "$P12_PATH" -passin "pass:${CERT_PASS}" -noout 2>"
   exit 1
 fi
 rm -f "$OPENSSL_ERR"
-echo "PKCS12 preflight passed."
+echo "PKCS12 preflight passed (OpenSSL)."
+
+# OpenSSL 3 can decrypt many PKCS12 variants that macOS Security.framework rejects.
+# Re-export with 3DES + SHA1 MAC so `security import` succeeds on GitHub runners.
+P12_KEYCHAIN="${P12_PATH}.keychain.p12"
+echo "Repackaging PKCS12 for macOS keychain compatibility..."
+REPACK_ERR=$(mktemp)
+repack_ok=0
+if openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" -legacy \
+  -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
+  repack_ok=1
+elif openssl pkcs12 -in "$P12_PATH" -passin "pass:${CERT_PASS}" \
+  -export -out "$P12_KEYCHAIN" -passout "pass:${CERT_PASS}" \
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 2>"$REPACK_ERR"; then
+  repack_ok=1
+fi
+if [ "$repack_ok" -ne 1 ]; then
+  echo "ERROR: failed to repackage PKCS12 for macOS keychain."
+  sed 's/^/  openssl: /' "$REPACK_ERR" >&2 || true
+  rm -f "$REPACK_ERR"
+  exit 1
+fi
+rm -f "$REPACK_ERR"
+REPACK_SIZE=$(wc -c < "$P12_KEYCHAIN" | tr -d ' ')
+echo "Repackaged PKCS12 size=${REPACK_SIZE} bytes"
 
 echo "Importing certificate to keychain..."
 KEYCHAIN_PATH="${RUNNER_TEMP:-/tmp}/app-signing.keychain-db"
@@ -60,8 +85,15 @@ KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-security import "$P12_PATH" -k "$KEYCHAIN_PATH" \
-  -P "$CERT_PASS" -T /usr/bin/codesign -T /usr/bin/security
+IMPORT_ERR=$(mktemp)
+if ! security import "$P12_KEYCHAIN" -k "$KEYCHAIN_PATH" -f pkcs12 -A \
+  -P "$CERT_PASS" -T /usr/bin/codesign -T /usr/bin/security 2>"$IMPORT_ERR"; then
+  echo "ERROR: keychain import failed after PKCS12 repack."
+  sed 's/^/  security: /' "$IMPORT_ERR" >&2 || true
+  rm -f "$IMPORT_ERR"
+  exit 1
+fi
+rm -f "$IMPORT_ERR"
 security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
 
