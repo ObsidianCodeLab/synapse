@@ -385,12 +385,12 @@ jobs:
         working-directory: apps/setup-center
         timeout-minutes: 150
         env:
-          TAURI_CONFIG: '{}'
+          # Ad-hoc sign during bundle only. Tauri CLI re-imports APPLE_CERTIFICATE via
+          # `security import`, which rejects our OpenSSL-exported PKCS12; real signing is
+          # done after build in "Re-sign final macOS app bundles for notarization".
+          TAURI_CONFIG: '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           NO_STRIP: true
           APPIMAGE_EXTRACT_AND_RUN: 1
         shell: bash
@@ -427,6 +427,12 @@ jobs:
           if [ -z "${APPLE_CERTIFICATE:-}" ] || [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
             echo "APPLE_CERTIFICATE / APPLE_SIGNING_IDENTITY not configured, skipping final app re-sign."
             exit 0
+          fi
+
+          if [ -n "${APPLE_SIGNING_KEYCHAIN_PATH:-}" ] && [ -f "$APPLE_SIGNING_KEYCHAIN_PATH" ]; then
+            echo "Unlocking signing keychain from embedded-binary codesign step..."
+            security unlock-keychain -p "$APPLE_SIGNING_KEYCHAIN_PASSWORD" "$APPLE_SIGNING_KEYCHAIN_PATH"
+            security list-keychains -d user -s "$APPLE_SIGNING_KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           fi
 
           TARGET_BASE="apps/setup-center/src-tauri/target"

@@ -162,6 +162,12 @@ fi
 rm -f "$IMPORT_ERR"
 security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+if [ -n "${GITHUB_ENV:-}" ]; then
+  {
+    echo "APPLE_SIGNING_KEYCHAIN_PATH=${KEYCHAIN_PATH}"
+    echo "APPLE_SIGNING_KEYCHAIN_PASSWORD=${KEYCHAIN_PASSWORD}"
+  } >> "$GITHUB_ENV"
+fi
 
 echo "Signing embedded binaries with identity: ${IDENTITY}"
 find "$RESOURCE_DIR" -type f -perm +111 | while read -r bin; do
