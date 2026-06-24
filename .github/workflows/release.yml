@@ -322,8 +322,9 @@ jobs:
             echo "APPLE_CERTIFICATE must be a single-line base64 of the .p12 file (no PEM headers)."
             exit 1
           fi
+          CERT_PASS="$(printf '%s' "$APPLE_CERTIFICATE_PASSWORD" | tr -d '[:space:]')"
           security import $RUNNER_TEMP/certificate.p12 -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+            -P "$CERT_PASS" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
 
