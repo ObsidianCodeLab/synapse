@@ -126,6 +126,8 @@ def resolve_work_dir_scope(order_dir: Path) -> tuple[str, dict[str, Any]] | None
 
 def should_list_in_meeting_rooms(data: dict[str, Any]) -> bool:
     local = str(data.get("local_process_state") or "").strip()
+    if local == "archived":
+        return False
     if local in ACTIVE_LOCAL_STATES:
         return True
     if data.get("pipeline_enabled") is True:

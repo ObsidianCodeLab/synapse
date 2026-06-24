@@ -270,6 +270,7 @@ function collectOrderIdsForHitlFlags(list: DemandListItem[]): string[] {
  */
 function deriveBaseTicketStatus(d: DemandListItem): Ticket["status"] {
   const local = effectiveLocalProcessState(d);
+  if (local === "archived") return "completed";
   const isCompleted =
     local === "已完成" ||
     (d.demand_status || "").trim() === "已完成" ||
@@ -942,7 +943,9 @@ export const OrderManagement: React.FC<{
   const applyBoardPayload = useCallback(
     async (data: RdManageDemandsPayload) => {
       setDemandListRaw(data.list || []);
-      const list = data.list || [];
+      const list = (data.list || []).filter(
+        (d) => effectiveLocalProcessState(d) !== "archived",
+      );
       const orderIds = collectOrderIdsForHitlFlags(list);
       let flags: Record<string, boolean> = {};
       try {
