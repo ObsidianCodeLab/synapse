@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, Literal
@@ -22,6 +23,9 @@ from synapse.rd_meeting.task_exec_code_diff import collect_repo_commit_stage_pat
 logger = logging.getLogger(__name__)
 
 ScopeType = Literal["demand", "task"]
+
+CODE_COMMIT_ASSETS_KEY = "code_commit_assets"
+_TERMINAL_COMMIT_STATUSES = frozenset({"ok", "partial", "failed"})
 
 _FLIGHT_POLL_INTERVAL_SEC = 15
 _FLIGHT_POLL_MAX_WAIT_SEC = 1800
@@ -159,11 +163,35 @@ def _code_commit_progress_snapshot(
     return snap
 
 
+def load_code_commit_assets(scope_id: str) -> dict[str, Any]:
+    """只读加载代码提交节点 pipeline 产物（其它 SOP 节点不得写入）。"""
+    from synapse.rd_meeting.system_node_display import _load_pipeline_context_asset
+
+    assets = _load_pipeline_context_asset(scope_id, CODE_COMMIT_ASSETS_KEY)
+    return dict(assets) if isinstance(assets, dict) else {}
+
+
+def _should_skip_stale_running_overwrite(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
+    """已完成 run 的过期轮询写回 running 时跳过，避免覆盖最终态。"""
+    if str(incoming.get("status") or "") != "running":
+        return False
+    if str(existing.get("status") or "") not in _TERMINAL_COMMIT_STATUSES:
+        return False
+    if not existing.get("finished_at"):
+        return False
+    incoming_run = str(incoming.get("run_id") or "")
+    existing_run = str(existing.get("run_id") or "")
+    if incoming_run and existing_run and incoming_run == existing_run:
+        return False
+    return True
+
+
 def _persist_code_commit_state(
     scope_id: str,
     assets: dict[str, Any],
     *,
     pipe: Any = None,
+    pipeline_assets_key: str = CODE_COMMIT_ASSETS_KEY,
 ) -> None:
     from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 
@@ -174,7 +202,21 @@ def _persist_code_commit_state(
     if not isinstance(raw, dict):
         return
     ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
-    ctx["code_commit_assets"] = assets
+    existing = ctx.get(pipeline_assets_key)
+    if (
+        pipeline_assets_key == CODE_COMMIT_ASSETS_KEY
+        and isinstance(existing, dict)
+        and _should_skip_stale_running_overwrite(existing, assets)
+    ):
+        logger.info(
+            "skip stale %s overwrite scope=%s incoming_run=%s existing_run=%s",
+            pipeline_assets_key,
+            sid,
+            assets.get("run_id"),
+            existing.get("run_id"),
+        )
+        return
+    ctx[pipeline_assets_key] = assets
     raw["context"] = ctx
     raw["updated_at"] = datetime.now().isoformat(timespec="seconds")
     save_meeting_pipeline(sid, raw)
@@ -182,7 +224,7 @@ def _persist_code_commit_state(
         pctx = pipe._data.get("context")
         if not isinstance(pctx, dict):
             pctx = {}
-        pctx["code_commit_assets"] = assets
+        pctx[pipeline_assets_key] = assets
         pipe._data["context"] = pctx
 
 
@@ -965,8 +1007,13 @@ def bootstrap_code_commit(
     room_id: str = "",
     pipe: Any = None,
     stage_name: str = "",
+    pipeline_assets_key: str = CODE_COMMIT_ASSETS_KEY,
 ) -> dict[str, Any]:
-    """按研发子单提交特性分支代码，并在全部提交成功后轮询试飞结果。"""
+    """按研发子单提交特性分支代码，并在全部提交成功后轮询试飞结果。
+
+    ``pipeline_assets_key`` 默认 ``code_commit_assets``（仅 exception_check 节点使用）。
+    试飞优化等下游节点须传入 ``diff_analysis_commit_assets``，且 ``stage_name`` 留空以免写上游 archive。
+    """
     sid = (scope_id or "").strip()
     orders = _collect_commit_orders(scope_type, sid)
     if not orders:
@@ -998,6 +1045,7 @@ def bootstrap_code_commit(
         "archives": archives,
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "finished_at": None,
+        "run_id": f"{datetime.now().isoformat(timespec='seconds')}-{uuid.uuid4().hex[:8]}",
     }
     result_doc["progress"] = _code_commit_progress_snapshot(
         phase="prepare",
@@ -1005,7 +1053,7 @@ def bootstrap_code_commit(
         task_total=task_total,
         result_doc=result_doc,
     )
-    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+    _persist_code_commit_state(sid, result_doc, pipe=pipe, pipeline_assets_key=pipeline_assets_key)
     if rid:
         _emit_code_commit_progress(
             sid,
@@ -1044,7 +1092,9 @@ def bootstrap_code_commit(
             result_doc["summary"] = summary
         if status is not None:
             result_doc["status"] = status
-        _persist_code_commit_state(sid, result_doc, pipe=pipe)
+        _persist_code_commit_state(
+            sid, result_doc, pipe=pipe, pipeline_assets_key=pipeline_assets_key
+        )
 
     def _emit_live_progress(*, log_type: str = "info") -> None:
         if not rid:
@@ -1276,7 +1326,9 @@ def bootstrap_code_commit(
                     archives = [a for a in archives if a.get("name") != flight_art.get("name")]
                     archives.append(flight_art)
                     result_doc["archives"] = archives
-                    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+                    _persist_code_commit_state(
+                        sid, result_doc, pipe=pipe, pipeline_assets_key=pipeline_assets_key
+                    )
             if rid:
                 _emit_code_commit_progress(
                     sid,
@@ -1355,7 +1407,7 @@ def bootstrap_code_commit(
         task_total=task_total,
         result_doc=result_doc,
     )
-    _persist_code_commit_state(sid, result_doc, pipe=pipe)
+    _persist_code_commit_state(sid, result_doc, pipe=pipe, pipeline_assets_key=pipeline_assets_key)
     if rid:
         _emit_code_commit_progress(
             sid,

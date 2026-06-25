@@ -8,7 +8,8 @@ from datetime import datetime
 from typing import Any, Literal
 
 from synapse.rd_meeting.paths import archive_node_dir
-from synapse.rd_meeting.task_check_assets import _analyze_flight_result, _load_code_commit_assets
+from synapse.rd_meeting.code_commit_assets import load_code_commit_assets
+from synapse.rd_meeting.task_check_assets import _analyze_flight_result
 from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def evaluate_flight_optimize_need(scope_id: str) -> FlightOptimizeNeed:
     if not sid:
         return "unknown"
 
-    assets = _load_code_commit_assets(sid)
+    assets = load_code_commit_assets(sid)
     if assets:
         tasks = assets.get("tasks") if isinstance(assets.get("tasks"), list) else []
         commit_failed = _commit_summary_failed(assets) or any(

@@ -1058,13 +1058,10 @@ class Settings(BaseSettings):
 
     @property
     def synapse_home(self) -> Path:
-        """用户数据根目录，优先使用 SYNAPSE_ROOT 环境变量，默认 ~/.synapse"""
-        import os
+        """用户数据根目录：SYNAPSE_ROOT → root_config.json → ~/.synapse"""
+        from synapse.synapse_home import resolve_synapse_home
 
-        env_root = os.environ.get("SYNAPSE_ROOT", "").strip()
-        if env_root:
-            return Path(env_root)
-        return Path.home() / ".synapse"
+        return resolve_synapse_home()
 
     @property
     def user_workspace_path(self) -> Path:

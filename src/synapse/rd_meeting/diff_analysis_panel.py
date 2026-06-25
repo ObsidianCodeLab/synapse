@@ -23,7 +23,7 @@ from synapse.rd_meeting.system_node_display import (
     _load_pipeline_context_asset,
     build_code_commit_display,
 )
-from synapse.rd_meeting.task_check_assets import _load_code_commit_assets
+from synapse.rd_meeting.code_commit_assets import load_code_commit_assets
 from synapse.rd_sop.nodes import stage_name_for_id
 
 DEV_STAGE_NAME = stage_name_for_id(4)
@@ -244,7 +244,7 @@ def _initial_code_commit_display(scope_id: str) -> dict[str, Any] | None:
         display = build_code_commit_display(da_assets)
         if isinstance(display, dict):
             return display
-    assets = _load_code_commit_assets(scope_id)
+    assets = load_code_commit_assets(scope_id)
     if not assets:
         return None
     display = build_code_commit_display(assets)
@@ -305,7 +305,7 @@ def resolve_flight_key_content(
     from synapse.rd_meeting.code_commit_assets import format_flight_result_report
 
     assets_for_md = code_commit if code_commit else (
-        _load_diff_analysis_commit_assets(sid) or _load_code_commit_assets(sid)
+        _load_diff_analysis_commit_assets(sid) or load_code_commit_assets(sid)
     )
     markdown = ""
     if isinstance(assets_for_md, dict) and assets_for_md:

@@ -18,7 +18,7 @@ DEV_STAGE = stage_name_for_id(4)
 
 def test_evaluate_not_needed_when_flight_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {
             "status": "ok",
             "flight": {"status": "ok"},
@@ -30,7 +30,7 @@ def test_evaluate_not_needed_when_flight_ok(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_evaluate_needed_when_flight_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {
             "status": "failed",
             "flight": {"status": "failed", "error": "构建失败"},
@@ -42,7 +42,7 @@ def test_evaluate_needed_when_flight_failed(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_evaluate_unknown_when_no_assets(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {},
     )
     monkeypatch.setattr(
@@ -54,7 +54,7 @@ def test_evaluate_unknown_when_no_assets(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 def test_evaluate_needed_from_archive_md(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {},
     )
     monkeypatch.setattr(
@@ -123,7 +123,7 @@ def test_write_skipped_can_replace_existing_placeholder(tmp_path, monkeypatch: p
 
 def test_evaluate_unknown_when_commit_failed_skips_flight(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {
             "status": "failed",
             "error": "11932298: 代码未提交成功，跳过试飞",
@@ -149,7 +149,7 @@ def test_evaluate_needed_when_commit_failed_but_archive_flight_failed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {
             "status": "failed",
             "flight": {"status": "skipped", "error": "代码未提交成功，跳过试飞"},
@@ -172,7 +172,7 @@ def test_evaluate_needed_when_commit_failed_but_archive_flight_failed(
 
 def test_evaluate_not_needed_when_flight_benign_skip(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "synapse.rd_meeting.flight_optimize_gate._load_code_commit_assets",
+        "synapse.rd_meeting.flight_optimize_gate.load_code_commit_assets",
         lambda _sid: {
             "status": "ok",
             "flight": {"status": "skipped", "error": "缺少 portal taskId，跳过试飞轮询"},

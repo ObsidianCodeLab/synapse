@@ -28,10 +28,9 @@ def get_upload_dir() -> Path:
     """Get or create the upload directory."""
     global UPLOAD_DIR
     if UPLOAD_DIR is None:
-        import os
+        from synapse.synapse_home import resolve_synapse_home
 
-        root = os.environ.get("SYNAPSE_ROOT", "").strip()
-        base = Path(root) if root else Path.home() / ".synapse"
+        base = resolve_synapse_home()
         UPLOAD_DIR = base / "uploads"
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return UPLOAD_DIR

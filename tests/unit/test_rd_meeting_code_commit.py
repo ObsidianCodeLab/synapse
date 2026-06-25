@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 import pytest
@@ -548,3 +549,78 @@ def test_format_flight_result_report_uses_compile_error_excerpt():
     )
     assert "error: symbol missing" in report
     assert "chmod warning" not in report
+
+
+def test_should_skip_stale_running_overwrite():
+    from synapse.rd_meeting.code_commit_assets import _should_skip_stale_running_overwrite
+
+    existing = {
+        "status": "ok",
+        "finished_at": "2026-06-25T10:09:06",
+        "run_id": "run-a",
+    }
+    stale = {"status": "running", "run_id": "run-b"}
+    same_run = {"status": "running", "run_id": "run-a"}
+    terminal = {"status": "ok", "finished_at": "2026-06-25T10:12:00", "run_id": "run-b"}
+
+    assert _should_skip_stale_running_overwrite(existing, stale) is True
+    assert _should_skip_stale_running_overwrite(existing, same_run) is False
+    assert _should_skip_stale_running_overwrite(existing, terminal) is False
+
+
+def test_persist_skips_stale_running_overwrite(tmp_path, monkeypatch):
+    from synapse.rd_meeting.code_commit_assets import (
+        CODE_COMMIT_ASSETS_KEY,
+        _persist_code_commit_state,
+    )
+    from synapse.rd_meeting.paths import meeting_pipeline_path
+
+    scope_id = "T-stale-cc"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    pipe_path = meeting_pipeline_path(scope_id)
+    pipe_path.parent.mkdir(parents=True, exist_ok=True)
+    pipe_path.write_text(
+        '{"context": {"code_commit_assets": {"status": "ok", "finished_at": "2026-06-25T10:09:06", "run_id": "old-run"}}}',
+        encoding="utf-8",
+    )
+
+    _persist_code_commit_state(
+        scope_id,
+        {"status": "running", "run_id": "stale-run", "progress": {"phase": "flight_poll"}},
+    )
+
+    saved = json.loads(pipe_path.read_text(encoding="utf-8"))
+    cc = saved["context"][CODE_COMMIT_ASSETS_KEY]
+    assert cc["status"] == "ok"
+    assert cc["run_id"] == "old-run"
+
+
+def test_bootstrap_diff_analysis_does_not_touch_code_commit_assets(tmp_path, monkeypatch):
+    from synapse.rd_meeting.code_commit_assets import bootstrap_code_commit
+    from synapse.rd_meeting.diff_analysis_inputs import CTX_DIFF_ANALYSIS_COMMIT
+    from synapse.rd_meeting.paths import meeting_pipeline_path
+
+    scope_id = "T-da-cc-key"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    pipe_path = meeting_pipeline_path(scope_id)
+    pipe_path.parent.mkdir(parents=True, exist_ok=True)
+    pipe_path.write_text(
+        '{"context": {"code_commit_assets": {"status": "ok", "finished_at": "2026-06-25T10:09:06"}}}',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "synapse.rd_meeting.code_commit_assets._collect_commit_orders",
+        lambda *_a, **_k: [],
+    )
+
+    bootstrap_code_commit(
+        scope_id,
+        scope_type="demand",
+        pipeline_assets_key=CTX_DIFF_ANALYSIS_COMMIT,
+    )
+
+    saved = json.loads(pipe_path.read_text(encoding="utf-8"))
+    ctx = saved["context"]
+    assert ctx["code_commit_assets"]["status"] == "ok"
+    assert CTX_DIFF_ANALYSIS_COMMIT not in ctx

@@ -546,7 +546,9 @@ class PluginManager:
         """
         missing = getattr(exc, "name", "") or str(exc)
         deps_dir = plugin_dir / "deps"
-        module_dir = Path.home() / ".synapse" / "modules" / manifest.id / "site-packages"
+        from synapse.synapse_home import resolve_synapse_home
+
+        module_dir = resolve_synapse_home() / "modules" / manifest.id / "site-packages"
         pip_specs: list[str] = []
         try:
             from .installer import _parse_pip_specs

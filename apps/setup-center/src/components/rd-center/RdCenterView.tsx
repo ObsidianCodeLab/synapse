@@ -79,12 +79,12 @@ function RdTabTitle({ ticket }: { ticket: RdWorkOrder }) {
   );
 }
 
-function RdTicketPanel({ ticket, homeDir }: { ticket: RdWorkOrder; homeDir: string }) {
+function RdTicketPanel({ ticket, synapseRootDir }: { ticket: RdWorkOrder; synapseRootDir: string }) {
   const { t } = useTranslation();
   const sessionName = useMemo(() => rdSessionNameForWorkOrderId(ticket.id), [ticket.id]);
   const projectPath = useMemo(
-    () => rdProjectPathForWorkOrder(homeDir, ticket.id),
-    [homeDir, ticket.id],
+    () => rdProjectPathForWorkOrder(synapseRootDir, ticket.id),
+    [synapseRootDir, ticket.id],
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -292,7 +292,7 @@ function RdTicketPanel({ ticket, homeDir }: { ticket: RdWorkOrder; homeDir: stri
 
 export function RdCenterView() {
   const { t } = useTranslation();
-  const [homeDir, setHomeDir] = useState<string | null>(null);
+  const [synapseRootDir, setSynapseRootDir] = useState<string | null>(null);
   const [tickets, setTickets] = useState<RdWorkOrder[]>(MOCK_WORK_ORDERS);
   const [activeKey, setActiveKey] = useState<string>(() => MOCK_WORK_ORDERS[0]?.id ?? "");
 
@@ -324,9 +324,9 @@ export function RdCenterView() {
 
   useEffect(() => {
     if (!IS_TAURI || !IS_WINDOWS) return;
-    invoke<{ homeDir: string }>("get_platform_info")
-      .then((p) => setHomeDir(p.homeDir))
-      .catch(() => setHomeDir(null));
+    invoke<{ synapseRootDir: string }>("get_platform_info")
+      .then((p) => setSynapseRootDir(p.synapseRootDir || null))
+      .catch(() => setSynapseRootDir(null));
   }, []);
 
   useEffect(() => {
@@ -349,7 +349,7 @@ export function RdCenterView() {
     );
   }
 
-  if (!homeDir) {
+  if (!synapseRootDir) {
     return (
       <div className="card" style={{ margin: 16 }}>
         <Typography.Text>{t("rdCenter.loadingHome")}</Typography.Text>
@@ -401,7 +401,7 @@ export function RdCenterView() {
                   overflow: "hidden",
                 }}
               >
-                <RdTicketPanel ticket={ticket} homeDir={homeDir} />
+                <RdTicketPanel ticket={ticket} synapseRootDir={synapseRootDir} />
               </div>
             ),
           }))}

@@ -70,7 +70,9 @@ def create_cli_session(
 
     Returns (session, completer) so the completer can be updated later.
     """
-    history_dir = Path.home() / ".synapse"
+    from synapse.synapse_home import resolve_synapse_home
+
+    history_dir = resolve_synapse_home()
     history_dir.mkdir(parents=True, exist_ok=True)
     history_path = history_dir / "cli_history"
 

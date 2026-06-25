@@ -9,7 +9,9 @@ import {
   fetchCursorAgentCliStatus,
   installCursorAgentCliTauri,
   loginCursorAgentCliTauri,
+  mergeCursorAgentCliStatus,
   type CursorAgentCliStatus,
+  type MergedCursorAgentCliStatus,
 } from '../../../api/cursorAgentCliService';
 import { IS_TAURI } from '../../../platform';
 
@@ -22,26 +24,6 @@ interface Props {
   onReady?: () => void | Promise<void>;
 }
 
-function mergeStatus(
-  local: Partial<CursorAgentCliStatus> | null,
-  remote: CursorAgentCliStatus | null,
-): CursorAgentCliStatus | null {
-  if (!local && !remote) return null;
-  const installed = Boolean(local?.installed ?? remote?.installed);
-  const loggedIn = Boolean(local?.logged_in ?? remote?.logged_in);
-  return {
-    installed,
-    logged_in: loggedIn,
-    ready: Boolean(local?.ready ?? remote?.ready ?? (installed && loggedIn)),
-    path: local?.path ?? remote?.path,
-    version: local?.version ?? remote?.version ?? null,
-    auth_message: local?.auth_message ?? remote?.auth_message,
-    error: local?.error ?? remote?.error,
-    install_hint: local?.install_hint ?? remote?.install_hint,
-    platform: local?.platform ?? remote?.platform,
-  };
-}
-
 export function CursorAgentInstallModal({
   open,
   synapseApiBase,
@@ -49,7 +31,7 @@ export function CursorAgentInstallModal({
   onClose,
   onReady,
 }: Props) {
-  const [status, setStatus] = useState<CursorAgentCliStatus | null>(null);
+  const [status, setStatus] = useState<MergedCursorAgentCliStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
@@ -85,7 +67,7 @@ export function CursorAgentInstallModal({
       } catch {
         if (!localPartial) throw new Error('检测失败');
       }
-      const next = mergeStatus(localPartial, remote);
+      const next = mergeCursorAgentCliStatus(localPartial, remote);
       setStatus(next);
       return next;
     } catch (e) {
@@ -105,9 +87,12 @@ export function CursorAgentInstallModal({
 
   const installed = Boolean(status?.installed);
   const loggedIn = Boolean(status?.logged_in);
-  const ready = Boolean(status?.ready ?? (installed && loggedIn));
-  const canInstall = IS_TAURI && !installed && !installing && !loggingIn;
-  const canLogin = IS_TAURI && installed && !loggedIn && !installing && !loggingIn;
+  const ready = Boolean(status?.ready);
+  const localInstalled = Boolean(status?.local_installed ?? status?.installed);
+  const localLoggedIn = Boolean(status?.local_logged_in ?? status?.logged_in);
+  const backendMismatch = Boolean(status?.backend_mismatch);
+  const canInstall = IS_TAURI && !localInstalled && !installing && !loggingIn;
+  const canLogin = IS_TAURI && localInstalled && !localLoggedIn && !installing && !loggingIn;
 
   const hintText = useMemo(() => {
     if (installHint?.trim()) return installHint.trim();
@@ -163,9 +148,12 @@ export function CursorAgentInstallModal({
   };
 
   const onContinue = async () => {
-    const next = await recheck();
-    if (!next?.ready) {
-      message.warning('请先完成安装与 Cursor 账号登录');
+    if (!ready) {
+      message.warning(
+        backendMismatch
+          ? 'Synapse 后端尚未识别 agent，请重启 Synapse 服务后点击「重新检测」'
+          : '请先完成安装与 Cursor 账号登录',
+      );
       return;
     }
     await onReady?.();
@@ -245,6 +233,15 @@ export function CursorAgentInstallModal({
           <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
             {hintText}
           </div>
+        ) : null}
+
+        {backendMismatch ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="桌面端已检测到 agent，Synapse 后端尚未识别"
+            description="任务执行由 Synapse 后端进程调用 agent。请重启 Synapse 服务（或新开终端后再启动 synapse serve），然后点击「重新检测」。"
+          />
         ) : null}
 
         {!IS_TAURI && !installed ? (

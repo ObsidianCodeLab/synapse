@@ -269,10 +269,9 @@ def _resolve_global_logs_dir() -> Path:
 
         return settings.synapse_home / "logs"
     except Exception:
-        import os
+        from synapse.synapse_home import resolve_synapse_home
 
-        root = os.environ.get("SYNAPSE_ROOT", "").strip()
-        return Path(root) / "logs" if root else Path.home() / ".synapse" / "logs"
+        return resolve_synapse_home() / "logs"
 
 
 def _resolve_synapse_home_dir() -> Path:
@@ -282,10 +281,9 @@ def _resolve_synapse_home_dir() -> Path:
 
         return settings.synapse_home
     except Exception:
-        import os
+        from synapse.synapse_home import resolve_synapse_home
 
-        root = os.environ.get("SYNAPSE_ROOT", "").strip()
-        return Path(root) if root else Path.home() / ".synapse"
+        return resolve_synapse_home()
 
 
 def _add_windows_crash_artifacts(zf: zipfile.ZipFile) -> None:

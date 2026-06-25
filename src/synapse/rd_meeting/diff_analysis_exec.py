@@ -441,13 +441,15 @@ def _run_code_commit_phase(
     pipe: Any = None,
 ) -> dict[str, Any]:
     from synapse.rd_meeting.code_commit_assets import bootstrap_code_commit
+    from synapse.rd_meeting.diff_analysis_inputs import CTX_DIFF_ANALYSIS_COMMIT
 
     return bootstrap_code_commit(
         scope_id,
         scope_type=scope_type,
         room_id=room_id,
         pipe=pipe,
-        stage_name=DEV_STAGE_NAME,
+        stage_name="",
+        pipeline_assets_key=CTX_DIFF_ANALYSIS_COMMIT,
     )
 
 

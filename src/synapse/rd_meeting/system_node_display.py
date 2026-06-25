@@ -770,7 +770,7 @@ def resolve_system_node_display(scope_id: str, node_id: str) -> dict[str, Any] |
 
     ctx = _pipeline_context(scope_id)
     last = ctx.get("last_system_node_result") if isinstance(ctx.get("last_system_node_result"), dict) else {}
-    if str(last.get("node_id") or "").strip() == nid:
+    if str(last.get("node_id") or "").strip() == nid and nid != "exception_check":
         wire = (
             _wire_row_for_sandbox(scope_id, str(last.get("prod") or ""))
             if nid == "sandbox_build"

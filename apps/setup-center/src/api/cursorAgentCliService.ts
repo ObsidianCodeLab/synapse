@@ -22,6 +22,55 @@ export interface CursorAgentCliCheckResult {
   authMessage?: string | null;
 }
 
+export interface MergedCursorAgentCliStatus extends CursorAgentCliStatus {
+  /** 桌面端（Tauri）本地检测结果，用于一键安装/登录按钮 */
+  local_installed?: boolean;
+  local_logged_in?: boolean;
+  local_ready?: boolean;
+  /** 桌面端已就绪但 Synapse 后端尚未识别 agent */
+  backend_mismatch?: boolean;
+}
+
+/** 合并 Tauri 本地与 Synapse 后端检测结果；任务执行在后端进程，ready 以后端为准。 */
+export function mergeCursorAgentCliStatus(
+  local: Partial<CursorAgentCliStatus> | null,
+  remote: CursorAgentCliStatus | null,
+): MergedCursorAgentCliStatus | null {
+  if (!local && !remote) return null;
+
+  const localInstalled = Boolean(local?.installed);
+  const localLoggedIn = Boolean(local?.logged_in);
+  const localReady = Boolean(local?.ready ?? (localInstalled && localLoggedIn));
+
+  const remoteInstalled = remote ? Boolean(remote.installed) : false;
+  const remoteLoggedIn = remote ? Boolean(remote.logged_in) : false;
+  const remoteReady = remote
+    ? Boolean(remote.ready ?? (remoteInstalled && remoteLoggedIn))
+    : false;
+
+  const useRemote = remote != null;
+  const installed = useRemote ? remoteInstalled : localInstalled;
+  const loggedIn = useRemote ? remoteLoggedIn : localLoggedIn;
+  const ready = useRemote ? remoteReady : localReady;
+  const backendMismatch = useRemote && localReady && !remoteReady;
+
+  return {
+    installed,
+    logged_in: loggedIn,
+    ready,
+    path: remote?.path ?? local?.path,
+    version: remote?.version ?? local?.version ?? null,
+    auth_message: remote?.auth_message ?? local?.auth_message,
+    error: remote?.error ?? local?.error,
+    install_hint: remote?.install_hint ?? local?.install_hint,
+    platform: remote?.platform ?? local?.platform,
+    local_installed: local ? localInstalled : undefined,
+    local_logged_in: local ? localLoggedIn : undefined,
+    local_ready: local ? localReady : undefined,
+    backend_mismatch: backendMismatch,
+  };
+}
+
 function wireToCheckResult(data: Record<string, unknown>): CursorAgentCliCheckResult {
   return {
     installed: Boolean(data.installed),
@@ -72,18 +121,16 @@ export async function loginCursorAgentCliTauri(onLog?: (text: string) => void): 
 }
 
 export async function resolveCursorAgentCliReady(synapseApiBase: string): Promise<boolean> {
-  if (IS_TAURI) {
-    try {
-      const local = await checkCursorAgentCliTauri();
-      if (local.ready) return true;
-    } catch {
-      /* fall through to API */
-    }
-  }
   try {
     const remote = await fetchCursorAgentCliStatus(synapseApiBase);
     return Boolean(remote.ready ?? (remote.installed && remote.logged_in));
   } catch {
-    return false;
+    if (!IS_TAURI) return false;
+    try {
+      const local = await checkCursorAgentCliTauri();
+      return local.ready;
+    } catch {
+      return false;
+    }
   }
 }
