@@ -57,7 +57,7 @@ export interface AdvancedViewProps {
   onOpenRuntimeEnvironment: () => void;
   askConfirm: (msg: string, onConfirm: () => void) => void;
   refreshAll: () => Promise<void>;
-  restartService: () => Promise<void>;
+  restartService: (options?: { startIfStopped?: boolean }) => Promise<void>;
   setView: (view: ViewId) => void;
 }
 
@@ -376,13 +376,13 @@ export function AdvancedView(props: AdvancedViewProps) {
       setMigrateBusy(false);
       notifySuccess(t("adv.migrateSuccess"));
       await refreshAll();
-      await restartService();
+      await restartService({ startIfStopped: true });
     } catch (e: any) {
       notifyError(t("adv.migrateFailed", { error: String(e) }));
       setMigrateBusy(false);
       dismissLoading(_busyId);
       try {
-        await restartService();
+        await restartService({ startIfStopped: true });
       } catch {
         /* 迁移失败后尽力恢复服务 */
       }
@@ -422,13 +422,13 @@ export function AdvancedView(props: AdvancedViewProps) {
       setMigrateBusy(false);
       notifySuccess(t("adv.migrateResetDone", { path: res.currentRoot }));
       await refreshAll();
-      await restartService();
+      await restartService({ startIfStopped: true });
     } catch (e: any) {
       notifyError(String(e));
       setMigrateBusy(false);
       dismissLoading(_busyId);
       try {
-        await restartService();
+        await restartService({ startIfStopped: true });
       } catch {
         /* 迁移失败后尽力恢复服务 */
       }

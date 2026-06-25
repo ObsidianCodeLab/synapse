@@ -1780,16 +1780,7 @@
       "serviceDetected": "Running service detected",
       "serviceDetectedDesc": "A local Synapse service is already running (version {{version}}). You can connect to it directly.",
       "connectExisting": "Connect to existing service",
-      "continueSetup": "Continue setup (ignore)",
-      "customRootToggle": "Custom data storage path",
-      "customRootHint": "Data is stored in your home directory by default. Change this to store data on another drive.",
-      "customRootPlaceholder": "e.g. D:\\MyData\\.synapse",
-      "customRootApply": "Apply",
-      "customRootApplied": "Custom storage path set: {{path}}",
-      "customRootDefault": "Use default path",
-      "customRootInvalid": "Invalid path format",
-      "customRootCurrent": "Current data directory: {{path}}",
-      "customRootMigrate": "Migrate existing data to new path"
+      "continueSetup": "Continue setup (ignore)"
     },
     "skipHint": "You can skip this step and complete the setup later in the Settings panel.",
     "llm": {

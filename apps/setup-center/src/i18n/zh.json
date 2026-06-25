@@ -1783,16 +1783,7 @@
       "serviceDetected": "检测到已运行的服务",
       "serviceDetectedDesc": "本地已有 Synapse 服务在运行（版本 {{version}}），可以直接连接使用。",
       "connectExisting": "连接已有服务",
-      "continueSetup": "继续配置（忽略）",
-      "customRootToggle": "自定义数据存储路径",
-      "customRootHint": "默认存储在用户目录下。如需将数据存放到其他磁盘（如 D 盘），可在此修改。",
-      "customRootPlaceholder": "例如：D:\\MyData\\.synapse",
-      "customRootApply": "应用",
-      "customRootApplied": "已设置自定义存储路径：{{path}}",
-      "customRootDefault": "使用默认路径",
-      "customRootInvalid": "路径格式无效",
-      "customRootCurrent": "当前数据目录：{{path}}",
-      "customRootMigrate": "迁移已有数据到新路径"
+      "continueSetup": "继续配置（忽略）"
     },
     "skipHint": "此步骤可以跳过，稍后在程序「配置」界面中完成设置。",
     "llm": {
