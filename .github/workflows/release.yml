@@ -162,11 +162,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows
-          - platform: windows-latest
-            bundles: "nsis"
-            args: ""
-            suffix: "windows-x64"
+          # Windows（暂时屏蔽以节省 CI 费用，恢复时取消注释）
+          # - platform: windows-latest
+          #   bundles: "nsis"
+          #   args: ""
+          #   suffix: "windows-x64"
           # Linux Ubuntu 22.04
           # - platform: ubuntu-22.04
           #   bundles: "deb"
@@ -191,12 +191,12 @@ jobs:
             args: "--target aarch64-apple-darwin"
             rust_target: "aarch64-apple-darwin"
             suffix: "macos-arm64"
-          # macOS - Intel (x86_64)
-          - platform: macos-15-intel
-            bundles: "app,dmg"
-            args: "--target x86_64-apple-darwin"
-            rust_target: "x86_64-apple-darwin"
-            suffix: "macos-x64"
+          # macOS - Intel (x86_64)（暂时屏蔽以节省 CI 费用，恢复时取消注释）
+          # - platform: macos-15-intel
+          #   bundles: "app,dmg"
+          #   args: "--target x86_64-apple-darwin"
+          #   rust_target: "x86_64-apple-darwin"
+          #   suffix: "macos-x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
