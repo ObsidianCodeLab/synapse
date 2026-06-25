@@ -7332,6 +7332,40 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   line-height: 1.6;
 }
 
+/* 试飞优化 · 计划项 ant-tabs：Tab 栏与 Markdown 正文分层，避免 flex 塌陷重叠 */
+.rd-flight-plan-tabs-wrap .ant-tabs {
+  display: block;
+  overflow: visible;
+}
+
+.rd-flight-plan-tabs-wrap .ant-tabs-nav {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px !important;
+}
+
+.rd-flight-plan-tabs-wrap .ant-tabs-content-holder {
+  position: relative;
+  z-index: 0;
+  flex: none;
+  min-height: unset;
+  overflow: visible;
+}
+
+.rd-flight-plan-tabs-wrap .ant-tabs-content {
+  position: static;
+  height: auto;
+}
+
+.rd-flight-plan-tabs-wrap .ant-tabs-tabpane {
+  position: static;
+  height: auto;
+}
+
+.rd-flight-plan-tabs-wrap .ant-tabs-tabpane-hidden {
+  display: none !important;
+}
+
 /* 代码差异 · 字符集 Segmented（紧凑，与 10px 标签对齐） */
 .rd-task-exec-encoding-segmented.ant-segmented {
   padding: 1px;
