@@ -11,7 +11,7 @@
     "test_files": [
       "tests/unit/test_example.py"
     ],
-    "test_list_path": "tests/单元测试用例列表.md",
+    "test_list_path": "archive/开发中/task_exec/单元测试用例列表.md",
     "run_command": "python -m pytest tests/unit/test_example.py -v"
   },
   "test_cases": [

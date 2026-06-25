@@ -100,6 +100,8 @@
       "refreshListFailed": "Failed to refresh list: {{message}}",
       "tooltipChangeRepos": "Update repository info",
       "tooltipDelete": "Delete",
+      "tooltipFavorite": "Add to favorites",
+      "tooltipUnfavorite": "Remove from favorites",
       "cardMineBadge": "Mine",
       "cardMineBadgeTooltip": "This machine’s login matches the product owner (name and employee ID)",
       "cardTeamBadge": "My team",

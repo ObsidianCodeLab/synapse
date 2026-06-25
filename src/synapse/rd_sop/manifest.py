@@ -190,7 +190,7 @@ NODE_OUTPUTS: dict[str, list[str]] = {
     "auto_split": ["研发子单拆分清单.md"],
     "sandbox_build": ["沙箱构建说明.md"],
     "env_pregen": ["环境预生成报告.md"],
-    "task_exec": ["任务执行记录.md"],
+    "task_exec": ["任务执行记录.md", "单元测试用例列表.md"],
     "exception_check": ["代码提交日志.md", "试飞结果.md"],
     "task_feedback": ["试飞优化方案.md"],
     "diff_analysis": ["试飞优化执行记录.md", "inputs/试飞优化方案.md", "inputs/试飞结果.md", "试飞结果_第N轮.md", "试飞优化方案_第N轮.md"],

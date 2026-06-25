@@ -21,6 +21,7 @@ from synapse.rd_meeting.devservice import unified_service_base_url
 from synapse.rd_meeting.paths import meeting_pipeline_path, scope_dir
 from synapse.rd_meeting.room_runtime import load_room_state, read_meeting_pipeline_json
 from synapse.rd_meeting.sandbox_assets import _force_remove_path
+from synapse.rd_sop.manifest import NODE_TYPES
 from synapse.rd_sop.nodes import (
     node_display_name,
     resolve_sop_raw_to_node_id,
@@ -121,13 +122,10 @@ def cleanup_orphan_work_directories(demand_nos: list[str]) -> list[str]:
     return cleaned
 
 
-def _processing_mode_for_local(local_process_state: str) -> str:
-    local = (local_process_state or "").strip()
-    if local == "全人工":
-        return "人工"
-    if local in ("处理中", "已完成"):
-        return "ai"
-    return "待定"
+def _processing_mode_for_demand(demand: dict[str, Any]) -> str:
+    """工单当前 SOP 节点的类型（``human`` / ``ai`` / ``ai_human`` / ``system`` 等）。"""
+    node_id = _resolve_sop_node_id(demand)
+    return NODE_TYPES.get(node_id, "ai")
 
 
 def _resolve_sop_node_id(demand: dict[str, Any]) -> str:
@@ -201,7 +199,7 @@ def build_rd_view_demand_save_payload(
         "priority": "高",
         "assignee_id": (assignee_id or "").strip(),
         "product_name": str(demand.get("prod") or "").strip(),
-        "processing_mode": _processing_mode_for_local(local),
+        "processing_mode": _processing_mode_for_demand(demand),
         "llm_estimated_hours": None,
         "llm_estimate_model": None,
         "feedback_type": None,

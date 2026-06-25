@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Edit2, Trash2, Ticket, Code, FileText, Check, Loader2, X, RefreshCw, GitBranch, Circle } from "lucide-react";
+import { Edit2, Trash2, Ticket, Code, FileText, Check, Loader2, X, RefreshCw, GitBranch, Circle, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Product, displayIdPipeName, type UnifiedWireAnalysisState } from "./types";
 import type { ProductManageScope } from "@/utils/ownerInfoGuard";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,8 @@ interface ProductCardProps {
   onRefreshProcess?: (product: Product) => void | Promise<void>;
   onChangeRepos?: (product: Product) => void | Promise<void>;
   cardActionBusy?: { productId: string; kind: "refresh" | "repo" | "delete" } | null;
+  isFavorite?: boolean;
+  onToggleFavorite?: (product: Product) => void;
 }
 
 type AnalysisKey = "code" | "ticket" | "document";
@@ -158,6 +161,8 @@ export function ProductCard({
   onRefreshProcess,
   onChangeRepos,
   cardActionBusy,
+  isFavorite = false,
+  onToggleFavorite,
 }: ProductCardProps) {
   const { t } = useTranslation();
   const busyRefresh = cardActionBusy?.productId === product.id && cardActionBusy.kind === "refresh";
@@ -166,7 +171,10 @@ export function ProductCard({
 
   return (
     <Card 
-      className="group relative flex h-[420px] flex-col overflow-hidden border-border/80 bg-background/60 shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+      className={cn(
+        "group relative flex h-[420px] flex-col overflow-hidden border-border/80 bg-background/60 shadow-sm transition-all hover:shadow-md hover:border-primary/30",
+        isFavorite && "border-amber-500/35 ring-1 ring-amber-500/15",
+      )}
       onClick={() => onView(product)}
       style={{ cursor: "pointer" }}
     >
@@ -182,7 +190,36 @@ export function ProductCard({
         </div>
       )}
 
-      <div className="absolute right-3 top-3 z-10 flex gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div
+        className={cn(
+          "absolute right-3 top-3 z-10 flex gap-1.5 transition-opacity",
+          isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+        )}
+      >
+        {onToggleFavorite ? (
+          <Button
+            variant="ghost"
+            className={cn(
+              "h-7 w-7 p-0 shadow-sm border bg-background/50 backdrop-blur",
+              isFavorite
+                ? "border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:text-amber-600"
+                : "border-border/50 text-muted-foreground hover:bg-background/90 hover:text-foreground",
+            )}
+            disabled={busyRefresh || busyRepo || busyDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(product);
+            }}
+            title={
+              isFavorite
+                ? t("workbench.products.tooltipUnfavorite")
+                : t("workbench.products.tooltipFavorite")
+            }
+            aria-pressed={isFavorite}
+          >
+            <Star size={13} className={isFavorite ? "fill-current" : undefined} />
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           className="h-7 w-7 p-0 text-muted-foreground hover:bg-background/90 hover:text-foreground shadow-sm border border-border/50 bg-background/50 backdrop-blur"

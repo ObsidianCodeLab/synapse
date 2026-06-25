@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from synapse.rd_meeting.paths import archive_node_dir
+from synapse.rd_meeting.paths import archive_node_dir, task_exec_test_list_work_rel
 from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ def normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(files, list):
         files = []
     suite["test_files"] = [str(x).strip() for x in files if str(x).strip()]
-    suite.setdefault("test_list_path", "tests/单元测试用例列表.md")
+    suite.setdefault("test_list_path", task_exec_test_list_work_rel())
     suite.setdefault("run_command", "")
     out["test_suite"] = suite
     cases_in = out.get("test_cases") if isinstance(out.get("test_cases"), list) else []

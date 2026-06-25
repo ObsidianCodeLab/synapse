@@ -101,6 +101,8 @@
       "refreshListFailed": "刷新列表失败：{{message}}",
       "tooltipChangeRepos": "更新仓库信息",
       "tooltipDelete": "删除产品",
+      "tooltipFavorite": "收藏产品",
+      "tooltipUnfavorite": "取消收藏",
       "cardMineBadge": "我的",
       "cardMineBadgeTooltip": "当前本机登录账号与该产品的创建者一致（姓名与工号匹配）",
       "cardTeamBadge": "本团队",

@@ -28,12 +28,13 @@ label: 测试案例
 |------|--------|------|
 | acceptance | 验收标准.md | `archive/需求分析/acceptance/` |
 | task_exec | 任务执行记录.md | `archive/开发中/task_exec/` |
+| task_exec | 单元测试用例列表.md | `{WORK_ORDER_DIR}/archive/开发中/task_exec/` |
 | 工程目录 | 任务执行阶段生成的 tests/** | `{PRODUCT_CODE_ROOT}/tests/` |
 
 ## 核心任务
 
 1. **完善单元测试代码**：在 `{PRODUCT_CODE_ROOT}` 内补全/修正任务执行阶段生成的 Python 单元测试（统一 Python 实现，mock 外部依赖）。
-2. **维护用例列表**：更新或创建 `{PRODUCT_CODE_ROOT}/tests/单元测试用例列表.md`。
+2. **维护用例列表**：更新或创建 `{WORK_ORDER_DIR}/archive/开发中/task_exec/单元测试用例列表.md`（**不要**写入工程 `tests/` 目录）。
 3. **输出结构化 JSON**：`unit_test_review.json`（schema 见 `references/unit_test_review.skeleton.json`）。
 4. **输出说明文档**：`测试案例说明.md`（每条用例的场景、要求、文件路径、预期结果）。
 

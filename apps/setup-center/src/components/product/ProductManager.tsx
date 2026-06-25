@@ -56,6 +56,7 @@ import {
   toastOwnerInfoGuardError,
   type ProductManageScope,
 } from "@/utils/ownerInfoGuard";
+import { useProductFavorites } from "./useProductFavorites";
 import "./product-workbench.css";
 
 /** 产品列表定时刷新间隔（与产品详情页的 process 轮询分离） */
@@ -243,12 +244,18 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
   } | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [listFilterQuery, setListFilterQuery] = useState("");
+  const { isFavorite, toggleFavorite, removeFavorite } = useProductFavorites();
 
   const filteredProducts = useMemo(() => {
     const q = listFilterQuery.trim();
-    if (!q) return products;
-    return products.filter((p) => productMatchesNameFilter(p, q));
-  }, [products, listFilterQuery]);
+    const base = q ? products.filter((p) => productMatchesNameFilter(p, q)) : products;
+    return [...base].sort((a, b) => {
+      const aFav = isFavorite(a.id) ? 0 : 1;
+      const bFav = isFavorite(b.id) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+      return a.name.localeCompare(b.name, "zh-CN");
+    });
+  }, [products, listFilterQuery, isFavorite]);
 
   const handleRefreshProcess = async (product: Product) => {
     if (!IS_TAURI) {
@@ -399,6 +406,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
 
     if (!IS_TAURI) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      removeFavorite(id);
       clearDetailIfNeeded();
       toast.success(t("workbench.products.deleted") || "已删除");
       return;
@@ -414,6 +422,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
     try {
       const resp = await destroyProd(synapseApiBase, { prod: prodKey });
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      removeFavorite(id);
       clearDetailIfNeeded();
       const okMsg = typeof resp.message === "string" && resp.message.trim() !== "" ? resp.message.trim() : "";
       toast.success(okMsg || t("workbench.products.deleted") || "已删除");
@@ -637,6 +646,8 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
                   key={product.id}
                   product={product}
                   manageScope={IS_TAURI ? productManageScopes.get(product.id) : "mine"}
+                  isFavorite={isFavorite(product.id)}
+                  onToggleFavorite={() => toggleFavorite(product.id)}
                   onEdit={handleEdit}
                   onDelete={handleDeleteRequest}
                   onView={handleView}

@@ -95,7 +95,19 @@ def test_collect_node_output_items(monkeypatch, tmp_path):
     assert items[0]["url"].endswith("archive/需求分析/req_clarify/需求澄清.md")
 
 
-def test_collect_repo_output_items():
+def test_collect_repo_output_items(monkeypatch):
+    monkeypatch.setattr(
+        "synapse.rd_meeting.owner_order_archive.collect_repo_branch_stats",
+        lambda path, **kwargs: {
+            "lines_added": 120,
+            "lines_deleted": 30,
+            "commit_count": 3,
+        },
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.owner_order_archive._sandbox_path_for_task",
+        lambda scope_id, task_no, product_module: "/tmp/sandbox/repo",
+    )
     demand = {
         "owned_work_items": [
             {
@@ -115,6 +127,9 @@ def test_collect_repo_output_items():
     assert items[0]["node_id"] == 22
     assert items[0]["repo_name"] == "billing-core"
     assert items[0]["branch"] == "feat-001"
+    assert items[0]["lines_added"] == 120
+    assert items[0]["lines_deleted"] == 30
+    assert items[0]["commit_count"] == 3
 
 
 @pytest.mark.asyncio
