@@ -54,7 +54,7 @@ const LeaderReviewView = lazy(() =>
 import { FeedbackModal, type FeedbackPrefill } from "./views/FeedbackModal";
 import { IMConfigView } from "./views/IMConfigView";
 import { AgentSystemView } from "./views/AgentSystemView";
-import { MyFeedbackView } from "./views/MyFeedbackView";
+import { MyFeedbackView } from "./views/MyFeedbackViews";
 import { LLMView } from "./views/LLMView";
 import { StatusView } from "./views/StatusView";
 import { RuntimeEnvironmentDialog, type RuntimeDiagnostics } from "./components/RuntimeEnvironmentPanel";
@@ -6407,6 +6407,7 @@ export function App() {
           apiBaseUrl={httpApiBase()}
           serviceRunning={serviceStatus?.running ?? false}
           refreshTrigger={feedbackRefreshKey}
+          assignee_id={obIwcEmployeeId}
           onOpenFeedbackModal={(prefill) => {
             setFeedbackPrefill(prefill ?? null);
             setBugReportOpen(true);
@@ -7044,6 +7045,7 @@ export function App() {
         }}
         serviceRunning={serviceStatus?.running ?? false}
         currentWorkspaceId={currentWorkspaceId}
+        assignee_id={obIwcEmployeeId}
       />
     </div>
     </EnvFieldContext.Provider>

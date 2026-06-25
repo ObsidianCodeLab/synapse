@@ -41,7 +41,8 @@
     "workbenchSandbox": "代码沙盒",
     "workbenchLeaderReview": "评审中心",
     "workbenchTeam": "团队视图",
-    "workbenchDevTools": "研发工具"
+    "workbenchDevTools": "研发工具",
+    "myFeedback": "反馈列表"
   },
   "workbench": {
     "placeholderHint": "此页面为占位，真实功能组件接入后将在路由中替换。",
@@ -2143,6 +2144,8 @@
   },
   "feedback": {
     "trigger": "反馈",
+    "submitSuccessTitle": "提交成功!",
+    "close": "关闭",
     "uploadFailedSaved": "上传失败（{{error}}）。报告数据已保存到本地，您可以下载后手动发送给技术支持。",
     "uploadFailedNetwork": "网络连接失败，无法提交反馈。请检查网络后重试。",
     "saveLocal": "💾 下载反馈数据包",
@@ -2182,6 +2185,35 @@
     "wechatPlaceholder": "微信号",
     "submit": "提交需求",
     "submitSuccess": "需求提交成功（ID: {{id}}）"
+  },
+  "myFeedback": {
+    "tabMine": "我的反馈",
+    "tabAll": "团队反馈",
+    "submitFeedback": "反馈",
+    "refresh": "刷新",
+    "viewFeedback": "查看反馈列表",
+    "loading": "加载中...",
+    "empty": "暂无反馈记录",
+    "emptyHint": "提交反馈后记录将在此处显示",
+    "filterAll": "全部",
+    "filterActive": "进行中",
+    "filterResolved": "已解决",
+    "searchPlaceholder": "搜索反馈标题...",
+    "sortLabel": "排序",
+    "sortDate": "日期",
+    "sortStatus": "状态",
+    "sortType": "类型",
+    "deleteConfirm": "确定要删除这条反馈记录吗？",
+    "statusPending": "待处理",
+    "statusConfirmed": "处理中",
+    "statusResolved": "已解决",
+    "description": "反馈描述",
+    "steps": "复现步骤",
+    "contact": "联系方式",
+    "imageFile": "截图",
+    "logDownload": "下载日志包",
+    "debugDownload": "下载调试包",
+    "teamEmpty": "暂无团队反馈"
   },
   "adv": {
     "networkSecurityTitle": "网络与安全",
