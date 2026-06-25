@@ -8,7 +8,7 @@ import {
   IconBug, IconBrain, IconGitee, IconUsers, IconBot,
   IconGear, IconBook, IconStorefront, IconPuzzle, IconFingerprint, IconLayoutGrid,
   IconShield, IconRadar, IconBuilding,
-  IconLaptop, IconPackage, IconClipboard, IconTerminal,
+  IconLaptop, IconPackage, IconClipboard,
 } from "../icons";
 import logoUrl from "../assets/logo.png";
 import dingtalkLogoUrl from "../assets/platform_logos/dingtalk.svg";

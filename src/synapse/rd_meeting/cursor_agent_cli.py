@@ -338,12 +338,14 @@ def format_workspace_trust_error_hint(workspace: str | None = None) -> str:
     )
 
 
-def _query_agent_version(resolved: str) -> str | None:
+def _run_agent_command(resolved: str, args: list[str]) -> subprocess.CompletedProcess[str] | None:
+    """通过 resolve_agent_launch_argv 启动 agent（Windows 下绕过 agent.ps1 版本目录问题）。"""
     if not Path(resolved).is_file():
         return None
+    argv = resolve_agent_launch_argv(resolved)
     try:
-        proc = subprocess.run(
-            [resolved, "--version"],
+        return subprocess.run(
+            [*argv, *args],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -352,7 +354,11 @@ def _query_agent_version(resolved: str) -> str | None:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    if proc.returncode != 0:
+
+
+def _query_agent_version(resolved: str) -> str | None:
+    proc = _run_agent_command(resolved, ["--version"])
+    if proc is None or proc.returncode != 0:
         return None
     text = f"{proc.stdout or ''}{proc.stderr or ''}".strip()
     if not text:
@@ -366,16 +372,8 @@ def _query_agent_auth(resolved: str) -> tuple[bool, str]:
     if not Path(resolved).is_file():
         return False, ""
     for subcmd in ("status", "whoami"):
-        try:
-            proc = subprocess.run(
-                [resolved, subcmd],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=20,
-            )
-        except (OSError, subprocess.TimeoutExpired):
+        proc = _run_agent_command(resolved, [subcmd])
+        if proc is None:
             continue
         text = f"{proc.stdout or ''}{proc.stderr or ''}".strip()
         lower = text.lower()

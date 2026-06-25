@@ -3293,6 +3293,7 @@ fn main() {
             cursor_agent_cli_check,
             cursor_agent_cli_install,
             cursor_agent_cli_login,
+            cursor_agent_cli_logout,
             rd_terminal::commands::create_agent_workspace,
             rd_terminal::commands::pty_create_attach,
             rd_terminal::commands::pty_write,
@@ -8093,14 +8094,66 @@ fn emit_cursor_agent_install_line(app: &tauri::AppHandle, text: &str) {
 }
 
 #[cfg(windows)]
-fn cursor_agent_base_dir() -> Option<PathBuf> {
-    let local = std::env::var("LOCALAPPDATA").ok()?;
-    let base = PathBuf::from(local).join("cursor-agent");
-    if base.is_dir() {
-        Some(base)
-    } else {
-        None
+fn resolve_local_app_data_dir() -> Result<PathBuf, String> {
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        let trimmed = local.trim();
+        if !trimmed.is_empty() {
+            let path = PathBuf::from(trimmed);
+            if path.is_absolute() {
+                return Ok(path);
+            }
+        }
     }
+    if let Some(home) = home_dir() {
+        let fallback = home.join("AppData").join("Local");
+        if fallback.is_dir() {
+            return Ok(fallback);
+        }
+    }
+    Err("无法定位 LOCALAPPDATA（请确认用户配置目录存在）".into())
+}
+
+#[cfg(windows)]
+fn cursor_agent_install_base_dir() -> Result<PathBuf, String> {
+    Ok(resolve_local_app_data_dir()?.join("cursor-agent"))
+}
+
+#[cfg(windows)]
+fn sanitize_path_component(raw: &str) -> String {
+    raw.chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+#[cfg(windows)]
+fn ensure_parent_dir(path: &Path) -> Result<(), String> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+    fs::create_dir_all(parent).map_err(|e| {
+        format!(
+            "创建目录失败 ({}): {e}",
+            parent.display()
+        )
+    })
+}
+
+#[cfg(windows)]
+fn cursor_agent_base_dir() -> Option<PathBuf> {
+    cursor_agent_install_base_dir()
+        .ok()
+        .filter(|base| base.is_dir())
 }
 
 #[cfg(windows)]
@@ -8129,6 +8182,127 @@ fn legacy_alias_for_timestamp_dir(name: &str) -> Option<String> {
         return None;
     }
     Some(format!("{}-{}", parts[0], parts[4]))
+}
+
+#[cfg(windows)]
+fn version_dir_sort_key(name: &str) -> (u32, u32, u32, u32, u32, u32) {
+    let parts: Vec<&str> = name.split('-').collect();
+    let date_bits: Vec<u32> = parts
+        .first()
+        .unwrap_or(&"")
+        .split('.')
+        .filter_map(|p| p.parse().ok())
+        .collect();
+    let (y, m, d) = match date_bits.as_slice() {
+        [y, m, d] => (*y, *m, *d),
+        _ => (0, 0, 0),
+    };
+    if parts.len() >= 5 && parts[1..4].iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
+        let h: u32 = parts[1].parse().unwrap_or(0);
+        let mi: u32 = parts[2].parse().unwrap_or(0);
+        let s: u32 = parts[3].parse().unwrap_or(0);
+        return (y, m, d, h, mi, s);
+    }
+    (y, m, d, 0, 0, 0)
+}
+
+#[cfg(windows)]
+fn find_runtime_version_dir(versions: &Path) -> Option<PathBuf> {
+    let dist = versions.join("dist-package");
+    if version_dir_has_runtime(&dist) {
+        return Some(dist);
+    }
+    let mut dirs: Vec<PathBuf> = fs::read_dir(versions)
+        .ok()?
+        .filter_map(|e| e.ok().map(|x| x.path()))
+        .filter(|p| p.is_dir() && version_dir_has_runtime(p))
+        .collect();
+    if dirs.is_empty() {
+        return None;
+    }
+    dirs.sort_by(|a, b| {
+        let ak = version_dir_sort_key(a.file_name().and_then(|n| n.to_str()).unwrap_or(""));
+        let bk = version_dir_sort_key(b.file_name().and_then(|n| n.to_str()).unwrap_or(""));
+        ak.cmp(&bk)
+    });
+    dirs.pop()
+}
+
+#[cfg(windows)]
+fn resolve_cursor_agent_launch_argv(agent_path: &Path) -> Vec<PathBuf> {
+    let suffix = agent_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !matches!(suffix.as_str(), "cmd" | "exe" | "bat" | "ps1") {
+        return vec![agent_path.to_path_buf()];
+    }
+    let Some(script_dir) = agent_path.parent() else {
+        return vec![agent_path.to_path_buf()];
+    };
+    let root_node = script_dir.join("node.exe");
+    let root_index = script_dir.join("index.js");
+    if root_node.is_file() && root_index.is_file() {
+        return vec![root_node, root_index];
+    }
+    let versions = script_dir.join("versions");
+    if let Some(version_dir) = find_runtime_version_dir(&versions) {
+        let node = version_dir.join("node.exe");
+        let index = version_dir.join("index.js");
+        if node.is_file() && index.is_file() {
+            return vec![node, index];
+        }
+    }
+    vec![agent_path.to_path_buf()]
+}
+
+#[cfg(windows)]
+fn run_cursor_agent_command(agent_path: &Path, args: &[&str]) -> Option<std::process::Output> {
+    let argv = resolve_cursor_agent_launch_argv(agent_path);
+    let mut cmd = Command::new(&argv[0]);
+    if argv.len() > 1 {
+        cmd.arg(&argv[1]);
+    }
+    for arg in args {
+        cmd.arg(arg);
+    }
+    apply_no_window(&mut cmd);
+    cmd.output().ok()
+}
+
+#[cfg(not(windows))]
+fn resolve_cursor_agent_launch_argv(agent_path: &Path) -> Vec<PathBuf> {
+    vec![agent_path.to_path_buf()]
+}
+
+#[cfg(not(windows))]
+fn run_cursor_agent_command(agent_path: &Path, args: &[&str]) -> Option<std::process::Output> {
+    let mut cmd = Command::new(agent_path);
+    for arg in args {
+        cmd.arg(arg);
+    }
+    apply_no_window(&mut cmd);
+    cmd.output().ok()
+}
+
+#[cfg(windows)]
+fn normalize_cursor_agent_version_layout(versions: &Path, version: &str) -> Result<PathBuf, String> {
+    let version_dir = versions.join(version);
+    if version_dir.is_dir() && version_dir_has_runtime(&version_dir) {
+        return Ok(version_dir);
+    }
+    let Some(runtime_src) = find_runtime_version_dir(versions) else {
+        return Err("未找到包含 node.exe 的 agent 运行时目录".into());
+    };
+    if runtime_src != version_dir {
+        if version_dir.exists() {
+            fs::remove_dir_all(&version_dir).map_err(|e| format!("清理版本目录失败: {e}"))?;
+        }
+        fs::rename(&runtime_src, &version_dir)
+            .map_err(|e| format!("重命名运行时目录 {} → {} 失败: {e}", runtime_src.display(), version))?;
+    }
+    Ok(version_dir)
 }
 
 #[cfg(windows)]
@@ -8174,10 +8348,7 @@ fn repair_cursor_agent_version_dirs_if_needed() -> Vec<String> {
     }
 
     if let Some(agent_path) = resolve_cursor_agent_executable() {
-        let mut c = Command::new(&agent_path);
-        c.arg("--version");
-        apply_no_window(&mut c);
-        if let Ok(o) = c.output() {
+        if let Some(o) = run_cursor_agent_command(&agent_path, &["--version"]) {
             if o.status.success() && merged_stdout_stderr_version_line(&o).is_some() {
                 return Vec::new();
             }
@@ -8220,8 +8391,8 @@ fn cursor_agent_exe_candidates() -> Vec<PathBuf> {
     let mut out: Vec<PathBuf> = Vec::new();
     #[cfg(windows)]
     {
-        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-            let base = PathBuf::from(local).join("cursor-agent");
+        if let Ok(local) = resolve_local_app_data_dir() {
+            let base = local.join("cursor-agent");
             for name in ["agent.exe", "agent.cmd", "cursor-agent.exe", "cursor-agent.cmd"] {
                 out.push(base.join(name));
             }
@@ -8277,34 +8448,32 @@ fn cursor_agent_cli_auth_sync(agent_path: &Path) -> (bool, Option<String>) {
         return (true, Some("已配置 CURSOR_API_KEY".into()));
     }
     for subcmd in ["status", "whoami"] {
-        let mut c = Command::new(agent_path);
-        c.arg(subcmd);
-        apply_no_window(&mut c);
-        if let Ok(o) = c.output() {
-            let text = format!(
-                "{}{}",
-                String::from_utf8_lossy(&o.stdout),
-                String::from_utf8_lossy(&o.stderr),
-            );
-            let trimmed = text.trim();
-            let lower = trimmed.to_lowercase();
-            if !o.status.success() {
-                continue;
-            }
-            if lower.contains("not logged")
-                || lower.contains("not authenticated")
-                || lower.contains("login required")
-            {
-                continue;
-            }
-            if trimmed.is_empty() {
-                return (true, Some("已登录".into()));
-            }
-            return (
-                true,
-                Some(trimmed.lines().next().unwrap_or(trimmed).to_string()),
-            );
+        let Some(o) = run_cursor_agent_command(agent_path, &[subcmd]) else {
+            continue;
+        };
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&o.stdout),
+            String::from_utf8_lossy(&o.stderr),
+        );
+        let trimmed = text.trim();
+        let lower = trimmed.to_lowercase();
+        if !o.status.success() {
+            continue;
         }
+        if lower.contains("not logged")
+            || lower.contains("not authenticated")
+            || lower.contains("login required")
+        {
+            continue;
+        }
+        if trimmed.is_empty() {
+            return (true, Some("已登录".into()));
+        }
+        return (
+            true,
+            Some(trimmed.lines().next().unwrap_or(trimmed).to_string()),
+        );
     }
     (false, Some("未登录 Cursor 账号".into()))
 }
@@ -8322,11 +8491,28 @@ fn cursor_agent_cli_check_sync() -> CursorAgentCliCheckResult {
     };
 
     let mut version = None;
-    let mut c = Command::new(&agent_path);
-    c.arg("--version");
-    apply_no_window(&mut c);
-    if let Ok(o) = c.output() {
+    if let Some(o) = run_cursor_agent_command(&agent_path, &["--version"]) {
         version = merged_stdout_stderr_version_line(&o);
+    }
+    let installed = version.is_some()
+        || {
+            #[cfg(windows)]
+            {
+                resolve_cursor_agent_launch_argv(&agent_path).len() >= 2
+            }
+            #[cfg(not(windows))]
+            {
+                true
+            }
+        };
+    if !installed {
+        return CursorAgentCliCheckResult {
+            installed: false,
+            logged_in: false,
+            ready: false,
+            version: None,
+            auth_message: Some("agent 运行时未就绪（缺少 node.exe/index.js）".into()),
+        };
     }
 
     let (logged_in, auth_message) = cursor_agent_cli_auth_sync(&agent_path);
@@ -8357,10 +8543,8 @@ fn cursor_agent_cli_login_sync(app: tauri::AppHandle) -> Result<String, String> 
         &app,
         "正在启动 Cursor 账号登录（将自动打开浏览器，请在浏览器中完成授权）…\n",
     );
-    let mut c = Command::new(&agent_path);
-    c.arg("login");
-    apply_no_window(&mut c);
-    let o = c.output().map_err(|e| format!("启动 agent login 失败: {e}"))?;
+    let o = run_cursor_agent_command(&agent_path, &["login"])
+        .ok_or_else(|| "启动 agent login 失败".to_string())?;
     let stdout = String::from_utf8_lossy(&o.stdout);
     let stderr = String::from_utf8_lossy(&o.stderr);
     if !stdout.is_empty() {
@@ -8389,6 +8573,38 @@ fn cursor_agent_cli_login_sync(app: tauri::AppHandle) -> Result<String, String> 
     })
 }
 
+fn cursor_agent_cli_logout_sync(app: tauri::AppHandle) -> Result<String, String> {
+    let agent_path = resolve_cursor_agent_executable()
+        .ok_or_else(|| "未找到 Cursor Agent CLI，请先安装 agent".to_string())?;
+    let (logged_in, _) = cursor_agent_cli_auth_sync(&agent_path);
+    if !logged_in {
+        return Ok("当前未登录 Cursor 账号，无需登出。".into());
+    }
+    emit_cursor_agent_install_line(&app, "正在登出 Cursor 账号（清除本机 OAuth 凭据）…\n");
+    let o = run_cursor_agent_command(&agent_path, &["logout"])
+        .ok_or_else(|| "启动 agent logout 失败".to_string())?;
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    if !stdout.is_empty() {
+        emit_cursor_agent_install_line(&app, &stdout);
+    }
+    if !stderr.is_empty() {
+        emit_cursor_agent_install_line(&app, &stderr);
+    }
+    let (still_logged_in, _) = cursor_agent_cli_auth_sync(&agent_path);
+    if still_logged_in {
+        return Err("登出未完成，请稍后重试。".into());
+    }
+    Ok("Cursor 账号已登出。".into())
+}
+
+/// 启动 `agent logout`（清除 OAuth 凭据，凭据不在 cursor-agent 目录内）。
+#[tauri::command]
+async fn cursor_agent_cli_logout(app: tauri::AppHandle) -> Result<String, String> {
+    let app = app.clone();
+    spawn_blocking_result(move || cursor_agent_cli_logout_sync(app)).await
+}
+
 /// 启动 `agent login`（OAuth 浏览器授权）。实时日志：`cursor_agent_install_log`。
 #[tauri::command]
 async fn cursor_agent_cli_login(app: tauri::AppHandle) -> Result<String, String> {
@@ -8396,67 +8612,364 @@ async fn cursor_agent_cli_login(app: tauri::AppHandle) -> Result<String, String>
     spawn_blocking_result(move || cursor_agent_cli_login_sync(app)).await
 }
 
+#[cfg(windows)]
+fn stop_cursor_agent_processes() {
+    let mut c = Command::new("powershell");
+    c.args([
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*cursor-agent*' } | Stop-Process -Force -ErrorAction SilentlyContinue",
+    ]);
+    apply_no_window(&mut c);
+    let _ = c.output();
+}
+
+#[cfg(not(windows))]
+fn stop_cursor_agent_processes() {}
+
+/// 安装前清理旧目录，避免官方脚本 Remove-Item 因 zip 被占用而失败。
+#[cfg(windows)]
+fn prepare_cursor_agent_install_dir(app: &tauri::AppHandle) -> Result<(), String> {
+    let Ok(base) = cursor_agent_install_base_dir() else {
+        return Ok(());
+    };
+    if !base.is_dir() {
+        return Ok(());
+    };
+    emit_cursor_agent_install_line(app, "正在清理旧的 Cursor Agent 安装…\n");
+    stop_cursor_agent_processes();
+
+    for attempt in 0..3 {
+        if fs::remove_dir_all(&base).is_ok() {
+            emit_cursor_agent_install_line(app, "旧安装已清理。\n");
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(400 * (attempt + 1) as u64));
+    }
+
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let backup = base
+        .parent()
+        .map(|p| p.join(format!("cursor-agent.bak.{ts}")))
+        .ok_or_else(|| "无法定位 cursor-agent 目录".to_string())?;
+    if backup.exists() {
+        let _ = fs::remove_dir_all(&backup);
+    }
+    fs::rename(&base, &backup).map_err(|e| {
+        format!(
+            "无法清理旧安装（文件可能被占用）: {e}。请关闭其他 Synapse 窗口或终端后重试。"
+        )
+    })?;
+    emit_cursor_agent_install_line(
+        app,
+        &format!("已将旧安装移至 {} …\n", backup.display()),
+    );
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn prepare_cursor_agent_install_dir(_app: &tauri::AppHandle) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(windows)]
+fn parse_cursor_agent_install_script(script: &str) -> Result<(String, String), String> {
+    let mut download_url: Option<String> = None;
+    let mut version: Option<String> = None;
+    for line in script.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("$downloadUrl") {
+            let raw = trimmed
+                .split('=')
+                .nth(1)
+                .map(|s| s.trim().trim_matches('\'').trim_matches('"').trim())
+                .unwrap_or("");
+            if !raw.is_empty() {
+                download_url = Some(raw.to_string());
+            }
+        } else if trimmed.starts_with("$version") {
+            let raw = trimmed
+                .split('=')
+                .nth(1)
+                .map(|s| s.trim().trim_matches('\'').trim_matches('"').trim())
+                .unwrap_or("");
+            if !raw.is_empty() {
+                version = Some(raw.to_string());
+            }
+        }
+    }
+    match (download_url, version) {
+        (Some(url), Some(ver)) => Ok((url, ver)),
+        _ => Err("无法从官方安装脚本解析 downloadUrl / version".into()),
+    }
+}
+
+#[cfg(windows)]
+fn cursor_agent_windows_arch() -> String {
+    for key in ["PROCESSOR_ARCHITECTURE", "PROCESSOR_ARCHITEW6432"] {
+        if let Ok(arch) = std::env::var(key) {
+            if arch.eq_ignore_ascii_case("ARM64") {
+                return "arm64".into();
+            }
+        }
+    }
+    "x64".into()
+}
+
+#[cfg(windows)]
+fn fetch_cursor_agent_install_manifest() -> Result<(String, String), String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("Synapse-Setup-Center/1.0")
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+    let script = client
+        .get("https://cursor.com/install?win32=true")
+        .send()
+        .map_err(|e| format!("获取官方安装脚本失败: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("官方安装脚本 HTTP 错误: {e}"))?
+        .text()
+        .map_err(|e| format!("读取官方安装脚本失败: {e}"))?;
+    parse_cursor_agent_install_script(&script)
+}
+
+#[cfg(windows)]
+fn format_cursor_agent_install_failure(detail: &str, exit_code: i32) -> String {
+    let lower = detail.to_lowercase();
+    if detail.contains("Invoke-WebRequest")
+        || detail.contains("无法连接到远程服务器")
+        || lower.contains("connection refused")
+        || lower.contains("timed out")
+        || lower.contains("downloads.cursor.com")
+    {
+        return format!(
+            "下载 Cursor Agent 安装包失败（无法访问 downloads.cursor.com，exit={exit_code}）。\n\
+             请检查网络/代理/VPN，或在 PowerShell 设置 HTTPS_PROXY 后重试。\n\
+             也可手动安装：irm 'https://cursor.com/install?win32=true' | iex"
+        );
+    }
+    if detail.len() > 800 {
+        format!("安装失败 (exit={exit_code}): {}…", &detail[..800])
+    } else {
+        format!("安装失败 (exit={exit_code}): {detail}")
+    }
+}
+
+#[cfg(windows)]
+fn download_cursor_agent_package(
+    app: &tauri::AppHandle,
+    url: &str,
+    dest: &Path,
+) -> Result<(), String> {
+    use std::io::Write as _;
+
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(600))
+        .user_agent("Synapse-Setup-Center/1.0")
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+
+    let mut last_err = String::new();
+    for attempt in 1..=3u32 {
+        emit_cursor_agent_install_line(
+            app,
+            &format!(
+                "正在下载 agent 安装包（第 {attempt}/3 次）…\n  {url}\n  保存到: {}\n",
+                dest.display()
+            ),
+        );
+        ensure_parent_dir(dest)?;
+        match client.get(url).send() {
+            Ok(resp) => {
+                if !resp.status().is_success() {
+                    last_err = format!("HTTP {}", resp.status());
+                    emit_cursor_agent_install_line(
+                        app,
+                        &format!("下载失败: {last_err}，准备重试…\n"),
+                    );
+                    std::thread::sleep(Duration::from_secs(2 * attempt as u64));
+                    continue;
+                }
+                let total = resp.content_length();
+                let mut file = fs::File::create(dest).map_err(|e| {
+                    format!(
+                        "创建临时文件失败 ({}): {e}",
+                        dest.display()
+                    )
+                })?;
+                let mut downloaded: u64 = 0;
+                let mut reader = resp;
+                let mut last_emit = std::time::Instant::now();
+                let mut buf = [0u8; 65536];
+                loop {
+                    let n = reader
+                        .read(&mut buf)
+                        .map_err(|e| format!("下载流读取失败: {e}"))?;
+                    if n == 0 {
+                        break;
+                    }
+                    file.write_all(&buf[..n])
+                        .map_err(|e| format!("写入安装包失败: {e}"))?;
+                    downloaded += n as u64;
+                    if last_emit.elapsed() >= Duration::from_secs(3) {
+                        if let Some(total_bytes) = total {
+                            let pct = ((downloaded as f64 / total_bytes as f64) * 100.0).min(100.0);
+                            emit_cursor_agent_install_line(
+                                app,
+                                &format!(
+                                    "  已下载 {:.1} / {:.1} MB ({pct:.0}%)\n",
+                                    downloaded as f64 / 1_048_576.0,
+                                    total_bytes as f64 / 1_048_576.0,
+                                ),
+                            );
+                        } else {
+                            emit_cursor_agent_install_line(
+                                app,
+                                &format!(
+                                    "  已下载 {:.1} MB…\n",
+                                    downloaded as f64 / 1_048_576.0,
+                                ),
+                            );
+                        }
+                        last_emit = std::time::Instant::now();
+                    }
+                }
+                emit_cursor_agent_install_line(app, "下载完成，正在解压…\n");
+                return Ok(());
+            }
+            Err(err) => {
+                last_err = err.to_string();
+                emit_cursor_agent_install_line(
+                    app,
+                    &format!("下载失败: {last_err}，准备重试…\n"),
+                );
+                std::thread::sleep(Duration::from_secs(2 * attempt as u64));
+            }
+        }
+    }
+    Err(format_cursor_agent_install_failure(&last_err, -1))
+}
+
+#[cfg(windows)]
+fn layout_cursor_agent_from_zip(base: &Path, versions: &Path, version: &str, zip_path: &Path) -> Result<(), String> {
+    let file = fs::File::open(zip_path).map_err(|e| format!("打开安装包失败: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 失败: {e}"))?;
+    archive
+        .extract(versions)
+        .map_err(|e| format!("解压安装包失败: {e}"))?;
+
+    let version_dir = normalize_cursor_agent_version_layout(versions, version)?;
+
+    for entry in fs::read_dir(&version_dir).map_err(|e| format!("读取版本目录失败: {e}"))? {
+        let entry = entry.map_err(|e| format!("读取版本条目失败: {e}"))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with("cursor-agent") {
+            let target = base.join(&name);
+            if target.exists() {
+                let _ = fs::remove_file(&target);
+            }
+            fs::copy(entry.path(), &target).map_err(|e| format!("复制 {name} 失败: {e}"))?;
+        }
+    }
+
+    for (src, dst) in [
+        ("cursor-agent.exe", "agent.exe"),
+        ("cursor-agent.cmd", "agent.cmd"),
+        ("cursor-agent.ps1", "agent.ps1"),
+    ] {
+        let from = base.join(src);
+        if from.is_file() {
+            let to = base.join(dst);
+            if to.exists() {
+                let _ = fs::remove_file(&to);
+            }
+            fs::copy(&from, &to).map_err(|e| format!("创建 {dst} 别名失败: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn cursor_agent_cli_install_native_windows(app: &tauri::AppHandle) -> Result<String, String> {
+    prepare_cursor_agent_install_dir(app)?;
+    let base = cursor_agent_install_base_dir()?;
+    let versions = base.join("versions");
+    fs::create_dir_all(&versions).map_err(|e| {
+        format!(
+            "创建安装目录失败 ({}): {e}",
+            versions.display()
+        )
+    })?;
+    windows_add_to_path(&base)?;
+    emit_cursor_agent_install_line(
+        app,
+        &format!(
+            "安装目录: {}\n正在获取 Cursor Agent 版本信息…\n",
+            base.display()
+        ),
+    );
+    let (download_url, version) = fetch_cursor_agent_install_manifest()?;
+    let version = sanitize_path_component(&version);
+    let arch = cursor_agent_windows_arch();
+    let package_url = format!("{download_url}windows/{arch}/agent-cli-package.zip");
+    emit_cursor_agent_install_line(
+        app,
+        &format!("目标版本: {version} ({arch})\n"),
+    );
+
+    let temp_zip = std::env::temp_dir().join(format!("synapse-cursor-agent-{version}.zip"));
+    if temp_zip.exists() {
+        let _ = fs::remove_file(&temp_zip);
+    }
+    if let Err(err) = download_cursor_agent_package(app, &package_url, &temp_zip) {
+        let _ = fs::remove_file(&temp_zip);
+        return Err(err);
+    }
+
+    if let Err(err) = layout_cursor_agent_from_zip(&base, &versions, &version, &temp_zip) {
+        let _ = fs::remove_file(&temp_zip);
+        return Err(err);
+    }
+    let _ = fs::remove_file(&temp_zip);
+
+    let aliases = repair_cursor_agent_version_dirs_if_needed();
+    if !aliases.is_empty() {
+        emit_cursor_agent_install_line(
+            app,
+            &format!(
+                "已自动修复 Cursor Agent 版本目录命名（{}）…\n",
+                aliases.join(", ")
+            ),
+        );
+    }
+
+    let check = cursor_agent_cli_check_sync();
+    if !check.installed {
+        return Err(format_cursor_agent_install_failure("未检测到 agent 可执行文件", 0));
+    }
+
+    let ver = check
+        .version
+        .clone()
+        .unwrap_or_else(|| version.clone());
+    emit_cursor_agent_install_line(app, &format!("检测成功：{ver}\n"));
+    Ok(format!(
+        "Cursor Agent CLI 已安装（{ver}）。请在界面中完成 Cursor 账号登录。"
+    ))
+}
+
 fn cursor_agent_cli_install_sync(app: tauri::AppHandle) -> Result<String, String> {
     #[cfg(windows)]
     {
-        emit_cursor_agent_install_line(&app, "正在通过官方脚本安装 Cursor Agent CLI…\n");
-        let script = "irm 'https://cursor.com/install?win32=true' | iex";
-        let mut c = Command::new("powershell");
-        c.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            script,
-        ]);
-        apply_no_window(&mut c);
-        let o = c.output().map_err(|e| format!("启动安装失败: {e}"))?;
-        let stdout = String::from_utf8_lossy(&o.stdout);
-        let stderr = String::from_utf8_lossy(&o.stderr);
-        if !stdout.is_empty() {
-            emit_cursor_agent_install_line(&app, &stdout);
-        }
-        if !stderr.is_empty() {
-            emit_cursor_agent_install_line(&app, &stderr);
-        }
-        if !o.status.success() {
-            return Err(format!(
-                "安装失败 (exit={}): {}",
-                o.status.code().unwrap_or(-1),
-                stderr.trim()
-            ));
-        }
-        let aliases = repair_cursor_agent_version_dirs_if_needed();
-        if !aliases.is_empty() {
-            emit_cursor_agent_install_line(
-                &app,
-                &format!(
-                    "已自动修复 Cursor Agent 版本目录命名（{}）…\n",
-                    aliases.join(", ")
-                ),
-            );
-        }
-        let check = cursor_agent_cli_check_sync();
-        if !check.installed {
-            return Err(
-                "安装脚本已结束，但未检测到 agent。请重启 Synapse 后重试。".into(),
-            );
-        }
-        let ver = check
-            .version
-            .clone()
-            .unwrap_or_else(|| "已安装".to_string());
-        emit_cursor_agent_install_line(&app, &format!("检测成功：{ver}\n"));
-        if !check.logged_in {
-            emit_cursor_agent_install_line(&app, "安装完成，接下来将引导 Cursor 账号登录…\n");
-            if let Err(err) = cursor_agent_cli_login_sync(app.clone()) {
-                emit_cursor_agent_install_line(&app, &format!("{err}\n"));
-                return Ok(format!(
-                    "Cursor Agent CLI 已安装（{ver}），但登录尚未完成：{err}"
-                ));
-            }
-        }
-        Ok(format!("Cursor Agent CLI 已安装并完成登录（{ver}）。"))
+        return cursor_agent_cli_install_native_windows(&app);
     }
     #[cfg(not(windows))]
     {
@@ -8487,14 +9000,14 @@ fn cursor_agent_cli_install_sync(app: tauri::AppHandle) -> Result<String, String
         if !check.installed {
             return Err("安装脚本已结束，但未检测到 agent。请重启终端后重试。".into());
         }
-        if !check.logged_in {
-            emit_cursor_agent_install_line(&app, "安装完成，接下来将引导 Cursor 账号登录…\n");
-            if let Err(err) = cursor_agent_cli_login_sync(app.clone()) {
-                emit_cursor_agent_install_line(&app, &format!("{err}\n"));
-                return Ok(format!("Cursor Agent CLI 已安装，但登录尚未完成：{err}"));
-            }
-        }
-        Ok("Cursor Agent CLI 已安装并完成登录。".into())
+        let ver = check
+            .version
+            .clone()
+            .unwrap_or_else(|| "已安装".to_string());
+        emit_cursor_agent_install_line(&app, &format!("检测成功：{ver}\n"));
+        Ok(format!(
+            "Cursor Agent CLI 已安装（{ver}）。请在界面中完成 Cursor 账号登录。"
+        ))
     }
 }
 

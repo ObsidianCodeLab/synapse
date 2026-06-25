@@ -26,7 +26,7 @@ def test_check_cursor_agent_cli_ready_when_logged_in(tmp_path, monkeypatch):
     agent.write_text("@echo off", encoding="utf-8")
 
     def fake_run(argv, **kwargs):
-        cmd = argv[1] if len(argv) > 1 else ""
+        cmd = argv[-1] if argv else ""
         if cmd == "--version":
             return subprocess.CompletedProcess(argv, 0, stdout="agent 1.0\n", stderr="")
         if cmd in ("status", "whoami"):

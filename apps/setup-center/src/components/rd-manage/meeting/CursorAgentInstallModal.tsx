@@ -2,8 +2,13 @@
  * 任务执行前置：Cursor Agent CLI 检测与一键安装弹窗。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Button, Modal, message } from 'antd';
 import { Download, Loader2, LogIn, RefreshCw, Terminal } from 'lucide-react';
+import {
+  CursorAgentInstallLogPanel,
+  type CursorAgentInstallPhase,
+} from '../../cursor-agent/CursorAgentInstallLogPanel';
 import {
   checkCursorAgentCliTauri,
   fetchCursorAgentCliStatus,
@@ -24,6 +29,10 @@ interface Props {
   onReady?: () => void | Promise<void>;
 }
 
+function versionSuffix(version: string | null | undefined): string {
+  return version ? `（${version}）` : '';
+}
+
 export function CursorAgentInstallModal({
   open,
   synapseApiBase,
@@ -31,6 +40,7 @@ export function CursorAgentInstallModal({
   onClose,
   onReady,
 }: Props) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<MergedCursorAgentCliStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -65,18 +75,18 @@ export function CursorAgentInstallModal({
       try {
         remote = await fetchCursorAgentCliStatus(synapseApiBase);
       } catch {
-        if (!localPartial) throw new Error('检测失败');
+        if (!localPartial) throw new Error(t('cursorAgentCli.modal.checkFailed'));
       }
       const next = mergeCursorAgentCliStatus(localPartial, remote);
       setStatus(next);
       return next;
     } catch (e) {
-      setError(e instanceof Error ? e.message : '检测失败');
+      setError(e instanceof Error ? e.message : t('cursorAgentCli.modal.checkFailed'));
       return null;
     } finally {
       setChecking(false);
     }
-  }, [synapseApiBase]);
+  }, [synapseApiBase, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,7 +96,6 @@ export function CursorAgentInstallModal({
   }, [open, recheck]);
 
   const installed = Boolean(status?.installed);
-  const loggedIn = Boolean(status?.logged_in);
   const ready = Boolean(status?.ready);
   const localInstalled = Boolean(status?.local_installed ?? status?.installed);
   const localLoggedIn = Boolean(status?.local_logged_in ?? status?.logged_in);
@@ -94,22 +103,31 @@ export function CursorAgentInstallModal({
   const canInstall = IS_TAURI && !localInstalled && !installing && !loggingIn;
   const canLogin = IS_TAURI && localInstalled && !localLoggedIn && !installing && !loggingIn;
 
+  const logPhase: CursorAgentInstallPhase = installing
+    ? 'install'
+    : loggingIn
+      ? 'login'
+      : installLog.trim()
+        ? 'idle'
+        : 'idle';
+
   const hintText = useMemo(() => {
     if (installHint?.trim()) return installHint.trim();
     if (status?.install_hint?.trim()) return status.install_hint.trim();
-    return '任务执行依赖 Cursor Agent CLI（agent 命令），与 Cursor 编辑器自带的 cursor 命令不同。';
-  }, [installHint, status?.install_hint]);
+    return t('cursorAgentCli.modal.defaultHint');
+  }, [installHint, status?.install_hint, t]);
 
   const startLogin = useCallback(async () => {
     if (!IS_TAURI) {
-      message.warning('请在 Synapse 桌面版中登录');
+      message.warning(t('cursorAgentCli.modal.loginDesktopOnly'));
       return false;
     }
     setLoggingIn(true);
     setError('');
     try {
+      appendLog(t('cursorAgentCli.modal.loginStartLog'));
       const msg = await loginCursorAgentCliTauri(appendLog);
-      message.success(msg || '登录成功');
+      message.success(msg || t('cursorAgentCli.modal.loginSuccess'));
       const next = await recheck();
       return Boolean(next?.ready);
     } catch (e) {
@@ -121,27 +139,43 @@ export function CursorAgentInstallModal({
     } finally {
       setLoggingIn(false);
     }
-  }, [appendLog, recheck]);
+  }, [appendLog, recheck, t]);
 
   const onInstall = async () => {
     if (!IS_TAURI) {
-      message.warning('请在 Synapse 桌面版中使用一键安装');
+      message.warning(t('cursorAgentCli.modal.installDesktopOnly'));
       return;
     }
     setInstalling(true);
     setInstallLog('');
     setError('');
+    appendLog(t('cursorAgentCli.modal.installStartLog'));
     try {
       const msg = await installCursorAgentCliTauri(appendLog);
-      message.success(msg || '安装完成');
+      if (msg?.trim()) appendLog(`${msg.trim()}\n`);
+      message.success(msg || t('cursorAgentCli.modal.installDone'));
       const next = await recheck();
-      if (next?.installed && !next.ready) {
+      const needsLocalLogin = Boolean(next?.local_installed ?? next?.installed)
+        && !Boolean(next?.local_logged_in ?? next?.logged_in);
+      if (needsLocalLogin) {
         await startLogin();
+      } else if (next?.backend_mismatch && next?.local_logged_in) {
+        appendLog(t('cursorAgentCli.modal.backendMismatchLoggedInLog'));
       }
     } catch (e) {
       const text = e instanceof Error ? e.message : String(e);
-      setError(text);
-      message.error(text);
+      const next = await recheck();
+      if (next?.installed) {
+        message.warning(t('cursorAgentCli.modal.installPartialWarning', { error: text }));
+        const needsLocalLogin = Boolean(next?.local_installed ?? next?.installed)
+          && !Boolean(next?.local_logged_in ?? next?.logged_in);
+        if (needsLocalLogin) {
+          await startLogin();
+        }
+      } else {
+        setError(text);
+        message.error(text);
+      }
     } finally {
       setInstalling(false);
     }
@@ -151,8 +185,8 @@ export function CursorAgentInstallModal({
     if (!ready) {
       message.warning(
         backendMismatch
-          ? 'Synapse 后端尚未识别 agent，请重启 Synapse 服务后点击「重新检测」'
-          : '请先完成安装与 Cursor 账号登录',
+          ? t('cursorAgentCli.modal.continueBackendMismatch')
+          : t('cursorAgentCli.modal.continueNeedLogin'),
       );
       return;
     }
@@ -163,17 +197,17 @@ export function CursorAgentInstallModal({
     <Modal
       open={open}
       title={
-        <span className="inline-flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-amber-400" />
-          Cursor Agent CLI 安装与登录
+        <span className="inline-flex items-center gap-2 text-foreground">
+          <Terminal className="h-4 w-4 shrink-0 opacity-80" />
+          {t('cursorAgentCli.modal.title')}
         </span>
       }
       onCancel={onClose}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
-          <Button onClick={onClose}>稍后</Button>
+          <Button onClick={onClose}>{t('cursorAgentCli.modal.later')}</Button>
           <Button icon={<RefreshCw className="h-4 w-4" />} loading={checking} onClick={() => void recheck()}>
-            重新检测
+            {t('cursorAgentCli.modal.recheck')}
           </Button>
           {canInstall ? (
             <Button
@@ -182,7 +216,7 @@ export function CursorAgentInstallModal({
               loading={installing}
               onClick={() => void onInstall()}
             >
-              一键安装
+              {t('cursorAgentCli.modal.install')}
             </Button>
           ) : null}
           {canLogin ? (
@@ -192,16 +226,12 @@ export function CursorAgentInstallModal({
               loading={loggingIn}
               onClick={() => void startLogin()}
             >
-              登录 Cursor 账号
+              {t('cursorAgentCli.modal.login')}
             </Button>
           ) : null}
           {ready ? (
-            <Button
-              type="primary"
-              className="bg-emerald-600 hover:bg-emerald-500"
-              onClick={() => void onContinue()}
-            >
-              已就绪，继续
+            <Button type="primary" onClick={() => void onContinue()}>
+              {t('cursorAgentCli.modal.continue')}
             </Button>
           ) : null}
         </div>
@@ -215,22 +245,22 @@ export function CursorAgentInstallModal({
           showIcon
           message={
             ready
-              ? `Cursor Agent CLI 已就绪${status?.version ? `（${status.version}）` : ''}`
+              ? t('cursorAgentCli.modal.statusReady', { version: versionSuffix(status?.version) })
               : installed
-                ? `已安装 agent${status?.version ? `（${status.version}）` : ''}，等待登录`
-                : '未检测到 Cursor Agent CLI（agent）'
+                ? t('cursorAgentCli.modal.statusInstalledWaitLogin', { version: versionSuffix(status?.version) })
+                : t('cursorAgentCli.modal.statusNotDetected')
           }
           description={
             ready
-              ? status?.auth_message || '可以继续执行任务。'
+              ? status?.auth_message || t('cursorAgentCli.modal.descReady')
               : installed
-                ? '安装完成后将自动打开浏览器完成 OAuth 登录；若未弹出，请点击「登录 Cursor 账号」。'
-                : '任务执行节点会在开始前自动检测；安装完成后会自动引导登录。'
+                ? t('cursorAgentCli.modal.descInstalled')
+                : t('cursorAgentCli.modal.descNotDetected')
           }
         />
 
         {!installed ? (
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap">
             {hintText}
           </div>
         ) : null}
@@ -239,8 +269,16 @@ export function CursorAgentInstallModal({
           <Alert
             type="warning"
             showIcon
-            message="桌面端已检测到 agent，Synapse 后端尚未识别"
-            description="任务执行由 Synapse 后端进程调用 agent。请重启 Synapse 服务（或新开终端后再启动 synapse serve），然后点击「重新检测」。"
+            message={
+              status?.backend_auth_gap
+                ? t('cursorAgentCli.modal.backendAuthGapTitle')
+                : t('cursorAgentCli.modal.backendMismatchTitle')
+            }
+            description={
+              status?.backend_auth_gap
+                ? t('cursorAgentCli.modal.backendAuthGapDesc')
+                : t('cursorAgentCli.modal.backendMismatchDesc')
+            }
           />
         ) : null}
 
@@ -248,18 +286,24 @@ export function CursorAgentInstallModal({
           <Alert
             type="info"
             showIcon
-            message="浏览器模式无法一键安装"
-            description="请在本机 PowerShell 执行：irm 'https://cursor.com/install?win32=true' | iex，然后 agent login"
+            message={t('cursorAgentCli.modal.webInstallTitle')}
+            description={t('cursorAgentCli.modal.webInstallDesc')}
           />
         ) : null}
 
         {error ? <Alert type="error" showIcon message={error} /> : null}
 
-        {installLog ? (
-          <pre className="max-h-40 overflow-auto rounded-lg border border-border/50 bg-black/30 p-3 text-[10px] leading-relaxed text-zinc-300 custom-scrollbar">
-            {installLog}
-          </pre>
-        ) : null}
+        <CursorAgentInstallLogPanel
+          phase={logPhase}
+          log={installLog}
+          emptyHint={
+            installing
+              ? t('cursorAgentCli.logPanel.waitingInstallOutput')
+              : loggingIn
+                ? t('cursorAgentCli.logPanel.waitingLoginOutput')
+                : undefined
+          }
+        />
       </div>
     </Modal>
   );

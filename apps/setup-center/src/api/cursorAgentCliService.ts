@@ -29,6 +29,8 @@ export interface MergedCursorAgentCliStatus extends CursorAgentCliStatus {
   local_ready?: boolean;
   /** 桌面端已就绪但 Synapse 后端尚未识别 agent */
   backend_mismatch?: boolean;
+  /** 桌面端已登录但后端 status/whoami 未识别；重启 serve 加载新检测逻辑后点「重新检测」，仍失败则查 CURSOR_AGENT_PATH / 后端进程环境 */
+  backend_auth_gap?: boolean;
 }
 
 /** 合并 Tauri 本地与 Synapse 后端检测结果；任务执行在后端进程，ready 以后端为准。 */
@@ -53,6 +55,12 @@ export function mergeCursorAgentCliStatus(
   const loggedIn = useRemote ? remoteLoggedIn : localLoggedIn;
   const ready = useRemote ? remoteReady : localReady;
   const backendMismatch = useRemote && localReady && !remoteReady;
+  const backendAuthGap =
+    useRemote &&
+    localLoggedIn &&
+    remoteInstalled &&
+    !remoteLoggedIn &&
+    !remoteReady;
 
   return {
     installed,
@@ -68,6 +76,7 @@ export function mergeCursorAgentCliStatus(
     local_logged_in: local ? localLoggedIn : undefined,
     local_ready: local ? localReady : undefined,
     backend_mismatch: backendMismatch,
+    backend_auth_gap: backendAuthGap,
   };
 }
 
@@ -118,6 +127,10 @@ export async function installCursorAgentCliTauri(onLog?: (text: string) => void)
 
 export async function loginCursorAgentCliTauri(onLog?: (text: string) => void): Promise<string> {
   return withInstallLog(onLog, () => invoke<string>('cursor_agent_cli_login'));
+}
+
+export async function logoutCursorAgentCliTauri(onLog?: (text: string) => void): Promise<string> {
+  return withInstallLog(onLog, () => invoke<string>('cursor_agent_cli_logout'));
 }
 
 export async function resolveCursorAgentCliReady(synapseApiBase: string): Promise<boolean> {

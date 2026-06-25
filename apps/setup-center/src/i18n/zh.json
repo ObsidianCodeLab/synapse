@@ -2846,5 +2846,51 @@
     "productUnspecified": "未指定产品",
     "soulInstructionLabel": "灵魂建议",
     "soulInstructionPlaceholder": "辅助工单处理：指明关键流程、模块与注意事项（写入本工单 work/<单号>/SOUL_INSTRUCTION.json）"
+  },
+  "cursorAgentCli": {
+    "logPanel": {
+      "titleInstall": "正在安装 Cursor Agent CLI",
+      "titleLogin": "正在登录 Cursor 账号",
+      "titleIdle": "安装/登录日志",
+      "waitingOutput": "等待输出…",
+      "waitingInstallOutput": "等待安装输出…",
+      "waitingLoginOutput": "等待登录输出…"
+    },
+    "onboarding": {
+      "installStartLog": "开始安装 Cursor Agent CLI（需联网，通常 3–6 分钟）…\n",
+      "loginGuidedLog": "安装完成，正在引导 Cursor 账号登录…\n"
+    },
+    "modal": {
+      "title": "Cursor Agent CLI 安装与登录",
+      "later": "稍后",
+      "recheck": "重新检测",
+      "install": "一键安装",
+      "login": "登录 Cursor 账号",
+      "continue": "已就绪，继续",
+      "checkFailed": "检测失败",
+      "defaultHint": "任务执行依赖 Cursor Agent CLI（agent 命令），与 Cursor 编辑器自带的 cursor 命令不同。",
+      "loginStartLog": "正在启动 Cursor 账号登录（将自动打开浏览器）…\n",
+      "loginSuccess": "登录成功",
+      "installStartLog": "开始安装 Cursor Agent CLI（需联网，通常 3–6 分钟）…\n",
+      "installDone": "安装完成",
+      "installPartialWarning": "安装过程有告警，但 agent 已检测到：{{error}}",
+      "installDesktopOnly": "请在 Synapse 桌面版中使用一键安装",
+      "loginDesktopOnly": "请在 Synapse 桌面版中登录",
+      "continueBackendMismatch": "Synapse 后端尚未识别 agent，请重启 synapse serve 后点击「重新检测」",
+      "continueNeedLogin": "请先完成安装与 Cursor 账号登录",
+      "statusReady": "Cursor Agent CLI 已就绪{{version}}",
+      "statusInstalledWaitLogin": "已安装 agent{{version}}，等待登录",
+      "statusNotDetected": "未检测到 Cursor Agent CLI（agent）",
+      "descReady": "可以继续执行任务。",
+      "descInstalled": "安装完成后将自动打开浏览器完成 OAuth 登录；若未弹出，请点击「登录 Cursor 账号」。",
+      "descNotDetected": "任务执行节点会在开始前自动检测；安装完成后会自动引导登录。",
+      "backendMismatchTitle": "桌面端已就绪，Synapse 后端尚未识别",
+      "backendMismatchDesc": "任务执行由 Synapse 后端进程调用 agent。请重启 synapse serve（或 synapse 桌面版），然后点击「重新检测」。",
+      "backendAuthGapTitle": "桌面端已登录，后端未识别登录状态",
+      "backendAuthGapDesc": "请先重启 synapse serve 一次以加载最新 agent 检测逻辑，再点「重新检测」。若仍失败，请设置 CURSOR_AGENT_PATH 指向 agent 可执行文件，或检查后端进程环境。",
+      "backendMismatchLoggedInLog": "桌面端已登录，但 Synapse 后端尚未识别；请重启 synapse serve 后点「重新检测」。\n",
+      "webInstallTitle": "浏览器模式无法一键安装",
+      "webInstallDesc": "请在本机 PowerShell 执行：irm 'https://cursor.com/install?win32=true' | iex，然后 agent login"
+    }
   }
 }

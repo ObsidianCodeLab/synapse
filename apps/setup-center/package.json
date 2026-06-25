@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "preview:web": "cross-env VITE_BUILD_TARGET=web vite preview --outDir dist-web",
     "smoke:routes": "node tests/smoke/hash-routes.mjs",
+    "test:cursor-agent-percent": "node tests/smoke/parse-cursor-agent-install-percent.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --max-warnings=9999",
     "lint:hooks": "eslint --rule \"react-hooks/rules-of-hooks: error\" --no-eslintrc --config eslint.config.js \"src/**/*.{ts,tsx}\"",
     "tauri": "tauri",

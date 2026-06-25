@@ -82,6 +82,12 @@ import "highlight.js/styles/github.css";
 import { getThemePref, setThemePref, THEME_CHANGE_EVENT, type Theme } from "./theme";
 import { copyToClipboard } from "./utils/clipboard";
 import {
+  checkCursorAgentCliTauri,
+  installCursorAgentCliTauri,
+  loginCursorAgentCliTauri,
+} from "./api/cursorAgentCliService";
+import { CursorAgentInstallLogPanel } from "./components/cursor-agent/CursorAgentInstallLogPanel";
+import {
   BUILTIN_PROVIDERS,
   PIP_INDEX_PRESETS,
   IWHALECLOUD_ONBOARDING_VALIDATION_MOCK,
@@ -641,6 +647,8 @@ export function App() {
   /** 一键配置终态：成功后禁用按钮；失败后禁用主按钮，需点「重新尝试」或修改 Token */
   const [obClaudeUserConfigResult, setObClaudeUserConfigResult] = useState<null | "success" | "error">(null);
   const [obClaudeUserConfigErr, setObClaudeUserConfigErr] = useState<string | null>(null);
+  const [obCursorAgentLog, setObCursorAgentLog] = useState("");
+  const [obCursorAgentLoggingIn, setObCursorAgentLoggingIn] = useState(false);
 
   /** 产品公共服务 IP（`~/.synapse/devservice.ip`，Synapse 用户根目录下） */
   const [obDevIp, setObDevIp] = useState("");
@@ -5414,9 +5422,26 @@ export function App() {
         async function runObCursorInstall() {
           setObClaudeInstalling("cursor");
           setObClaudeError(null);
+          setObCursorAgentLog(t("cursorAgentCli.onboarding.installStartLog"));
+          const appendLog = (line: string) => setObCursorAgentLog((prev) => prev + line);
           try {
-            await invoke<string>("cursor_agent_cli_install");
+            const msg = await installCursorAgentCliTauri(appendLog);
+            if (msg?.trim()) appendLog(`${msg.trim()}\n`);
             await obClaudeRecheck({ afterInstall: true });
+            if (IS_TAURI) {
+              try {
+                const local = await checkCursorAgentCliTauri();
+                if (local.installed && !local.loggedIn) {
+                  setObCursorAgentLoggingIn(true);
+                  appendLog(t("cursorAgentCli.onboarding.loginGuidedLog"));
+                  await loginCursorAgentCliTauri(appendLog);
+                }
+              } catch (e) {
+                setObClaudeError(String(e));
+              } finally {
+                setObCursorAgentLoggingIn(false);
+              }
+            }
           } catch (e) {
             setObClaudeError(String(e));
           } finally {
@@ -5549,6 +5574,19 @@ export function App() {
                     })}
                   </div>
                 )}
+                {obClaudeInstalling === "cursor" || obCursorAgentLoggingIn || obCursorAgentLog.trim() ? (
+                  <CursorAgentInstallLogPanel
+                    className="mt-3"
+                    phase={
+                      obClaudeInstalling === "cursor"
+                        ? "install"
+                        : obCursorAgentLoggingIn
+                          ? "login"
+                          : "idle"
+                    }
+                    log={obCursorAgentLog}
+                  />
+                ) : null}
               </section>
 
               {IS_TAURI && (

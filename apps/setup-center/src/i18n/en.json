@@ -41,7 +41,8 @@
     "workbenchSandbox": "Code sandbox",
     "workbenchLeaderReview": "Review Center",
     "workbenchTeam": "Team view",
-    "workbenchDevTools": "R&D tools"
+    "workbenchDevTools": "R&D tools",
+    "myFeedback": "Feedback"
   },
   "workbench": {
     "placeholderHint": "This page is a placeholder; it will be replaced when the real feature is wired in.",
@@ -2812,5 +2813,51 @@
     "productUnspecified": "Product not specified",
     "soulInstructionLabel": "Soul instruction",
     "soulInstructionPlaceholder": "Guide ticket handling: key flows, modules, and notes (saved to work/<ticket>/SOUL_INSTRUCTION.json)"
+  },
+  "cursorAgentCli": {
+    "logPanel": {
+      "titleInstall": "Installing Cursor Agent CLI",
+      "titleLogin": "Signing in to Cursor",
+      "titleIdle": "Install / login log",
+      "waitingOutput": "Waiting for output…",
+      "waitingInstallOutput": "Waiting for install output…",
+      "waitingLoginOutput": "Waiting for login output…"
+    },
+    "onboarding": {
+      "installStartLog": "Starting Cursor Agent CLI install (network required, usually 3–6 minutes)…\n",
+      "loginGuidedLog": "Install finished. Starting Cursor account sign-in…\n"
+    },
+    "modal": {
+      "title": "Cursor Agent CLI install & sign-in",
+      "later": "Later",
+      "recheck": "Check again",
+      "install": "Install",
+      "login": "Sign in to Cursor",
+      "continue": "Ready — continue",
+      "checkFailed": "Check failed",
+      "defaultHint": "Task execution requires the Cursor Agent CLI (`agent` command), not the Cursor editor's `cursor` command.",
+      "loginStartLog": "Starting Cursor sign-in (browser will open automatically)…\n",
+      "loginSuccess": "Signed in",
+      "installStartLog": "Starting Cursor Agent CLI install (network required, usually 3–6 minutes)…\n",
+      "installDone": "Install complete",
+      "installPartialWarning": "Install reported a warning, but agent was detected: {{error}}",
+      "installDesktopOnly": "Use one-click install in the Synapse desktop app",
+      "loginDesktopOnly": "Sign in from the Synapse desktop app",
+      "continueBackendMismatch": "Synapse backend has not detected agent yet. Restart synapse serve, then click Check again.",
+      "continueNeedLogin": "Complete install and Cursor account sign-in first",
+      "statusReady": "Cursor Agent CLI is ready{{version}}",
+      "statusInstalledWaitLogin": "agent installed{{version}}, waiting for sign-in",
+      "statusNotDetected": "Cursor Agent CLI (agent) not detected",
+      "descReady": "You can continue with task execution.",
+      "descInstalled": "After install, the browser opens for OAuth sign-in. If it does not, click Sign in to Cursor.",
+      "descNotDetected": "Task execution checks before starting; after install you will be guided to sign in.",
+      "backendMismatchTitle": "Desktop ready, Synapse backend not synced",
+      "backendMismatchDesc": "Tasks run agent from the Synapse backend process. Restart synapse serve (or the Synapse desktop app), then click Check again.",
+      "backendAuthGapTitle": "Desktop signed in, backend auth not recognized",
+      "backendAuthGapDesc": "Restart synapse serve once to load the latest agent detection logic, then click Check again. If it still fails, set CURSOR_AGENT_PATH to the agent executable or verify the backend process environment.",
+      "backendMismatchLoggedInLog": "Desktop is signed in but the Synapse backend has not synced. Restart synapse serve, then click Check again.\n",
+      "webInstallTitle": "One-click install unavailable in browser mode",
+      "webInstallDesc": "On this machine, run in PowerShell: irm 'https://cursor.com/install?win32=true' | iex, then agent login"
+    }
   }
 }
