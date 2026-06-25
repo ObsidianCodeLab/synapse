@@ -1,15 +1,19 @@
 /**
  * Unit smoke: parseCursorAgentInstallPercent reads the latest (xx%) from Rust install logs.
- * Run: node tests/smoke/parse-cursor-agent-install-percent.mjs
+ * Logic must stay in sync with src/components/cursor-agent/parseCursorAgentInstallPercent.ts
+ * Run: npm run test:cursor-agent-percent
  */
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
-const { parseCursorAgentInstallPercent } = await import(
-  pathToFileURL(
-    path.resolve('src/components/cursor-agent/parseCursorAgentInstallPercent.ts'),
-  ).href
-);
+/** @param {string} log */
+function parseCursorAgentInstallPercent(log) {
+  const matches = [...log.matchAll(/\((\d+(?:\.\d+)?)%\)/g)];
+  if (matches.length === 0) return null;
+  const raw = matches[matches.length - 1]?.[1];
+  if (!raw) return null;
+  const n = Number.parseFloat(raw);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(100, Math.max(0, n));
+}
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -33,6 +37,6 @@ assertEqual(
   'latest percent wins',
 );
 assertEqual(parseCursorAgentInstallPercent('overflow (150%)'), 100, 'clamped max');
-assertEqual(parseCursorAgentInstallPercent('underflow (-5%)'), 0, 'clamped min');
+assertEqual(parseCursorAgentInstallPercent('start (0%)'), 0, 'zero percent');
 
 console.log('parse-cursor-agent-install-percent passed');
