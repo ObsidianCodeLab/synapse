@@ -514,7 +514,9 @@ def create_app(
             from synapse.config import settings
             home = settings.synapse_home
         except Exception:
-            home = Path.home() / ".synapse"
+            from synapse.synapse_home import resolve_synapse_home
+
+            home = resolve_synapse_home()
         pending = home / "pending_feedback.json"
         if not pending.exists():
             return

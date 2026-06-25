@@ -154,15 +154,36 @@ def test_ensure_rd_local_gitignore_appends_patterns(tmp_path: Path) -> None:
     assert row["modified"] is True
     assert "AGENTS.md" in row["added"]
     assert "synapse_archive/" in row["added"]
+    assert ".idea/" in row["added"]
+    assert "__pycache__/" in row["added"]
 
     content = (repo / ".gitignore").read_text(encoding="utf-8")
     assert "AGENTS.md" in content
     assert "synapse_archive/" in content
+    assert ".idea/" in content
+    assert "__pycache__/" in content
 
     again = ensure_rd_local_gitignore(repo)
     assert again["status"] == "ok"
     assert again["modified"] is False
     assert again["added"] == []
+
+
+def test_ensure_rd_local_gitignore_skips_existing_patterns(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "test")
+    (repo / ".gitignore").write_text(".idea/\n__pycache__/\n", encoding="utf-8")
+
+    row = ensure_rd_local_gitignore(repo)
+    assert row["status"] == "ok"
+    assert row["modified"] is True
+    assert ".idea/" not in row["added"]
+    assert "__pycache__/" not in row["added"]
+    assert "AGENTS.md" in row["added"]
+    assert "synapse_archive/" in row["added"]
 
 
 def test_bootstrap_engineering_layout_updates_gitignore(work_root, tmp_path) -> None:

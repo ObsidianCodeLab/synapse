@@ -673,7 +673,7 @@ jobs:
 
       - name: Notarize macOS artifacts (manual notarytool)
         if: runner.os == 'macOS'
-        timeout-minutes: 90
+        timeout-minutes: 180
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}

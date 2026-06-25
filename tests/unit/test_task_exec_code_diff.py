@@ -310,11 +310,11 @@ def test_decode_git_quoted_path_unicode() -> None:
         "\\345\\215\\225\\345\\205\\203\\346\\265\\213\\350\\257\\225"
         "\\347\\224\\250\\344\\276\\213\\345\\210\\227\\350\\241\\250.md"
     )
-    quoted = f'"src/tests/{octal_name}"'
+    quoted = f'"archive/\\345\\274\\200\\345\\217\\221\\344\\270\\255/task_exec/{octal_name}"'
     decoded = decode_git_quoted_path(quoted)
-    assert decoded == "src/tests/单元测试用例列表.md"
-    assert normalize_repo_rel_path(quoted) == "src/tests/单元测试用例列表.md"
+    assert decoded == "archive/开发中/task_exec/单元测试用例列表.md"
+    assert normalize_repo_rel_path(quoted) == "archive/开发中/task_exec/单元测试用例列表.md"
 
     status_out = f'?? {quoted}\n'
     rows = _parse_status_paths(status_out)
-    assert rows == [("added", "src/tests/单元测试用例列表.md")]
+    assert rows == [("added", "archive/开发中/task_exec/单元测试用例列表.md")]

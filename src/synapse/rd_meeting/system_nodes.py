@@ -369,6 +369,7 @@ def handle_code_commit(
     from synapse.rd_meeting.system_node_display import attach_system_node_display
 
     out = {
+        "node_id": node_id,
         "status": assets.get("status") or "ok",
         "error": assets.get("error") or "",
         "tasks": assets.get("tasks") or [],

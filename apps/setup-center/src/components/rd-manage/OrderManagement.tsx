@@ -266,13 +266,19 @@ function collectOrderIdsForHitlFlags(list: DemandListItem[]): string[] {
   return Array.from(ids);
 }
 
+/** 本地已归档（含历史值 archived） */
+function isArchivedLocalState(local: string): boolean {
+  const s = (local || "").trim();
+  return s === "已归档" || s === "archived";
+}
+
 /**
  * 基础态（不含「人工介入」）：人工介入仍仅由「处理中 + sop_trajectories」叠加。
  * 「全人工」表示走外部人工、不进本系统智能流水线，由 local_process_state 单独标识。
  */
 function deriveBaseTicketStatus(d: DemandListItem): Ticket["status"] {
   const local = effectiveLocalProcessState(d);
-  if (local === "archived") return "completed";
+  if (isArchivedLocalState(local)) return "completed";
   const isCompleted =
     local === "已完成" ||
     (d.demand_status || "").trim() === "已完成" ||
@@ -1039,7 +1045,7 @@ export const OrderManagement: React.FC<{
       if (ticketFilter === 'full_manual') return t.status === 'full_manual';
       if (ticketFilter === 'prepare') return t.status === 'prepare';
       if (ticketFilter === 'rd_completed') return (t.localProcessState || '').trim() === '已完成';
-      if (ticketFilter === 'archived') return (t.localProcessState || '').trim() === 'archived';
+      if (ticketFilter === 'archived') return isArchivedLocalState((t.localProcessState || '').trim());
       return true;
     });
   }, [tickets, ticketFilter, searchQuery]);
@@ -1053,7 +1059,7 @@ export const OrderManagement: React.FC<{
     [tickets],
   );
   const archivedCount = useMemo(
-    () => tickets.filter((t) => (t.localProcessState || '').trim() === 'archived').length,
+    () => tickets.filter((t) => isArchivedLocalState((t.localProcessState || '').trim())).length,
     [tickets],
   );
 
@@ -1647,9 +1653,8 @@ export const OrderManagement: React.FC<{
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><TestTube className="w-4 h-4" /> 测试案例</h4>
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300 space-y-2">
-              <p>功能案例：覆盖本次研发涉及的核心场景与边界条件。</p>
-              <p>单元测试文件：<code className="text-cyan-400">tests/unit/test_feature_x.py</code></p>
-              <p>当前结果：通过 12 / 12</p>
+              <p>小鲸完善任务执行阶段单元测试代码，产出 <code className="text-cyan-400">unit_test_review.json</code> 与 <code className="text-cyan-400">测试案例说明.md</code>。</p>
+              <p>请在研发会议室「测试案例评审」面板执行 pytest、查看用例场景与要求，并完成逐条人工确认。</p>
             </div>
           </div>
         );

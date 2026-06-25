@@ -999,6 +999,123 @@ export async function submitFuncSolutionReviewDecision(
   );
 }
 
+export type UnitTestCaseReviewStatus = 'pending' | 'approved' | 'needs_change';
+export type UnitTestResultStatus = 'pending' | 'passed' | 'failed' | 'skipped' | 'error';
+
+export interface UnitTestCaseRow {
+  id: string;
+  name?: string;
+  scenario?: string;
+  requirements?: string;
+  acceptance_ref?: string;
+  test_file?: string;
+  test_function?: string;
+  last_result?: {
+    status?: UnitTestResultStatus;
+    message?: string;
+    duration_ms?: number;
+    ran_at?: string | null;
+  };
+  human_review?: {
+    status?: UnitTestCaseReviewStatus;
+    comment?: string;
+  };
+}
+
+export interface UnitTestReviewPayload {
+  schema_version?: number;
+  demand_no?: string;
+  requirement_name?: string;
+  reviewed_at?: string | null;
+  whale_summary?: { markdown?: string };
+  test_suite?: {
+    code_root?: string;
+    test_files?: string[];
+    test_list_path?: string;
+    run_command?: string;
+  };
+  test_cases?: UnitTestCaseRow[];
+  last_run?: {
+    ran_at?: string | null;
+    exit_code?: number | null;
+    passed?: number;
+    failed?: number;
+    skipped?: number;
+    total?: number;
+    command?: string;
+    raw_output_tail?: string;
+  };
+  human_review?: {
+    decision?: string | null;
+    comment?: string;
+    decided_at?: string | null;
+  };
+}
+
+export interface UnitTestReviewGetResponse {
+  room_id: string;
+  scope_id: string;
+  payload: UnitTestReviewPayload;
+  intervention_kind?: string;
+  blocked?: boolean;
+  pending_node_id?: string;
+}
+
+export const MIN_UNIT_TEST_REVIEW_COMMENT_LEN = 20;
+
+export async function fetchUnitTestReview(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<UnitTestReviewGetResponse> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiGet<UnitTestReviewGetResponse>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/unit-test-review`,
+  );
+}
+
+export async function runUnitTestReviewTests(
+  synapseApiBase: string,
+  roomId: string,
+): Promise<{ scope_id: string; payload: UnitTestReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPost<{ scope_id: string; payload: UnitTestReviewPayload }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/unit-test-review/run`,
+    {},
+  );
+}
+
+export async function saveUnitTestCaseReviews(
+  synapseApiBase: string,
+  roomId: string,
+  cases: Array<{ id: string; status?: UnitTestCaseReviewStatus; comment?: string }>,
+): Promise<{ scope_id: string; payload: UnitTestReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPut<{ scope_id: string; payload: UnitTestReviewPayload }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/unit-test-review/cases`,
+    { cases },
+  );
+}
+
+export async function submitUnitTestReviewDecision(
+  synapseApiBase: string,
+  roomId: string,
+  body: {
+    decision: 'approve' | 'revise';
+    comment: string;
+    cases?: Array<{ id: string; status?: UnitTestCaseReviewStatus; comment?: string }>;
+  },
+): Promise<{ status: string; node_id?: string; unit_test_review_payload?: UnitTestReviewPayload }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPost(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/unit-test-review/decision`,
+    body,
+  );
+}
+
 export async function fetchMeetingRoomLive(
   synapseApiBase: string,
   roomId: string,

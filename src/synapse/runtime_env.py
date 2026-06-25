@@ -169,16 +169,10 @@ def get_configured_venv_path() -> str | None:
 
 
 def _get_synapse_root() -> Path:
-    """获取 Synapse 根目录路径 (避免循环导入 config)。
+    """获取 Synapse 根目录路径 (避免循环导入 config)。"""
+    from synapse.synapse_home import resolve_synapse_home
 
-    优先使用 SYNAPSE_ROOT 环境变量，默认 ~/.synapse。
-    """
-    import os
-
-    env_root = os.environ.get("SYNAPSE_ROOT", "").strip()
-    if env_root:
-        return Path(env_root)
-    return Path.home() / ".synapse"
+    return resolve_synapse_home()
 
 
 def _get_bundled_internal_python() -> str | None:

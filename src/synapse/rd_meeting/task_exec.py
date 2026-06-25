@@ -30,7 +30,7 @@ from synapse.rd_meeting.cursor_agent_cli import (
     format_argv_as_shell,
     resolve_agent_executable,
 )
-from synapse.rd_meeting.paths import archive_node_dir, scope_dir
+from synapse.rd_meeting.paths import archive_node_dir, scope_dir, task_exec_test_list_path
 from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
 from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
 from synapse.rd_meeting.system_node_display import (
@@ -308,6 +308,15 @@ def build_task_develop_prompt(
     from synapse.rd_meeting.soul_instruction import format_soul_instruction_cli_lines
 
     lines.extend(format_soul_instruction_cli_lines(scope_id))
+    if (scope_id or "").strip():
+        list_path = task_exec_test_list_path(scope_id)
+        lines.extend(
+            [
+                "",
+                "单元测试：按 AGENTS.md 为改造内容编写/更新 Python 单元测试（工程 `tests/` 目录）；",
+                f"并维护单元测试用例列表（工单 archive，非 tests/）：{list_path}",
+            ]
+        )
     lines.extend(
         [
             "",
@@ -368,6 +377,11 @@ def build_task_verify_prompt(
     lines.extend(format_soul_instruction_cli_lines(scope_id))
     if develop_log_hint:
         lines.append(f"开发轮日志：{develop_log_hint}")
+    if (scope_id or "").strip():
+        list_path = task_exec_test_list_path(scope_id)
+        lines.append(
+            f"单元测试用例列表（工单 archive）：{list_path} — 确认已随本次改造同步更新。"
+        )
     lines.extend(
         [
             "",

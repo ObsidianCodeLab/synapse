@@ -125,8 +125,10 @@ def resolve_work_dir_scope(order_dir: Path) -> tuple[str, dict[str, Any]] | None
 
 
 def should_list_in_meeting_rooms(data: dict[str, Any]) -> bool:
+    from synapse.rd_meeting.owner_order_archive import is_archived_local_state
+
     local = str(data.get("local_process_state") or "").strip()
-    if local == "archived":
+    if is_archived_local_state(local):
         return False
     if local in ACTIVE_LOCAL_STATES:
         return True

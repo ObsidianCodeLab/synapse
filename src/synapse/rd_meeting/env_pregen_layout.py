@@ -63,6 +63,8 @@ _GITIGNORE_RD_LOCAL_PATTERNS: tuple[str, ...] = (
     "AGENTS.md",
     "agents.md",
     "synapse_archive/",
+    ".idea/",
+    "__pycache__/",
 )
 
 
@@ -176,7 +178,7 @@ def _gitignore_contains_pattern(lines: list[str], pattern: str) -> bool:
 
 
 def ensure_rd_local_gitignore(repo_root: Path) -> dict[str, Any]:
-    """确保仓库 ``.gitignore`` 忽略 ``synapse_archive/`` 与 ``AGENTS.md``。"""
+    """确保仓库 ``.gitignore`` 忽略研发本地文件（先检测已有规则，仅追加缺失项）。"""
     entry: dict[str, Any] = {
         "repo_root": str(repo_root),
         "path": "",

@@ -42,6 +42,14 @@ export const RD_UNIFIED_PATHS = {
   rdViewReportReviewersResolve: "/dev/iwhalecloud/synapse/rd_view_report_reviewers_resolve",
   entropyAnalysis: "/dev/iwhalecloud/synapse/entropy-analysis",
   entropyDetail: "/dev/iwhalecloud/synapse/entropy-detail",
+  /** 提交反馈（bug / feature） */
+  submitFeedback: "/dev/iwhalecloud/synapse/feedback/submit",
+  /** 查询反馈列表（按提交人） */
+  queryFeedback: "/dev/iwhalecloud/synapse/feedback/query",
+  /** 删除反馈 */
+  deleteFeedback: "/dev/iwhalecloud/synapse/feedback/delete",
+  /** 查询团队反馈（按 position 控制范围） */
+  teamQueryFeedback: "/dev/iwhalecloud/synapse/feedback/team_query",
 } as const;
 
 export type RdRepoInfo = {

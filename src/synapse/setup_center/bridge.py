@@ -1084,10 +1084,12 @@ def _resolve_skills_dir(workspace_dir: str) -> Path:
         return Path(workspace_dir).expanduser().resolve() / "skills"
     import os
 
+    from synapse.synapse_home import resolve_synapse_home
+
     root = os.environ.get("SYNAPSE_ROOT", "").strip()
     if root:
         return Path(root) / "workspaces" / "default" / "skills"
-    return Path.home() / ".synapse" / "workspaces" / "default" / "skills"
+    return resolve_synapse_home() / "workspaces" / "default" / "skills"
 
 
 def _has_git() -> bool:

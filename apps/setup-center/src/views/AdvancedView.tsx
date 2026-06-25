@@ -57,7 +57,7 @@ export interface AdvancedViewProps {
   onOpenRuntimeEnvironment: () => void;
   askConfirm: (msg: string, onConfirm: () => void) => void;
   refreshAll: () => Promise<void>;
-  restartService: () => Promise<void>;
+  restartService: (options?: { startIfStopped?: boolean }) => Promise<void>;
   setView: (view: ViewId) => void;
 }
 
@@ -303,6 +303,38 @@ export function AdvancedView(props: AdvancedViewProps) {
 
   // ── Migration ──
 
+  async function stopServiceForMigration(): Promise<boolean> {
+    if (!IS_TAURI || dataMode !== "local") return false;
+    const base = httpApiBase();
+    let alive = false;
+    try {
+      const ping = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(2000) });
+      alive = ping.ok;
+    } catch {
+      alive = false;
+    }
+    if (!alive) return false;
+
+    try {
+      await fetch(`${base}/api/shutdown`, { method: "POST", signal: AbortSignal.timeout(2000) });
+      await new Promise((r) => setTimeout(r, 1000));
+    } catch {
+      /* 服务关闭时请求失败属正常 */
+    }
+
+    const wsId = currentWorkspaceId || workspaces[0]?.id;
+    if (wsId) {
+      try {
+        await invoke("synapse_service_stop", { workspaceId: wsId });
+      } catch {
+        /* PID 文件可能不存在 */
+      }
+    }
+    await invoke<number[]>("synapse_stop_all_processes");
+    await new Promise((r) => setTimeout(r, 500));
+    return true;
+  }
+
   async function runMigratePreflight() {
     if (!migrateTargetPath.trim()) { notifyError(t("adv.migrateTargetPlaceholder")); return; }
     setMigrateBusy(true);
@@ -333,6 +365,7 @@ export function AdvancedView(props: AdvancedViewProps) {
     setMigrateBusy(true);
     const _busyId = notifyLoading(t("adv.migrateBusy"));
     try {
+      await stopServiceForMigration();
       const res = await invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>(
         "set_custom_root_dir", { path: migrateTargetPath.trim(), migrate: true }
       );
@@ -343,18 +376,32 @@ export function AdvancedView(props: AdvancedViewProps) {
       setMigrateBusy(false);
       notifySuccess(t("adv.migrateSuccess"));
       await refreshAll();
-      await restartService();
+      await restartService({ startIfStopped: true });
     } catch (e: any) {
       notifyError(t("adv.migrateFailed", { error: String(e) }));
       setMigrateBusy(false);
       dismissLoading(_busyId);
+      try {
+        await restartService({ startIfStopped: true });
+      } catch {
+        /* 迁移失败后尽力恢复服务 */
+      }
     }
   }
 
   function runMigrate() {
     if (!migratePreflight?.canMigrate) return;
+    const serviceRunning = !!serviceStatus?.running;
     askConfirm(
-      t("adv.migrateConfirm", { from: migratePreflight.sourcePath, to: migratePreflight.targetPath }),
+      serviceRunning
+        ? t("adv.migrateConfirmWithService", {
+            from: migratePreflight.sourcePath,
+            to: migratePreflight.targetPath,
+          })
+        : t("adv.migrateConfirm", {
+            from: migratePreflight.sourcePath,
+            to: migratePreflight.targetPath,
+          }),
       () => executeMigrate()
     );
   }
@@ -363,6 +410,7 @@ export function AdvancedView(props: AdvancedViewProps) {
     setMigrateBusy(true);
     const _busyId = notifyLoading(t("adv.migrateBusy"));
     try {
+      await stopServiceForMigration();
       const res = await invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>(
         "set_custom_root_dir", { path: null, migrate: true }
       );
@@ -374,16 +422,25 @@ export function AdvancedView(props: AdvancedViewProps) {
       setMigrateBusy(false);
       notifySuccess(t("adv.migrateResetDone", { path: res.currentRoot }));
       await refreshAll();
-      await restartService();
+      await restartService({ startIfStopped: true });
     } catch (e: any) {
       notifyError(String(e));
       setMigrateBusy(false);
       dismissLoading(_busyId);
+      try {
+        await restartService({ startIfStopped: true });
+      } catch {
+        /* 迁移失败后尽力恢复服务 */
+      }
     }
   }
 
   function runMigrateResetDefault() {
-    askConfirm(t("adv.migrateResetConfirm"), () => executeMigrateReset());
+    const serviceRunning = !!serviceStatus?.running;
+    askConfirm(
+      serviceRunning ? t("adv.migrateResetConfirmWithService") : t("adv.migrateResetConfirm"),
+      () => executeMigrateReset()
+    );
   }
 
   // ── Render ──

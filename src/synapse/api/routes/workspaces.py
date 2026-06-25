@@ -34,10 +34,9 @@ router = APIRouter()
 
 
 def _synapse_home() -> Path:
-    env_root = os.environ.get("SYNAPSE_ROOT", "").strip()
-    if env_root:
-        return Path(env_root)
-    return Path.home() / ".synapse"
+    from synapse.synapse_home import resolve_synapse_home
+
+    return resolve_synapse_home()
 
 
 def _state_file_path() -> Path:

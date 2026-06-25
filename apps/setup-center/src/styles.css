@@ -1032,7 +1032,7 @@ textarea:not([data-slot]):focus {
 
 /* (legacy btnSmall override removed; see status section) */
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn) {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn):not(.rd-meeting-chat-stream-rail):not(.rd-meeting-chat-stream-edge-handle):not(.rd-meeting-sop-pipeline-rail):not(.rd-meeting-sop-pipeline-edge-handle) {
   border: 0;
   cursor: pointer;
   border-radius: 14px;

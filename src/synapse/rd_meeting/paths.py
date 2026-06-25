@@ -217,3 +217,28 @@ def iter_work_order_directories() -> list[Path]:
         if is_work_order_directory(entry, work=root):
             dirs.append(entry)
     return dirs
+
+
+TEST_LIST_MD_NAME = "单元测试用例列表.md"
+TASK_EXEC_NODE_ID = "task_exec"
+TASK_EXEC_STAGE_ID = 4
+
+
+def task_exec_archive_dir(scope_id: str) -> Path:
+    """任务执行节点归档目录：``work/<scope>/archive/开发中/task_exec/``。"""
+    from synapse.rd_sop.nodes import stage_name_for_id
+
+    return archive_node_dir(scope_id, stage_name_for_id(TASK_EXEC_STAGE_ID), TASK_EXEC_NODE_ID)
+
+
+def task_exec_test_list_path(scope_id: str) -> Path:
+    """单元测试用例列表绝对路径（工单 archive，非工程 tests/）。"""
+    return task_exec_archive_dir(scope_id) / TEST_LIST_MD_NAME
+
+
+def task_exec_test_list_work_rel() -> str:
+    """相对 WORK_ORDER_DIR 的用例列表路径（写入 unit_test_review.json.test_list_path）。"""
+    from synapse.rd_sop.nodes import stage_name_for_id
+
+    stg = archive_stage_segment(stage_name_for_id(TASK_EXEC_STAGE_ID))
+    return f"archive/{stg}/{TASK_EXEC_NODE_ID}/{TEST_LIST_MD_NAME}"

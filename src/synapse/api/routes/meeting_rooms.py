@@ -1385,6 +1385,143 @@ async def submit_func_solution_review_decision(
     return success_response(result)
 
 
+class UnitTestCaseReviewRow(BaseModel):
+    id: str = Field(..., description="用例 id")
+    status: Literal["pending", "approved", "needs_change"] | None = Field(None)
+    comment: str | None = Field(None)
+
+
+class UnitTestCasesBody(BaseModel):
+    cases: list[UnitTestCaseReviewRow] = Field(default_factory=list)
+
+
+class UnitTestDecisionBody(BaseModel):
+    decision: Literal["approve", "revise"] = Field(..., description="全部用例通过后推进 / 需修订")
+    comment: str = Field("", description="总体评审意见")
+    cases: list[UnitTestCaseReviewRow] = Field(default_factory=list)
+
+
+@router.get("/api/dev/meeting-rooms/{room_id}/unit-test-review")
+async def get_unit_test_review(room_id: str) -> dict:
+    """读取测试案例评审结构化 payload。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.unit_test_gate import load_unit_test_review_payload
+
+    payload = load_unit_test_review_payload(sid)
+    if payload is None:
+        return error_response(404, "unit_test_review_not_found")
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "payload": payload,
+            "intervention_kind": room_state.get("intervention_kind"),
+            "blocked": bool(room_state.get("unit_test_blocked")),
+            "pending_node_id": pending.get("node_id"),
+        }
+    )
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/unit-test-review/run")
+async def run_unit_test_review_tests(room_id: str) -> dict:
+    """动态执行单元测试并回写 last_run / test_cases.last_result。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.unit_test_gate import load_unit_test_review_payload, run_unit_tests
+
+    if load_unit_test_review_payload(sid) is None:
+        return error_response(404, "unit_test_review_not_found")
+    try:
+        payload = run_unit_tests(sid)
+    except ValueError as exc:
+        code = str(exc)
+        if code in (
+            "unit_test_review_not_found",
+            "test_cwd_not_found",
+            "no_test_targets",
+            "pytest_timeout",
+        ) or code.startswith("pytest_start_failed"):
+            return error_response(422, code)
+        return error_response(400, code)
+    return success_response({"scope_id": sid, "payload": payload})
+
+
+@router.put("/api/dev/meeting-rooms/{room_id}/unit-test-review/cases")
+async def save_unit_test_case_reviews(
+    room_id: str,
+    body: UnitTestCasesBody,
+) -> dict:
+    """保存逐条测试案例评审状态（不触发节点裁决）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.unit_test_gate import load_unit_test_review_payload, save_case_reviews
+
+    if load_unit_test_review_payload(sid) is None:
+        return error_response(404, "unit_test_review_not_found")
+    updates = [c.model_dump(exclude_none=True) for c in body.cases]
+    try:
+        payload = save_case_reviews(sid, updates)
+    except ValueError as exc:
+        return error_response(422, str(exc))
+    return success_response({"scope_id": sid, "payload": payload})
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/unit-test-review/decision")
+async def submit_unit_test_review_decision(
+    room_id: str,
+    body: UnitTestDecisionBody,
+    request: Request,
+) -> dict:
+    """测试案例评审裁决：全部用例确认且测试通过后推进；需修订则阻断。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, scope_type = resolved
+    pool = getattr(request.app.state, "agent_pool", None)
+    detail = _service.get_room_detail(room_id) or {}
+    ticket_title = str(detail.get("ticket_title") or "")
+    orch = MeetingRoomOrchestrator()
+    case_updates = [c.model_dump(exclude_none=True) for c in body.cases]
+    try:
+        result = orch.confirm_unit_test_review_decision(
+            scope_type=scope_type,
+            scope_id=sid,
+            room_id=room_id,
+            decision=body.decision,
+            comment=body.comment,
+            case_updates=case_updates or None,
+            ticket_title=ticket_title,
+            agent_pool=pool,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code in (
+            "not_all_cases_approved",
+            "comment_too_short",
+            "tests_still_failing",
+            "no_cases_need_change",
+            "case_comment_required",
+            "no_pending_delivery",
+            "not_unit_test_node",
+            "invalid_decision",
+        ):
+            return error_response(422, code)
+        return error_response(400, code)
+    except Exception as exc:
+        logger.exception("submit_unit_test_review_decision failed: %s", exc)
+        return error_response(500, "unit_test_review_decision_failed", str(exc))
+    return success_response(result)
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/patch-versions")
 async def list_patch_versions_for_room(
     room_id: str,

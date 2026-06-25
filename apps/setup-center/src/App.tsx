@@ -54,7 +54,7 @@ const LeaderReviewView = lazy(() =>
 import { FeedbackModal, type FeedbackPrefill } from "./views/FeedbackModal";
 import { IMConfigView } from "./views/IMConfigView";
 import { AgentSystemView } from "./views/AgentSystemView";
-import { MyFeedbackView } from "./views/MyFeedbackView";
+import { MyFeedbackView } from "./views/MyFeedbackViews";
 import { LLMView } from "./views/LLMView";
 import { StatusView } from "./views/StatusView";
 import { RuntimeEnvironmentDialog, type RuntimeDiagnostics } from "./components/RuntimeEnvironmentPanel";
@@ -504,20 +504,6 @@ export function App() {
   const currentStepIdxRaw = useMemo(() => steps.findIndex((s) => s.id === stepId), [steps, stepId]);
   const currentStepIdx = currentStepIdxRaw < 0 ? 0 : currentStepIdxRaw;
 
-  useEffect(() => {
-    if (stepId === "workspace") {
-      invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>("get_root_dir_info")
-        .then((info) => {
-          setObCurrentRoot(info.currentRoot);
-          if (info.customRoot) {
-            setObCustomRootInput(info.customRoot);
-            setObCustomRootApplied(true);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [stepId]);
-
   // ── Onboarding Wizard (首次安装引导) ──
   type OnboardingStep =
     | "ob-welcome"
@@ -551,14 +537,6 @@ export function App() {
   const [obCliAddToPath, setObCliAddToPath] = useState(true);
   const [obAutostart, setObAutostart] = useState(true); // 开机自启，默认勾选
   const [obAgreementInput, setObAgreementInput] = useState("");
-
-  // Custom root directory
-  const [obShowCustomRoot, setObShowCustomRoot] = useState(false);
-  const [obCustomRootInput, setObCustomRootInput] = useState("");
-  const [obCustomRootApplied, setObCustomRootApplied] = useState(false);
-  const [obCustomRootMigrate, setObCustomRootMigrate] = useState(false);
-  const [obCurrentRoot, setObCurrentRoot] = useState("");
-  const [obCustomRootBusy, setObCustomRootBusy] = useState(false);
 
   // Quick workspace switcher
   const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
@@ -2279,8 +2257,11 @@ export function App() {
   /**
    * 纯重启：安装 IM 依赖 → 检测存活 → 触发重启 → 轮询恢复。
    * 不含 env 保存逻辑，可独立调用（如 Bot 配置保存后重启）。
+   *
+   * startIfStopped: 服务已停止时仍尝试启动（用于数据目录迁移等先停服再改配置的场景）。
    */
-  async function restartService(): Promise<void> {
+  async function restartService(options?: { startIfStopped?: boolean }): Promise<void> {
+    const startIfStopped = options?.startIfStopped === true;
     const base = httpApiBase();
     setRestartOverlay({ phase: "restarting" });
 
@@ -2302,7 +2283,7 @@ export function App() {
         alive = ping.ok;
       } catch { alive = false; }
 
-      if (!alive) {
+      if (!alive && !startIfStopped) {
         setRestartOverlay({ phase: "notRunning" });
         setTimeout(() => {
           setRestartOverlay(null);
@@ -2311,22 +2292,24 @@ export function App() {
         return;
       }
 
-      // 触发重启
+      // 触发重启（服务在跑则先 shutdown；已停且 startIfStopped 则直接启动）
       setRestartOverlay({ phase: "restarting" });
       const wsId = currentWorkspaceId || workspaces[0]?.id;
 
       if (IS_TAURI && wsId && venvDir && dataMode === "local") {
-        // ── Tauri 本地模式：进程级重启（杀旧进程 → 启新进程） ──
-        try {
-          const shutRes = await fetch(`${base}/api/shutdown`, { method: "POST", signal: AbortSignal.timeout(2000) });
-          if (shutRes.ok) await new Promise((r) => setTimeout(r, 1000));
-        } catch { /* 请求可能因服务关闭而失败 */ }
+        if (alive) {
+          // ── Tauri 本地模式：进程级重启（杀旧进程 → 启新进程） ──
+          try {
+            const shutRes = await fetch(`${base}/api/shutdown`, { method: "POST", signal: AbortSignal.timeout(2000) });
+            if (shutRes.ok) await new Promise((r) => setTimeout(r, 1000));
+          } catch { /* 请求可能因服务关闭而失败 */ }
 
-        try {
-          await invoke("synapse_service_stop", { workspaceId: wsId });
-        } catch { /* PID 文件可能不存在 */ }
+          try {
+            await invoke("synapse_service_stop", { workspaceId: wsId });
+          } catch { /* PID 文件可能不存在 */ }
 
-        await waitForServiceDown(base, 15000);
+          await waitForServiceDown(base, 15000);
+        }
 
         setRestartOverlay({ phase: "waiting" });
         try {
@@ -2342,13 +2325,20 @@ export function App() {
           }, 2500);
           return;
         }
-      } else {
+      } else if (alive) {
         // ── Web / Capacitor 模式：进程内重启（唯一可用方式） ──
         try {
           await fetch(`${base}/api/config/restart`, { method: "POST", signal: AbortSignal.timeout(3000) });
         } catch { /* 请求可能因服务关闭而失败 */ }
 
         await waitForServiceDown(base, 15000);
+      } else if (!startIfStopped) {
+        setRestartOverlay({ phase: "notRunning" });
+        setTimeout(() => {
+          setRestartOverlay(null);
+          notifySuccess(t("config.restartNotRunning"));
+        }, 2000);
+        return;
       }
 
       // 轮询等待服务恢复
@@ -2379,6 +2369,7 @@ export function App() {
           prev ? { ...prev, running: true } : { running: true, pid: null, pidFile: "" }
         );
         try { await refreshStatus(undefined, undefined, true); } catch { /* ignore */ }
+        try { await loadSavedEndpoints(); } catch { /* ignore */ }
         autoCheckEndpoints(apiBaseUrl);
         setTimeout(() => {
           setRestartOverlay(null);
@@ -3343,6 +3334,7 @@ export function App() {
         backendBootPhase={backendBootPhase}
         onOpenRuntimeEnvironment={() => setRuntimeDialogOpen(true)}
         setView={navigateToView}
+        synapseRootDir={info?.synapseRootDir ?? ""}
       />
     );
   }
@@ -4901,107 +4893,6 @@ export function App() {
                 </Card>
               )}
 
-              <div className="w-full max-w-[460px] mt-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-xs text-muted-foreground px-2 h-7"
-                  onClick={async () => {
-                    if (!obShowCustomRoot) {
-                      try {
-                        const info = await invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>("get_root_dir_info");
-                        setObCurrentRoot(info.currentRoot);
-                        if (info.customRoot) {
-                          setObCustomRootInput(info.customRoot);
-                          setObCustomRootApplied(true);
-                        }
-                      } catch {}
-                    }
-                    setObShowCustomRoot((v) => !v);
-                  }}
-                >
-                  <ChevronRight className={`size-3.5 transition-transform duration-200 ${obShowCustomRoot ? "rotate-90" : ""}`} />
-                  {t("onboarding.welcome.customRootToggle")}
-                </Button>
-
-                {obShowCustomRoot && (
-                  <Card className="mt-2 shadow-sm">
-                    <CardContent className="py-4 px-4 space-y-3">
-                      <p className="text-xs text-muted-foreground leading-relaxed">{t("onboarding.welcome.customRootHint")}</p>
-                      {obCurrentRoot && (
-                        <p className="text-[11px] text-muted-foreground/60 break-all">
-                          {t("onboarding.welcome.customRootCurrent", { path: obCurrentRoot })}
-                        </p>
-                      )}
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          className="flex-1 h-8 text-[13px]"
-                          value={obCustomRootInput}
-                          onChange={(e) => { setObCustomRootInput(e.target.value); setObCustomRootApplied(false); }}
-                          placeholder={t("onboarding.welcome.customRootPlaceholder")}
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 shrink-0"
-                          disabled={!obCustomRootInput.trim() || obCustomRootApplied || obCustomRootBusy}
-                          onClick={async () => {
-                            if (obCustomRootBusy) return;
-                            setObCustomRootBusy(true);
-                            try {
-                              const info = await invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>(
-                                "set_custom_root_dir", { path: obCustomRootInput.trim(), migrate: obCustomRootMigrate }
-                              );
-                              setObCurrentRoot(info.currentRoot);
-                              setObCustomRootApplied(true);
-                              notifySuccess(t("onboarding.welcome.customRootApplied", { path: info.currentRoot }));
-                              obLoadEnvCheck();
-                            } catch (e: any) {
-                              notifyError(String(e));
-                            } finally {
-                              setObCustomRootBusy(false);
-                            }
-                          }}
-                        >
-                          {obCustomRootBusy ? <Loader2 className="size-3.5 animate-spin" /> : t("onboarding.welcome.customRootApply")}
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="ob-migrate"
-                          checked={obCustomRootMigrate}
-                          onCheckedChange={(v) => setObCustomRootMigrate(!!v)}
-                        />
-                        <Label htmlFor="ob-migrate" className="text-xs cursor-pointer font-normal">
-                          {t("onboarding.welcome.customRootMigrate")}
-                        </Label>
-                      </div>
-                      {obCustomRootApplied && obCustomRootInput.trim() && (
-                        <Button
-                          variant="link"
-                          className="h-auto p-0 text-[11px] text-muted-foreground"
-                          onClick={async () => {
-                            try {
-                              const info = await invoke<{ defaultRoot: string; currentRoot: string; customRoot: string | null }>(
-                                "set_custom_root_dir", { path: null, migrate: false }
-                              );
-                              setObCurrentRoot(info.currentRoot);
-                              setObCustomRootInput("");
-                              setObCustomRootApplied(false);
-                              notifySuccess(t("onboarding.welcome.customRootDefault") + ": " + info.currentRoot);
-                              obLoadEnvCheck();
-                            } catch (e: any) {
-                              notifyError(String(e));
-                            }
-                          }}
-                        >
-                          {t("onboarding.welcome.customRootDefault")}
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
               <Button
                 size="lg"
                 className="mt-2 px-10 rounded-xl text-[15px]"
@@ -6407,6 +6298,7 @@ export function App() {
           apiBaseUrl={httpApiBase()}
           serviceRunning={serviceStatus?.running ?? false}
           refreshTrigger={feedbackRefreshKey}
+          assignee_id={obIwcEmployeeId}
           onOpenFeedbackModal={(prefill) => {
             setFeedbackPrefill(prefill ?? null);
             setBugReportOpen(true);
@@ -7044,6 +6936,7 @@ export function App() {
         }}
         serviceRunning={serviceStatus?.running ?? false}
         currentWorkspaceId={currentWorkspaceId}
+        assignee_id={obIwcEmployeeId}
       />
     </div>
     </EnvFieldContext.Provider>

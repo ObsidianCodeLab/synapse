@@ -61,7 +61,7 @@ fn get_platform_info() -> PlatformInfo {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         home_dir: home.to_string_lossy().to_string(),
-        synapse_root_dir: default_synapse_root(),
+        synapse_root_dir: synapse_root_dir().to_string_lossy().to_string(),
     }
 }
 
@@ -131,6 +131,52 @@ fn default_root_dir() -> PathBuf {
 struct RootConfig {
     #[serde(default)]
     custom_root: Option<String>,
+}
+
+/// 迁移时必须成功，否则整次迁移回滚。
+const ROOT_MIGRATE_CRITICAL_DIRS: &[&str] = &["workspaces"];
+/// 迁移时尽力复制；失败仅记录，不中止（除 workspaces 外）。
+const ROOT_MIGRATE_OPTIONAL_DIRS: &[&str] = &[
+    "venv",
+    "runtime",
+    "run",
+    "logs",
+    "modules",
+    "bin",
+    "work",
+    "tmp",
+    "rd_meeting",
+    "data",
+    "crashdumps",
+];
+/// 根目录下的单文件迁移项。
+const ROOT_MIGRATE_FILES: &[&str] = &[
+    "state.json",
+    "cli.json",
+    "devservice.ip",
+    "cli_history",
+    "feedback.env",
+];
+
+fn root_migrate_all_dirs() -> Vec<&'static str> {
+    ROOT_MIGRATE_CRITICAL_DIRS
+        .iter()
+        .chain(ROOT_MIGRATE_OPTIONAL_DIRS.iter())
+        .copied()
+        .collect()
+}
+
+fn stop_synapse_processes_for_migration() {
+    let stopped = synapse_stop_all_processes();
+    if stopped.is_empty() {
+        return;
+    }
+    eprintln!(
+        "Stopped {} Synapse process(es) before data root migration: {:?}",
+        stopped.len(),
+        stopped
+    );
+    std::thread::sleep(std::time::Duration::from_millis(800));
 }
 
 fn root_config_path() -> PathBuf {
@@ -999,6 +1045,8 @@ fn set_custom_root_dir(path: Option<String>, migrate: bool) -> Result<RootDirInf
     }
 
     let migrate_old_root: Option<PathBuf> = if migrate {
+        stop_synapse_processes_for_migration();
+
         let old_root = synapse_root_dir();
         let new_root_path = match &clean_path {
             Some(p) => PathBuf::from(p),
@@ -1011,8 +1059,8 @@ fn set_custom_root_dir(path: Option<String>, migrate: bool) -> Result<RootDirInf
                     .map_err(|e| format!("无法创建目标目录: {e}"))?;
             }
 
-            let critical_dirs = ["workspaces"];
-            let optional_dirs = ["venv", "runtime", "run", "logs", "modules", "bin"];
+            let critical_dirs = ROOT_MIGRATE_CRITICAL_DIRS;
+            let optional_dirs = ROOT_MIGRATE_OPTIONAL_DIRS;
             let mut errors: Vec<String> = Vec::new();
 
             for entry_name in critical_dirs.iter().chain(optional_dirs.iter()) {
@@ -1033,7 +1081,7 @@ fn set_custom_root_dir(path: Option<String>, migrate: bool) -> Result<RootDirInf
                     }
                 }
             }
-            for file_name in &["state.json", "cli.json"] {
+            for file_name in ROOT_MIGRATE_FILES {
                 let src = old_root.join(file_name);
                 let dst = new_root_path.join(file_name);
                 if src.exists() && src.is_file() && !dst.exists() {
@@ -1063,8 +1111,8 @@ fn set_custom_root_dir(path: Option<String>, migrate: bool) -> Result<RootDirInf
 
     // Config updated successfully — clean up migrated entries from old root
     if let Some(ref old_root) = migrate_old_root {
-        let dir_names = ["workspaces", "venv", "runtime", "run", "logs", "modules", "bin"];
-        let file_names = ["state.json", "cli.json"];
+        let dir_names = root_migrate_all_dirs();
+        let file_names = ROOT_MIGRATE_FILES;
         for name in &dir_names {
             let p = old_root.join(name);
             if p.exists() && p.is_dir() {
@@ -1073,7 +1121,7 @@ fn set_custom_root_dir(path: Option<String>, migrate: bool) -> Result<RootDirInf
                 }
             }
         }
-        for name in &file_names {
+        for name in file_names {
             let p = old_root.join(name);
             if p.exists() && p.is_file() {
                 let _ = fs::remove_file(&p);
@@ -1197,13 +1245,13 @@ fn preflight_migrate_root(target_path: String) -> Result<MigratePreflightInfo, S
         });
     }
 
-    let dir_names: &[&str] = &["workspaces", "venv", "runtime", "run", "logs", "modules", "bin"];
-    let file_names: &[&str] = &["state.json", "cli.json"];
+    let dir_names = root_migrate_all_dirs();
+    let file_names = ROOT_MIGRATE_FILES;
 
     let mut entries = Vec::new();
     let mut total_size: u64 = 0;
 
-    for name in dir_names {
+    for name in &dir_names {
         let src = source.join(name);
         if src.exists() && src.is_dir() {
             let size = dir_size_bytes(&src);

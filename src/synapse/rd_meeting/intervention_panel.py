@@ -10,6 +10,7 @@ InterventionPanel = Literal[
     "solution_review",
     "func_solution_review",
     "task_exec",
+    "unit_test_review",
     "node_review",
     "leader_review_panel",
     "hitl",
@@ -24,6 +25,7 @@ _COLLAB_DEDICATED_PANEL: dict[str, InterventionPanel] = {
     "task_exec": "task_exec",
     "diff_analysis": "task_exec",
     "leader_review": "leader_review_panel",
+    "unit_test": "unit_test_review",
 }
 
 
@@ -86,6 +88,9 @@ def resolve_intervention_panel(
     if kind == "func_solution_review" or pending.get("func_solution_review_payload"):
         return "func_solution_review"
 
+    if kind == "unit_test_review" or pending.get("unit_test_review_payload"):
+        return "unit_test_review"
+
     if (
         kind == "task_exec"
         or pending.get("task_exec_payload")
@@ -97,7 +102,8 @@ def resolve_intervention_panel(
     dedicated = collab_dedicated_panel(nid)
     if (
         is_collab_sop_type(sop)
-        and dedicated in ("func_solution_review", "solution_review", "task_exec")
+        and dedicated
+        in ("func_solution_review", "solution_review", "task_exec", "unit_test_review")
         and kind not in ("interactive", "exception")
     ):
         return dedicated
@@ -111,7 +117,14 @@ def resolve_intervention_panel(
             return "leader_review_panel"
         return "node_review"
 
-    if is_collab_sop_type(sop) and dedicated and kind in ("solution_review", "func_solution_review", "result_confirm", "gate", ""):
+    if is_collab_sop_type(sop) and dedicated and kind in (
+        "solution_review",
+        "func_solution_review",
+        "unit_test_review",
+        "result_confirm",
+        "gate",
+        "",
+    ):
         if dedicated == "solution_review" and (
             kind == "solution_review" or pending.get("solution_review_payload")
         ):
@@ -120,6 +133,10 @@ def resolve_intervention_panel(
             kind == "func_solution_review" or pending.get("func_solution_review_payload")
         ):
             return "func_solution_review"
+        if dedicated == "unit_test_review" and (
+            kind == "unit_test_review" or pending.get("unit_test_review_payload")
+        ):
+            return "unit_test_review"
         if dedicated == "leader_review_panel" and (
             kind == "result_confirm" or kind == "leader_review" or nid == "leader_review"
         ):
@@ -137,5 +154,10 @@ def resolve_intervention_panel(
         "func_solution_review_payload"
     ):
         return "func_solution_review"
+
+    if is_collab_sop_type(sop) and dedicated == "unit_test_review" and pending.get(
+        "unit_test_review_payload"
+    ):
+        return "unit_test_review"
 
     return None

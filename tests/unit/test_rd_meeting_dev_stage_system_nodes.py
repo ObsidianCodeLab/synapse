@@ -98,10 +98,15 @@ def test_task_check_flight_fail_redirects_to_task_feedback(tmp_path, monkeypatch
     assert assets["outcome"] == "flight_fail"
     assert assets["redirect_to_node"] == "task_feedback"
     assert assets["fail_count"] == 1
+    assert "编译失败" in assets["error"]
 
     commit_archive = archive_node_dir(scope_id, stage, "exception_check") / "试飞结果.md"
-    assert commit_archive.is_file()
-    assert "编译失败" in commit_archive.read_text(encoding="utf-8")
+    assert not commit_archive.is_file()
+
+    pipe_after = json.loads(pipe_path.read_text(encoding="utf-8"))
+    cc = (pipe_after.get("context") or {}).get("code_commit_assets") or {}
+    assert cc.get("status") == "partial"
+    assert cc.get("flight", {}).get("error") == "编译失败"
 
 
 def test_downstream_advance_not_blocked_for_dev_cli_nodes():

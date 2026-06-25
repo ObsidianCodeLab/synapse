@@ -551,7 +551,7 @@ jobs:
 
       - name: Notarize macOS artifacts (manual notarytool)
         if: runner.os == 'macOS' && (github.event_name != 'workflow_dispatch' || inputs.enable_notarization == true || inputs.enable_notarization == 'true')
-        timeout-minutes: 90
+        timeout-minutes: 180
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}

@@ -95,6 +95,10 @@ def submit_questionnaire(
         raise ValueError(SOLUTION_REVIEW_HITL_QUESTIONNAIRE_FORBIDDEN_MSG)
     if uses_func_solution_gate(node_id):
         raise ValueError(FUNC_SOLUTION_HITL_FORBIDDEN)
+    from synapse.rd_meeting.unit_test_gate import UNIT_TEST_HITL_FORBIDDEN, uses_unit_test_gate
+
+    if uses_unit_test_gate(node_id):
+        raise ValueError(UNIT_TEST_HITL_FORBIDDEN)
     existing = rs.get(PENDING_QUESTIONNAIRE_KEY)
     if isinstance(existing, dict) and not existing.get("consumed"):
         logger.info(

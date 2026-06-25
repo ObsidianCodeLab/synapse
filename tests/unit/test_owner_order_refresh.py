@@ -18,6 +18,7 @@ from synapse.rd_meeting.owner_order_refresh import (
 
 def test_should_keep_orphan_only_when_completed():
     assert should_keep_orphan_demand({"local_process_state": "已完成"}) is True
+    assert should_keep_orphan_demand({"local_process_state": "已归档"}) is True
     assert should_keep_orphan_demand({"local_process_state": "archived"}) is True
     assert should_keep_orphan_demand({"local_process_state": "处理中"}) is False
     assert should_keep_orphan_demand({"local_process_state": "待处理"}) is False
@@ -54,7 +55,7 @@ def test_build_rd_view_demand_save_payload_maps_sop_fields(monkeypatch, tmp_path
     assert payload["name"] == "需求澄清"
     assert payload["assignee_id"] == "E001"
     assert payload["product_name"] == "billing-core"
-    assert payload["processing_mode"] == "ai"
+    assert payload["processing_mode"] == "human"
     assert payload["run_status"] == "running"
     assert payload["comments"] == []
 
@@ -65,14 +66,14 @@ def test_build_rd_view_processing_mode():
             {"demand_no": "1", "local_process_state": "全人工"},
             assignee_id="x",
         )["processing_mode"]
-        == "人工"
+        == "system"
     )
     assert (
         build_rd_view_demand_save_payload(
             {"demand_no": "1", "local_process_state": "预备中"},
             assignee_id="x",
         )["processing_mode"]
-        == "待定"
+        == "system"
     )
 
 

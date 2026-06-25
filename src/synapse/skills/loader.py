@@ -94,10 +94,12 @@ def _resolve_user_workspace_skills() -> Path:
     except Exception:
         import os
 
+        from synapse.synapse_home import resolve_synapse_home
+
         root = os.environ.get("SYNAPSE_ROOT", "").strip()
         if root:
             return Path(root) / "workspaces" / "default" / "skills"
-        return Path.home() / ".synapse" / "workspaces" / "default" / "skills"
+        return resolve_synapse_home() / "workspaces" / "default" / "skills"
 
 
 def _builtin_skills_root() -> Path | None:

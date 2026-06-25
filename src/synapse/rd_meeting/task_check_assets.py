@@ -6,9 +6,9 @@ import logging
 import re
 from typing import Any, Literal
 
-from synapse.rd_meeting.paths import archive_node_dir, meeting_pipeline_path
+from synapse.rd_meeting.paths import archive_node_dir
+from synapse.rd_meeting.code_commit_assets import load_code_commit_assets
 from synapse.rd_meeting.room_runtime import read_meeting_pipeline_json, save_meeting_pipeline
-from synapse.rd_meeting.system_node_display import _load_pipeline_context_asset
 from synapse.rd_sop.nodes import stage_name_for_id
 
 logger = logging.getLogger(__name__)
@@ -39,43 +39,6 @@ def _read_archive_text(scope_id: str, node_id: str, filename: str) -> str:
         return path.read_text(encoding="utf-8")
     except OSError:
         return ""
-
-
-def _load_code_commit_assets(scope_id: str) -> dict[str, Any]:
-    assets = _load_pipeline_context_asset(scope_id, "code_commit_assets")
-    return dict(assets) if isinstance(assets, dict) else {}
-
-
-def _save_code_commit_assets(scope_id: str, assets: dict[str, Any]) -> None:
-    sid = (scope_id or "").strip()
-    if not sid:
-        return
-    raw = read_meeting_pipeline_json(sid)
-    if not isinstance(raw, dict):
-        return
-    ctx = raw.get("context") if isinstance(raw.get("context"), dict) else {}
-    ctx["code_commit_assets"] = assets
-    raw["context"] = ctx
-    save_meeting_pipeline(sid, raw)
-
-
-def _overlay_flight_error_on_code_commit(scope_id: str, error_text: str) -> None:
-    assets = _load_code_commit_assets(scope_id)
-    if not assets:
-        return
-    flight = dict(assets.get("flight") or {}) if isinstance(assets.get("flight"), dict) else {}
-    flight["status"] = "failed"
-    flight["error"] = error_text
-    assets["flight"] = flight
-    assets["status"] = "failed"
-    assets["error"] = error_text
-    _save_code_commit_assets(scope_id, assets)
-
-    archive_dir = archive_node_dir(scope_id, DEV_STAGE_NAME, "exception_check")
-    archive_dir.mkdir(parents=True, exist_ok=True)
-    report_path = archive_dir / "试飞结果.md"
-    body = f"# 试飞结果（任务检查覆盖）\n\n- 状态：失败\n- 报错：{error_text}\n"
-    report_path.write_text(body, encoding="utf-8")
 
 
 def _pipeline_context(scope_id: str) -> dict[str, Any]:
@@ -215,7 +178,7 @@ def bootstrap_task_check(scope_id: str) -> dict[str, Any]:
         except OSError:
             func_solution_text = ""
 
-    code_commit = _load_code_commit_assets(sid)
+    code_commit = load_code_commit_assets(sid)
     flight_ok, flight_error = _analyze_flight_result(code_commit)
     feature_complete = _analyze_feature_completeness(task_exec_text, flight_optimize_text)
     requirement_gaps = _extract_requirement_gaps(task_exec_text, func_solution_text)
@@ -236,7 +199,6 @@ def bootstrap_task_check(scope_id: str) -> dict[str, Any]:
         outcome = "flight_fail"
         redirect_to_node = "task_feedback"
         redirect_reason = "试飞检查未通过，请回到试飞方案节点评估优化方案"
-        _overlay_flight_error_on_code_commit(sid, flight_error)
         fail_count = _bump_task_check_fail_count(sid)
         if fail_count >= MAX_TASK_CHECK_FAILURES:
             ai_blocked = True

@@ -89,7 +89,7 @@ export const SOP_STAGES: SOPStage[] = [
       { id: 'task_feedback', name: '试飞方案', type: 'ai', desc: '基于试飞结果生成优化方案，确保不引入新试飞问题并解决已识别项' },
       { id: 'diff_analysis', name: '试飞优化', type: 'ai_human', desc: '根据试飞优化方案协同执行改动并提交代码' },
       { id: 'env_start', name: '任务检查', type: 'system', desc: '试飞级与需求方案级检查；未通过时引导回退，三次失败禁止 AI 处理' },
-      { id: 'unit_test', name: '测试案例', type: 'ai_human', desc: '说明功能测试案例、单元测试文件与结果，辅助后续自动化测试' },
+      { id: 'unit_test', name: '测试案例', type: 'ai_human', desc: '完善单元测试代码，输出用例说明，执行测试并人机评审' },
     ],
   },
   {

@@ -248,6 +248,100 @@ def _resolve_git_repo_root(repo_path: Path) -> Path | None:
     return resolved if resolved.is_dir() else None
 
 
+_GIT_BASE_REF_CANDIDATES = ("origin/master", "origin/main", "master", "main")
+
+
+def _resolve_git_base_ref(repo_root: Path) -> str | None:
+    """解析可用于 diff / rev-list 的基线分支 ref。"""
+    for ref in _GIT_BASE_REF_CANDIDATES:
+        ok, _ = _run_git(["git", "-C", str(repo_root), "rev-parse", "--verify", ref], timeout=15.0)
+        if ok:
+            return ref
+    return None
+
+
+def _aggregate_filtered_numstat(numstat: dict[str, dict[str, int]]) -> tuple[int, int]:
+    """汇总 numstat 增删行数（排除 synapse_archive / AGENTS.md）。"""
+    added = 0
+    deleted = 0
+    for rel_path, stat in numstat.items():
+        if not should_include_commit_file(rel_path):
+            continue
+        added += int(stat.get("additions") or 0)
+        deleted += int(stat.get("deletions") or 0)
+    return added, deleted
+
+
+def collect_repo_branch_stats(
+    repo_path: str,
+    *,
+    feature_branch: str = "",
+    base_ref: str = "",
+) -> dict[str, int | None]:
+    """统计仓库相对基线分支的新增/删除行数与 commit 数（归档 rd_view 用）。
+
+    优先 ``merge-base(base_ref, HEAD)..HEAD``；无基线分支时回退未提交 diff（相对 HEAD）。
+    """
+    declared = Path(str(repo_path or "").strip())
+    if not declared.is_dir():
+        return {"lines_added": None, "lines_deleted": None, "commit_count": None}
+
+    repo_root = _resolve_git_repo_root(declared) or declared
+    ok, _ = _run_git(["git", "-C", str(repo_root), "rev-parse", "--is-inside-work-tree"], timeout=30.0)
+    if not ok:
+        return {"lines_added": None, "lines_deleted": None, "commit_count": None}
+
+    tip_ref = "HEAD"
+    branch = (feature_branch or "").strip()
+    if branch:
+        ok_branch, _ = _run_git(
+            ["git", "-C", str(repo_root), "rev-parse", "--verify", branch],
+            timeout=15.0,
+        )
+        if ok_branch:
+            tip_ref = branch
+
+    base = (base_ref or "").strip() or _resolve_git_base_ref(repo_root) or ""
+    commit_count: int | None = None
+    if base:
+        ok_mb, merge_base = _run_git(
+            ["git", "-C", str(repo_root), "merge-base", tip_ref, base],
+            timeout=30.0,
+        )
+        if ok_mb and merge_base.strip():
+            mb = merge_base.strip()
+            ok_count, count_out = _run_git(
+                ["git", "-C", str(repo_root), "rev-list", "--count", f"{mb}..{tip_ref}"],
+                timeout=60.0,
+            )
+            commit_count = int(count_out.strip()) if ok_count and count_out.strip().isdigit() else None
+
+            ok_ns, numstat_out = _run_git(
+                ["git", "-C", str(repo_root), "diff", f"{mb}..{tip_ref}", "--numstat"],
+                timeout=120.0,
+            )
+            if ok_ns:
+                added, deleted = _aggregate_filtered_numstat(_parse_numstat(numstat_out))
+                return {
+                    "lines_added": added,
+                    "lines_deleted": deleted,
+                    "commit_count": commit_count,
+                }
+
+    # 无基线分支：回退未提交变更统计
+    files = collect_repo_code_diff_files(str(declared))
+    if not files:
+        return {"lines_added": 0, "lines_deleted": 0, "commit_count": commit_count if base else 0}
+
+    added = sum(int(f.get("additions") or 0) for f in files)
+    deleted = sum(int(f.get("deletions") or 0) for f in files)
+    return {
+        "lines_added": added,
+        "lines_deleted": deleted,
+        "commit_count": 1 if (added or deleted) else 0,
+    }
+
+
 def _read_git_object_bytes(repo_root: Path, spec: str) -> bytes:
     try:
         proc = subprocess.run(

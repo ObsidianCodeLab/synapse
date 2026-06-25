@@ -19,13 +19,16 @@ from synapse.rd_meeting.devservice import unified_service_base_url
 from synapse.rd_meeting.node_review import collect_artifact_files
 from synapse.rd_meeting.paths import scope_dir
 from synapse.rd_meeting.room_runtime import load_room_state
+from synapse.rd_meeting.product_assets import resolve_sandbox_path_for_product_module
+from synapse.rd_meeting.task_exec_code_diff import collect_repo_branch_stats
 from synapse.rd_meeting.userwork_sync import patch_userwork_summary
 from synapse.rd_sop.manifest import NODE_TYPES
 from synapse.rd_sop.nodes import ALL_NODES, node_display_name, seq_index_for_node_id, stage_id_for_node_id
 
 logger = logging.getLogger(__name__)
 
-ARCHIVED_LOCAL_STATE = "archived"
+ARCHIVED_LOCAL_STATE = "已归档"
+LEGACY_ARCHIVED_LOCAL_STATE = "archived"
 RD_VIEW_DEMAND_SAVE_PATH = "/dev/iwhalecloud/synapse/rd_view_demand_save"
 
 RD_VIEW_SOP_NODE_INSERT_PATH = "/dev/iwhalecloud/synapse/rd_view_sop_node_insert"
@@ -34,24 +37,21 @@ RD_VIEW_NODE_REPO_OUTPUT_INSERT_PATH = "/dev/iwhalecloud/synapse/rd_view_node_re
 
 
 def is_archived_local_state(local_process_state: str) -> bool:
-    return _snapshot_norm_id(local_process_state) == ARCHIVED_LOCAL_STATE
+    local = _snapshot_norm_id(local_process_state)
+    return local in (ARCHIVED_LOCAL_STATE, LEGACY_ARCHIVED_LOCAL_STATE)
 
 
 def should_archive_orphan_demand(demand: dict[str, Any]) -> bool:
     """门户已下架且本地已完成、尚未归档时触发归档。"""
     local = _snapshot_norm_id(demand.get("local_process_state"))
-    if local == ARCHIVED_LOCAL_STATE:
+    if is_archived_local_state(local):
         return False
     return local == OWNED_WORK_ITEM_STATE_COMPLETED
 
 
 def _processing_mode_for_node(node_id: str) -> str:
-    node_type = NODE_TYPES.get((node_id or "").strip(), "")
-    if node_type in ("human", "human_start", "human_multi"):
-        return "人工"
-    if node_type in ("ai", "ai_human", "ai_exception", "system"):
-        return "ai"
-    return "待定"
+    """返回 SOP 节点类型（与 ``NODE_TYPES`` / manifest type 一致）。"""
+    return NODE_TYPES.get((node_id or "").strip(), "ai")
 
 
 def _repo_name_from_url(repo_url: str) -> str:
@@ -193,6 +193,33 @@ def collect_node_output_items(
     return items
 
 
+def _sandbox_path_for_task(scope_id: str, task_no: str, product_module: str) -> str:
+    """从任务执行/试飞 payload 或 catalog 解析沙箱路径。"""
+    sid = _snapshot_norm_id(scope_id)
+    tno = (task_no or "").strip()
+    module = (product_module or "").strip()
+    if sid and tno:
+        from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+        from synapse.rd_meeting.task_exec import load_task_exec_payload
+
+        for loader in (load_diff_analysis_payload, load_task_exec_payload):
+            payload = loader(sid) or {}
+            tasks = payload.get("tasks")
+            if not isinstance(tasks, list):
+                continue
+            for task in tasks:
+                if not isinstance(task, dict):
+                    continue
+                if str(task.get("task_no") or "").strip() != tno:
+                    continue
+                sandbox = str(task.get("sandbox_path") or "").strip()
+                if sandbox:
+                    return sandbox
+    if sid and module:
+        return resolve_sandbox_path_for_product_module("demand", sid, module)
+    return ""
+
+
 def collect_repo_output_items(
     *,
     demand_no: str,
@@ -227,6 +254,12 @@ def collect_repo_output_items(
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
+        sandbox_path = _sandbox_path_for_task(dn, str(row.get("task_no") or ""), repo_name)
+        stats = (
+            collect_repo_branch_stats(sandbox_path, feature_branch=branch)
+            if sandbox_path
+            else {"lines_added": None, "lines_deleted": None, "commit_count": None}
+        )
         items.append(
             {
                 "demand_no": dn,
@@ -234,9 +267,9 @@ def collect_repo_output_items(
                 "repo_url": repo_url,
                 "repo_name": repo_name,
                 "branch": branch,
-                "lines_added": None,
-                "lines_deleted": None,
-                "commit_count": None,
+                "lines_added": stats.get("lines_added"),
+                "lines_deleted": stats.get("lines_deleted"),
+                "commit_count": stats.get("commit_count"),
             }
         )
     return items
@@ -349,7 +382,7 @@ async def archive_completed_demand_if_needed(*, demand_no: str) -> dict[str, Any
         return {"status": "skipped", "demand_no": dn, "archived": False, "reason": "demand_not_in_userwork"}
 
     local = _snapshot_norm_id(demand.get("local_process_state"))
-    if local == ARCHIVED_LOCAL_STATE:
+    if is_archived_local_state(local):
         return {"status": "skipped", "demand_no": dn, "archived": True, "reason": "already_archived"}
     if local != OWNED_WORK_ITEM_STATE_COMPLETED:
         return {"status": "skipped", "demand_no": dn, "archived": False, "reason": "not_completed"}

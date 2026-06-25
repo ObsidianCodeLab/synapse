@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "demand_no": "{{DEMAND_NO}}",
+  "requirement_name": "{{REQUIREMENT_NAME}}",
+  "reviewed_at": "{{ISO8601}}",
+  "whale_summary": {
+    "markdown": "本次完善/新增单元测试的摘要：覆盖范围、与验收标准对齐说明、相对任务执行阶段的改进点。"
+  },
+  "test_suite": {
+    "code_root": "{{PRODUCT_CODE_ROOT}}",
+    "test_files": [
+      "tests/unit/test_example.py"
+    ],
+    "test_list_path": "archive/开发中/task_exec/单元测试用例列表.md",
+    "run_command": "python -m pytest tests/unit/test_example.py -v"
+  },
+  "test_cases": [
+    {
+      "id": "tc-1",
+      "name": "正常场景示例",
+      "scenario": "描述被测业务场景、输入与期望输出",
+      "requirements": "对应验收标准或函数级方案中的验证方式",
+      "acceptance_ref": "验收标准.md#场景1",
+      "test_file": "tests/unit/test_example.py",
+      "test_function": "test_normal_case",
+      "last_result": {
+        "status": "pending",
+        "message": "",
+        "duration_ms": 0,
+        "ran_at": null
+      },
+      "human_review": {
+        "status": "pending",
+        "comment": ""
+      }
+    }
+  ],
+  "last_run": {
+    "ran_at": null,
+    "exit_code": null,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "total": 0,
+    "command": "",
+    "raw_output_tail": ""
+  },
+  "human_review": {
+    "decision": null,
+    "comment": "",
+    "decided_at": null
+  }
+}

@@ -655,8 +655,9 @@ class BrowserManager:
                         logger.info(f"[Browser] Using bundled {pw_name}: {bundled}")
                         return
 
-        _root = os.environ.get("SYNAPSE_ROOT", "").strip()
-        _base = Path(_root) if _root else Path.home() / ".synapse"
+        from synapse.synapse_home import resolve_synapse_home
+
+        _base = resolve_synapse_home()
         browsers_dir = _base / "modules" / "browser" / "browsers"
         if browsers_dir.is_dir():
             os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browsers_dir)

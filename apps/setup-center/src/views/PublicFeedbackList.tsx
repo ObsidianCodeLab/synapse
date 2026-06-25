@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { safeFetch } from "../providers";
-import { openExternalUrl } from "../platform";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -9,9 +8,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select";
 import {
-  IconSearch, IconBug, IconZap, IconUser, IconLoader,
+  IconSearch, IconUser, IconLoader,
   IconChevronDown, IconChevronRight, IconMessageCircle,
-  IconSend, IconGlobe, IconRefresh,
+  IconSend, IconRefresh,
 } from "../icons";
 import { useMdModules } from "./chat/hooks/useMdModules";
 
@@ -304,11 +303,16 @@ export function PublicFeedbackList({ apiBaseUrl, serviceRunning, refreshTrigger 
                     <div className="shrink-0">
                       {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
                     </div>
-                    <div className="shrink-0">
-                      {issue.type === "bug"
-                        ? <IconBug size={16} className="text-red-500" />
-                        : <IconZap size={16} className="text-amber-500" />}
-                    </div>
+                    <Badge
+                      variant="secondary"
+                      className={`text-[11px] px-1.5 py-0 shrink-0 font-medium ${
+                        issue.type === "bug"
+                          ? "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                          : "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                      }`}
+                    >
+                      {issue.type === "bug" ? "bug" : "需求"}
+                    </Badge>
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <span className="text-[14px] font-medium truncate">{issue.title}</span>
                       {issue.comments_count > 0 && (
@@ -327,41 +331,21 @@ export function PublicFeedbackList({ apiBaseUrl, serviceRunning, refreshTrigger 
                     >
                       {t(`myFeedback.${STATUS_I18N[issue.status] ?? "statusOpen"}`)}
                     </Badge>
-                    <IconGlobe
-                      size={14}
-                      className="shrink-0 cursor-pointer text-muted-foreground/40 hover:text-primary transition-colors"
-                      onClick={(e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        if (issue.html_url) openExternalUrl(issue.html_url);
-                      }}
-                    />
                   </div>
 
                   {isExpanded && (
-                    <div className="px-4 pb-4 pt-1 border-t border-border bg-muted/20">
+                    <div className="px-4 pb-4 pt-3 border-t border-border bg-muted/20 space-y-2.5">
                       {detailLoading ? (
                         <div className="flex items-center gap-2 text-[13px] text-muted-foreground py-2">
                           <IconLoader size={14} className="animate-spin" />
                           {t("myFeedback.publicLoading")}
                         </div>
                       ) : detail ? (
-                        <div className="space-y-3 mt-2">
+                        <div className="space-y-2.5">
                           {detail.summary && (
-                            <div className="flex gap-2.5">
-                              <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
-                                <IconUser size={14} />
-                              </div>
-                              <div className="max-w-[85%]">
-                                <div className="flex items-center gap-2 text-[12px]">
-                                  <span className="font-medium text-blue-600 dark:text-blue-400">
-                                    {t("myFeedback.publicSubmitter")}
-                                  </span>
-                                  <span className="text-muted-foreground">{formatDate(detail.created_at)}</span>
-                                </div>
-                                <div className="mt-1 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-[13px] whitespace-pre-wrap break-words">
-                                  {detail.summary}
-                                </div>
-                              </div>
+                            <div className="bg-background rounded-lg border border-border p-3">
+                              <p className="text-[11px] text-muted-foreground font-medium mb-1.5">{t("myFeedback.description")}</p>
+                              <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{detail.summary}</p>
                             </div>
                           )}
 

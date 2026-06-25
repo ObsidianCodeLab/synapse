@@ -1,0 +1,50 @@
+name: Notarize Test
+
+# 独立公证冒烟测试：不跑完整 Release，只验证凭证 / 查询 Submission / 最小 DMG 端到端。
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: |
+          credentials — 验证 APPLE_ID/专用密码/Team ID（~1 分钟）
+          check-submission — 查询已有 Submission ID 状态
+          minimal-dmg — 打最小签名 DMG 并公证+staple（端到端，通常 3–15 分钟）
+        required: true
+        default: credentials
+        type: choice
+        options:
+          - credentials
+          - check-submission
+          - minimal-dmg
+      submission_id:
+        description: "check-submission 模式必填，例如 2360024e-165e-4e74-a817-cb24c9b30396"
+        required: false
+        default: ""
+      wait_timeout_minutes:
+        description: "minimal-dmg 模式：notarytool --wait 最长等待分钟数"
+        required: false
+        default: "30"
+
+jobs:
+  notarize_test:
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run notarization smoke test
+        env:
+          MODE: ${{ inputs.mode }}
+          SUBMISSION_ID: ${{ inputs.submission_id }}
+          WAIT_TIMEOUT_MINUTES: ${{ inputs.wait_timeout_minutes }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ci/notarize-test.sh
+          scripts/ci/notarize-test.sh

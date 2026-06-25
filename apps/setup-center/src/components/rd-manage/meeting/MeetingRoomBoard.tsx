@@ -38,6 +38,7 @@ import { FuncSolutionReviewPanel } from './FuncSolutionReviewPanel';
 import { TaskExecReviewPanel } from './TaskExecReviewPanel';
 import { NodeReviewPanel } from './NodeReviewPanel';
 import { LeaderReviewSopPanel } from '../LeaderReviewSopPanel';
+import { UnitTestSopPanel } from './UnitTestSopPanel';
 import { MeetingProdSelectionPanel } from './panels/MeetingProdSelectionPanel';
 import { MeetingAutoSplitChoicePanel } from './panels/MeetingAutoSplitChoicePanel';
 import type {
@@ -45,6 +46,7 @@ import type {
   FuncSolutionReviewPayload,
   SolutionReviewPayload,
   TaskExecPayload,
+  UnitTestReviewPayload,
 } from '../../../api/meetingRoomService';
 import {
   MeetingAgentContextDrawer,
@@ -100,7 +102,7 @@ import { chatSpeakerAccentClass } from './chatRoleTheme';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Bot, Cpu, FileText, TerminalSquare, AlertTriangle, ShieldAlert, Sparkles, 
-  Users, MessageSquare, CheckCircle2, ChevronRight, Hash, Activity, Zap, Settings2,
+  Users, MessageSquare, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Hash, Activity, Zap, Settings2,
   Globe, Clock, Coins, MoreHorizontal, CircleDashed, 
   Terminal, Code2, GitBranch, FileCode2, Play, User, Info, Network, Code, 
   TestTube, CheckSquare, Flame, TrendingUp, Loader2, AlertCircle, MessageSquareText, ClipboardCheck,
@@ -180,6 +182,8 @@ interface MeetingRoom {
   solutionReviewBlocked?: boolean;
   funcSolutionReviewPayload?: FuncSolutionReviewPayload | null;
   funcSolutionBlocked?: boolean;
+  unitTestReviewPayload?: UnitTestReviewPayload | null;
+  unitTestBlocked?: boolean;
   taskExecPayload?: TaskExecPayload | null;
   taskExecBlocked?: boolean;
   /** pending_delivery.node_id：当前人工门控所属节点 */
@@ -421,6 +425,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
         review_payload?: NodeReviewPayload;
         solution_review_payload?: SolutionReviewPayload;
         func_solution_review_payload?: FuncSolutionReviewPayload;
+        unit_test_review_payload?: UnitTestReviewPayload;
         task_exec_payload?: TaskExecPayload;
         diff_analysis_payload?: TaskExecPayload;
         report_body?: string;
@@ -462,6 +467,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
           pendingDelivery?.solution_review_payload ?? room.solutionReviewPayload,
         funcSolutionReviewPayload:
           pendingDelivery?.func_solution_review_payload ?? room.funcSolutionReviewPayload,
+        unitTestReviewPayload:
+          pendingDelivery?.unit_test_review_payload ?? room.unitTestReviewPayload,
         autoSplitChoicePayload:
           (live.auto_split_choice_payload as AutoSplitChoicePayload | undefined) ??
           room.autoSplitChoicePayload,
@@ -482,6 +489,8 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
   );
   const isFuncSolutionReview =
     interventionKind === 'func_solution_review' || interventionPanel === 'func_solution_review';
+  const isUnitTestReview =
+    interventionKind === 'unit_test_review' || interventionPanel === 'unit_test_review';
   return {
     ...room,
     currentNode: nextNodeId,
@@ -516,7 +525,7 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       pendingDelivery?.node_id != null
         ? String(pendingDelivery.node_id)
         : room.hitlPendingNodeId ?? null,
-    reviewPayload: isSolutionReview || isFuncSolutionReview || hasCliExecPayload
+    reviewPayload: isSolutionReview || isFuncSolutionReview || isUnitTestReview || hasCliExecPayload
       ? null
       : ((pendingDelivery?.review_payload as NodeReviewPayload | undefined) ??
         (live.pending_delivery !== undefined ? null : room.reviewPayload ?? null)),
@@ -542,6 +551,13 @@ function applyLivePatch(room: MeetingRoom, live: MeetingRoomLivePayload): Meetin
       live.solution_review_blocked ?? room.solutionReviewBlocked,
     ),
     funcSolutionBlocked: Boolean(live.func_solution_blocked ?? room.funcSolutionBlocked),
+    unitTestReviewPayload: isUnitTestReview
+      ? ((pendingDelivery?.unit_test_review_payload as UnitTestReviewPayload | undefined) ??
+        (live.pending_delivery !== undefined ? null : room.unitTestReviewPayload ?? null))
+      : live.pending_delivery !== undefined
+        ? null
+        : room.unitTestReviewPayload ?? null,
+    unitTestBlocked: Boolean(live.unit_test_blocked ?? room.unitTestBlocked),
     taskExecPayload:
       (pendingDelivery?.diff_analysis_payload as TaskExecPayload | undefined) ??
       (pendingDelivery?.task_exec_payload as TaskExecPayload | undefined) ??
@@ -939,6 +955,9 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
         funcSolutionReviewPayload: (item.room_state?.pending_delivery as {
           func_solution_review_payload?: unknown;
         })?.func_solution_review_payload,
+        unitTestReviewPayload: (item.room_state?.pending_delivery as {
+          unit_test_review_payload?: unknown;
+        })?.unit_test_review_payload,
         hitlPendingNodeId: (item.room_state?.pending_delivery as { node_id?: string })?.node_id,
       },
       nodeTypeForId(
@@ -962,6 +981,10 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
       ((item.room_state?.pending_delivery as { func_solution_review_payload?: FuncSolutionReviewPayload })
         ?.func_solution_review_payload as FuncSolutionReviewPayload | undefined) ?? null,
     funcSolutionBlocked: Boolean(item.room_state?.func_solution_blocked),
+    unitTestReviewPayload:
+      ((item.room_state?.pending_delivery as { unit_test_review_payload?: UnitTestReviewPayload })
+        ?.unit_test_review_payload as UnitTestReviewPayload | undefined) ?? null,
+    unitTestBlocked: Boolean(item.room_state?.unit_test_blocked),
     taskExecPayload:
       ((item.room_state?.pending_delivery as { diff_analysis_payload?: TaskExecPayload; task_exec_payload?: TaskExecPayload })
         ?.diff_analysis_payload as TaskExecPayload | undefined) ??
@@ -2012,6 +2035,22 @@ const InterventionDialog = ({
   const [reprocessModalOpen, setReprocessModalOpen] = useState(false);
   const [reprocessTargetNodeId, setReprocessTargetNodeId] = useState<string | null>(null);
   const [reprocessReason, setReprocessReason] = useState('');
+  const [chatStreamCollapsed, setChatStreamCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('synapse_meeting_chat_stream_collapsed');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [sopPipelineCollapsed, setSopPipelineCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('synapse_meeting_sop_pipeline_collapsed');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
 
   const openReprocessModal = (nodeId: string) => {
     if (room?.status === 'completed') return;
@@ -2044,6 +2083,22 @@ const InterventionDialog = ({
   useEffect(() => {
     onViewNodeChange?.(chatNodeId);
   }, [chatNodeId, onViewNodeChange]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('synapse_meeting_chat_stream_collapsed', String(chatStreamCollapsed));
+    } catch {
+      /* ignore */
+    }
+  }, [chatStreamCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('synapse_meeting_sop_pipeline_collapsed', String(sopPipelineCollapsed));
+    } catch {
+      /* ignore */
+    }
+  }, [sopPipelineCollapsed]);
   /** 人工确认表单/结果确认仅归属当前流水线节点（或 review_payload 指定节点） */
   const hitlTargetNodeId = room ? resolveHitlTargetNodeId(room) : '';
   const isViewingHitlNode = Boolean(hitlTargetNodeId && chatNodeId === hitlTargetNodeId);
@@ -2077,6 +2132,7 @@ const InterventionDialog = ({
     if (interventionPanel === 'auto_split_choice') return '拆单策略';
     if (interventionPanel === 'solution_review') return '方案评审';
     if (interventionPanel === 'func_solution_review') return '函数级方案评审';
+    if (interventionPanel === 'unit_test_review') return '测试案例评审';
     if (interventionPanel === 'task_exec') {
       const nid = (room.hitlPendingNodeId || room.currentNode || 'task_exec').trim();
       return nid === 'diff_analysis' ? '试飞优化评审' : '任务执行评审';
@@ -2455,11 +2511,13 @@ const InterventionDialog = ({
       closable={false}
       maskClosable={false}
       keyboard={false}
-      className="intervention-modal"
+      className={`intervention-modal${chatStreamCollapsed ? ' intervention-modal--chat-stream-collapsed' : ''}${sopPipelineCollapsed ? ' intervention-modal--sop-pipeline-collapsed' : ''}`}
       classNames={{
         // antd v5: 部分版本不在 ModalClassNamesType 中暴露 content；通过 className 兜底
         ...({
-          content: 'bg-[color:var(--panel)] p-0 overflow-hidden border border-border/50 rounded-2xl shadow-2xl',
+          content: `bg-[color:var(--panel)] p-0 overflow-hidden border border-border/50 shadow-2xl ${
+            sopPipelineCollapsed ? 'rounded-l-none' : 'rounded-l-2xl'
+          } ${chatStreamCollapsed ? 'rounded-r-none' : 'rounded-r-2xl'}`,
           mask: 'backdrop-blur-sm bg-black/70',
         } as Record<string, string>),
       }}
@@ -2478,37 +2536,67 @@ const InterventionDialog = ({
 
         <div className="relative flex min-h-0 flex-1">
         {showRoomBusyOverlay ? <MeetingBusyOverlay label={roomBusyOverlayLabel} /> : null}
-        {/* 左栏：SOP 阶段 + 议题清单 */}
-        <div className="w-[320px] bg-[color:var(--panel)] flex flex-col shrink-0 min-h-0 border-r border-border/60">
-          {/* SOP Stage Navigator */}
-          <div className="px-3 py-3 border-b border-border/40 bg-gradient-to-b from-muted/25 to-background/60 shrink-0">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Layers className="w-3.5 h-3.5 text-foreground/70 shrink-0" />
-                <span className="text-[11px] font-semibold text-foreground/90 tracking-wide">
-                  SOP 流水线
+        {/* 左栏：SOP 阶段 + 议题清单（可侧边收起） */}
+        {sopPipelineCollapsed ? (
+          <div className="rd-meeting-sop-pipeline-rail-wrap">
+            <Tooltip title="展开 SOP 流水线" placement="right">
+              <button
+                type="button"
+                aria-label="展开 SOP 流水线"
+                aria-expanded={false}
+                className="rd-meeting-sop-pipeline-rail"
+                onClick={() => setSopPipelineCollapsed(false)}
+              >
+                <span className="rd-meeting-sop-pipeline-rail__glow" aria-hidden />
+                <Layers className="rd-meeting-sop-pipeline-rail__icon" />
+                <span className="rd-meeting-sop-pipeline-rail__label">SOP 流水线</span>
+                <ChevronRight className="rd-meeting-sop-pipeline-rail__hint" aria-hidden />
+              </button>
+            </Tooltip>
+          </div>
+        ) : (
+          <div className="relative flex w-[320px] shrink-0 flex-col min-h-0 border-r border-border/60 bg-[color:var(--panel)]">
+            <Tooltip title="收起 SOP 流水线" placement="right">
+              <button
+                type="button"
+                aria-label="收起 SOP 流水线"
+                aria-expanded
+                className="rd-meeting-sop-pipeline-edge-handle"
+                onClick={() => setSopPipelineCollapsed(true)}
+              >
+                <ChevronsLeft className="rd-meeting-sop-pipeline-edge-handle__icon" aria-hidden />
+                <span className="rd-meeting-sop-pipeline-edge-handle__label">收起</span>
+              </button>
+            </Tooltip>
+            {/* SOP Stage Navigator */}
+            <div className="px-3 py-3 border-b border-border/40 bg-gradient-to-b from-muted/25 to-background/60 shrink-0">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Layers className="w-3.5 h-3.5 text-foreground/70 shrink-0" />
+                  <span className="text-[11px] font-semibold text-foreground/90 tracking-wide">
+                    SOP 流水线
+                  </span>
+                </div>
+                <span
+                  className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${
+                    (STAGE_NAV_THEME[pipelineStageId] ?? DEFAULT_STAGE_THEME).badge
+                  }`}
+                >
+                  {pipelineStageId}/{MEETING_PIPELINE_STAGES.length}
                 </span>
               </div>
-              <span
-                className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${
-                  (STAGE_NAV_THEME[pipelineStageId] ?? DEFAULT_STAGE_THEME).badge
-                }`}
-              >
-                {pipelineStageId}/{MEETING_PIPELINE_STAGES.length}
-              </span>
+              <MeetingSopStageStepper
+                viewStageId={effectiveViewStageId}
+                pipelineStageId={pipelineStageId}
+                roomCompleted={room.status === 'completed'}
+                roomProcessing={room.status === 'processing'}
+                onSelect={handleStageSelect}
+              />
             </div>
-            <MeetingSopStageStepper
-              viewStageId={effectiveViewStageId}
-              pipelineStageId={pipelineStageId}
-              roomCompleted={room.status === 'completed'}
-              roomProcessing={room.status === 'processing'}
-              onSelect={handleStageSelect}
-            />
-          </div>
 
-          {/* 议题节点列表 */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-            {stageNodes.map((node, idx) => {
+            {/* 议题节点列表 */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+              {stageNodes.map((node, idx) => {
               const state = getNodeStateGlobal(room, node.id, disabledSopNodeIds);
               const typeInfo = getSopNodeTypeInfo(node.type);
               const isSelected = resolvedSelectedNodeId === node.id;
@@ -2652,8 +2740,9 @@ const InterventionDialog = ({
                 </motion.div>
               );
             })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 中栏：节点详情 / 人工确认 */}
         <div className="flex-1 bg-background flex flex-col relative overflow-hidden min-h-0 min-w-0">
@@ -2772,6 +2861,17 @@ const InterventionDialog = ({
                   scopeId={room.scopeId}
                   initialPayload={room.funcSolutionReviewPayload ?? null}
                   blocked={room.funcSolutionBlocked}
+                  onDecided={() => setCenterTab('detail')}
+                />
+              </div>
+            ) : centerTab === 'hitl' && hitlAvailable && interventionPanel === 'unit_test_review' ? (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <UnitTestSopPanel
+                  synapseApiBase={synapseApiBase || ''}
+                  roomId={room.id}
+                  scopeId={room.scopeId}
+                  initialPayload={room.unitTestReviewPayload ?? null}
+                  blocked={room.unitTestBlocked}
                   onDecided={() => setCenterTab('detail')}
                 />
               </div>
@@ -2945,6 +3045,17 @@ const InterventionDialog = ({
                           readOnly
                         />
                       </div>
+                    ) : detailViewMode === 'review' && selectedNode.id === 'unit_test' ? (
+                      <div className="min-h-0 flex-1 overflow-hidden">
+                        <UnitTestSopPanel
+                          key={`detail-ut-${room.id}`}
+                          synapseApiBase={synapseApiBase || ''}
+                          roomId={room.id}
+                          scopeId={room.scopeId}
+                          initialPayload={room.unitTestReviewPayload ?? null}
+                          blocked={room.unitTestBlocked}
+                        />
+                      </div>
                     ) : detailViewMode === 'review' && selectedNode.id === 'leader_review' ? (
                       <div className="min-h-0 flex-1 overflow-hidden">
                         <LeaderReviewSopPanel
@@ -3008,77 +3119,108 @@ const InterventionDialog = ({
           </div>
         </div>
 
-        {/* 右栏：协作会议流 */}
-        <div className="w-[440px] flex flex-col min-h-0 bg-[color:var(--panel)] shrink-0 border-l border-border/60">
-          <div className="h-14 shrink-0 flex items-center border-b border-border/60 px-4 bg-gradient-to-b from-muted/25 to-background/60">
-            <div className="flex items-center gap-3 min-w-0 w-full">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <MessageSquare className="w-3.5 h-3.5 text-violet-400 shrink-0" />
-                <span className="text-[11px] font-semibold text-foreground/90 tracking-wide whitespace-nowrap">
-                  协作会议流
-                </span>
-              </div>
-              <span className="h-4 w-px bg-border/50 shrink-0" aria-hidden />
-              <div className="flex flex-1 items-center gap-1.5 min-w-0 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <Avatar size="small" className="bg-muted text-[9px] ring-2 ring-background shrink-0">我</Avatar>
-                {displayAgents.map((a) => (
-                  <MeetingAgentAvatar
-                    key={a.id}
-                    agent={a}
-                    size="small"
-                    showStatusBadge={false}
-                    showHoverName
-                    onClick={() => openAgentContext(a)}
-                  />
-                ))}
-              </div>
-            </div>
+        {/* 右栏：协作会议流（可侧边收起） */}
+        {chatStreamCollapsed ? (
+          <div className="rd-meeting-chat-stream-rail-wrap">
+            <Tooltip title="展开协作会议流" placement="left">
+              <button
+                type="button"
+                aria-label="展开协作会议流"
+                aria-expanded={false}
+                className="rd-meeting-chat-stream-rail"
+                onClick={() => setChatStreamCollapsed(false)}
+              >
+                <span className="rd-meeting-chat-stream-rail__glow" aria-hidden />
+                <MessageSquare className="rd-meeting-chat-stream-rail__icon" />
+                <span className="rd-meeting-chat-stream-rail__label">协作会议流</span>
+                <ChevronLeft className="rd-meeting-chat-stream-rail__hint" aria-hidden />
+              </button>
+            </Tooltip>
           </div>
-
-          {/* Chat Logs */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar scroll-smooth">
-            <div className="rd-meeting-chat-stream">
-              {displayChatLogs.length === 0 ? <MeetingChatEmpty /> : null}
-              {displayChatLogs.map((log, index) => {
-                const agent = resolveLogAgent(displayAgents, log.agentId, log);
-                const speaker = resolveChatSpeakerName(
-                  log,
-                  agent?.name || resolveSpeakerName(room, log.agentId),
-                );
-                const showAvatar = shouldShowChatAvatar(log);
-                const avatarAgent =
-                  agent ??
-                  (log.speakerRole === 'worker'
-                    ? stubWorkerAgent(log.agentId, speaker)
-                    : undefined);
-                return (
-                  <motion.div
-                    key={log.id || `log-${index}`}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.22 }}
-                  >
-                    <MeetingChatMessage
-                      log={log}
-                      speakerName={speaker}
-                      agent={showAvatar ? avatarAgent : undefined}
-                      showAvatar={showAvatar}
-                      roomId={room.id}
-                      scopeId={room.scopeId}
-                      synapseApiBase={synapseApiBase || ''}
-                      onAvatarClick={
-                        showAvatar && avatarAgent && log.speakerRole !== 'system'
-                          ? () => openAgentContext(avatarAgent)
-                          : undefined
-                      }
+        ) : (
+          <div className="relative flex w-[440px] shrink-0 flex-col min-h-0 border-l border-border/60 bg-[color:var(--panel)]">
+            <Tooltip title="收起协作会议流" placement="left">
+              <button
+                type="button"
+                aria-label="收起协作会议流"
+                aria-expanded
+                className="rd-meeting-chat-stream-edge-handle"
+                onClick={() => setChatStreamCollapsed(true)}
+              >
+                <ChevronsRight className="rd-meeting-chat-stream-edge-handle__icon" aria-hidden />
+                <span className="rd-meeting-chat-stream-edge-handle__label">收起</span>
+              </button>
+            </Tooltip>
+            <div className="h-14 shrink-0 flex items-center border-b border-border/60 px-4 bg-gradient-to-b from-muted/25 to-background/60">
+              <div className="flex items-center gap-3 min-w-0 w-full">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <MessageSquare className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                  <span className="text-[11px] font-semibold text-foreground/90 tracking-wide whitespace-nowrap">
+                    协作会议流
+                  </span>
+                </div>
+                <span className="h-4 w-px bg-border/50 shrink-0" aria-hidden />
+                <div className="flex flex-1 items-center gap-1.5 min-w-0 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <Avatar size="small" className="bg-muted text-[9px] ring-2 ring-background shrink-0">我</Avatar>
+                  {displayAgents.map((a) => (
+                    <MeetingAgentAvatar
+                      key={a.id}
+                      agent={a}
+                      size="small"
+                      showStatusBadge={false}
+                      showHoverName
+                      onClick={() => openAgentContext(a)}
                     />
-                  </motion.div>
-                );
-              })}
+                  ))}
+                </div>
+              </div>
             </div>
-            <div ref={logsEndRef} className="h-2" />
+
+            {/* Chat Logs */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar scroll-smooth">
+              <div className="rd-meeting-chat-stream">
+                {displayChatLogs.length === 0 ? <MeetingChatEmpty /> : null}
+                {displayChatLogs.map((log, index) => {
+                  const agent = resolveLogAgent(displayAgents, log.agentId, log);
+                  const speaker = resolveChatSpeakerName(
+                    log,
+                    agent?.name || resolveSpeakerName(room, log.agentId),
+                  );
+                  const showAvatar = shouldShowChatAvatar(log);
+                  const avatarAgent =
+                    agent ??
+                    (log.speakerRole === 'worker'
+                      ? stubWorkerAgent(log.agentId, speaker)
+                      : undefined);
+                  return (
+                    <motion.div
+                      key={log.id || `log-${index}`}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.22 }}
+                    >
+                      <MeetingChatMessage
+                        log={log}
+                        speakerName={speaker}
+                        agent={showAvatar ? avatarAgent : undefined}
+                        showAvatar={showAvatar}
+                        roomId={room.id}
+                        scopeId={room.scopeId}
+                        synapseApiBase={synapseApiBase || ''}
+                        onAvatarClick={
+                          showAvatar && avatarAgent && log.speakerRole !== 'system'
+                            ? () => openAgentContext(avatarAgent)
+                            : undefined
+                        }
+                      />
+                    </motion.div>
+                  );
+                })}
+              </div>
+              <div ref={logsEndRef} className="h-2" />
+            </div>
           </div>
-        </div>
+        )}
 
         </div>
       </div>

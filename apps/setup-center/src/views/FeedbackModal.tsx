@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { downloadFile, showInFolder, invoke, IS_TAURI, onDragDrop, readFileBase64 } from "../platform";
 import { IconX, IconInfo } from "../icons";
 import { safeFetch } from "../providers";
+import { submitFeedback } from "../api/feedbackService";
+import { fetchIwhalecloudUserinfoSummary } from "../api/rdUnifiedService";
 import {
   Dialog,
   DialogContent,
@@ -44,9 +46,11 @@ type FeedbackModalProps = {
   onNavigateToMyFeedback?: () => void;
   serviceRunning?: boolean;
   currentWorkspaceId?: string | null;
+  /** 提交人工号 ID（Tauri 路径下直接调用 SynapseService 时使用） */
+  assignee_id?: string;
 };
 
-export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", prefill, onNavigateToMyFeedback, serviceRunning = true, currentWorkspaceId }: FeedbackModalProps) {
+export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", prefill, onNavigateToMyFeedback, serviceRunning = true, currentWorkspaceId, assignee_id }: FeedbackModalProps) {
   const { t } = useTranslation();
 
   const [mode, setMode] = useState<FeedbackMode>(initialMode);
@@ -113,16 +117,9 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
   useEffect(() => {
     if (!open) return;
 
-    if (useOfflineIpc) {
-      setSystemInfo({ os: navigator.userAgent, note: "collected_via_tauri_offline" });
-      const wsId = currentWorkspaceId || "default";
-      invoke<{ captcha_scene_id: string; captcha_prefix: string }>("get_feedback_config_offline", { workspaceId: wsId })
-        .then((cfg) => {
-          if (cfg.captcha_scene_id && cfg.captcha_prefix) {
-            setCaptchaCfg({ scene_id: cfg.captcha_scene_id, prefix: cfg.captcha_prefix });
-          }
-        })
-        .catch(() => {});
+    // Tauri 路径走 SynapseService，无需 CAPTCHA，仅收集系统信息
+    if (IS_TAURI) {
+      setSystemInfo({ os: navigator.userAgent, note: "collected_via_tauri" });
       return;
     }
 
@@ -139,7 +136,7 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
         }
       })
       .catch(() => {});
-  }, [open, apiBase, useOfflineIpc, currentWorkspaceId]);
+  }, [open, apiBase, currentWorkspaceId]);
 
   useEffect(() => {
     if (!open || !captchaCfg) return;
@@ -437,13 +434,6 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
   const handleSubmit = useCallback(async () => {
     if (submittingRef.current) return;
     if (!title.trim() || !description.trim()) return;
-    if (captchaCfg && captchaBoundRef.current && !captchaTokenRef.current) return;
-
-    // 一次性消费 captcha token：先取出再立即清空，避免任一路径再次进入时复用同一 token。
-    const token = captchaTokenRef.current || "none";
-    const captchaNonce = captchaNonceRef.current || "";
-    captchaTokenRef.current = "";
-    captchaNonceRef.current = "";
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -455,21 +445,93 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
     abortRef.current = controller;
 
     try {
-      // Offline IPC path: backend is down, submit via Tauri Rust commands
-      if (useOfflineIpc) {
-        try {
-          await handleSubmitViaIpc(token);
-          setUploadProgress(null);
-          resetForm();
-          setPhase("success");
-        } catch (err: any) {
-          setUploadProgress(null);
-          setSubmitResult({ ok: false, msg: err?.message || err?.toString() || t("feedback.uploadFailedNetwork") });
-          setPhase("form");
-          setCaptchaResetKey((k) => k + 1);
+      // New path: Tauri → SynapseService, no CAPTCHA needed
+      if (IS_TAURI) {
+        let s = assignee_id;
+        if (!s) {
+          try {
+            const info = await fetchIwhalecloudUserinfoSummary(apiBase);
+            s = info.employee_id || "";
+          } catch {
+            s = "";
+          }
         }
+        if (!s) {
+          setUploadProgress(null);
+          setSubmitResult({ ok: false, msg: "无法获取提交人工号，请先完成登录" });
+          setPhase("form");
+          return;
+        }
+
+        // 收集诊断日志包（勾选任一即打包，后端按 flag 分别保存）
+        let logZipData: string | undefined;
+        if (mode === "bug" && (uploadLogs || uploadDebug)) {
+          setUploadProgress({ percent: 10, phase: "building", detail: t("feedback.progressPacking") });
+          try {
+            const wsId = currentWorkspaceId || "default";
+            const zipPath = await invoke<string>("export_diagnostic_bundle", {
+              workspaceId: wsId,
+              systemInfoJson: systemInfo ? JSON.stringify(systemInfo) : null,
+            });
+            const dataUrl = await readFileBase64(zipPath);
+            // 剥离 "data:application/zip;base64," 前缀
+            const commaIdx = dataUrl.indexOf(",");
+            logZipData = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+          } catch (err) {
+            console.warn("[feedback] export_diagnostic_bundle failed:", err);
+          }
+        }
+
+        setUploadProgress({ percent: 30, phase: "submitting", detail: "提交反馈..." });
+
+        // 图片转 base64
+        let imagesBase64: { name: string; data: string }[] | undefined;
+        if (imageFiles.length > 0) {
+          imagesBase64 = [];
+          for (const f of imageFiles) {
+            const buf = await f.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            imagesBase64.push({ name: f.name, data: btoa(binary) });
+          }
+        }
+
+        const result = await submitFeedback(apiBase, {
+          type: mode,
+          title: title.trim(),
+          description: description.trim(),
+          steps: mode === "bug" ? steps.trim() : undefined,
+          contact_email: contactEmail.trim() || undefined,
+          contact_wechat: contactWechat.trim() || undefined,
+          system_info: systemInfo ? JSON.stringify(systemInfo) : undefined,
+          upload_logs: mode === "bug" ? (uploadLogs ? 1 : 0) : undefined,
+          upload_debug: mode === "bug" ? (uploadDebug ? 1 : 0) : undefined,
+          images: imageFiles.length > 0 ? imageFiles.map((f) => f.name).join(",") : undefined,
+          images_base64: imagesBase64,
+          log_zip_data: logZipData,
+          assignee_id: s,
+        });
+        console.log("[feedback] SynapseService submit result:", result);
+        setUploadProgress(null);
+        resetForm();
+        setPhase("success");
         return;
       }
+
+      // Web path: require CAPTCHA
+      if (captchaCfg && captchaBoundRef.current && !captchaTokenRef.current) {
+        submittingRef.current = false;
+        setSubmitting(false);
+        setPhase("form");
+        return;
+      }
+
+      // 一次性消费 captcha token：先取出再立即清空，避免任一路径再次进入时复用同一 token。
+      const token = captchaTokenRef.current || "none";
+      const captchaNonce = captchaNonceRef.current || "";
+      captchaTokenRef.current = "";
+      captchaNonceRef.current = "";
 
       const form = new FormData();
       form.append("title", title.trim());
@@ -585,7 +647,7 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
       // `if (submittingRef.current) return;` check at the top of this handler).
       submittingRef.current = false;
     }
-  }, [captchaCfg, mode, title, description, steps, uploadLogs, uploadDebug, contactEmail, contactWechat, imageFiles, apiBase, t, resetForm, useOfflineIpc, handleSubmitViaIpc, handleSseError]);
+  }, [captchaCfg, mode, title, description, steps, uploadLogs, uploadDebug, contactEmail, contactWechat, imageFiles, apiBase, t, resetForm, handleSseError, systemInfo, assignee_id]);
 
   handleSubmitRef.current = handleSubmit;
 
@@ -937,17 +999,12 @@ export function FeedbackModal({ open, onClose, apiBase, initialMode = "bug", pre
               <DialogTitle className="text-[15px]">{t("feedback.submitSuccessTitle")}</DialogTitle>
               <DialogDescription className="sr-only">{t("feedback.submitSuccessTitle")}</DialogDescription>
             </DialogHeader>
-            <div className="px-5 py-4">
-              <p className="text-[14px] text-muted-foreground leading-relaxed">
-                {t("feedback.submitSuccessMessage")}
-              </p>
-            </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
-              <Button variant="outline" size="sm" onClick={() => { onNavigateToMyFeedback?.(); handleClose(); }}>
+              <Button variant="outline" size="sm" onClick={onClose}>
                 {t("feedback.close")}
               </Button>
               {onNavigateToMyFeedback && (
-                <Button size="sm" onClick={() => { onNavigateToMyFeedback(); handleClose(); }}>
+                <Button size="sm" onClick={() => { onNavigateToMyFeedback(); onClose(); }}>
                   {t("myFeedback.viewFeedback")}
                 </Button>
               )}

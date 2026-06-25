@@ -21,8 +21,9 @@ export function rdSessionNameForWorkOrderId(workOrderId: string): string {
   return `synapse-work-${sanitizeWorkOrderSegment(workOrderId)}`;
 }
 
-export function rdProjectPathForWorkOrder(homeDir: string, workOrderId: string): string {
+export function rdProjectPathForWorkOrder(synapseRootDir: string, workOrderId: string): string {
   const seg = sanitizeWorkOrderSegment(workOrderId);
-  const sep = homeDir.includes("\\") ? "\\" : "/";
-  return `${homeDir}${sep}.synapse${sep}work${sep}${seg}`;
+  const sep = synapseRootDir.includes("\\") ? "\\" : "/";
+  const root = synapseRootDir.replace(/[\\/]+$/, "");
+  return `${root}${sep}work${sep}${seg}`;
 }

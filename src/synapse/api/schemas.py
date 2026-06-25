@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 def success_response(data: Any = None, message: str = "success") -> dict:
     return {"errorcode": 0, "message": message, "data": data}
@@ -20,6 +20,8 @@ def error_response(errorcode: int = 500, message: str = "error", error: str | No
 class ChatRequest(BaseModel):
     """Chat request body."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     message: str = Field("", description="User message text")
     conversation_id: str | None = Field(None, description="Conversation ID for context")
     mode: Literal["ask", "plan", "agent"] = Field(
@@ -30,6 +32,10 @@ class ChatRequest(BaseModel):
         False, description="Deprecated: use mode='plan' instead. Kept for backward compatibility."
     )
     endpoint: str | None = Field(None, description="Specific endpoint name (null=auto)")
+    endpoint_policy: Literal["prefer", "require"] = Field(
+        "prefer",
+        description="When endpoint is set: prefer allows fallback; require fails if unavailable.",
+    )
     attachments: list[AttachmentInfo] | None = Field(None, description="Attached files/images")
     thinking_mode: str | None = Field(
         None,
@@ -46,6 +52,20 @@ class ChatRequest(BaseModel):
     client_id: str | None = Field(
         None,
         description="Unique client/tab identifier for multi-device busy-lock coordination.",
+    )
+    org_mode: bool = Field(False, alias="orgMode", description="Route message through org command graph.")
+    org_id: str | None = Field(None, alias="orgId", description="Target org graph id when org_mode is true.")
+    org_node_id: str | None = Field(
+        None, alias="orgNodeId", description="Optional org node id override."
+    )
+    permission_mode: str | None = Field(
+        None,
+        description="Session confirmation mode override (e.g. plan).",
+    )
+    turn_id: str | None = Field(
+        None,
+        alias="turnId",
+        description="Stable per-send id for idempotency / SSE retry.",
     )
 
 
