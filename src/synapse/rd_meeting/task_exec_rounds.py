@@ -276,6 +276,28 @@ def on_task_exec_reprocess_prep(pipe: MeetingPipeline, *, reason: str) -> dict[s
     return entry
 
 
+def on_task_exec_round_retry(scope_id: str) -> dict[str, Any] | None:
+    """当前轮次重试：不新增轮次，重置最后一轮为 running。"""
+    pipe, ctx = _pipeline_context(scope_id)
+    if pipe is None:
+        return None
+    rounds = _rounds_from_ctx(ctx)
+    if not rounds:
+        return None
+    last = rounds[-1]
+    last["status"] = "running"
+    last["started_at"] = _now_iso()
+    last["finished_at"] = None
+    last["summary"] = {}
+    _save_rounds(pipe, rounds)
+    logger.info(
+        "task_exec_rounds: retry current round scope=%s round=%s",
+        scope_id,
+        last.get("round"),
+    )
+    return last
+
+
 def on_task_exec_cli_starting(scope_id: str, *, reason: str = "") -> dict[str, Any] | None:
     """CLI 启动：首轮初始化，或将 pending 轮次标为 running。"""
     pipe, ctx = _pipeline_context(scope_id)

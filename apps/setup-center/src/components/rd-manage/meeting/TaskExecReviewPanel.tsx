@@ -2,7 +2,7 @@
  * 任务执行评审面板：展示 CLI 批量执行结果，供人工确认后推进。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Input, Tabs, message } from 'antd';
+import { Alert, Button, Input, Popconfirm, Tabs, message } from 'antd';
 import {
   Bot,
   CheckCircle2,
@@ -25,6 +25,7 @@ import {
 import {
   fetchTaskExec,
   reprocessMeetingRoom,
+  retryTaskExecCurrentRound,
   submitTaskExecCommit,
   submitTaskExecDecision,
   type TaskExecPayload,
@@ -42,6 +43,8 @@ import { TaskExecCodeDiffPanel } from './TaskExecCodeDiffPanel';
 import { CodeCommitFlightPanel } from './CodeCommitFlightPanel';
 import { CodeCommitProgressSteps } from './CodeCommitProgressSteps';
 import { codeCommitSummaryLine, resolveCodeCommitStepStates } from './codeCommitDisplay';
+import { rdSessionNameForWorkOrderId } from '../../rd-center/rdWorkOrderPaths';
+import { invoke, IS_TAURI } from '../../../platform';
 
 const { TextArea } = Input;
 
@@ -128,6 +131,7 @@ interface Props {
   synapseApiBase: string;
   roomId: string;
   scopeId?: string;
+  ticketId?: string;
   nodeId?: CliExecNodeId;
   initialPayload?: TaskExecPayload | null;
   blocked?: boolean;
@@ -198,10 +202,17 @@ function TaskExecRoundsPanel({
   rounds,
   currentRound,
   variant = 'task_exec',
+  onRetryRound,
+  retryingRound,
+  retryDisabled,
 }: {
   rounds: TaskExecReprocessRound[];
   currentRound?: number;
   variant?: 'task_exec' | 'diff_analysis';
+  /** 当前轮次重试（终止 IDE 终端并重跑） */
+  onRetryRound?: (round: number) => void;
+  retryingRound?: number | null;
+  retryDisabled?: boolean;
 }) {
   if (!rounds.length) return null;
   const total = currentRound || rounds[rounds.length - 1]?.round || rounds.length;
@@ -226,6 +237,12 @@ function TaskExecRoundsPanel({
           const active = round.round === currentRound;
           const reason = (round.reason || '').trim();
           const summary = round.summary;
+          const roundStatus = String(round.status).toLowerCase();
+          const showRetry =
+            Boolean(onRetryRound) &&
+            active &&
+            roundStatus === 'running' &&
+            !retryDisabled;
           return (
             <div
               key={`round-${round.round}`}
@@ -235,29 +252,59 @@ function TaskExecRoundsPanel({
                   : 'border-white/10 bg-black/20'
               }`}
             >
-              <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                <span className="font-semibold text-foreground">第 {round.round} 轮</span>
-                <span className="text-muted-foreground">{roundKindLabel(round.kind, variant)}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] ${
-                    String(round.status).toLowerCase() === 'ok'
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : String(round.status).toLowerCase() === 'running'
-                        ? 'bg-blue-500/15 text-blue-300'
-                        : 'bg-white/10 text-muted-foreground'
-                  }`}
-                >
-                  {roundStatusLabel(round.status)}
-                </span>
-                {summary?.total_tokens ? (
-                  <span className="text-muted-foreground tabular-nums">
-                    {summary.total_tokens} tokens
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px]">
+                  <span className="font-semibold text-foreground">第 {round.round} 轮</span>
+                  <span className="text-muted-foreground">{roundKindLabel(round.kind, variant)}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${
+                      roundStatus === 'ok'
+                        ? 'bg-emerald-500/15 text-emerald-300'
+                        : roundStatus === 'running'
+                          ? 'bg-blue-500/15 text-blue-300'
+                          : 'bg-white/10 text-muted-foreground'
+                    }`}
+                  >
+                    {roundStatusLabel(round.status)}
                   </span>
-                ) : null}
-                {summary?.total_duration_sec ? (
-                  <span className="text-muted-foreground tabular-nums">
-                    {formatDuration(Number(summary.total_duration_sec))}
-                  </span>
+                  {summary?.total_tokens ? (
+                    <span className="text-muted-foreground tabular-nums">
+                      {summary.total_tokens} tokens
+                    </span>
+                  ) : null}
+                  {summary?.total_duration_sec ? (
+                    <span className="text-muted-foreground tabular-nums">
+                      {formatDuration(Number(summary.total_duration_sec))}
+                    </span>
+                  ) : null}
+                </div>
+                {showRetry ? (
+                  <Popconfirm
+                    title={variant === 'diff_analysis' ? '确认重试当前优化轮？' : '确认重试当前轮？'}
+                    description={
+                      variant === 'diff_analysis'
+                        ? '将终止 IDE 终端并重新执行当前优化轮，当前轮次会重复运行。'
+                        : '将终止 IDE 终端并重新执行当前轮次，当前轮次会重复运行。'
+                    }
+                    okText="确认重试"
+                    cancelText="取消"
+                    okButtonProps={{ loading: retryingRound === round.round }}
+                    disabled={retryingRound === round.round}
+                    onConfirm={() => onRetryRound?.(round.round)}
+                  >
+                    <button
+                      type="button"
+                      className="rd-task-exec-round-retry-btn"
+                      disabled={retryingRound === round.round}
+                    >
+                      {retryingRound === round.round ? (
+                        <Loader2 className="rd-task-exec-round-retry-btn__icon animate-spin" />
+                      ) : (
+                        <RotateCw className="rd-task-exec-round-retry-btn__icon" />
+                      )}
+                      重试当前轮
+                    </button>
+                  </Popconfirm>
                 ) : null}
               </div>
               {reason ? (
@@ -278,6 +325,8 @@ function TaskExecRoundsPanel({
     </div>
   );
 }
+
+export { TaskExecRoundsPanel };
 
 function DiffAnalysisTaskRowCard({ task }: { task: TaskExecTaskRow }) {
   const status = String(task.status || '—');
@@ -606,6 +655,8 @@ function TaskRowCard({
 export function TaskExecReviewPanel({
   synapseApiBase,
   roomId,
+  scopeId: _scopeId,
+  ticketId,
   nodeId = 'task_exec',
   initialPayload,
   blocked,
@@ -625,6 +676,7 @@ export function TaskExecReviewPanel({
   const [error, setError] = useState('');
   const [installOpen, setInstallOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [retryingRound, setRetryingRound] = useState<number | null>(null);
   const [committing, setCommitting] = useState(false);
   const [liveTail, setLiveTail] = useState<TaskExecLiveTail | null>(null);
   const [optimizePlanSections, setOptimizePlanSections] = useState<
@@ -698,6 +750,44 @@ export function TaskExecReviewPanel({
     !agentCliMissing &&
     Boolean(payload) &&
     String(payload?.status || '').toLowerCase() !== 'running';
+
+  const onRetryCurrentRound = useCallback(
+    async (_roundNo: number) => {
+      if (roomCompleted || readOnly) {
+        message.warning('当前状态不可重试');
+        return;
+      }
+      if (!isRunning) {
+        message.warning('仅在执行中可重试当前轮次');
+        return;
+      }
+      setRetryingRound(_roundNo);
+      try {
+        const workOrderId = (ticketId || '').trim();
+        if (IS_TAURI && workOrderId) {
+          const sessionName = rdSessionNameForWorkOrderId(workOrderId);
+          try {
+            await invoke('transcripts_stop', { sessionName });
+          } catch {
+            /* ignore */
+          }
+          try {
+            await invoke('agent_psmux_kill_session', { sessionName });
+          } catch {
+            /* ignore */
+          }
+        }
+        await retryTaskExecCurrentRound(synapseApiBase, roomId, { node_id: nodeId });
+        message.success('已终止终端并重试当前轮次');
+        await refresh();
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '重试当前轮次失败');
+      } finally {
+        setRetryingRound(null);
+      }
+    },
+    [isRunning, nodeId, readOnly, refresh, roomCompleted, roomId, synapseApiBase, ticketId],
+  );
 
   const onDecision = async (decision: 'approve') => {
     setSubmitting(true);
@@ -986,6 +1076,9 @@ export function TaskExecReviewPanel({
         rounds={reprocessRounds}
         currentRound={currentRound || undefined}
         variant={isDiffAnalysis ? 'diff_analysis' : 'task_exec'}
+        onRetryRound={readOnly || roomCompleted ? undefined : onRetryCurrentRound}
+        retryingRound={retryingRound}
+        retryDisabled={!isRunning}
       />
 
       {agentCliMissing ? (

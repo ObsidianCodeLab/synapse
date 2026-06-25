@@ -10,6 +10,7 @@ from synapse.rd_meeting.task_exec_rounds import (
     on_task_exec_cli_finished,
     on_task_exec_cli_starting,
     on_task_exec_reprocess_prep,
+    on_task_exec_round_retry,
 )
 
 
@@ -178,3 +179,30 @@ def test_format_task_exec_reprocess_prompt_block_includes_history(tmp_path, monk
     )
     assert "需补单测与边界校验" in prompt
     assert "再加集成测试" in prompt
+
+
+def test_on_task_exec_round_retry_keeps_round_number(tmp_path, monkeypatch):
+    scope_id = "round-retry-scope"
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    (tmp_path / "work" / scope_id).mkdir(parents=True)
+    MeetingPipeline.create(scope_id, scope_type="demand")
+    pipe = MeetingPipeline.load(scope_id)
+    on_task_exec_cli_starting(scope_id, reason="")
+    on_task_exec_cli_finished(
+        scope_id,
+        {"status": "ok", "started_at": "2026-06-16T02:11:07", "finished_at": "2026-06-16T02:17:23"},
+    )
+    on_task_exec_reprocess_prep(pipe, reason="补测")
+    on_task_exec_cli_starting(scope_id, reason="补测")
+
+    before = load_task_exec_rounds(scope_id)
+    assert before[-1]["status"] == "running"
+    round_no = int(before[-1]["round"])
+
+    retried = on_task_exec_round_retry(scope_id)
+    assert retried is not None
+    assert int(retried["round"]) == round_no
+    after = load_task_exec_rounds(scope_id)
+    assert len(after) == len(before)
+    assert after[-1]["status"] == "running"
+    assert after[-1]["finished_at"] is None

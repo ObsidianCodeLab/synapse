@@ -1477,6 +1477,47 @@ class MeetingRoomService:
         titles = build_title_index()
         return self._room_detail_payload(dev, sid, titles)
 
+    def retry_task_exec_current_round(
+        self,
+        room_id: str,
+        *,
+        node_id: str | None = None,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """任务执行/试飞优化：终止卡死 CLI 并重试当前轮次（不增轮次号）。"""
+        rid = (room_id or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+        dev = load_dev_status(sid) or {}
+        rs = load_room_state(sid) or {}
+        effective_node = (
+            (node_id or "").strip()
+            or str(rs.get("current_node_id") or detail.get("current_node_id") or "task_exec")
+        )
+        from synapse.rd_meeting.task_exec import retry_task_exec_current_round
+
+        result = retry_task_exec_current_round(
+            scope_type,
+            sid,
+            rid,
+            node_id=effective_node,
+            agent_pool=agent_pool,
+        )
+        titles = build_title_index()
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload.update(result)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
+
     def assess_node_recovery(
         self,
         room_id: str,

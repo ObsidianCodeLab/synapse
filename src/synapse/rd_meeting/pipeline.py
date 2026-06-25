@@ -1624,7 +1624,13 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     pipe.set_flow_step(STEP_NODE_FINISH, reason=f"系统节点 {run_node} 执行完成，进入收尾")
 
 
-def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
+def _step_task_exec_cli(
+    pipe: MeetingPipeline,
+    ctx: PipelineRunContext,
+    *,
+    resume_checkpoint: dict[str, Any] | None = None,
+    is_round_retry: bool = False,
+) -> None:
     """任务执行 / 试飞优化：CLI 批量处理，完成后进入专用门控（不调用小鲸）。"""
     from synapse.rd_meeting.cli_models import display_cli_model_label, resolve_cli_model_arg
     from synapse.rd_meeting.cli_tools import normalize_cli_tool
@@ -1764,27 +1770,29 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         from synapse.rd_meeting.diff_analysis_exec import write_diff_analysis_cli_starting
         from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_starting
 
-        write_diff_analysis_cli_starting(
-            sid,
-            cli_tool=tool_norm,
-            cli_model=cli_model,
-            cli_model_custom=cli_model_custom,
-            cli_model_label=model_label,
-            demand_no=_resolve_demand_no(scope_type, sid),
-        )
-        on_diff_analysis_cli_starting(sid, reason=reprocess_reason)
+        if not is_round_retry:
+            write_diff_analysis_cli_starting(
+                sid,
+                cli_tool=tool_norm,
+                cli_model=cli_model,
+                cli_model_custom=cli_model_custom,
+                cli_model_label=model_label,
+                demand_no=_resolve_demand_no(scope_type, sid),
+            )
+            on_diff_analysis_cli_starting(sid, reason=reprocess_reason)
     else:
-        write_task_exec_cli_starting(
-            sid,
-            cli_tool=tool_norm,
-            cli_model=cli_model,
-            cli_model_custom=cli_model_custom,
-            cli_model_label=model_label,
-            demand_no=_resolve_demand_no(scope_type, sid),
-        )
         from synapse.rd_meeting.task_exec_rounds import on_task_exec_cli_starting
 
-        on_task_exec_cli_starting(sid, reason=reprocess_reason)
+        if not is_round_retry:
+            write_task_exec_cli_starting(
+                sid,
+                cli_tool=tool_norm,
+                cli_model=cli_model,
+                cli_model_custom=cli_model_custom,
+                cli_model_label=model_label,
+                demand_no=_resolve_demand_no(scope_type, sid),
+            )
+            on_task_exec_cli_starting(sid, reason=reprocess_reason)
     logger.info(
         "%s_cli: bootstrap begin scope=%s tool=%s model=%s",
         run_node,
@@ -1812,10 +1820,6 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
         )
         report_body = render_diff_analysis_report_markdown(result)
         assets_key = "diff_analysis_assets"
-
-        from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_finished
-
-        on_diff_analysis_cli_finished(sid, result)
     else:
         result = bootstrap_task_exec(
             scope_type,  # type: ignore[arg-type]
@@ -1826,12 +1830,22 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
             cli_timeout_seconds=cli_timeout_arg,
             human_suggestions=human_suggestions,
             reprocess_reason=reprocess_reason,
+            resume_checkpoint=resume_checkpoint,
         )
         from synapse.rd_meeting.task_exec import render_task_exec_report_markdown
 
         report_body = render_task_exec_report_markdown(result)
         assets_key = "task_exec_assets"
 
+    if str(result.get("status") or "").lower() == "running":
+        pipe.set_flow_step(STEP_TASK_EXEC_CLI, reason="CLI 执行中（含轮次重试续跑）")
+        return
+
+    if is_diff_analysis:
+        from synapse.rd_meeting.diff_analysis_rounds import on_diff_analysis_cli_finished
+
+        on_diff_analysis_cli_finished(sid, result)
+    else:
         from synapse.rd_meeting.task_exec_rounds import on_task_exec_cli_finished
 
         on_task_exec_cli_finished(sid, result)
@@ -1889,6 +1903,45 @@ def _step_task_exec_cli(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:
     elif is_diff_analysis and result.get("flight_failed"):
         wait_reason = "试飞优化失败：试飞仍未通过，请填写优化建议后重处理"
     pipe.set_flow_step(STEP_WAITING, reason=wait_reason)
+
+
+def retry_step_task_exec_cli(
+    scope_id: str,
+    scope_type: Literal["demand", "task"],
+    *,
+    resume_checkpoint: dict[str, Any],
+    agent_pool: Any | None = None,
+    node_id: str = "task_exec",
+) -> None:
+    """当前轮次重试：从 checkpoint 续跑 CLI 步骤（不新增轮次）。"""
+    sid = (scope_id or "").strip()
+    if not sid or not MeetingPipeline.exists(sid):
+        raise ValueError("pipeline_not_found")
+    pipe = MeetingPipeline.load(sid)
+    dev = load_dev_status(sid) or {}
+    meeting_room = dev.get("meeting_room") if isinstance(dev.get("meeting_room"), dict) else {}
+    room_id = str(pipe.room_id or meeting_room.get("room_id") or "")
+    ticket_title = str(meeting_room.get("ticket_title") or dev.get("ticket_title") or "")
+    ctx = PipelineRunContext(
+        scope_type=scope_type,
+        scope_id=sid,
+        sync_userwork=False,
+        promote_to_processing=False,
+        agent_pool=agent_pool,
+        dev_status=dev,
+        detail={
+            "scope_id": sid,
+            "room_id": room_id,
+            "ticket_title": ticket_title,
+            "current_node_id": node_id,
+        },
+    )
+    _step_task_exec_cli(
+        pipe,
+        ctx,
+        resume_checkpoint=resume_checkpoint,
+        is_round_retry=True,
+    )
 
 
 def _step_node_finish(pipe: MeetingPipeline, ctx: PipelineRunContext) -> None:

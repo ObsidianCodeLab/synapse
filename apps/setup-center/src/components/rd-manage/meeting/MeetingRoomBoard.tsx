@@ -2846,6 +2846,7 @@ const InterventionDialog = ({
                   synapseApiBase={synapseApiBase || ''}
                   roomId={room.id}
                   scopeId={room.scopeId}
+                  ticketId={room.ticketId}
                   nodeId={cliExecNodeId}
                   initialPayload={room.taskExecPayload ?? null}
                   blocked={room.taskExecBlocked}
@@ -3001,6 +3002,7 @@ const InterventionDialog = ({
                           synapseApiBase={synapseApiBase || ''}
                           roomId={room.id}
                           scopeId={room.scopeId}
+                          ticketId={room.ticketId}
                           nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}
@@ -3016,6 +3018,7 @@ const InterventionDialog = ({
                           synapseApiBase={synapseApiBase || ''}
                           roomId={room.id}
                           scopeId={room.scopeId}
+                          ticketId={room.ticketId}
                           nodeId={selectedNode.id === 'diff_analysis' ? 'diff_analysis' : 'task_exec'}
                           initialPayload={room.taskExecPayload ?? null}
                           blocked={room.taskExecBlocked}

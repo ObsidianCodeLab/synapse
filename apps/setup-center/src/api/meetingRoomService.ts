@@ -302,6 +302,18 @@ async function apiPost<T>(base: string, path: string, body: unknown): Promise<T>
   return j.data as T;
 }
 
+async function apiDelete<T>(base: string, path: string): Promise<T> {
+  const res = await fetch(`${base}${path}`, {
+    method: 'DELETE',
+    signal: AbortSignal.timeout(120_000),
+  });
+  const j = await parseJson(res);
+  if (j.errorcode !== 0) {
+    throw new Error(j.message || 'api_error');
+  }
+  return j.data as T;
+}
+
 /** 一键开会 HTTP 超时（正常应秒级返回；超时后尝试按 scope 补救查 room） */
 export const OPEN_MEETING_HTTP_TIMEOUT_MS = 15_000;
 
@@ -886,6 +898,32 @@ export async function saveTaskExecCodeDiff(
     base,
     `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/code-diffs`,
     body,
+  );
+}
+
+export async function discardTaskExecCodeDiff(
+  synapseApiBase: string,
+  roomId: string,
+  fileId: string,
+): Promise<{ discarded: boolean; file: TaskExecCodeDiffFile | null }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  const q = new URLSearchParams({ file_id: fileId });
+  return apiDelete<{ discarded: boolean; file: TaskExecCodeDiffFile | null }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/code-diffs?${q.toString()}`,
+  );
+}
+
+export async function retryTaskExecCurrentRound(
+  synapseApiBase: string,
+  roomId: string,
+  body?: { node_id?: string },
+): Promise<{ current_round?: number; retry_round?: number }> {
+  const base = synapseApiBase.replace(/\/$/, '');
+  return apiPost<{ current_round?: number; retry_round?: number }>(
+    base,
+    `/api/dev/meeting-rooms/${encodeURIComponent(roomId)}/task-exec/retry-round`,
+    body ?? {},
   );
 }
 

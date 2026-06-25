@@ -1032,7 +1032,7 @@ textarea:not([data-slot]):focus {
 
 /* (legacy btnSmall override removed; see status section) */
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn):not(.rd-meeting-chat-stream-rail):not(.rd-meeting-chat-stream-edge-handle):not(.rd-meeting-sop-pipeline-rail):not(.rd-meeting-sop-pipeline-edge-handle) {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn):not(.rd-meeting-chat-stream-rail):not(.rd-meeting-chat-stream-edge-handle):not(.rd-meeting-sop-pipeline-rail):not(.rd-meeting-sop-pipeline-edge-handle):not(.rd-task-exec-round-retry-btn) {
   border: 0;
   cursor: pointer;
   border-radius: 14px;
@@ -1045,12 +1045,12 @@ button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNati
   transition: background 0.15s, border-color 0.15s;
 }
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):not(.rd-meeting-node-stop-btn):not(.rd-meeting-node-reprocess-btn):not(.rd-meeting-soul-btn):not(.rd-meeting-soul-alert):not(.rd-leader-review-inline-btn):not(.rd-leader-review-action-btn):not(.rd-leader-review-picker-option):not(.rd-leader-review-comment-modal-close):not(.rd-leader-review-comment-modal-btn):not(.rd-leader-review-refresh-btn):not(.rd-task-exec-round-retry-btn):not(.btnPrimary):not(.btnDanger):not(.btnApplyRestart):hover {
   background: var(--bg-app);
   border-color: var(--muted2);
 }
 
-button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):disabled {
+button:not([data-slot]):not([data-close-button]):not([data-button]):not(.winNativeTitlebarBtn):not(.rd-meeting-config-switch):not(.rd-meeting-worker-picker__trigger):not(.rd-meeting-worker-picker__option):disabled:not(.rd-task-exec-round-retry-btn) {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -7452,6 +7452,108 @@ button.rd-meeting-node-reprocess-btn:hover:not(:disabled) {
   border-color: rgb(34 211 238 / 0.75) !important;
   background: rgb(34 211 238 / 0.38) !important;
   color: rgb(255 255 255) !important;
+}
+
+/* 代码差异 · 放弃变更（与保存按钮同高，红底白字，默认即高对比） */
+.rd-task-exec-discard-btn.ant-btn {
+  min-height: 18px;
+  height: 18px;
+  padding: 0 6px !important;
+  font-size: 10px;
+  line-height: 16px;
+  border: 1px solid rgb(248 113 113 / 0.85) !important;
+  border-radius: 9999px !important;
+  background: rgb(220 38 38 / 0.92) !important;
+  color: rgb(255 255 255) !important;
+  box-shadow: 0 0 0 1px rgb(248 113 113 / 0.25), 0 1px 4px rgb(0 0 0 / 0.35) !important;
+}
+.rd-task-exec-discard-btn.ant-btn .ant-btn-icon {
+  font-size: 10px;
+  line-height: 0;
+}
+.rd-task-exec-discard-btn.ant-btn:not(:disabled):hover {
+  border-color: rgb(252 165 165) !important;
+  background: rgb(239 68 68 / 0.98) !important;
+  color: rgb(255 255 255) !important;
+  box-shadow: 0 0 0 1px rgb(252 165 165 / 0.35), 0 0 10px rgb(239 68 68 / 0.35) !important;
+}
+.rd-task-exec-discard-btn.ant-btn:not(:disabled):active {
+  border-color: rgb(254 202 202) !important;
+  background: rgb(185 28 28 / 1) !important;
+  color: rgb(255 255 255) !important;
+}
+.rd-task-exec-discard-btn.ant-btn:disabled {
+  opacity: 0.55;
+  border-color: rgb(248 113 113 / 0.5) !important;
+  background: rgb(127 29 29 / 0.75) !important;
+  color: rgb(254 226 226) !important;
+}
+.rd-task-exec-discard-btn--icon.ant-btn {
+  width: 18px;
+  min-width: 18px;
+  padding: 0 !important;
+}
+.rd-task-exec-discard-btn--icon.ant-btn .ant-btn-icon {
+  margin-inline-end: 0 !important;
+}
+
+/* 执行轮次 · 右侧重试操作（独立小按钮，不跟状态 pill 挤一行） */
+button.rd-task-exec-round-retry-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid rgb(167 139 250 / 0.42) !important;
+  border-radius: 9999px !important;
+  background: linear-gradient(
+    180deg,
+    rgb(139 92 246 / 0.32),
+    rgb(109 40 217 / 0.24)
+  ) !important;
+  color: rgb(237 233 254) !important;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.28),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+}
+button.rd-task-exec-round-retry-btn .rd-task-exec-round-retry-btn__icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+button.rd-task-exec-round-retry-btn:hover:not(:disabled) {
+  border-color: rgb(196 181 253 / 0.65) !important;
+  background: linear-gradient(
+    180deg,
+    rgb(139 92 246 / 0.45),
+    rgb(124 58 237 / 0.36)
+  ) !important;
+  color: rgb(255 255 255) !important;
+  box-shadow:
+    0 0 0 1px rgb(167 139 250 / 0.2),
+    0 2px 8px rgb(109 40 217 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+button.rd-task-exec-round-retry-btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+button.rd-task-exec-round-retry-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 /* 任务执行 inline diff：隐藏原稿侧行号列，只保留改后行号（Monaco 默认双列） */

@@ -2,10 +2,11 @@
  * 任务执行评审 · 代码差异（Monaco 单窗 inline diff：全量文件 + 红删绿增高亮）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Segmented, message } from 'antd';
+import { Alert, Button, Popconfirm, Segmented, message } from 'antd';
 import { DiffEditor } from '@monaco-editor/react';
-import { GitBranch, Loader2, Plus, Minus, Save } from 'lucide-react';
+import { GitBranch, Loader2, Plus, Minus, Save, X } from 'lucide-react';
 import {
+  discardTaskExecCodeDiff,
   fetchTaskExecCodeDiffs,
   saveTaskExecCodeDiff,
   type TaskExecCodeDiffFile,
@@ -173,6 +174,7 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
   const [activeId, setActiveId] = useState('');
   const [textEncoding, setTextEncoding] = useState<DiffTextEncoding>('utf-8');
   const [saving, setSaving] = useState(false);
+  const [discardingId, setDiscardingId] = useState('');
   const [dirtyRevision, setDirtyRevision] = useState(0);
   const editedByIdRef = useRef<Record<string, string>>({});
   const editorBaselineByIdRef = useRef<Record<string, string>>({});
@@ -283,6 +285,41 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
     [],
   );
 
+  const onDiscardFile = useCallback(
+    async (file: TaskExecCodeDiffFile) => {
+      if (isFileDirty(file)) {
+        message.warning('当前文件有未保存的编辑，请先保存或手动撤销后再放弃');
+        return;
+      }
+      setDiscardingId(file.id);
+      try {
+        const res = await discardTaskExecCodeDiff(synapseApiBase, roomId, file.id);
+        if (res.discarded) {
+          setFiles((prev) => {
+            const next = prev.filter((f) => f.id !== file.id);
+            if (activeId === file.id) {
+              setActiveId(next[0]?.id || '');
+            }
+            return next;
+          });
+          delete editedByIdRef.current[file.id];
+          delete editorBaselineByIdRef.current[file.id];
+          setDirtyRevision((n) => n + 1);
+          message.success('已放弃该文件的变更');
+        } else if (res.file) {
+          setFiles((prev) => prev.map((f) => (f.id === res.file!.id ? res.file! : f)));
+          message.success('已恢复为 git HEAD 状态');
+        }
+        void refresh();
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '放弃变更失败');
+      } finally {
+        setDiscardingId('');
+      }
+    },
+    [activeId, isFileDirty, refresh, roomId, synapseApiBase],
+  );
+
   const onSaveActive = useCallback(async () => {
     if (!activeFile || !activeEditable) return;
     const content = getEditedContent(activeFile);
@@ -390,25 +427,50 @@ export function TaskExecCodeDiffPanel({ synapseApiBase, roomId }: Props) {
                 const dirty = fileDirty(file);
                 const name = fileBaseName(file.path);
                 return (
-                  <button
+                  <div
                     key={file.id}
-                    type="button"
-                    title={fileTooltip(file)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-left transition-colors ${
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-md border pr-1 transition-colors ${
                       active
                         ? 'border-cyan-400/35 bg-cyan-500/15'
                         : 'border-white/10 bg-black/20 hover:bg-white/5'
                     }`}
-                    onClick={() => onSelectFile(file.id)}
                   >
-                    <span className="max-w-[12rem] truncate text-[11px] font-medium text-foreground">
-                      {name}
-                      {dirty ? ' *' : ''}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">{statusLabel(file.status)}</span>
-                    <span className="text-[10px] text-emerald-300/90">+{file.additions ?? 0}</span>
-                    <span className="text-[10px] text-rose-300/90">-{file.deletions ?? 0}</span>
-                  </button>
+                    <button
+                      type="button"
+                      title={fileTooltip(file)}
+                      className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-left"
+                      onClick={() => onSelectFile(file.id)}
+                    >
+                      <span className="max-w-[12rem] truncate text-[11px] font-medium text-foreground">
+                        {name}
+                        {dirty ? ' *' : ''}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{statusLabel(file.status)}</span>
+                      <span className="text-[10px] text-emerald-300/90">+{file.additions ?? 0}</span>
+                      <span className="text-[10px] text-rose-300/90">-{file.deletions ?? 0}</span>
+                    </button>
+                    <Popconfirm
+                      title="放弃此文件的全部变更？"
+                      description="将恢复为 git HEAD 状态，此操作不可撤销。"
+                      okText="放弃"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true, loading: discardingId === file.id }}
+                      onConfirm={() => void onDiscardFile(file)}
+                    >
+                      <Button
+                        type="primary"
+                        danger
+                        size="small"
+                        className="rd-task-exec-discard-btn rd-task-exec-discard-btn--icon"
+                        title="放弃此文件变更"
+                        aria-label="放弃此文件变更"
+                        icon={<X className="h-3 w-3" strokeWidth={2.5} />}
+                        loading={discardingId === file.id}
+                        disabled={discardingId === file.id}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Popconfirm>
+                  </div>
                 );
               })}
             </div>

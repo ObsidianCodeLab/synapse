@@ -1181,6 +1181,89 @@ async def save_task_exec_code_diff(room_id: str, body: TaskExecCodeDiffSaveBody,
     )
 
 
+@router.delete("/api/dev/meeting-rooms/{room_id}/task-exec/code-diffs")
+async def discard_task_exec_code_diff(
+    room_id: str,
+    file_id: str = "",
+    node_id: str = "",
+) -> dict:
+    """任务执行评审：放弃单个文件的未提交变更（恢复 git HEAD）。"""
+    resolved = _resolve_scope_for_room(room_id)
+    if resolved is None:
+        return error_response(404, "meeting_room_not_found")
+    sid, _ = resolved
+    from synapse.rd_meeting.dev_status import load_dev_status
+    from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+    from synapse.rd_meeting.task_exec import load_task_exec_payload
+    from synapse.rd_meeting.task_exec_code_diff import discard_task_exec_code_diff_file
+
+    room_state = load_room_state(sid) or {}
+    pending = room_state.get("pending_delivery") if isinstance(room_state.get("pending_delivery"), dict) else {}
+    dev = load_dev_status(sid) or {}
+    effective_node = (node_id or pending.get("node_id") or dev.get("current_node_id") or "task_exec").strip()
+
+    if effective_node == "diff_analysis":
+        payload = load_diff_analysis_payload(sid)
+    else:
+        payload = load_task_exec_payload(sid)
+    if payload is None:
+        return error_response(404, "task_exec_not_found")
+    if str(payload.get("status") or "").lower() == "running":
+        return error_response(409, "task_exec_still_running")
+
+    needle = str(file_id or "").strip()
+    if not needle:
+        return error_response(400, "code_diff_file_id_required")
+
+    try:
+        file_entry = discard_task_exec_code_diff_file(sid, needle)
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except Exception as exc:
+        logger.exception("discard_task_exec_code_diff failed: %s", exc)
+        return error_response(500, "code_diff_discard_failed", str(exc))
+
+    discarded = bool(file_entry.get("discarded"))
+    return success_response(
+        {
+            "room_id": room_id,
+            "scope_id": sid,
+            "file": None if discarded else file_entry,
+            "discarded": discarded,
+        }
+    )
+
+
+class TaskExecRetryRoundBody(BaseModel):
+    node_id: str | None = Field(None, description="task_exec | diff_analysis；缺省为当前节点")
+
+
+@router.post("/api/dev/meeting-rooms/{room_id}/task-exec/retry-round")
+async def retry_task_exec_current_round_api(
+    room_id: str,
+    request: Request,
+    body: TaskExecRetryRoundBody | None = None,
+) -> dict:
+    """任务执行：终止 IDE/CLI 并重试当前轮次（不新增轮次号）。"""
+    pool = getattr(request.app.state, "agent_pool", None)
+    node_id = (body.node_id if body else None) or None
+    try:
+        item = await _service_call(
+            _service.retry_task_exec_current_round,
+            room_id,
+            node_id=node_id,
+            agent_pool=pool,
+        )
+        return success_response(item)
+    except ValueError as exc:
+        msg = str(exc)
+        code = 404 if "not_found" in msg else 400
+        return error_response(code, msg)
+    except Exception as exc:
+        logger.exception("retry_task_exec_current_round failed: %s", exc)
+        return error_response(500, "task_exec_retry_round_failed", str(exc))
+
+
 @router.post("/api/dev/meeting-rooms/{room_id}/task-exec/commit")
 async def submit_task_exec_commit(room_id: str, request: Request, node_id: str = "") -> dict:
     """试飞优化：人工确认开发结果后触发代码提交与试飞等待。"""

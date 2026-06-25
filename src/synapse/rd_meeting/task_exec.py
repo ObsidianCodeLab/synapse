@@ -55,6 +55,106 @@ ScopeType = Literal["demand", "task"]
 
 CLI_EXEC_NODE_IDS = frozenset({NODE_ID, "diff_analysis"})
 
+# 运行中 CLI 子进程登记，供「当前轮次重试」终止卡死进程
+_ACTIVE_CLI_PROCS: dict[str, subprocess.Popen[str]] = {}
+_CLI_KILL_REQUESTED: set[str] = set()
+
+
+def kill_task_exec_cli_process(scope_id: str) -> bool:
+    """终止 scope 下正在运行的 Cursor CLI 子进程（若存在）。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return False
+    _CLI_KILL_REQUESTED.add(sid)
+    proc = _ACTIVE_CLI_PROCS.pop(sid, None)
+    if proc is None:
+        return False
+    if proc.poll() is None:
+        try:
+            proc.kill()
+            proc.wait(timeout=15)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            logger.warning("kill task_exec CLI failed scope=%s: %s", sid, exc)
+    return True
+
+
+def build_task_exec_resume_checkpoint(result_doc: dict[str, Any]) -> dict[str, Any]:
+    """从 running 态 task_exec_result 提取重试 checkpoint（保留已完成子单）。"""
+    tasks = [t for t in (result_doc.get("tasks") or []) if isinstance(t, dict)]
+    progress = result_doc.get("progress") if isinstance(result_doc.get("progress"), dict) else {}
+    completed = [t for t in tasks if str(t.get("status") or "").lower() != "running"]
+    running = next((t for t in tasks if str(t.get("status") or "").lower() == "running"), None)
+    task_index = int(progress.get("task_index") or len(completed) + 1)
+    phase = str(
+        progress.get("phase") or (running.get("phase") if isinstance(running, dict) else "") or "develop"
+    ).lower()
+    return {
+        "task_rows": completed,
+        "task_index": max(1, task_index),
+        "phase": phase if phase in ("develop", "verify") else "develop",
+    }
+
+
+def retry_task_exec_current_round(
+    scope_type: ScopeType,
+    scope_id: str,
+    room_id: str,
+    *,
+    node_id: str = "task_exec",
+    agent_pool: Any | None = None,
+) -> dict[str, Any]:
+    """终止卡死 CLI 并从当前轮次 checkpoint 重跑（不增加轮次号）。"""
+    sid = (scope_id or "").strip()
+    rid = (room_id or "").strip()
+    nid = (node_id or NODE_ID).strip()
+    if not sid or not rid:
+        raise ValueError("scope_id required")
+
+    if nid == "diff_analysis":
+        from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+
+        payload = load_diff_analysis_payload(sid)
+    else:
+        payload = load_task_exec_payload(sid)
+
+    if not isinstance(payload, dict) or str(payload.get("status") or "").lower() != "running":
+        raise ValueError("task_exec_not_running")
+
+    checkpoint = build_task_exec_resume_checkpoint(payload)
+    cleaned = dict(payload)
+    cleaned["tasks"] = list(checkpoint.get("task_rows") or [])
+    cleaned["status"] = "running"
+    _persist_task_exec_state(sid, cleaned)
+
+    from synapse.rd_meeting.orchestrator import cancel_room_run, schedule_pipeline_background
+    from synapse.rd_meeting.task_exec_rounds import current_task_exec_round, on_task_exec_round_retry
+
+    kill_task_exec_cli_process(sid)
+    cancel_room_run(rid)
+    round_entry = on_task_exec_round_retry(sid)
+
+    def _rerun() -> None:
+        from synapse.rd_meeting.pipeline import retry_step_task_exec_cli
+
+        retry_step_task_exec_cli(
+            sid,
+            scope_type,
+            resume_checkpoint=checkpoint,
+            agent_pool=agent_pool,
+            node_id=nid,
+        )
+
+    schedule_pipeline_background(rid, _rerun, scope_id=sid)
+    return {
+        "room_id": rid,
+        "scope_id": sid,
+        "node_id": nid,
+        "current_round": current_task_exec_round(sid),
+        "retry_round": int((round_entry or {}).get("round") or current_task_exec_round(sid)),
+        "resume_task_index": checkpoint.get("task_index"),
+        "resume_phase": checkpoint.get("phase"),
+    }
+
 
 def uses_task_exec_cli(node_id: str) -> bool:
     """任务执行 / 试飞优化等走 CLI 批量处理、跳过小鲸主控的节点。"""
@@ -543,6 +643,7 @@ def _run_cursor_cli_round(
     resume_session_id: str = "",
     phase: str = "develop",
     model: str | None = None,
+    scope_id: str = "",
 ) -> dict[str, Any]:
     script = _cursor_operation_script()
     if not script.is_file():
@@ -590,24 +691,31 @@ def _run_cursor_cli_round(
     if model is not None:
         argv.extend(["--model", model])
 
+    sid = (scope_id or "").strip()
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             argv,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=timeout + 120,
             cwd=str(Path(code_path).parent if Path(code_path).is_dir() else scope_dir("")),
         )
-    except subprocess.TimeoutExpired:
-        return {
-            "status": "failed",
-            "error": f"CLI 超时（>{timeout}s）",
-            "duration_seconds": int(time.monotonic() - started),
-            "tokens_used": 0,
-            "log_path": str(log_path),
-        }
+        if sid:
+            _ACTIVE_CLI_PROCS[sid] = proc
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout + 120)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
+            return {
+                "status": "failed",
+                "error": f"CLI 超时（>{timeout}s）",
+                "duration_seconds": int(time.monotonic() - started),
+                "tokens_used": 0,
+                "log_path": str(log_path),
+            }
     except OSError as exc:
         return {
             "status": "failed",
@@ -616,8 +724,25 @@ def _run_cursor_cli_round(
             "tokens_used": 0,
             "log_path": str(log_path),
         }
+    finally:
+        if sid:
+            _ACTIVE_CLI_PROCS.pop(sid, None)
+            killed = sid in _CLI_KILL_REQUESTED
+            _CLI_KILL_REQUESTED.discard(sid)
+        else:
+            killed = False
 
-    parsed = _parse_cursor_subprocess_output(proc.stdout)
+    if killed or (proc.returncode is not None and proc.returncode < 0):
+        return {
+            "status": "cancelled",
+            "error": "CLI 进程已终止（当前轮次重试）",
+            "duration_seconds": int(time.monotonic() - started),
+            "tokens_used": 0,
+            "log_path": str(log_path),
+            "exit_code": proc.returncode,
+        }
+
+    parsed = _parse_cursor_subprocess_output(stdout)
     ok = parsed["success"] and proc.returncode == 0
     effective_log = str(parsed.get("log_path") or log_path)
     log_metrics = _parse_cli_round_metrics_from_log(effective_log)
@@ -631,10 +756,10 @@ def _run_cursor_cli_round(
     tokens_used = int(
         log_metrics.get("tokens_used") or parsed.get("tokens_used") or 0
     )
-    stderr = (proc.stderr or "").strip()
+    stderr = (stderr or "").strip()
     result: dict[str, Any] = {
         "status": "ok" if ok else "failed",
-        "error": "" if ok else (stderr or proc.stdout or f"exit={proc.returncode}")[:2000],
+        "error": "" if ok else (stderr or stdout or f"exit={proc.returncode}")[:2000],
         "duration_ms": duration_ms,
         "duration_seconds": duration_seconds,
         "tokens_used": tokens_used,
@@ -1015,6 +1140,7 @@ def bootstrap_task_exec(
     cli_timeout_seconds: int | None = None,
     human_suggestions: str = "",
     reprocess_reason: str | None = None,
+    resume_checkpoint: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """循环处理工单：CLI 开发 + 完成检测 + 持久化。"""
     sid = (scope_id or "").strip()
@@ -1101,14 +1227,24 @@ def bootstrap_task_exec(
     log_root = work_dir / "agents" / NODE_ID / "cli_logs"
     log_root.mkdir(parents=True, exist_ok=True)
 
-    task_rows: list[dict[str, Any]] = []
+    checkpoint = resume_checkpoint if isinstance(resume_checkpoint, dict) else {}
+    start_task_index = int(checkpoint.get("task_index") or 1)
+    resume_phase = str(checkpoint.get("phase") or "develop").lower()
+    if resume_phase not in ("develop", "verify"):
+        resume_phase = "develop"
+
+    task_rows: list[dict[str, Any]] = list(checkpoint.get("task_rows") or [])
     task_total = len(orders)
     started_at = datetime.now().isoformat(timespec="seconds")
+
+    resume_hint = ""
+    if checkpoint:
+        resume_hint = f"（从第 {start_task_index} 个子单 · {resume_phase} 轮续跑）"
 
     _emit_task_exec_progress(
         sid,
         event="task_exec_cli_running",
-        message=f"开始 CLI 任务执行，共 {task_total} 个研发子单",
+        message=f"开始 CLI 任务执行，共 {task_total} 个研发子单{resume_hint}",
         room_id=room_id,
         task_total=task_total,
     )
@@ -1158,6 +1294,9 @@ def bootstrap_task_exec(
 
     for order_index, order in enumerate(orders):
         task_index = order_index + 1
+        if task_index < start_task_index:
+            continue
+        skip_develop = task_index == start_task_index and resume_phase == "verify"
         sandbox_path = str(order.get("sandbox_path") or "").strip()
         task_key = str(order.get("task_no") or order.get("index"))
         task_no = str(order.get("task_no") or task_key)
@@ -1290,16 +1429,38 @@ def bootstrap_task_exec(
             live_log_path=str(dev_log),
         )
 
-        dev_result = _run_cursor_cli_round(
-            code_path=sandbox_path,
-            target=develop_prompt,
-            func_doc=func_doc,
-            accept_doc=accept_doc,
-            log_path=dev_log,
-            model=model_arg,
-            timeout=cli_timeout,
-            phase="develop",
-        )
+        if skip_develop:
+            dev_result = {
+                "status": "ok",
+                "error": "",
+                "duration_seconds": 0,
+                "tokens_used": 0,
+                "log_path": str(dev_log),
+            }
+        else:
+            dev_result = _run_cursor_cli_round(
+                code_path=sandbox_path,
+                target=develop_prompt,
+                func_doc=func_doc,
+                accept_doc=accept_doc,
+                log_path=dev_log,
+                model=model_arg,
+                timeout=cli_timeout,
+                phase="develop",
+                scope_id=sid,
+            )
+        if dev_result.get("status") == "cancelled":
+            _sync_running(
+                phase="develop",
+                message=f"工单 {task_no} · 开发轮已终止，等待重试",
+                task_index=task_index,
+                task_no=task_no,
+                tasks=[*task_rows, running_row],
+                live_log_path=str(dev_log),
+            )
+            result_doc["status"] = "running"
+            _persist_task_exec_state(sid, result_doc)
+            return result_doc
         _emit_task_exec_progress(
             sid,
             event="task_exec_develop_finished",
@@ -1378,7 +1539,20 @@ def bootstrap_task_exec(
             model=model_arg,
             timeout=cli_timeout,
             phase="verify",
+            scope_id=sid,
         )
+        if verify_result.get("status") == "cancelled":
+            _sync_running(
+                phase="verify",
+                message=f"工单 {task_no} · 完成检测已终止，等待重试",
+                task_index=task_index,
+                task_no=task_no,
+                tasks=[*task_rows, running_row],
+                live_log_path=str(verify_log),
+            )
+            result_doc["status"] = "running"
+            _persist_task_exec_state(sid, result_doc)
+            return result_doc
 
         report_md = _extract_report_from_log(str(verify_result.get("log_path") or verify_log))
         completion = _infer_completion_status(report_md, dev_result.get("status") == "ok")

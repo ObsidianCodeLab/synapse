@@ -579,6 +579,96 @@ def find_task_exec_code_diff_file(scope_id: str, file_id: str) -> dict[str, Any]
     return None
 
 
+def discard_task_exec_code_diff_file(scope_id: str, file_id: str) -> dict[str, Any]:
+    """放弃单个文件的未提交变更，恢复为 git HEAD 状态（或删除新增未跟踪文件）。"""
+    entry = find_task_exec_code_diff_file(scope_id, file_id)
+    if entry is None:
+        raise ValueError("code_diff_file_not_found")
+
+    sandbox = str(entry.get("sandbox_path") or "").strip()
+    rel_path = str(entry.get("path") or "").strip()
+    status = str(entry.get("status") or "").lower()
+    if not sandbox or not rel_path:
+        raise ValueError("code_diff_file_not_found")
+
+    declared = Path(sandbox)
+    if not declared.is_dir():
+        raise ValueError("sandbox_not_found")
+
+    repo_root = _resolve_git_repo_root(declared) or declared
+    if not should_include_diff_file(rel_path):
+        raise ValueError("code_diff_file_not_allowed")
+
+    target = _repo_file_path(repo_root, rel_path)
+    _assert_path_within_repo(repo_root, target)
+
+    if status == "added":
+        if target.is_file():
+            try:
+                target.unlink()
+            except OSError as exc:
+                logger.warning("discard added file unlink failed %s: %s", target, exc)
+                raise ValueError("code_diff_discard_failed") from exc
+        _run_git(["git", "-C", str(repo_root), "clean", "-fd", "--", rel_path], timeout=60.0)
+    elif status == "deleted":
+        ok, err = _run_git(
+            ["git", "-C", str(repo_root), "restore", "--source=HEAD", "--worktree", "--", rel_path],
+            timeout=60.0,
+        )
+        if not ok:
+            ok2, _ = _run_git(
+                ["git", "-C", str(repo_root), "checkout", "HEAD", "--", rel_path],
+                timeout=60.0,
+            )
+            if not ok2:
+                raise ValueError("code_diff_discard_failed") from None
+            if err and not ok:
+                logger.debug("discard deleted restore fallback: %s", err)
+    else:
+        ok, err = _run_git(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "restore",
+                "--source=HEAD",
+                "--worktree",
+                "--staged",
+                "--",
+                rel_path,
+            ],
+            timeout=60.0,
+        )
+        if not ok:
+            ok2, _ = _run_git(
+                ["git", "-C", str(repo_root), "checkout", "HEAD", "--", rel_path],
+                timeout=60.0,
+            )
+            if not ok2:
+                raise ValueError("code_diff_discard_failed") from None
+            if err:
+                logger.debug("discard modified restore fallback: %s", err)
+
+    task_no = str(entry.get("task_no") or "").strip()
+    for fresh in collect_repo_code_diff_files(sandbox):
+        if str(fresh.get("path") or "") == rel_path:
+            out_id = f"{task_no}:{rel_path}" if task_no else rel_path
+            return {
+                **fresh,
+                "id": out_id,
+                "task_no": task_no,
+                "sandbox_path": sandbox,
+            }
+    return {
+        "id": file_id,
+        "path": rel_path,
+        "task_no": task_no,
+        "sandbox_path": sandbox,
+        "discarded": True,
+        "status": "unchanged",
+    }
+
+
 def save_task_exec_code_diff_file(
     scope_id: str,
     file_id: str,

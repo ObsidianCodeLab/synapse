@@ -130,6 +130,7 @@ export type ViewId =
   | "workbench_meeting"
   | "workbench_sandbox"
   | "workbench_team"
+  | "task_exec_ops_demo"
   | `plugin_app:${string}`;
 
 export type PluginUIApp = {

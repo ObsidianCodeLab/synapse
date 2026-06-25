@@ -13,6 +13,7 @@ from synapse.rd_meeting.task_exec_code_diff import (
     collect_repo_commit_stage_paths,
     collect_task_exec_code_diffs,
     decode_text_bytes,
+    discard_task_exec_code_diff_file,
     is_test_file,
     save_task_exec_code_diff_file,
     should_include_commit_file,
@@ -318,3 +319,37 @@ def test_decode_git_quoted_path_unicode() -> None:
     status_out = f'?? {quoted}\n'
     rows = _parse_status_paths(status_out)
     assert rows == [("added", "archive/开发中/task_exec/单元测试用例列表.md")]
+
+
+def test_discard_task_exec_code_diff_file_modified(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scope_id = "te-discard-mod"
+    repo = tmp_path / "sandbox"
+    repo.mkdir()
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "test")
+    (repo / "App.py").write_text("v1\n", encoding="utf-8")
+    _git(repo, "add", "App.py")
+    _git(repo, "commit", "-m", "init")
+    (repo / "App.py").write_text("v2\n", encoding="utf-8")
+
+    archive = tmp_path / "work" / scope_id / "archive" / "开发中" / "task_exec"
+    archive.mkdir(parents=True)
+    payload = {
+        "status": "partial",
+        "tasks": [{"task_no": "T-1", "status": "ok", "sandbox_path": str(repo)}],
+    }
+    import json
+
+    (archive / "task_exec_result.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr("synapse.rd_meeting.paths.work_root", lambda: tmp_path / "work")
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.archive_node_dir",
+        lambda sid, stage, nid: archive,
+    )
+    monkeypatch.setattr("synapse.rd_meeting.task_exec.stage_name_for_id", lambda _s: "开发中")
+
+    out = discard_task_exec_code_diff_file(scope_id, "T-1:App.py")
+    assert out.get("discarded") is True or out.get("path") == "App.py"
+    assert (repo / "App.py").read_text(encoding="utf-8") == "v1\n"
+    assert collect_repo_code_diff_files(str(repo)) == []

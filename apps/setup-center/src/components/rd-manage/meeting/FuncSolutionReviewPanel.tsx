@@ -1,7 +1,7 @@
 /**
  * 函数级方案评审面板：解析改造方案，按 需求 → 模块 展示；GitHub PR 式逐条打勾评审
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -296,14 +296,18 @@ const CollapseToggle: React.FC<{
   </button>
 );
 
+type ScrollAnchorCapture = (anchorEl: HTMLElement) => void;
+
 const PlanReviewCard: React.FC<{
   plan: FuncSolutionTransformationPlan;
   index: number;
   draft: PlanDraft;
   onChange: (next: PlanDraft) => void;
+  onBeforeCollapse?: ScrollAnchorCapture;
   isDark: boolean;
   readOnly?: boolean;
-}> = ({ plan, index, draft, onChange, isDark, readOnly = false }) => {
+}> = ({ plan, index, draft, onChange, onBeforeCollapse, isDark, readOnly = false }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
   const approved = draft.status === 'approved';
   const needsChange = draft.status === 'needs_change';
   const deprecated = draft.status === 'deprecated';
@@ -311,12 +315,26 @@ const PlanReviewCard: React.FC<{
   const moduleLabel = (plan.module_name || '').trim();
   const titleLabel = (plan.title || moduleLabel || `改造方案 ${index + 1}`).trim();
 
+  const captureCollapseAnchor = () => {
+    const card = cardRef.current;
+    if (!card || !onBeforeCollapse) return;
+    const nextCard = card.nextElementSibling;
+    onBeforeCollapse((nextCard instanceof HTMLElement ? nextCard : card) as HTMLElement);
+  };
+
+  const collapseDraft = (next: PlanDraft) => {
+    if (!draft.collapsed && next.collapsed) {
+      captureCollapseAnchor();
+    }
+    onChange(next);
+  };
+
   const toggleApprove = () => {
     if (approved) {
       onChange({ ...draft, status: 'pending', collapsed: false, showRejectForm: false });
       return;
     }
-    onChange({
+    collapseDraft({
       ...draft,
       status: 'approved',
       collapsed: true,
@@ -345,6 +363,7 @@ const PlanReviewCard: React.FC<{
 
   return (
     <div
+      ref={cardRef}
       className={`rounded-xl border transition-all duration-300 ${
         approved
           ? 'border-[rgba(0,255,178,0.35)] bg-[rgba(0,217,165,0.08)]'
@@ -410,7 +429,9 @@ const PlanReviewCard: React.FC<{
         <div className="flex shrink-0 items-center gap-1">
           <CollapseToggle
             collapsed={draft.collapsed}
-            onToggle={() => onChange({ ...draft, collapsed: !draft.collapsed })}
+            onToggle={() =>
+              collapseDraft({ ...draft, collapsed: !draft.collapsed })
+            }
           />
         </div>
       </div>
@@ -563,7 +584,33 @@ export function FuncSolutionReviewPanel({
   /** 本地逐条评审有未保存编辑时，禁止轮询 initialPayload 覆盖 planDrafts */
   const draftsDirtyRef = useRef(false);
   const overallCommentDirtyRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  /** 方案折叠后补偿 scrollTop，避免视口内容跳动 */
+  const scrollAnchorRef = useRef<{ el: HTMLElement; topBefore: number } | null>(null);
   const isDark = useAntThemeDark();
+
+  const captureScrollAnchor = useCallback((anchorEl: HTMLElement) => {
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+    const scrollRect = scrollEl.getBoundingClientRect();
+    scrollAnchorRef.current = {
+      el: anchorEl,
+      topBefore: anchorEl.getBoundingClientRect().top - scrollRect.top,
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const anchor = scrollAnchorRef.current;
+    const scrollEl = scrollContainerRef.current;
+    if (!anchor || !scrollEl) return;
+    scrollAnchorRef.current = null;
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const topAfter = anchor.el.getBoundingClientRect().top - scrollRect.top;
+    const delta = topAfter - anchor.topBefore;
+    if (Math.abs(delta) > 0.5) {
+      scrollEl.scrollTop += delta;
+    }
+  }, [planDrafts]);
 
   const reload = useCallback(async () => {
     if (!synapseApiBase || !roomId) return;
@@ -783,7 +830,10 @@ export function FuncSolutionReviewPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-6 py-5">
+      <div
+        ref={scrollContainerRef}
+        className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-6 py-5"
+      >
         {readOnly ? <NodeProcessingMetricsSection metrics={nodeMetrics} /> : null}
 
         {blocked ? (
@@ -914,6 +964,7 @@ export function FuncSolutionReviewPanel({
                 draft={planDrafts[plan.id] || planDraftFromPayload(plan)}
                 isDark={isDark}
                 readOnly={readOnly}
+                onBeforeCollapse={captureScrollAnchor}
                 onChange={(next) => updatePlanDraft(plan.id, next)}
               />
             ))}
