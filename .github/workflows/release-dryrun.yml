@@ -565,6 +565,10 @@ jobs:
             exit 1
           fi
 
+          APPLE_ID="$(printf '%s' "$APPLE_ID" | tr -d '[:space:]')"
+          APPLE_PASSWORD="$(printf '%s' "$APPLE_PASSWORD" | tr -d '[:space:]')"
+          APPLE_TEAM_ID="$(printf '%s' "$APPLE_TEAM_ID" | tr -d '[:space:]')"
+
           TARGET_BASE="apps/setup-center/src-tauri/target"
           if [ -n "${{ matrix.rust_target }}" ]; then
             BUNDLE_DIR="${TARGET_BASE}/${{ matrix.rust_target }}/release/bundle"
