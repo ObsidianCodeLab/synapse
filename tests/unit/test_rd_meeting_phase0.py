@@ -33,7 +33,7 @@ def test_should_list_processing(synapse_work_home):
 
 
 def test_should_list_excludes_archived(synapse_work_home):
-    data = default_dev_status(scope_type="demand", scope_id="21878318", local_process_state="archived")
+    data = default_dev_status(scope_type="demand", scope_id="21878318", local_process_state="已归档")
     data["pipeline_enabled"] = True
     data["meeting_room"] = {"active": True}
     assert should_list_in_meeting_rooms(data) is False

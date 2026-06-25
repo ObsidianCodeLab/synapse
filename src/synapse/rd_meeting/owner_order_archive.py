@@ -25,7 +25,8 @@ from synapse.rd_sop.nodes import ALL_NODES, node_display_name, seq_index_for_nod
 
 logger = logging.getLogger(__name__)
 
-ARCHIVED_LOCAL_STATE = "archived"
+ARCHIVED_LOCAL_STATE = "已归档"
+LEGACY_ARCHIVED_LOCAL_STATE = "archived"
 RD_VIEW_DEMAND_SAVE_PATH = "/dev/iwhalecloud/synapse/rd_view_demand_save"
 
 RD_VIEW_SOP_NODE_INSERT_PATH = "/dev/iwhalecloud/synapse/rd_view_sop_node_insert"
@@ -34,13 +35,14 @@ RD_VIEW_NODE_REPO_OUTPUT_INSERT_PATH = "/dev/iwhalecloud/synapse/rd_view_node_re
 
 
 def is_archived_local_state(local_process_state: str) -> bool:
-    return _snapshot_norm_id(local_process_state) == ARCHIVED_LOCAL_STATE
+    local = _snapshot_norm_id(local_process_state)
+    return local in (ARCHIVED_LOCAL_STATE, LEGACY_ARCHIVED_LOCAL_STATE)
 
 
 def should_archive_orphan_demand(demand: dict[str, Any]) -> bool:
     """门户已下架且本地已完成、尚未归档时触发归档。"""
     local = _snapshot_norm_id(demand.get("local_process_state"))
-    if local == ARCHIVED_LOCAL_STATE:
+    if is_archived_local_state(local):
         return False
     return local == OWNED_WORK_ITEM_STATE_COMPLETED
 
@@ -349,7 +351,7 @@ async def archive_completed_demand_if_needed(*, demand_no: str) -> dict[str, Any
         return {"status": "skipped", "demand_no": dn, "archived": False, "reason": "demand_not_in_userwork"}
 
     local = _snapshot_norm_id(demand.get("local_process_state"))
-    if local == ARCHIVED_LOCAL_STATE:
+    if is_archived_local_state(local):
         return {"status": "skipped", "demand_no": dn, "archived": True, "reason": "already_archived"}
     if local != OWNED_WORK_ITEM_STATE_COMPLETED:
         return {"status": "skipped", "demand_no": dn, "archived": False, "reason": "not_completed"}

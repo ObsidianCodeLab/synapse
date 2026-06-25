@@ -18,6 +18,7 @@ from synapse.rd_meeting.owner_order_refresh import (
 
 def test_should_keep_orphan_only_when_completed():
     assert should_keep_orphan_demand({"local_process_state": "已完成"}) is True
+    assert should_keep_orphan_demand({"local_process_state": "已归档"}) is True
     assert should_keep_orphan_demand({"local_process_state": "archived"}) is True
     assert should_keep_orphan_demand({"local_process_state": "处理中"}) is False
     assert should_keep_orphan_demand({"local_process_state": "待处理"}) is False

@@ -266,13 +266,19 @@ function collectOrderIdsForHitlFlags(list: DemandListItem[]): string[] {
   return Array.from(ids);
 }
 
+/** 本地已归档（含历史值 archived） */
+function isArchivedLocalState(local: string): boolean {
+  const s = (local || "").trim();
+  return s === "已归档" || s === "archived";
+}
+
 /**
  * 基础态（不含「人工介入」）：人工介入仍仅由「处理中 + sop_trajectories」叠加。
  * 「全人工」表示走外部人工、不进本系统智能流水线，由 local_process_state 单独标识。
  */
 function deriveBaseTicketStatus(d: DemandListItem): Ticket["status"] {
   const local = effectiveLocalProcessState(d);
-  if (local === "archived") return "completed";
+  if (isArchivedLocalState(local)) return "completed";
   const isCompleted =
     local === "已完成" ||
     (d.demand_status || "").trim() === "已完成" ||
@@ -1039,7 +1045,7 @@ export const OrderManagement: React.FC<{
       if (ticketFilter === 'full_manual') return t.status === 'full_manual';
       if (ticketFilter === 'prepare') return t.status === 'prepare';
       if (ticketFilter === 'rd_completed') return (t.localProcessState || '').trim() === '已完成';
-      if (ticketFilter === 'archived') return (t.localProcessState || '').trim() === 'archived';
+      if (ticketFilter === 'archived') return isArchivedLocalState((t.localProcessState || '').trim());
       return true;
     });
   }, [tickets, ticketFilter, searchQuery]);
@@ -1053,7 +1059,7 @@ export const OrderManagement: React.FC<{
     [tickets],
   );
   const archivedCount = useMemo(
-    () => tickets.filter((t) => (t.localProcessState || '').trim() === 'archived').length,
+    () => tickets.filter((t) => isArchivedLocalState((t.localProcessState || '').trim())).length,
     [tickets],
   );
 

@@ -33,7 +33,7 @@ export interface DemandListItem {
   prod?: string;
   /** 当前 SOP 节点名或 id；待处理时必为「等待调度」；预备中/全人工时必为空串 */
   sop_node: string;
-  /** 预备中 | 待处理 | 处理中 | 全人工 等；「全人工」表示不走本系统智能流水线（由 local_process_state 标识）。是否需人工介入由前端根据 /human-in-loop-flags（按最新 sop 轨迹）与处理中子单 task_no 查询得到，非本字段 */
+  /** 预备中 | 待处理 | 处理中 | 全人工 | 已完成 | 已归档 等 */
   local_process_state: string;
   owned_work_items: OwnedWorkItem[];
 }
