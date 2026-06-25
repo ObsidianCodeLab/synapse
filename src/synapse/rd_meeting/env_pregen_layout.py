@@ -65,6 +65,7 @@ _GITIGNORE_RD_LOCAL_PATTERNS: tuple[str, ...] = (
     "synapse_archive/",
     ".idea/",
     "__pycache__/",
+    "target/",
 )
 
 
