@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke, IS_TAURI, logger } from "../platform";
 import { safeFetch } from "../providers";
-import { envGet } from "../utils";
+import { envGet, joinPath } from "../utils";
 import { notifyLoading, notifyError, notifySuccess, dismissLoading } from "../utils/notify";
 import { copyToClipboard } from "../utils/clipboard";
 import {
@@ -91,6 +91,7 @@ export interface StatusViewProps {
   doStartLocalService: (wsId: string) => Promise<void>;
   onOpenRuntimeEnvironment: () => void;
   setView: (view: ViewId) => void;
+  synapseRootDir?: string;
 }
 
 export function StatusView(props: StatusViewProps) {
@@ -109,6 +110,7 @@ export function StatusView(props: StatusViewProps) {
     doStopService, waitForServiceDown, doStartLocalService,
     onOpenRuntimeEnvironment,
     setView,
+    synapseRootDir = "",
   } = props;
 
   const [healthChecking, setHealthChecking] = useState<string | null>(null);
@@ -140,7 +142,7 @@ export function StatusView(props: StatusViewProps) {
   const [repairOpen, setRepairOpen] = useState(false);
 
   const effectiveWsId = currentWorkspaceId || workspaces[0]?.id || null;
-  const ws = workspaces.find((w) => w.id === effectiveWsId) || workspaces[0] || null;
+  const workDir = synapseRootDir ? joinPath(synapseRootDir, "work") : "";
   const startBackend = async () => {
     if (startingService || !!busy || !effectiveWsId) return;
     setStartingService(true);
@@ -585,20 +587,20 @@ export function StatusView(props: StatusViewProps) {
         </div>
         )}
 
-        {/* Workspace row */}
+        {/* work 目录 */}
         <div className="statusPanelRow statusPanelRowWs">
           <div className="statusPanelIcon">
             <FolderOpen size={18} />
           </div>
           <div className="statusPanelInfo" style={{ flex: 1, minWidth: 0 }}>
-            <div className="statusPanelTitle">{t("config.step.workspace")}</div>
+            <div className="statusPanelTitle">{t("status.workDir")}</div>
             <div className="statusPanelDesc" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontWeight: 600, color: "var(--fg)" }}>{currentWorkspaceId || "—"}</span>
-              <span style={{ opacity: 0.5 }}>·</span>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{ws?.path || ""}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }} title={workDir}>
+                {workDir || t("status.unknown")}
+              </span>
             </div>
           </div>
-          {ws?.path && (
+          {workDir && (
             <Button
               variant="ghost"
               size="icon"
@@ -606,7 +608,7 @@ export function StatusView(props: StatusViewProps) {
               title={t("status.openFolder")}
               onClick={async () => {
                 const { openFileWithDefault } = await import("../platform");
-                try { await openFileWithDefault(ws.path); } catch (e) { logger.error("App", "openFileWithDefault failed", { error: String(e) }); }
+                try { await openFileWithDefault(workDir); } catch (e) { logger.error("App", "openFileWithDefault failed", { error: String(e) }); }
               }}
             >
               <FolderOpen size={14} />
