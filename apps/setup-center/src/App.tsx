@@ -3343,6 +3343,7 @@ export function App() {
         backendBootPhase={backendBootPhase}
         onOpenRuntimeEnvironment={() => setRuntimeDialogOpen(true)}
         setView={navigateToView}
+        synapseRootDir={info?.synapseRootDir ?? ""}
       />
     );
   }

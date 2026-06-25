@@ -9,6 +9,28 @@ WAIT_TIMEOUT_MINUTES="${WAIT_TIMEOUT_MINUTES:-120}"
 PROFILE_NAME="${NOTARY_PROFILE_NAME:-synapse-notary-test}"
 ENTITLEMENTS="${ENTITLEMENTS:-apps/setup-center/src-tauri/Entitlements.plist}"
 
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+run_notarytool() {
+  # notarytool occasionally aborts (exit 134) on unsupported flag combos — surface clearly.
+  set +e
+  local output
+  output="$("$@" 2>&1)"
+  local code=$?
+  set -e
+  printf '%s\n' "${output}"
+  if [ "${code}" -ne 0 ]; then
+    echo "ERROR: notarytool failed (exit ${code}): $*" >&2
+    if [ "${code}" -eq 134 ]; then
+      echo "HINT: exit 134 often means notarytool crashed (trace trap). Try updating Xcode CLT or use a simpler subcommand." >&2
+    fi
+    return "${code}"
+  fi
+  return 0
+}
+
 require_notary_secrets() {
   if [ -z "${APPLE_ID:-}" ] || [ -z "${APPLE_PASSWORD:-}" ] || [ -z "${APPLE_TEAM_ID:-}" ]; then
     echo "ERROR: APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID must be set in repo secrets." >&2
@@ -20,48 +42,92 @@ require_notary_secrets() {
 }
 
 store_notary_profile() {
-  xcrun notarytool store-credentials "${PROFILE_NAME}" \
+  echo "Storing notary credentials profile: ${PROFILE_NAME}"
+  run_notarytool xcrun notarytool store-credentials "${PROFILE_NAME}" \
     --apple-id "${APPLE_ID}" \
     --password "${APPLE_PASSWORD}" \
     --team-id "${APPLE_TEAM_ID}"
 }
 
-mode_credentials() {
-  echo "== Mode: credentials =="
-  store_notary_profile
-  echo "Credentials stored in keychain profile: ${PROFILE_NAME}"
-
+print_history() {
   echo ""
-  echo "== Recent notarization history (up to 15) =="
-  xcrun notarytool history \
-    --keychain-profile "${PROFILE_NAME}" \
-    --output-format json | python - <<'PY'
+  echo "== Recent notarization history =="
+  # Avoid --output-format json here: some notarytool builds abort (exit 134) on history+json.
+  if ! run_notarytool xcrun notarytool history --keychain-profile "${PROFILE_NAME}"; then
+    echo "WARN: notarytool history failed; skipping history listing." >&2
+  fi
+}
+
+parse_info_status() {
+  local info_json="$1"
+  printf '%s' "${info_json}" | python -c '
 import json, sys
 raw = sys.stdin.read().strip()
 if not raw:
-    print("(empty history)")
-    raise SystemExit(0)
+    sys.exit(0)
 data = json.loads(raw)
-items = data.get("history") or data.get("items") or []
-if isinstance(data, dict) and "data" in data:
-    items = data["data"]
-if not items:
-    print("(no history entries)")
-    raise SystemExit(0)
-for row in items[:15]:
-    if isinstance(row, dict):
-        attrs = row.get("attributes") or row
-        sid = row.get("id") or attrs.get("id") or "?"
-        status = attrs.get("status") or row.get("status") or "?"
-        name = attrs.get("name") or attrs.get("submissionName") or "?"
-        created = attrs.get("createdDate") or attrs.get("created") or "?"
-        print(f"- {sid} | {status} | {name} | {created}")
-    else:
-        print(row)
-PY
+status = data.get("status")
+if not status and isinstance(data.get("data"), dict):
+    status = data["data"].get("attributes", {}).get("status")
+print(status or "")
+'
+}
+
+mode_credentials() {
+  echo "== Mode: credentials =="
+  echo "bash: $(bash --version | head -1)"
+  echo "notarytool: $(xcrun notarytool --version 2>&1 || echo unknown)"
+
+  store_notary_profile
+  echo "Credentials stored in keychain profile: ${PROFILE_NAME}"
+
+  print_history
+
+  if [ -n "${SUBMISSION_ID}" ]; then
+    echo ""
+    echo "== Bonus: checking provided submission_id =="
+    mode_check_submission_inner || echo "WARN: submission check failed (credentials may still be OK)." >&2
+  fi
 
   echo ""
   echo "OK: Apple notary credentials accepted."
+}
+
+mode_check_submission_inner() {
+  echo "Querying submission: ${SUBMISSION_ID}"
+  local info_json
+  info_json="$(xcrun notarytool info "${SUBMISSION_ID}" \
+    --keychain-profile "${PROFILE_NAME}" \
+    --output-format json)"
+  printf '%s\n' "${info_json}" | python -m json.tool
+
+  local status status_lc
+  status="$(parse_info_status "${info_json}")"
+  status_lc="$(to_lower "${status}")"
+  echo ""
+  echo ">>> STATUS: ${status:-unknown}"
+
+  case "${status_lc}" in
+    invalid|rejected)
+      echo ""
+      echo "== Notarization log =="
+      xcrun notarytool log "${SUBMISSION_ID}" \
+        --keychain-profile "${PROFILE_NAME}" || true
+      return 1
+      ;;
+    accepted)
+      echo "OK: Submission already accepted."
+      ;;
+    in\ progress|"in progress")
+      echo "OK: Apple is still processing (In Progress)."
+      ;;
+    "")
+      echo "WARN: Could not parse status from notarytool info output." >&2
+      ;;
+    *)
+      echo "NOTE: Unexpected status '${status}'."
+      ;;
+  esac
 }
 
 mode_check_submission() {
@@ -71,35 +137,7 @@ mode_check_submission() {
     exit 1
   fi
   store_notary_profile
-
-  echo "Querying submission: ${SUBMISSION_ID}"
-  info_json="$(xcrun notarytool info "${SUBMISSION_ID}" \
-    --keychain-profile "${PROFILE_NAME}" \
-    --output-format json)"
-  printf '%s\n' "${info_json}" | python -m json.tool
-
-  status="$(printf '%s' "${info_json}" | python -c 'import json,sys; print(json.load(sys.stdin).get("status","").strip())')"
-  echo ""
-  echo ">>> STATUS: ${status:-unknown}"
-
-  case "${status,,}" in
-    invalid|rejected)
-      echo ""
-      echo "== Notarization log =="
-      xcrun notarytool log "${SUBMISSION_ID}" \
-        --keychain-profile "${PROFILE_NAME}" || true
-      exit 1
-      ;;
-    accepted)
-      echo "OK: Submission already accepted."
-      ;;
-    "in progress")
-      echo "OK: Apple is still processing (In Progress)."
-      ;;
-    *)
-      echo "NOTE: Unexpected status '${status}'."
-      ;;
-  esac
+  mode_check_submission_inner
 }
 
 mode_minimal_dmg() {
@@ -109,11 +147,12 @@ mode_minimal_dmg() {
     exit 1
   fi
 
-  IDENTITY="${APPLE_SIGNING_IDENTITY}"
+  local IDENTITY="${APPLE_SIGNING_IDENTITY}"
+  local WORK_DIR
   WORK_DIR="$(mktemp -d)"
-  APP_NAME="Synapse Notarize Test"
-  APP_PATH="${WORK_DIR}/${APP_NAME}.app"
-  DMG_PATH="${WORK_DIR}/${APP_NAME}.dmg"
+  local APP_NAME="SynapseNotarizeTest"
+  local APP_PATH="${WORK_DIR}/${APP_NAME}.app"
+  local DMG_PATH="${WORK_DIR}/${APP_NAME}.dmg"
 
   cleanup() {
     rm -rf "${WORK_DIR}"
@@ -176,6 +215,7 @@ EOF
   store_notary_profile
 
   echo "Submitting minimal DMG (wait timeout: ${WAIT_TIMEOUT_MINUTES}m)..."
+  local START_TS END_TS ELAPSED submit_json status submission_id status_lc
   START_TS=$(date +%s)
   submit_json="$(xcrun notarytool submit "${DMG_PATH}" \
     --keychain-profile "${PROFILE_NAME}" \
@@ -188,11 +228,12 @@ EOF
 
   status="$(printf '%s' "${submit_json}" | python -c 'import json,sys; print(json.load(sys.stdin).get("status","").strip())')"
   submission_id="$(printf '%s' "${submit_json}" | python -c 'import json,sys; print(json.load(sys.stdin).get("id",""))')"
+  status_lc="$(to_lower "${status}")"
   echo ""
   echo ">>> SUBMISSION_ID: ${submission_id}"
   echo ">>> STATUS: ${status} (elapsed ${ELAPSED}s)"
 
-  if [ "${status,,}" != "accepted" ]; then
+  if [ "${status_lc}" != "accepted" ]; then
     echo "ERROR: Expected Accepted, got '${status}'." >&2
     if [ -n "${submission_id}" ]; then
       xcrun notarytool log "${submission_id}" \
