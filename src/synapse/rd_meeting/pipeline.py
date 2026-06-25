@@ -1204,6 +1204,7 @@ def clear_room_state_for_node_reprocess(
         "stopped_prev_status",
         "solution_review_blocked",
         "func_solution_blocked",
+        "unit_test_blocked",
         "escalate_reason",
         "last_error",
         "last_pipeline_error",
@@ -1257,6 +1258,7 @@ def clear_room_state_for_revision_resume(
         "stopped_prev_status",
         "solution_review_blocked",
         "func_solution_blocked",
+        "unit_test_blocked",
         "escalate_reason",
         "last_error",
         "last_pipeline_error",
@@ -1411,12 +1413,17 @@ def _step_resume_revision(pipe: MeetingPipeline, ctx: PipelineRunContext) -> Non
         return
 
     from synapse.rd_meeting.func_solution_review import has_revision_context
+    from synapse.rd_meeting.unit_test_gate import has_revision_context as has_unit_test_revision_context
 
-    if run_node != "func_solution" or not has_revision_context(sid):
+    if run_node == "func_solution" and has_revision_context(sid):
+        revision_kind = "func_solution"
+    elif run_node == "unit_test" and has_unit_test_revision_context(sid):
+        revision_kind = "unit_test"
+    else:
         pipe.mark_step_completed(STEP_RESUME_REVISION)
         pipe.set_flow_step(
             STEP_REPROCESS_PREP,
-            reason="非函数级方案增量修订，回退整节点重处理",
+            reason="非增量修订节点，回退整节点重处理",
         )
         return
 
@@ -1436,7 +1443,11 @@ def _step_resume_revision(pipe: MeetingPipeline, ctx: PipelineRunContext) -> Non
             "event": "resume_revision_prep",
             "room_id": room_id,
             "node_id": run_node,
-            "text": "函数级方案增量修订：已保留归档与 revision_context，重新调度 Agent 修订",
+            "text": (
+                "函数级方案增量修订：已保留归档与 revision_context，重新调度 Agent 修订"
+                if revision_kind == "func_solution"
+                else "测试案例增量修订：已保留归档与 revision_context，重新调度 Agent 修订"
+            ),
             "flow_stage": FLOW_STEP_LABEL[STEP_RESUME_REVISION],
             "log_type": "info",
             "agent_id": "system",

@@ -4,6 +4,7 @@ export type InterventionPanelKind =
   | 'solution_review'
   | 'func_solution_review'
   | 'task_exec'
+  | 'unit_test_review'
   | 'node_review'
   | 'leader_review_panel'
   | 'hitl'
@@ -18,6 +19,7 @@ const COLLAB_DEDICATED_PANEL: Record<string, InterventionPanelKind> = {
   diff_analysis: 'task_exec',
   // leader_review 使用独立评审面板，区别于普通的 node_review 确认总结
   leader_review: 'leader_review_panel',
+  unit_test: 'unit_test_review',
 };
 
 export function collabDedicatedPanel(nodeId: string): InterventionPanelKind | null {
@@ -67,6 +69,8 @@ export type MeetingInterventionRoomSlice = {
   solutionReviewPayload?: unknown;
   funcSolutionReviewPayload?: unknown;
   funcSolutionBlocked?: boolean;
+  unitTestReviewPayload?: unknown;
+  unitTestBlocked?: boolean;
   taskExecPayload?: unknown;
   autoSplitChoicePayload?: AutoSplitChoicePayload | null;
   /** pending_delivery.node_id：人工门控所属 SOP 节点（优先于 currentNode） */
@@ -88,6 +92,7 @@ export type AutoSplitChoicePayload = {
 const INTERVENTION_KIND_LABELS: Record<string, string> = {
   solution_review: '方案评审',
   func_solution_review: '函数级方案评审',
+  unit_test_review: '测试案例评审',
   task_exec: '任务执行评审',
   diff_analysis: '试飞优化评审',
   result_confirm: '结果确认',
@@ -146,6 +151,14 @@ export function resolveHitlTargetNodeId(room: MeetingInterventionRoomSlice): str
     room.funcSolutionReviewPayload
   ) {
     return pendingNid || current || 'func_solution';
+  }
+
+  if (
+    kind === 'unit_test_review' ||
+    panel === 'unit_test_review' ||
+    room.unitTestReviewPayload
+  ) {
+    return pendingNid || current || 'unit_test';
   }
 
   if (
@@ -208,6 +221,7 @@ export function resolveMeetingInterventionPanel(
   if (
     panel === 'solution_review' ||
     panel === 'func_solution_review' ||
+    panel === 'unit_test_review' ||
     panel === 'task_exec' ||
     panel === 'node_review' ||
     panel === 'leader_review_panel' ||
@@ -243,6 +257,9 @@ export function resolveMeetingInterventionPanel(
   }
   if (kind === 'func_solution_review' || room.funcSolutionReviewPayload) {
     return 'func_solution_review';
+  }
+  if (kind === 'unit_test_review' || room.unitTestReviewPayload) {
+    return 'unit_test_review';
   }
 
   const collabPanel = resolveCollabDedicatedPanel(resolvedType, nid, kind);

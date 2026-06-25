@@ -893,6 +893,39 @@ def format_func_solution_revision_instruction(scope_id: str, node_id: str) -> st
     return "\n".join(lines)
 
 
+def format_unit_test_revision_instruction(scope_id: str, node_id: str) -> str:
+    """测试案例增量修订：渲染 revision_context 驱动的说明段。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if nid != "unit_test":
+        return ""
+
+    from synapse.rd_meeting.unit_test_gate import (
+        REVISION_CONTEXT_NAME,
+        format_revision_prompt_block,
+        revision_context_path,
+    )
+
+    block = format_revision_prompt_block(sid)
+    if not block.strip():
+        return ""
+
+    ctx_path = revision_context_path(sid)
+    lines = [
+        "## 测试案例增量修订（人工评审反馈，必须遵循）",
+        "",
+        f"- **状态**：本节点处于**增量修订**（非首次生成、非整节点重跑）。",
+        f"- **修订上下文**：必须先 `read_file` `{ctx_path}`（`{REVISION_CONTEXT_NAME}`），"
+        "再读 `unit_test_review.json` 与 `测试案例说明.md`。",
+        "",
+        block.strip(),
+        "",
+        "- **落盘要求**：仅修订 marked 用例对应的测试代码与 JSON/Markdown 条目；"
+        "修订后重置对应 `human_review.status=pending`；**禁止**伪造 pytest 通过结果。",
+    ]
+    return "\n".join(lines)
+
+
 def _format_meeting_outputs(binding: dict[str, Any] | None) -> str:
     """从 binding.node_outputs 渲染「会议产出」展示串（与归档强约束一一对应）。"""
     if not isinstance(binding, dict):
@@ -960,6 +993,16 @@ _HOST_DUTY_TEXTS: dict[str, str] = {
     "iter_collab_leader_review": (
         "- **组长评审（协同门控）**：生成 `研发组长评审结论.md` 等产出；"
         "**禁止** interactive HITL；人工在 NodeReview 面板确认。"
+    ),
+    "iter_collab_unit_test": (
+        "- **测试案例（协同门控）**：执行 `whalecloud-dev-tool-unit-test` 完善单元测试代码；"
+        "产出 `unit_test_review.json` + `测试案例说明.md`；**禁止** interactive HITL；"
+        "禁止在技能内伪造 pytest 通过结果；人工在「测试案例评审」面板执行测试并逐条确认。"
+    ),
+    "iter_collab_unit_test_revision": (
+        "- **测试案例（增量修订）**：必须先读 `revision_context.json`、"
+        "`unit_test_review.json` 与 `测试案例说明.md`；"
+        "仅修订 `cases_to_revise` 中列出的用例及对应测试代码；完成后回写 JSON 与 MD。"
     ),
     "iter_collab_default": (
         "- **协同评审节点**：结构化报告落盘后走专用前端面板；**禁止** interactive HITL。"
@@ -1100,7 +1143,7 @@ _HOST_DUTY_KEYS_SOLO: list[str] = [
 def _collab_node_suffix(node_id: str) -> str:
     """协同节点按 node_id 选取迭代语义文案的后缀 key。"""
     nid = (node_id or "").strip()
-    if nid in ("solution_review", "func_solution", "leader_review"):
+    if nid in ("solution_review", "func_solution", "leader_review", "unit_test"):
         return nid
     return "default"
 
@@ -1126,6 +1169,13 @@ def _host_duty_keys_shared(
                 keys.append("iter_collab_func_solution_revision")
             else:
                 keys.append("iter_collab_func_solution")
+        elif nid == "unit_test":
+            from synapse.rd_meeting.unit_test_gate import has_revision_context as has_unit_test_revision
+
+            if has_unit_test_revision(scope_id):
+                keys.append("iter_collab_unit_test_revision")
+            else:
+                keys.append("iter_collab_unit_test")
         else:
             keys.append(f"iter_collab_{_collab_node_suffix(node_id)}")
     else:  # ai
@@ -1262,6 +1312,10 @@ def build_meeting_runtime_header(
     if revision_block:
         lines.append("")
         lines.append(revision_block)
+    unit_test_revision_block = format_unit_test_revision_instruction(context.scope_id, context.node_id)
+    if unit_test_revision_block:
+        lines.append("")
+        lines.append(unit_test_revision_block)
     lines.append(f"- **人工确认**：{confirm_label}")
     from synapse.rd_meeting.prior_outputs import (
         format_prior_sop_outputs_section,

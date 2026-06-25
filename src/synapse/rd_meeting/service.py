@@ -391,6 +391,7 @@ class MeetingRoomService:
             "pending_delivery": room_state.get("pending_delivery"),
             "solution_review_blocked": bool(room_state.get("solution_review_blocked")),
             "func_solution_blocked": bool(room_state.get("func_solution_blocked")),
+            "unit_test_blocked": bool(room_state.get("unit_test_blocked")),
             "skipped_node_ids": extract_skipped_node_ids(all_history),
             "system_node_display": system_node_display,
             **(
@@ -1192,6 +1193,79 @@ class MeetingRoomService:
 
         pipe = MeetingPipeline.load(sid)
         pipe.set_flow_step(STEP_RESUME_REVISION, reason="函数级方案增量修订")
+        pipe.save()
+
+        def _run_revision_pipeline() -> None:
+            run_pipeline_until_waiting(ctx, initial_flow_step=STEP_RESUME_REVISION)
+
+        schedule_pipeline_background(rid, _run_revision_pipeline, scope_id=sid)
+
+        dev = load_dev_status(sid) or {}
+        titles = build_title_index()
+        payload = self._room_detail_payload(dev, sid, titles)
+        payload["status"] = "processing"
+        payload["run_in_progress"] = True
+        return payload
+
+    def resume_unit_test_revision(
+        self,
+        room_id: str,
+        *,
+        agent_pool: Any | None = None,
+    ) -> dict[str, Any]:
+        """测试案例评审修订：保留归档，走 resume_revision→node_init 增量改 marked cases。"""
+        rid = (room_id or "").strip()
+        if not rid:
+            raise ValueError("room_id required")
+
+        detail = self.get_room_detail(rid)
+        if detail is None:
+            raise ValueError("meeting_room_not_found")
+
+        sid = str(detail.get("scope_id") or "").strip()
+        if not sid:
+            raise ValueError("scope_id missing")
+
+        from synapse.rd_meeting.unit_test_gate import has_revision_context
+
+        if not has_revision_context(sid):
+            raise ValueError("unit_test_revision_context_missing")
+
+        scope = detail.get("scope_type") or "demand"
+        scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
+
+        rs = load_room_state(sid) or {}
+        current = str(
+            rs.get("current_node_id") or detail.get("current_node_id") or "unit_test"
+        ).strip()
+        if current != "unit_test":
+            raise ValueError("not_unit_test_node")
+
+        from synapse.rd_meeting.pipeline import (
+            STEP_RESUME_REVISION,
+            PipelineRunContext,
+            run_pipeline_until_waiting,
+        )
+        from synapse.rd_meeting.orchestrator import schedule_pipeline_background
+
+        cancel_room_run(rid)
+
+        dev = load_dev_status(sid) or {}
+        dev["local_process_state"] = "处理中"
+        save_dev_status(sid, dev)
+
+        ctx = PipelineRunContext(
+            scope_type=scope_type,
+            scope_id=sid,
+            sync_userwork=False,
+            promote_to_processing=False,
+            agent_pool=agent_pool,
+            dev_status=dev,
+            detail=dict(detail),
+        )
+
+        pipe = MeetingPipeline.load(sid)
+        pipe.set_flow_step(STEP_RESUME_REVISION, reason="测试案例增量修订")
         pipe.save()
 
         def _run_revision_pipeline() -> None:

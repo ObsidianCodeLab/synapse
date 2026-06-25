@@ -209,6 +209,7 @@ def _uses_collab_dedicated_review_panel(node_id: str) -> bool:
         "func_solution_review",
         "solution_review",
         "task_exec",
+        "unit_test_review",
     )
 
 

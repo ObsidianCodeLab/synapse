@@ -1653,9 +1653,8 @@ export const OrderManagement: React.FC<{
           <div className="space-y-3">
             <h4 className="text-sm font-medium text-slate-400 flex items-center gap-2"><TestTube className="w-4 h-4" /> 测试案例</h4>
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-300 space-y-2">
-              <p>功能案例：覆盖本次研发涉及的核心场景与边界条件。</p>
-              <p>单元测试文件：<code className="text-cyan-400">tests/unit/test_feature_x.py</code></p>
-              <p>当前结果：通过 12 / 12</p>
+              <p>小鲸完善任务执行阶段单元测试代码，产出 <code className="text-cyan-400">unit_test_review.json</code> 与 <code className="text-cyan-400">测试案例说明.md</code>。</p>
+              <p>请在研发会议室「测试案例评审」面板执行 pytest、查看用例场景与要求，并完成逐条人工确认。</p>
             </div>
           </div>
         );

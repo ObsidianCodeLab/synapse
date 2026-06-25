@@ -178,6 +178,10 @@ def resolve_ready_for_node_review_after_hitl(
         return False
     if uses_func_solution_gate(node_id):
         return False
+    from synapse.rd_meeting.unit_test_gate import uses_unit_test_gate
+
+    if uses_unit_test_gate(node_id):
+        return False
     if not user_selected_no_further_processing(values or {}, schema):
         return False
     return node_archive_ready_for_review(scope_id, node_id)

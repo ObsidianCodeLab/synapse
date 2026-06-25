@@ -16,6 +16,8 @@
 
 **`leader_review`**：运行 `whalecloud-dev-tool-leader-review` → 落盘 `leader_review.json` + `研发组长评审报告.html` + `ai_review.md`（AI 独立评审意见）→ 进入**研发组长评审**专用面板门控（展示报告、评审人员及评审进度；开发者自评通过后推送统一服务；全员通过后方可代码合并）。**禁止**在人工评审通过前生成 `研发组长评审结论.md`。
 
+**`unit_test`**：运行 `whalecloud-dev-tool-unit-test` → 完善任务执行阶段单元测试代码 → 落盘 `unit_test_review.json` + `测试案例说明.md` → 自动进入 **测试案例评审**门控（前端执行 pytest、逐条确认用例场景与要求、总体意见≥20字、全部通过且测试无失败后推进）。
+
 能力超出「你的能力档案」或 JSON/schema 无法合规生成 → `submit_hitl_questionnaire(kind="exception", summary="…")`，提交即停（**唯一**允许的 HITL 场景）。
 
 ### 3. 上下文与归档
@@ -28,3 +30,4 @@
 | `func_solution` | `函数级方案.md`、`func_solution_review.json` |
 | `solution_review` | `方案评审结论.md`、`solution_review.json` |
 | `leader_review` | `leader_review.json`、`研发组长评审报告.html`、`ai_review.md` |
+| `unit_test` | `测试案例说明.md`、`unit_test_review.json` |

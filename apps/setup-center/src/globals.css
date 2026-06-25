@@ -751,6 +751,499 @@
 }
 
 /* --- 研发会议室 · 协作会议流 --- */
+.rd-meeting-chat-stream-rail-wrap {
+  display: flex;
+  min-height: 0;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.rd-meeting-chat-stream-rail-wrap > span {
+  display: flex !important;
+  height: 100%;
+  min-height: 0;
+}
+
+button.rd-meeting-chat-stream-rail {
+  position: relative;
+  display: flex;
+  width: 44px;
+  height: 100%;
+  align-self: stretch;
+  min-height: 0;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px 0 16px;
+  border: none;
+  border-left: 1px solid color-mix(in srgb, #8b5cf6 18%, var(--line));
+  border-radius: 0;
+  background: color-mix(in srgb, #8b5cf6 4%, var(--panel));
+  color: color-mix(in srgb, var(--text) 72%, #c4b5fd);
+  cursor: pointer;
+  overflow: hidden;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  isolation: isolate;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+button.rd-meeting-chat-stream-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: transparent;
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #8b5cf6 22%, transparent) 0,
+      color-mix(in srgb, #8b5cf6 22%, transparent) 1px,
+      transparent 1px,
+      transparent 9px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, #c4b5fd 10%, transparent) 0,
+      color-mix(in srgb, #c4b5fd 10%, transparent) 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, #c4b5fd 10%, transparent) 0,
+      color-mix(in srgb, #c4b5fd 10%, transparent) 1px,
+      transparent 1px,
+      transparent 12px
+    );
+  opacity: 0.72;
+  transition: opacity 0.18s ease;
+}
+
+button.rd-meeting-chat-stream-rail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #8b5cf6 10%, transparent) 0%,
+    transparent 28%,
+    transparent 72%,
+    color-mix(in srgb, #4c1d95 12%, transparent) 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+.rd-meeting-chat-stream-rail__glow {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, #8b5cf6 55%, transparent) 35%,
+    color-mix(in srgb, #8b5cf6 55%, transparent) 65%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+.rd-meeting-chat-stream-rail__icon {
+  position: relative;
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  color: #a78bfa;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, #8b5cf6 35%, transparent));
+}
+
+.rd-meeting-chat-stream-rail__label {
+  position: relative;
+  z-index: 2;
+  writing-mode: vertical-rl;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  opacity: 0.88;
+}
+
+.rd-meeting-chat-stream-rail__hint {
+  position: relative;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  margin-top: auto;
+  opacity: 0.42;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+button.rd-meeting-chat-stream-rail:hover {
+  color: color-mix(in srgb, var(--text) 88%, #ddd6fe);
+  border-left-color: color-mix(in srgb, #8b5cf6 42%, var(--line));
+  background: color-mix(in srgb, #8b5cf6 8%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #8b5cf6 10%, transparent);
+}
+
+button.rd-meeting-chat-stream-rail:hover::before {
+  opacity: 0.95;
+}
+
+button.rd-meeting-chat-stream-rail:hover::after {
+  opacity: 0.72;
+}
+
+button.rd-meeting-chat-stream-rail:hover .rd-meeting-chat-stream-rail__glow {
+  opacity: 1;
+}
+
+button.rd-meeting-chat-stream-rail:hover .rd-meeting-chat-stream-rail__hint {
+  opacity: 0.92;
+  transform: translateX(-1px);
+}
+
+button.rd-meeting-chat-stream-rail:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #8b5cf6 24%, transparent),
+    0 0 0 2px color-mix(in srgb, #8b5cf6 18%, transparent);
+}
+
+button.rd-meeting-chat-stream-edge-handle {
+  position: absolute;
+  left: 0;
+  bottom: 24px;
+  z-index: 20;
+  display: flex;
+  width: 24px;
+  height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, #8b5cf6 55%, var(--line));
+  border-radius: 9999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #4c1d95 28%, var(--panel)) 0%,
+    color-mix(in srgb, #312e81 18%, var(--panel)) 100%
+  );
+  color: #e9d5ff;
+  cursor: pointer;
+  transform: translateX(-50%);
+  box-shadow:
+    0 2px 10px color-mix(in srgb, #000 28%, transparent),
+    0 0 0 1px color-mix(in srgb, #8b5cf6 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.rd-meeting-chat-stream-edge-handle__icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.25px;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, #c4b5fd 45%, transparent));
+}
+
+.rd-meeting-chat-stream-edge-handle__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #ddd6fe;
+}
+
+button.rd-meeting-chat-stream-edge-handle:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, #a78bfa 75%, #fff);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #6d28d9 42%, var(--panel)) 0%,
+    color-mix(in srgb, #4c1d95 32%, var(--panel)) 100%
+  );
+  box-shadow:
+    0 4px 14px color-mix(in srgb, #8b5cf6 28%, transparent),
+    0 0 0 1px color-mix(in srgb, #a78bfa 35%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  transform: translate(calc(-50% - 1px), 0);
+}
+
+button.rd-meeting-chat-stream-edge-handle:hover .rd-meeting-chat-stream-edge-handle__label {
+  color: #fff;
+}
+
+button.rd-meeting-chat-stream-edge-handle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, #8b5cf6 45%, transparent),
+    0 4px 14px color-mix(in srgb, #8b5cf6 22%, transparent);
+}
+
+/* --- 研发会议室 · SOP 流水线（折叠边栏） --- */
+.rd-meeting-sop-pipeline-rail-wrap {
+  display: flex;
+  min-height: 0;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.rd-meeting-sop-pipeline-rail-wrap > span {
+  display: flex !important;
+  height: 100%;
+  min-height: 0;
+}
+
+button.rd-meeting-sop-pipeline-rail {
+  position: relative;
+  display: flex;
+  width: 44px;
+  height: 100%;
+  align-self: stretch;
+  min-height: 0;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 14px 0 16px;
+  border: none;
+  border-right: 1px solid color-mix(in srgb, #3b82f6 18%, var(--line));
+  border-radius: 0;
+  background: color-mix(in srgb, #3b82f6 4%, var(--panel));
+  color: color-mix(in srgb, var(--text) 72%, #93c5fd);
+  cursor: pointer;
+  overflow: hidden;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  isolation: isolate;
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+button.rd-meeting-sop-pipeline-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: transparent;
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #3b82f6 22%, transparent) 0,
+      color-mix(in srgb, #3b82f6 22%, transparent) 1px,
+      transparent 1px,
+      transparent 9px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, #93c5fd 10%, transparent) 0,
+      color-mix(in srgb, #93c5fd 10%, transparent) 1px,
+      transparent 1px,
+      transparent 12px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, #93c5fd 10%, transparent) 0,
+      color-mix(in srgb, #93c5fd 10%, transparent) 1px,
+      transparent 1px,
+      transparent 12px
+    );
+  opacity: 0.72;
+  transition: opacity 0.18s ease;
+}
+
+button.rd-meeting-sop-pipeline-rail::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #3b82f6 10%, transparent) 0%,
+    transparent 28%,
+    transparent 72%,
+    color-mix(in srgb, #1e3a8a 12%, transparent) 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+.rd-meeting-sop-pipeline-rail__glow {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 1;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, #3b82f6 55%, transparent) 35%,
+    color-mix(in srgb, #3b82f6 55%, transparent) 65%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.18s ease;
+}
+
+.rd-meeting-sop-pipeline-rail__icon {
+  position: relative;
+  z-index: 2;
+  width: 15px;
+  height: 15px;
+  color: #60a5fa;
+  filter: drop-shadow(0 0 8px color-mix(in srgb, #3b82f6 35%, transparent));
+}
+
+.rd-meeting-sop-pipeline-rail__label {
+  position: relative;
+  z-index: 2;
+  writing-mode: vertical-rl;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  opacity: 0.88;
+}
+
+.rd-meeting-sop-pipeline-rail__hint {
+  position: relative;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  margin-top: auto;
+  opacity: 0.42;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+button.rd-meeting-sop-pipeline-rail:hover {
+  color: color-mix(in srgb, var(--text) 88%, #bfdbfe);
+  border-right-color: color-mix(in srgb, #3b82f6 42%, var(--line));
+  background: color-mix(in srgb, #3b82f6 8%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #3b82f6 10%, transparent);
+}
+
+button.rd-meeting-sop-pipeline-rail:hover::before {
+  opacity: 0.95;
+}
+
+button.rd-meeting-sop-pipeline-rail:hover::after {
+  opacity: 0.72;
+}
+
+button.rd-meeting-sop-pipeline-rail:hover .rd-meeting-sop-pipeline-rail__glow {
+  opacity: 1;
+}
+
+button.rd-meeting-sop-pipeline-rail:hover .rd-meeting-sop-pipeline-rail__hint {
+  opacity: 0.92;
+  transform: translateX(1px);
+}
+
+button.rd-meeting-sop-pipeline-rail:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, #3b82f6 24%, transparent),
+    0 0 0 2px color-mix(in srgb, #3b82f6 18%, transparent);
+}
+
+button.rd-meeting-sop-pipeline-edge-handle {
+  position: absolute;
+  right: 0;
+  bottom: 24px;
+  z-index: 20;
+  display: flex;
+  width: 24px;
+  height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, #3b82f6 55%, var(--line));
+  border-radius: 9999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #1e3a8a 28%, var(--panel)) 0%,
+    color-mix(in srgb, #1e40af 18%, var(--panel)) 100%
+  );
+  color: #dbeafe;
+  cursor: pointer;
+  transform: translateX(50%);
+  box-shadow:
+    0 2px 10px color-mix(in srgb, #000 28%, transparent),
+    0 0 0 1px color-mix(in srgb, #3b82f6 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.rd-meeting-sop-pipeline-edge-handle__icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.25px;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, #93c5fd 45%, transparent));
+}
+
+.rd-meeting-sop-pipeline-edge-handle__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #bfdbfe;
+}
+
+button.rd-meeting-sop-pipeline-edge-handle:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, #60a5fa 75%, #fff);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #2563eb 42%, var(--panel)) 0%,
+    color-mix(in srgb, #1e3a8a 32%, var(--panel)) 100%
+  );
+  box-shadow:
+    0 4px 14px color-mix(in srgb, #3b82f6 28%, transparent),
+    0 0 0 1px color-mix(in srgb, #60a5fa 35%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  transform: translate(calc(50% + 1px), 0);
+}
+
+button.rd-meeting-sop-pipeline-edge-handle:hover .rd-meeting-sop-pipeline-edge-handle__label {
+  color: #fff;
+}
+
+button.rd-meeting-sop-pipeline-edge-handle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, #3b82f6 45%, transparent),
+    0 4px 14px color-mix(in srgb, #3b82f6 22%, transparent);
+}
+
 .rd-meeting-chat-stream {
   display: flex;
   flex-direction: column;

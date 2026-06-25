@@ -51,11 +51,12 @@ def _repair_pending_delivery(scope_id: str, room_state: dict[str, Any], panel: s
             rs = dict(load_room_state(scope_id) or rs)
             return rs
 
-    if panel in ("solution_review", "func_solution_review", "task_exec"):
+    if panel in ("solution_review", "func_solution_review", "task_exec", "unit_test_review"):
         key = {
             "solution_review": "solution_review_payload",
             "func_solution_review": "func_solution_review_payload",
             "task_exec": "task_exec_payload",
+            "unit_test_review": "unit_test_review_payload",
         }[panel]
         if not pending.get(key):
             review = load_node_review(scope_id, node_id)

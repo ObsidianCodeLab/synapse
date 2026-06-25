@@ -194,7 +194,7 @@
     "unit_test": {
       "host_profile_id": "default",
       "worker_profile_ids": [],
-      "node_intent": "说明本次研发任务涉及的功能测试案例、单元测试文件路径与测试结果，辅助后续自动化测试。"
+      "node_intent": "完善任务执行阶段单元测试代码，输出用例说明与测试结果，经专用评审面板执行 pytest 并人工确认。"
     },
     "dev_process_review": {
       "host_profile_id": "default",
