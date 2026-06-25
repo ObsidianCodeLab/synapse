@@ -39,10 +39,6 @@ const MeetingRoomView = lazy(() =>
   import("./views/rd-manage/MeetingRoomView").then((m) => ({ default: m.MeetingRoomView })),
 );
 
-const TaskExecOpsDemoView = lazy(() =>
-  import("./views/dev/TaskExecOpsDemoView").then((m) => ({ default: m.TaskExecOpsDemoView })),
-);
-
 const OrderManagementView = lazy(() =>
   import("./views/rd-manage/OrderManagementView").then((m) => ({ default: m.OrderManagementView })),
 );
@@ -180,7 +176,6 @@ const _HASH_TO_VIEW: Record<string, ViewId> = {
   "workbench-sandbox": "workbench_sandbox",
   "workbench-team": "workbench_team",
   "workbench-dev-tools": "workbench_dev_tools",
-  "task-exec-ops-demo": "task_exec_ops_demo",
 };
 
 const _VIEW_TO_HASH: Record<string, string> = Object.fromEntries(
@@ -6337,13 +6332,6 @@ export function App() {
     }
     if (view === "workbench_team") {
       return <TeamViewView synapseApiBase={httpApiBase()} />;
-    }
-    if (view === "task_exec_ops_demo") {
-      return (
-        <Suspense fallback={<div className="card">{t("common.loading")}</div>}>
-          <TaskExecOpsDemoView />
-        </Suspense>
-      );
     }
     if (view === "workbench_dev_tools") {
       if (disabledViews.includes("skills")) {
