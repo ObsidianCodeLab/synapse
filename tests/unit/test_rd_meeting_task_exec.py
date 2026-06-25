@@ -10,6 +10,7 @@ from synapse.rd_meeting.binding import resolve_node_binding
 from synapse.rd_meeting.cli_models import (
     DEFAULT_CURSOR_CLI_MODEL,
     normalize_cursor_cli_model,
+    resolve_cli_exec_node_model_label,
     resolve_cli_model_arg,
     resolve_cursor_cli_model_arg,
 )
@@ -61,6 +62,39 @@ def test_resolve_cli_model_arg():
     assert resolve_cursor_cli_model_arg("custom", "my-model") == "my-model"
     assert resolve_cursor_cli_model_arg("custom", "") == DEFAULT_CURSOR_CLI_MODEL
     assert resolve_cli_model_arg("cursor_cli", "auto") == "auto"
+
+
+def test_resolve_cli_exec_node_model_label_from_config(monkeypatch):
+    monkeypatch.setattr(
+        "synapse.rd_meeting.config_store.load_meeting_room_config",
+        lambda: {
+            "node_overrides": {
+                "task_exec": {
+                    "cli_tool": "cursor_cli",
+                    "cli_model": "custom",
+                    "cli_model_custom": "composer-2.5-fast",
+                }
+            }
+        },
+    )
+    assert resolve_cli_exec_node_model_label("scope-1", "task_exec") == "composer-2.5-fast"
+    assert resolve_cli_exec_node_model_label("scope-1", "req_clarify") is None
+
+
+def test_resolve_cli_exec_node_model_label_from_result(monkeypatch):
+    monkeypatch.setattr(
+        "synapse.rd_meeting.config_store.load_meeting_room_config",
+        lambda: {"node_overrides": {}},
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.task_exec.load_task_exec_payload",
+        lambda _sid: {
+            "cli_tool": "cursor_cli",
+            "cli_model": "auto",
+            "cli_model_label": "Auto",
+        },
+    )
+    assert resolve_cli_exec_node_model_label("scope-2", "task_exec") == "Auto"
 
 
 def test_bootstrap_task_exec_passes_model_to_cli(tmp_path, monkeypatch):

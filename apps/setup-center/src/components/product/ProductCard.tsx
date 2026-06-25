@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Edit2, Trash2, Ticket, Code, FileText, Check, Loader2, X, RefreshCw, GitBranch, Circle, Star } from "lucide-react";
+import { Edit2, Trash2, Ticket, Code, FileText, Check, Loader2, X, RefreshCw, GitBranch, Circle, Star, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Product, displayIdPipeName, type UnifiedWireAnalysisState } from "./types";
 import type { ProductManageScope } from "@/utils/ownerInfoGuard";
@@ -14,6 +14,7 @@ interface ProductCardProps {
   /** 当前用户对该产品的管理范围（仅桌面端计算） */
   manageScope?: ProductManageScope;
   onEdit: (product: Product) => void | Promise<void>;
+  onCopy?: (product: Product) => void | Promise<void>;
   onDelete: (product: Product) => void;
   onView: (product: Product) => void;
   onRefreshProcess?: (product: Product) => void | Promise<void>;
@@ -156,6 +157,7 @@ export function ProductCard({
   product,
   manageScope,
   onEdit,
+  onCopy,
   onDelete,
   onView,
   onRefreshProcess,
@@ -218,6 +220,20 @@ export function ProductCard({
             aria-pressed={isFavorite}
           >
             <Star size={13} className={isFavorite ? "fill-current" : undefined} />
+          </Button>
+        ) : null}
+        {onCopy ? (
+          <Button
+            variant="ghost"
+            className="h-7 w-7 p-0 text-muted-foreground hover:bg-background/90 hover:text-foreground shadow-sm border border-border/50 bg-background/50 backdrop-blur"
+            disabled={busyRefresh || busyRepo || busyDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              void onCopy(product);
+            }}
+            title={t("workbench.products.tooltipCopy")}
+          >
+            <Copy size={13} />
           </Button>
         ) : null}
         <Button

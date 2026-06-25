@@ -37,6 +37,51 @@ def test_should_list_excludes_archived():
     assert should_list_in_meeting_rooms(data) is False
 
 
+def test_collect_sop_node_items_task_exec_uses_cli_model(monkeypatch, tmp_path):
+    dn = "21890010"
+    work = tmp_path / "work" / dn
+    work.mkdir(parents=True)
+    (work / "room_state.json").write_text(
+        json.dumps(
+            {
+                "node_metrics": {
+                    "task_exec": {
+                        "started_at": "2026-06-01T10:00:00",
+                        "completed_at": "2026-06-01T12:00:00",
+                        "seconds": 7200,
+                        "tokens": 5000,
+                    }
+                }
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("synapse.rd_meeting.owner_order_archive.scope_dir", lambda sid: tmp_path / "work" / sid)
+    monkeypatch.setattr(
+        "synapse.rd_meeting.owner_order_archive.load_room_state",
+        lambda sid: json.loads((tmp_path / "work" / sid / "room_state.json").read_text(encoding="utf-8")),
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.config_store.load_meeting_room_config",
+        lambda: {
+            "node_overrides": {
+                "task_exec": {
+                    "cli_tool": "cursor_cli",
+                    "cli_model": "composer-2.5",
+                }
+            }
+        },
+    )
+
+    items = collect_sop_node_items(demand_no=dn, scope_id=dn)
+    task_items = [i for i in items if i["sop_node_id"] == "task_exec"]
+    assert len(task_items) == 1
+    assert task_items[0]["tokens"] == 5000
+    assert task_items[0]["model"] == "Composer 2.5"
+
+
 def test_collect_sop_node_items_from_room_state(monkeypatch, tmp_path):
     dn = "21890001"
     work = tmp_path / "work" / dn

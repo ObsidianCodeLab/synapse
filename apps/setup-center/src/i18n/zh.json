@@ -91,6 +91,7 @@
       "recentTickets": "近30日改造工单 ({{count}})",
       "noTickets": "暂无活跃工单",
       "tooltipEdit": "编辑配置",
+      "tooltipCopy": "复制产品",
       "tooltipDetail": "产品详情",
       "tooltipRefreshProcess": "刷新分析状态",
       "refreshNow": "立即刷新",

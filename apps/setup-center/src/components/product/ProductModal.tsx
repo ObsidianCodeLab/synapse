@@ -73,6 +73,16 @@ export function sanitizeProductNameForWindows(value: string): string {
   return value.replace(WINDOWS_FILENAME_INVALID_GLOBAL_RE, "");
 }
 
+/** 复制产品时默认名称：原名称_复制_YYYYMMDD（经 Windows 路径非法字符清洗） */
+export function buildProductCopyName(originalName: string): string {
+  const base = (originalName || "").trim();
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return sanitizeProductNameForWindows(`${base}_复制_${y}${m}${d}`);
+}
+
 export function productNameViolatesWindowsFileRules(value: string): boolean {
   return WINDOWS_FILENAME_INVALID_RE.test(value);
 }
@@ -134,6 +144,8 @@ interface ProductModalProps {
   onCancel: () => void;
   onFinish: (values: ProductModalFinishValues) => void | Promise<void>;
   initialValues?: Product;
+  /** 复制来源：以新建模式打开并预填字段（名称改为 原名称_复制_YYYYMMDD） */
+  copyFrom?: Product;
   /** 项目空间下拉选项（label/value 均为 projectId|projectName） */
   projectSpaces?: { label: string; value: string }[] | null;
   synapseApiBase?: string;
@@ -144,6 +156,7 @@ export function ProductModal({
   onCancel,
   onFinish,
   initialValues,
+  copyFrom,
   projectSpaces: externalSpaces,
   synapseApiBase = "http://127.0.0.1:18900",
 }: ProductModalProps) {
@@ -203,7 +216,7 @@ export function ProductModal({
     setProjectSpaces(Array.isArray(externalSpaces) ? externalSpaces : []);
   }, [open, externalSpaces]);
 
-  /** 仅在打开弹窗或切换 新建/编辑 时初始化表单（勿依赖 externalSpaces，否则会与版本列表请求竞态） */
+  /** 仅在打开弹窗或切换 新建/编辑/复制 时初始化表单（勿依赖 externalSpaces，否则会与版本列表请求竞态） */
   useEffect(() => {
     if (!open) return;
 
@@ -219,6 +232,18 @@ export function ProductModal({
         repositories: initialValues.repositories || [],
       });
       setIsEdit(true);
+    } else if (copyFrom) {
+      setFormState({
+        name: buildProductCopyName(copyFrom.name),
+        icon: copyFrom.icon || DEFAULT_ICONS[0].value,
+        projectSpace: copyFrom.space ?? "",
+        productVersion: copyFrom.version ?? "",
+        productTag: copyFrom.module ?? "",
+        description: copyFrom.description || "",
+        featureRows: parseFeaturesFromStored(copyFrom.features ?? ""),
+        repositories: (copyFrom.repositories || []).map((r) => ({ ...r })),
+      });
+      setIsEdit(false);
     } else {
       setFormState({
         name: "",
@@ -233,7 +258,7 @@ export function ProductModal({
       setIsEdit(false);
       setDefaultRepoAccessToken("");
     }
-  }, [open, initialValues]);
+  }, [open, initialValues, copyFrom]);
 
   useEffect(() => {
     if (!open || initialValues) return;

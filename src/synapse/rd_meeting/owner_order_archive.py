@@ -67,11 +67,17 @@ def _repo_name_from_url(repo_url: str) -> str:
 
 def _resolve_node_model(scope_id: str, node_id: str) -> str | None:
     from synapse.rd_meeting.agent_activity import list_node_agent_profiles, read_activity_log
+    from synapse.rd_meeting.cli_models import resolve_cli_exec_node_model_label
 
     sid = (scope_id or "").strip()
     nid = (node_id or "").strip()
     if not sid or not nid:
         return None
+
+    cli_label = resolve_cli_exec_node_model_label(sid, nid)
+    if cli_label:
+        return cli_label
+
     for pid in list_node_agent_profiles(sid, nid):
         for row in read_activity_log(sid, nid, pid, limit=500):
             if str(row.get("category") or "") != "llm_usage":

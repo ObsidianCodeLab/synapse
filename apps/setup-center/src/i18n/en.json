@@ -90,6 +90,7 @@
       "recentTickets": "Last 30 days work orders ({{count}})",
       "noTickets": "No active tickets",
       "tooltipEdit": "Edit",
+      "tooltipCopy": "Copy product",
       "tooltipDetail": "Details",
       "tooltipRefreshProcess": "Refresh analysis status",
       "refreshNow": "Refresh Now",

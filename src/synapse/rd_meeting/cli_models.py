@@ -34,6 +34,8 @@ CLI_MODEL_OPTIONS_BY_TOOL: dict[str, list[dict[str, Any]]] = {
 
 _VALID_CURSOR_PRESETS = frozenset(o["id"] for o in CURSOR_CLI_MODEL_OPTIONS)
 
+CLI_EXEC_NODE_IDS = frozenset({"task_exec", "diff_analysis"})
+
 
 def normalize_cursor_cli_model(value: str | None) -> str:
     raw = (value or "").strip()
@@ -90,3 +92,68 @@ def display_cli_model_label(
         if opt["id"] == mode:
             return str(opt.get("label") or mode)
     return mode
+
+
+def _cli_exec_model_label_from_config(node_id: str) -> str | None:
+    """会议室 node_overrides 中的 IDE CLI 模型展示名。"""
+    from synapse.rd_meeting.config_store import load_meeting_room_config
+
+    nid = (node_id or "").strip()
+    if nid not in CLI_EXEC_NODE_IDS:
+        return None
+    cfg = load_meeting_room_config()
+    overrides = cfg.get("node_overrides") if isinstance(cfg.get("node_overrides"), dict) else {}
+    ov = overrides.get(nid) if isinstance(overrides.get(nid), dict) else {}
+    tool = normalize_cli_tool(str(ov.get("cli_tool") or DEFAULT_CLI_TOOL))
+    preset = normalize_cursor_cli_model(str(ov.get("cli_model") or DEFAULT_CURSOR_CLI_MODEL))
+    custom = str(ov.get("cli_model_custom") or "").strip()
+    label = display_cli_model_label(tool, preset, custom)
+    if label and label != "—":
+        return label[:120]
+    return None
+
+
+def _cli_exec_model_label_from_result(scope_id: str, node_id: str) -> str | None:
+    """CLI 执行结果 JSON 中落盘的 IDE 模型（启动时写入）。"""
+    sid = (scope_id or "").strip()
+    nid = (node_id or "").strip()
+    if not sid or nid not in CLI_EXEC_NODE_IDS:
+        return None
+
+    data: dict[str, Any] | None = None
+    if nid == "task_exec":
+        from synapse.rd_meeting.task_exec import load_task_exec_payload
+
+        data = load_task_exec_payload(sid)
+    elif nid == "diff_analysis":
+        from synapse.rd_meeting.diff_analysis_exec import load_diff_analysis_payload
+
+        data = load_diff_analysis_payload(sid)
+
+    if not isinstance(data, dict):
+        return None
+
+    label = str(data.get("cli_model_label") or "").strip()
+    if label and label != "—":
+        return label[:120]
+
+    preset = str(data.get("cli_model") or "").strip()
+    if not preset:
+        return None
+    tool = normalize_cli_tool(str(data.get("cli_tool") or DEFAULT_CLI_TOOL))
+    custom = str(data.get("cli_model_custom") or "").strip()
+    label = display_cli_model_label(tool, preset, custom)
+    if label and label != "—":
+        return label[:120]
+    return None
+
+
+def resolve_cli_exec_node_model_label(scope_id: str, node_id: str) -> str | None:
+    """CLI 执行节点 token 统计对应模型：IDE 配置（结果 JSON 为运行期快照，否则读会议室配置）。"""
+    nid = (node_id or "").strip()
+    if nid not in CLI_EXEC_NODE_IDS:
+        return None
+    label = _cli_exec_model_label_from_result(scope_id, nid)
+    if label:
+        return label
+    return _cli_exec_model_label_from_config(nid)

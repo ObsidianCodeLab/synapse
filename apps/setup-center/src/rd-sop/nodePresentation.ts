@@ -7,6 +7,12 @@ import type {
   MeetingRoomConfigPayload,
   MeetingRoomNodeOverride,
 } from '../api/meetingRoomService';
+import {
+  DEFAULT_CURSOR_CLI_MODEL,
+  displayCliModelLabel,
+  type CliToolId,
+} from '../components/rd-manage/meeting/cliModelConfig';
+import { DEFAULT_CLI_TOOL } from '../components/rd-manage/meeting/cliToolConfig';
 
 /** 流水线节点在 UI 上的状态（会议室与工单看板对齐） */
 export type SopPipelineNodeState =
@@ -124,14 +130,32 @@ export function sopNodeShowsLlmMetrics(nodeType: NodeType): boolean {
   return nodeType !== 'system';
 }
 
+const CLI_EXEC_NODE_IDS = new Set(['task_exec', 'diff_analysis']);
+
+/** 任务执行 / 试飞优化：Token 统计对应 IDE CLI 模型（会议室 node_overrides） */
+function resolveCliExecNodeModelDisplay(
+  nodeId: string,
+  config: Pick<MeetingRoomConfigPayload, 'bindings' | 'node_overrides'> | null | undefined,
+): string {
+  const override = config?.node_overrides?.[nodeId];
+  const binding = config?.bindings?.find((b) => b.node_id === nodeId);
+  const cliTool = (override?.cli_tool ?? binding?.cli_tool ?? DEFAULT_CLI_TOOL) as CliToolId;
+  const preset = override?.cli_model ?? binding?.cli_model ?? DEFAULT_CURSOR_CLI_MODEL;
+  const custom = override?.cli_model_custom ?? binding?.cli_model_custom ?? '';
+  return displayCliModelLabel(cliTool, preset, custom);
+}
+
 /** 流水线节点卡片「模型」：主控绑定端点在目录中的 model 字段（与会议室配置一致） */
 export function resolveSopNodeModelDisplay(
   nodeType: NodeType,
   nodeId: string,
-  config: Pick<MeetingRoomConfigPayload, 'host_llm_endpoint_key' | 'bindings'> | null | undefined,
+  config: Pick<MeetingRoomConfigPayload, 'host_llm_endpoint_key' | 'bindings' | 'node_overrides'> | null | undefined,
   catalog: readonly LlmEndpointCatalogRow[],
 ): string {
   if (nodeType === 'system') return '系统';
+  if (CLI_EXEC_NODE_IDS.has(nodeId)) {
+    return resolveCliExecNodeModelDisplay(nodeId, config);
+  }
   const binding = config?.bindings?.find((b) => b.node_id === nodeId);
   const hostKey =
     (binding?.host_llm_endpoint_key || config?.host_llm_endpoint_key || 'default').trim() ||

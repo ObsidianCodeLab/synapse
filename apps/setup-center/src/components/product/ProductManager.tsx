@@ -236,6 +236,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
+  const [copyFromProduct, setCopyFromProduct] = useState<Product | undefined>(undefined);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [cardActionBusy, setCardActionBusy] = useState<{
@@ -362,8 +363,21 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
     });
   };
 
+  const closeProductModal = () => {
+    setIsModalOpen(false);
+    setEditingProduct(undefined);
+    setCopyFromProduct(undefined);
+  };
+
   const handleAdd = () => {
     setEditingProduct(undefined);
+    setCopyFromProduct(undefined);
+    setIsModalOpen(true);
+  };
+
+  const handleCopy = (product: Product) => {
+    setEditingProduct(undefined);
+    setCopyFromProduct(product);
     setIsModalOpen(true);
   };
 
@@ -376,6 +390,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
         return;
       }
     }
+    setCopyFromProduct(undefined);
     setEditingProduct(product);
     setIsModalOpen(true);
   };
@@ -486,7 +501,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
         ),
       );
       toast.success(t("workbench.products.updated") || "已更新");
-      setIsModalOpen(false);
+      closeProductModal();
       return;
     }
 
@@ -541,7 +556,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
     } as Product;
     setProducts([newProduct, ...products]);
     toast.success(t("workbench.products.created") || "已创建");
-    setIsModalOpen(false);
+    closeProductModal();
   };
 
   return (
@@ -649,6 +664,7 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
                   isFavorite={isFavorite(product.id)}
                   onToggleFavorite={() => toggleFavorite(product.id)}
                   onEdit={handleEdit}
+                  onCopy={handleCopy}
                   onDelete={handleDeleteRequest}
                   onView={handleView}
                   onRefreshProcess={handleRefreshProcess}
@@ -674,9 +690,10 @@ export function ProductManager({ synapseApiBase = "http://127.0.0.1:18900" }: { 
 
         <ProductModal
           open={isModalOpen}
-          onCancel={() => setIsModalOpen(false)}
+          onCancel={closeProductModal}
           onFinish={handleFinish}
           initialValues={editingProduct}
+          copyFrom={copyFromProduct}
           projectSpaces={projectSpaces}
           synapseApiBase={synapseApiBase}
         />
