@@ -371,6 +371,10 @@ function ReviewTable({
 
   const canAddReviewer = !resolvedLoading && availableReviewers.length > 0;
 
+  const selfRow = rows.find((r) => r.isSelf);
+  const selfCommentReady = Boolean(selfRow?.comments?.trim());
+  const submitDisabled = selfReviewing || !selfCommentReady;
+
   useEffect(() => {
     if (!canAddReviewer) setAddingRow(false);
   }, [canAddReviewer]);
@@ -548,15 +552,19 @@ function ReviewTable({
               </Tooltip>
             )}
             {!isSubmitted && (
-              <button
-                type="button"
-                onClick={onSubmit}
-                disabled={selfReviewing}
-                className="rd-leader-review-action-btn bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500"
-              >
-                <SendHorizonal className="h-3.5 w-3.5 shrink-0" />
-                评审推送
-              </button>
+              <Tooltip title={!selfCommentReady ? '请先填写本人评审意见' : undefined}>
+                <span className={`inline-flex ${submitDisabled && !selfReviewing ? 'cursor-not-allowed' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={onSubmit}
+                    disabled={submitDisabled}
+                    className="rd-leader-review-action-btn bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500"
+                  >
+                    <SendHorizonal className="h-3.5 w-3.5 shrink-0" />
+                    评审推送
+                  </button>
+                </span>
+              </Tooltip>
             )}
           </>
         )}
@@ -867,7 +875,11 @@ export function LeaderReviewSopPanel({
 
   // ── 自评处理器（由 ReviewTable 中「评审推送」按钮触发） ─────────────────────
   const handleSelfReview = useCallback(async () => {
-    const comment = selfDraftComment;
+    const comment = selfDraftComment.trim();
+    if (!comment) {
+      toast.warning('请先填写本人评审意见');
+      return;
+    }
     if (!report?.report_id && !reportHtml.trim()) {
       toast.warning('报告尚未归档，请等待流水线生成研发组长评审报告');
       return;
@@ -912,7 +924,7 @@ export function LeaderReviewSopPanel({
         demand_no:   demandNo,
         employee_id: effectiveUser.employee_id,
         conclusion:  'approved',
-        comments:    comment || undefined,
+        comments:    comment,
       });
       toast.success('自评通过，等待其他评审人审阅');
       await fetchStatus();

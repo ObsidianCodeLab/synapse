@@ -335,7 +335,11 @@ function DiffAnalysisDetailSubsection({
   );
 }
 
-function FlightOptimizePlanTabs({
+function planRoundTitle(base: string, round?: number): string {
+  return round && Number(round) > 1 ? `${base}（第 ${round} 轮）` : base;
+}
+
+function FlightOptimizePlanItemTabs({
   section,
 }: {
   section: NonNullable<TaskExecGetResponse['optimize_plan_sections']>[number] | undefined;
@@ -352,7 +356,7 @@ function FlightOptimizePlanTabs({
           key: String(item.item_no ?? item.label ?? item.title),
           label: String(item.label || item.title || `计划项 ${item.item_no ?? ''}`),
           children: (
-            <div className="rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 py-2 text-[13px] leading-relaxed">
+            <div className="rd-flight-plan-tabs__pane rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 pt-2 pb-2 text-[13px] leading-relaxed">
               <ReviewMarkdown content={String(item.markdown || '')} compact />
             </div>
           ),
@@ -363,7 +367,7 @@ function FlightOptimizePlanTabs({
               key: 'all',
               label: '修复建议',
               children: (
-                <div className="rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 py-2 text-[13px] leading-relaxed">
+                <div className="rd-flight-plan-tabs__pane rd-task-exec-report__body custom-scrollbar max-h-[480px] overflow-y-auto px-1 pt-2 pb-2 text-[13px] leading-relaxed">
                   <ReviewMarkdown content={fallbackMd} compact />
                 </div>
               ),
@@ -371,18 +375,13 @@ function FlightOptimizePlanTabs({
           ]
         : [];
 
+  if (tabItems.length === 0) {
+    return <Alert type="warning" showIcon message="未解析到计划项" />;
+  }
+
   return (
-    <div className="space-y-2">
-      {String(section.intro || '').trim() ? (
-        <div className="rounded-lg border border-white/5 bg-black/10 px-3 py-2 text-[12px] text-muted-foreground rd-task-exec-report__body">
-          <ReviewMarkdown content={String(section.intro)} compact />
-        </div>
-      ) : null}
-      {tabItems.length > 0 ? (
-        <Tabs size="small" items={tabItems} className="rd-flight-plan-tabs" destroyInactiveTabPane={false} />
-      ) : (
-        <Alert type="warning" showIcon message="未解析到计划项" />
-      )}
+    <div className="rd-flight-plan-tabs-wrap">
+      <Tabs size="small" items={tabItems} className="rd-flight-plan-tabs" />
     </div>
   );
 }
@@ -456,14 +455,10 @@ function DiffAnalysisDetailPanel({
       </DiffAnalysisDetailSubsection>
 
       <DiffAnalysisDetailSubsection
-        title={
-          latestPlan && Number(latestPlan.round) > 1
-            ? `修复建议（第 ${latestPlan.round} 轮）`
-            : '修复建议'
-        }
+        title={planRoundTitle('修复建议', latestPlan?.round)}
         icon={<Sparkles className="h-3.5 w-3.5 text-violet-400" />}
       >
-        <FlightOptimizePlanTabs section={latestPlan} />
+        <FlightOptimizePlanItemTabs section={latestPlan} />
       </DiffAnalysisDetailSubsection>
     </div>
   );
