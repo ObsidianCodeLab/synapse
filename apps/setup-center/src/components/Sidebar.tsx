@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import type { StepId, Step, ViewId, PluginUIApp } from "../types";
 import {
   IconChat, IconIM, IconSkills, IconStatus, IconConfig,
-  IconChevronDown, IconChevronRight, IconGlobe,
+  IconChevronDown, IconChevronRight,
   IconZap, IconPlug, IconCalendar,
-  IconBug, IconBrain, IconGitHub, IconGitee, IconUsers, IconBot,
+  IconBug, IconBrain, IconGitee, IconUsers, IconBot,
   IconGear, IconBook, IconStorefront, IconPuzzle, IconFingerprint, IconLayoutGrid,
   IconShield, IconRadar, IconBuilding,
   IconLaptop, IconPackage, IconClipboard, IconTerminal,
@@ -463,12 +463,12 @@ export function Sidebar({
           {!backendVersion && serviceRunning && <div>Backend: -</div>}
           <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span
-              onClick={() => openExternalUrl("https://synapse.ai")}
+              onClick={() => openExternalUrl("https://git-nj.iwhalecloud.com/xmjfbss/Synapse.git")}
               style={{ color: "var(--accent, #5B8DEF)", textDecoration: "none", opacity: 1, display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}
               onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
               onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
             >
-              <IconGlobe size={11} />
+              <IconGitee size={11} />
               synapse.ai
             </span>
             <span
@@ -520,20 +520,6 @@ export function Sidebar({
               <IconBook size={12} />
               {t("sidebar.docs")}
             </span>
-            <span
-              onClick={() => openExternalUrl("https://github.com/jyhk1314/synapse")}
-              title="GitHub"
-              style={{ color: "var(--accent, #5B8DEF)", opacity: 1, display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-            >
-              <IconGitHub size={13} />
-            </span>
-            <span
-              onClick={() => openExternalUrl("https://gitee.com/jyhk1314/synapse")}
-              title="Gitee"
-              style={{ color: "var(--accent, #5B8DEF)", opacity: 1, display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-            >
-              <IconGitee size={13} />
-            </span>
           </div>
         </div>
       )}
@@ -549,11 +535,11 @@ export function Sidebar({
         }}>
           <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
             <span
-              onClick={() => openExternalUrl("https://synapse.ai")}
+              onClick={() => openExternalUrl("https://git-nj.iwhalecloud.com/xmjfbss/Synapse.git")}
               title="synapse.ai"
               style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
             >
-              <IconGlobe size={14} />
+              <IconGitee size={14} />
             </span>
             <span
               onClick={() => setDingtalkQrOpen(true)}
@@ -595,20 +581,6 @@ export function Sidebar({
               style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
             >
               <IconBook size={14} />
-            </span>
-            <span
-              onClick={() => openExternalUrl("https://github.com/jyhk1314/synapse")}
-              title="GitHub"
-              style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
-            >
-              <IconGitHub size={14} />
-            </span>
-            <span
-              onClick={() => openExternalUrl("https://gitee.com/jyhk1314/synapse")}
-              title="Gitee"
-              style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
-            >
-              <IconGitee size={14} />
             </span>
           </div>
         </div>
