@@ -1827,6 +1827,10 @@ async def _get_task_build_history(body: GetTaskBuildHistoryRequest) -> dict:
     build_result_cache: dict[str, list[dict]] = {}
     simplified: list[dict] = []
     for it in raw.get("data").get("featureBuildHisList") or []:
+        # 排除 "createUserId": null + "triggerTaskIds": null + "reuseBranchName": "master" 的记录
+        if it.get("createUserId") is None and it.get("triggerTaskIds") is None and it.get("reuseBranchName") == "master":
+            continue
+
         run_state = it.get("ciFlowInstRunState")
         item: dict = {
             "ciFlowId": it.get("ciFlowId"),
