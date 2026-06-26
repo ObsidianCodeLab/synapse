@@ -91,6 +91,8 @@ def main() -> int:
     print(
         f"updated badges: products={stats['product_count']} tickets={stats['processed_ticket_count']}"
     )
+    print(f"Gitea raw preview: {GITEA_BADGE_RAW_BASE}/platform-stats-products.svg")
+    print("commit docs/badges/ and push to Gitea to refresh README")
     return 0
 
 
