@@ -12,8 +12,10 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 BADGE_DIR = ROOT / "docs" / "badges"
-# BSS 团队产品公共服务默认地址（与引导期 devservice.ip 探测目标一致）
-DEFAULT_UNIFIED_SERVICE_BASE_URL = "http://10.10.8.21:10001"
+# Gitea README 中 img 须用 absolute raw URL（HTML 相对路径不会被解析到仓库文件）
+GITEA_BADGE_RAW_BASE = (
+    "https://git-nj.iwhalecloud.com/xmjfbss/Synapse/raw/branch/master/docs/badges"
+)
 
 
 def _fetch_stats(base_url: str) -> dict[str, int]:
