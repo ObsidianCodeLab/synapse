@@ -12,6 +12,8 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 BADGE_DIR = ROOT / "docs" / "badges"
+# BSS 团队产品公共服务默认地址（与引导期 devservice.ip 探测目标一致）
+DEFAULT_UNIFIED_SERVICE_BASE_URL = "http://10.10.8.21:10001"
 
 
 def _fetch_stats(base_url: str) -> dict[str, int]:
@@ -54,8 +56,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Sync Gitea README platform stat badges from unified service")
     parser.add_argument(
         "--base-url",
-        default="http://127.0.0.1:10001",
-        help="SynapseService base URL (default: http://127.0.0.1:10001)",
+        default=DEFAULT_UNIFIED_SERVICE_BASE_URL,
+        help=f"SynapseService base URL (default: {DEFAULT_UNIFIED_SERVICE_BASE_URL})",
     )
     args = parser.parse_args()
 
