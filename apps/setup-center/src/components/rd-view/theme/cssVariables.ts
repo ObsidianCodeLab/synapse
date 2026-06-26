@@ -51,11 +51,13 @@ const PALETTE_TO_CSS_VAR: Record<keyof RdViewThemePalette, string> = {
   woItemBgInProgress: '--wo-item-bg-inProgress',
   woItemBgPending: '--wo-item-bg-pending',
   woItemBgError: '--wo-item-bg-error',
+  woItemBgManual: '--wo-item-bg-manual',
   woItemBorder: '--wo-item-border',
   woItemBorderCompleted: '--wo-item-border-completed',
   woItemBorderInProgress: '--wo-item-border-inProgress',
   woItemBorderPending: '--wo-item-border-pending',
   woItemBorderError: '--wo-item-border-error',
+  woItemBorderManual: '--wo-item-border-manual',
   woItemBorderWidth: '--wo-item-border-width',
   woItemRadius: '--wo-item-radius',
   woItemMainBg: '--wo-item-main-bg',
@@ -81,6 +83,9 @@ const PALETTE_TO_CSS_VAR: Record<keyof RdViewThemePalette, string> = {
   woTagErrorFg: '--wo-tag-error-fg',
   woTagErrorBg: '--wo-tag-error-bg',
   woTagErrorBorder: '--wo-tag-error-border',
+  woTagManualFg: '--wo-tag-manual-fg',
+  woTagManualBg: '--wo-tag-manual-bg',
+  woTagManualBorder: '--wo-tag-manual-border',
   woTagSopCompletedFg: '--wo-tag-sop-completed-fg',
   woTagSopCompletedBg: '--wo-tag-sop-completed-bg',
   woTagSopCompletedBorder: '--wo-tag-sop-completed-border',
@@ -100,6 +105,7 @@ const PALETTE_TO_CSS_VAR: Record<keyof RdViewThemePalette, string> = {
   woAccentInProgress: '--wo-accent-inProgress',
   woAccentPending: '--wo-accent-pending',
   woAccentError: '--wo-accent-error',
+  woAccentManual: '--wo-accent-manual',
 };
 
 export function paletteToCssVariables(palette: RdViewThemePalette): Record<string, string> {
@@ -118,10 +124,11 @@ export function applyCssVariables(target: HTMLElement, palette: RdViewThemePalet
   }
 }
 
-/** portal 容器 class，需与 Drawer rootClassName 等保持一致 */
+/** portal 容器 class，需与 Drawer / Popover overlayClassName 等保持一致 */
 export const RD_VIEW_PORTAL_THEME_CLASSES = [
   'person-workload-drawer',
   'work-order-drawer',
+  'efficiency-popover-overlay',
 ] as const;
 
 export function syncPortalThemeVariables(palette: RdViewThemePalette): void {

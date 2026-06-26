@@ -33,6 +33,10 @@ export const RD_UNIFIED_PATHS = {
   destroyProd: "/dev/iwhalecloud/synapse/destroy_prod",
   /** 引导验证通过后登记处理人（后端 login / devservice-ip 也会调用） */
   rdViewAssigneeSave: "/dev/iwhalecloud/synapse/rd_view_assignee_save",
+  /** 团队视图：按处理人与时间范围查询 rd_view 工单 */
+  rdViewTeamQuery: "/dev/iwhalecloud/synapse/rd_view_team_query",
+  /** 工单表情反馈更新（feedback_type 为 JSON 串） */
+  rdViewDemandUpdateFeedback: "/dev/iwhalecloud/synapse/rd_view_demand_update_feedback",
   /** 研发组长评审报告（与产品管理相同：Tauri 直连统一服务 :10001） */
   rdViewReportSubmit: "/dev/iwhalecloud/synapse/rd_view_report_submit",
   rdViewReportSearch: "/dev/iwhalecloud/synapse/rd_view_report_search",

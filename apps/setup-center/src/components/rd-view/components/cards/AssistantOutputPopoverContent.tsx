@@ -1,8 +1,5 @@
 import { FileTextOutlined, CodeOutlined } from '@ant-design/icons';
-import { useMemo } from 'react';
 import { useDashboard } from '@rd-view/context/DashboardContext';
-import { getProductAssistantOutputByTimeRange } from '@rd-view/data/mockData';
-import { TIME_RANGE_LABEL } from '@rd-view/utils/assistantOutput';
 
 function ProductOutputCard({
   productName,
@@ -33,17 +30,13 @@ function ProductOutputCard({
 }
 
 export function AssistantOutputPopoverContent() {
-  const { state } = useDashboard();
-
-  const products = useMemo(
-    () => getProductAssistantOutputByTimeRange(state.timeRange),
-    [state.timeRange],
-  );
+  const { dashboard } = useDashboard();
+  const products = dashboard.details.assistantOutput;
 
   return (
     <div className="efficiency-popover assistant-output-popover">
       <div className="efficiency-popover-header">
-        研发助手产出明细（{TIME_RANGE_LABEL[state.timeRange]}）
+        研发助手产出明细
       </div>
       <div className="assistant-output-product-grid">
         {products.map((item) => (

@@ -5,12 +5,11 @@ import '../../components/rd-view/rd-view-shell.css';
 import '../../components/rd-view/theme/theme.css';
 import '../../components/rd-view/index.css';
 
-export function TeamViewView({ synapseApiBase }: { synapseApiBase?: string }) {
-  void synapseApiBase;
+export function TeamViewView({ synapseApiBase = '' }: { synapseApiBase?: string }) {
   return (
     <div className="rdViewRoot">
       <RdViewThemeProvider>
-        <TeamDashboardWithTheme />
+        <TeamDashboardWithTheme synapseApiBase={synapseApiBase} />
       </RdViewThemeProvider>
     </div>
   );

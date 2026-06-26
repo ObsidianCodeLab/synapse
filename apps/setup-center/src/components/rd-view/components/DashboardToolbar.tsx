@@ -4,7 +4,7 @@ import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { TimeRange } from '@rd-view/types';
 
 export function DashboardToolbar() {
-  const { state, setTimeRange } = useDashboard();
+  const { state, setTimeRange, loading, refreshDashboard } = useDashboard();
 
   return (
     <div className="dashboard-header">
@@ -25,21 +25,14 @@ export function DashboardToolbar() {
           ]}
         />
         <Button
-          icon={<ReloadOutlined />}
+          icon={<ReloadOutlined spin={loading} />}
           shape="circle"
           size="small"
           className="dashboard-header-icon-btn"
           title="刷新数据"
+          disabled={loading}
+          onClick={() => void refreshDashboard()}
         />
-        <Badge dot>
-          <Button
-            icon={<FilterOutlined />}
-            shape="circle"
-            size="small"
-            className="dashboard-header-icon-btn"
-            title="筛选条件"
-          />
-        </Badge>
       </Space>
     </div>
   );

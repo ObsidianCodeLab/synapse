@@ -37,39 +37,50 @@ export interface PersonAiCoverageView extends PersonAiCoverageItem {
   coverageRate: number;
 }
 
+/** 需求工单覆盖 — 单模型消耗汇总（model + tokens + hours） */
+export interface OrderCoverageModelUsage {
+  model: string;
+  tokens: number;
+  hours: number;
+}
+
+/** 需求优先级（门户枚举 `1`~`4` 对应展示文案） */
+export type DemandPriorityLevel = '较低' | '普通' | '紧急' | '非常紧急';
+
 /** 需求工单覆盖明细 */
 export interface OrderCoverageDetailItem {
   id: string;
   title: string;
-  priority: '高' | '中' | '低';
+  /** 有值时展示优先级圆点；未传则不显示 */
+  priority?: DemandPriorityLevel;
   /** 是否被智能助手覆盖 */
   covered: boolean;
-  model?: string;
-  tokens?: number;
-  hours?: number;
+  /** 各模型消耗汇总（按 tokens 降序）；主展示取第一项 */
+  modelUsages?: OrderCoverageModelUsage[];
 }
 
 /** 工单处理满意度明细 */
 export interface OrderSatisfactionDetailItem {
   id: string;
   title: string;
-  priority: '高' | '中' | '低';
-  /** true=点赞，false=点踩 */
-  liked: boolean;
+  /** 有值时展示优先级圆点；未传则不显示 */
+  priority?: DemandPriorityLevel;
+  /** true=点赞；false=点踩；未传=未评价（明细展示，计分不参与） */
+  liked?: boolean;
 }
 
 /** 模型 Token 消耗明细 */
 export interface ModelTokenUsageItem {
   model: string;
-  /** 定价：元/千Token */
+  /** 定价：元/千Token（由 model 静态映射表解析） */
   unitPrice: number;
   /** 使用量（Token 数） */
   tokens: number;
-}
-
-export interface ModelTokenUsageView extends ModelTokenUsageItem {
+  /** 实际成本：tokens / 1000 × unitPrice 累加 */
   cost: number;
 }
+
+export type ModelTokenUsageView = ModelTokenUsageItem;
 
 /** 研发助手产出 - 按产品 */
 export interface ProductAssistantOutputItem {
@@ -103,32 +114,15 @@ export interface PersonCostUsageItem {
 /** 需求状态 */
 export type RequirementStatus = 'pending' | 'inProgress' | 'completed';
 
-/** SOP 节点明细 */
-export interface SopNodeDetail {
-  key: string;
-  name: string;
-  status: RequirementStatus;
-  hours: number;
-  description: string;
-}
-
-/** 人员被分配的需求 */
-export interface PersonRequirement {
-  id: string;
-  title: string;
-  status: RequirementStatus;
-  assignee: string;
-  startDay: number;
-  duration: number;
-  priority: '高' | '中' | '低';
-  description: string;
-  createdAt: string;
-  plannedEnd: string;
-  sopNodes: SopNodeDetail[];
-}
-
-/** SOP 节点运行状态 */
-export type SopNodeRunStatus = 'running' | 'abnormal' | 'manual' | 'completed' | 'pending';
+/** SOP 节点 run_status（与 rd_view_demand_save / owner_order_refresh._RUN_STATUS_TO_SLUG 一致） */
+export type SopNodeRunStatus =
+  | 'running'
+  | 'human_intervention'
+  | 'completed'
+  | 'failed'
+  | 'stopped'
+  | 'pending'
+  | 'full_manual';
 
 /** 智能体对话 */
 export interface SopDialogueMessage {
@@ -143,10 +137,25 @@ export interface SopNodeOutput {
   label: string;
 }
 
+/** SOP 节点代码仓库产出 */
+export interface SopNodeRepoOutput {
+  repoName: string;
+  repoUrl: string;
+  branch: string;
+  linesAdded: number;
+  linesDeleted: number;
+  commitCount: number;
+}
+
 /** 工单 SOP 节点（含对话与消耗） */
 export interface WorkOrderSopNode {
+  /** 小类键（sop_node_id） */
   key: string;
   name: string;
+  /** SOP 阶段大类：analysis / design / environment / development / review */
+  group: string;
+  /** 同 group 内顺序，从 1 起 */
+  seqId: number;
   status: RequirementStatus;
   runStatus: SopNodeRunStatus;
   hours: number;
@@ -155,6 +164,7 @@ export interface WorkOrderSopNode {
   description: string;
   dialogues: SopDialogueMessage[];
   outputs: SopNodeOutput[];
+  repoOutputs: SopNodeRepoOutput[];
 }
 
 /** 工单评论 */
@@ -162,6 +172,19 @@ export interface WorkOrderComment {
   author: string;
   time: string;
   content: string;
+}
+
+/** 工单表情评论（feedback_type JSON 数组元素） */
+export interface DemandEnjoyComment {
+  assignee: string;
+  assigneeId: string;
+  enjoyId: string;
+}
+
+/** 团队视图当前登录用户（来自 userinfo-summary） */
+export interface RdViewCurrentUser {
+  employeeId: string;
+  name: string;
 }
 
 /** 工作内容 - 工单 */
@@ -177,30 +200,13 @@ export interface WorkOrderTicket {
   updatedAt: string;
   plannedEnd: string;
   comments: WorkOrderComment[];
+  /** 表情评论；来自 feedback_type JSON，enjoyId 对应 enjoyEmojiCatalog 序号 */
+  enjoyComments: DemandEnjoyComment[];
   sopNodes: WorkOrderSopNode[];
+  /** 表1 local_process_state 原文（需求处理状态） */
+  localProcessState?: string;
+  /** 表1 当前节点 run_status（需求级，非 sop_nodes） */
+  currentRunStatus?: SopNodeRunStatus;
+  /** 表1 当前节点名称（需求级 name） */
+  currentNodeName?: string;
 }
-
-/** 人员维度明细（mock 内部使用） */
-export interface PersonDetail {
-  name: string;
-  totalOrders: number;
-  completed: number;
-  inProgress: number;
-  avgHoursPerOrder: number;
-  aiEfficiencyRate: number;
-  tokenConsumed: number;
-  personalCost: number;
-  satisfaction: number;
-}
-
-/** 当前登录用户（mock） */
-export const CURRENT_USER_NAME = '李四';
-
-/** 团队成员颜色映射 */
-export const PERSON_COLORS: Record<string, string> = {
-  '张三': '#165DFF',
-  '李四': '#00B42A',
-  '王五': '#FF7D00',
-  '赵六': '#722ED1',
-  '钱七': '#13C2C2',
-};

@@ -1,23 +1,35 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
-import { orderCoverageDetailData } from '@rd-view/data/mockData';
-import type { OrderCoverageDetailItem } from '@rd-view/types';
+import { Tooltip } from 'antd';
+import { useDashboard } from '@rd-view/context/DashboardContext';
+import type { DemandPriorityLevel, OrderCoverageDetailItem, OrderCoverageModelUsage } from '@rd-view/types';
+import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
+import { buildPopoverScrollModel } from '../../utils/popoverScrollList';
 
 const ROW_HEIGHT = 40;
 const SCROLL_VIEWPORT_HEIGHT = 200;
 const PAUSE_HOVER_DELAY_MS = 120;
 
-const PRIORITY_COLOR: Record<OrderCoverageDetailItem['priority'], string> = {
-  高: '#F53F3F',
-  中: '#FF7D00',
-  低: '#86909C',
+const PRIORITY_COLOR: Record<DemandPriorityLevel, string> = {
+  非常紧急: '#F53F3F',
+  紧急: '#F76560',
+  普通: '#FF7D00',
+  较低: '#86909C',
 };
 
-const PRIORITY_WEIGHT: Record<OrderCoverageDetailItem['priority'], number> = {
-  高: 0,
-  中: 1,
-  低: 2,
+const PRIORITY_SORT_WEIGHT: Record<DemandPriorityLevel, number> = {
+  非常紧急: 0,
+  紧急: 1,
+  普通: 2,
+  较低: 3,
 };
+
+const NO_PRIORITY_SORT_WEIGHT = 4;
+
+function prioritySortWeight(priority?: DemandPriorityLevel): number {
+  if (!priority) return NO_PRIORITY_SORT_WEIGHT;
+  return PRIORITY_SORT_WEIGHT[priority];
+}
 
 function formatTokens(tokens: number): string {
   if (tokens >= 10000) {
@@ -29,28 +41,49 @@ function formatTokens(tokens: number): string {
   return String(tokens);
 }
 
+function ModelUsageTooltipContent({ usages }: { usages: OrderCoverageModelUsage[] }) {
+  return (
+    <div className="order-coverage-model-tooltip">
+      {usages.map((entry) => (
+        <div key={entry.model} className="order-coverage-model-tooltip-line">
+          {entry.model} · {formatTokens(entry.tokens)} Token · {entry.hours}h
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CoverageOrderRow({ item }: { item: OrderCoverageDetailItem }) {
+  const topUsage = item.modelUsages?.[0];
+
   return (
     <div className="order-coverage-row" style={{ height: ROW_HEIGHT }}>
-      <span
-        className="order-coverage-dot"
-        style={{ backgroundColor: PRIORITY_COLOR[item.priority] }}
-        title={`${item.priority}优先级`}
-      />
+      {item.priority && (
+        <span
+          className="order-coverage-dot"
+          style={{ backgroundColor: PRIORITY_COLOR[item.priority] }}
+          title={`${item.priority}优先级`}
+        />
+      )}
       <div className="order-coverage-title-wrap">
         <span className="order-coverage-id">{item.id}</span>
         <span className="order-coverage-title" title={item.title}>
           {item.title}
         </span>
       </div>
-      {item.covered && item.model && item.tokens != null && item.hours != null && (
-        <div className="order-coverage-meta">
-          <span>{item.model}</span>
-          <span className="order-coverage-meta-divider">·</span>
-          <span>{formatTokens(item.tokens)} Token</span>
-          <span className="order-coverage-meta-divider">·</span>
-          <span>{item.hours}h</span>
-        </div>
+      {item.covered && topUsage && (
+        <Tooltip
+          placement="top"
+          title={<ModelUsageTooltipContent usages={item.modelUsages ?? [topUsage]} />}
+        >
+          <div className="order-coverage-meta">
+            <span>{topUsage.model}</span>
+            <span className="order-coverage-meta-divider">·</span>
+            <span>{formatTokens(topUsage.tokens)} Token</span>
+            <span className="order-coverage-meta-divider">·</span>
+            <span>{topUsage.hours}h</span>
+          </div>
+        </Tooltip>
       )}
       {item.covered ? (
         <CheckCircleFilled className="order-coverage-icon order-coverage-icon--covered" />
@@ -71,23 +104,25 @@ function readTrackOffset(track: HTMLDivElement | null): number {
 }
 
 export function OrderCoveragePopoverContent() {
+  const { dashboard } = useDashboard();
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const pauseTimerRef = useRef<number>();
 
   const sortedItems = useMemo(
-    () => [...orderCoverageDetailData].sort((a, b) => {
-      const priorityDiff = PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority];
+    () => [...dashboard.details.orderCoverage].sort((a, b) => {
+      const priorityDiff = prioritySortWeight(a.priority) - prioritySortWeight(b.priority);
       if (priorityDiff !== 0) return priorityDiff;
       return a.title.localeCompare(b.title, 'zh-CN');
     }),
-    [],
+    [dashboard.details.orderCoverage],
   );
 
-  const loopItems = useMemo(() => [...sortedItems, ...sortedItems], [sortedItems]);
-  const scrollDuration = Math.max(sortedItems.length * 2.8, 16);
-  const loopHeight = sortedItems.length * ROW_HEIGHT;
+  const { displayItems, shouldScroll, scrollDuration, loopHeight, loopSplitIndex } = useMemo(
+    () => buildPopoverScrollModel(sortedItems, ROW_HEIGHT, SCROLL_VIEWPORT_HEIGHT),
+    [sortedItems],
+  );
 
   useEffect(() => () => {
     window.clearTimeout(pauseTimerRef.current);
@@ -128,6 +163,7 @@ export function OrderCoveragePopoverContent() {
   };
 
   const handleMouseEnter = () => {
+    if (!shouldScroll) return;
     window.clearTimeout(pauseTimerRef.current);
     pauseTimerRef.current = window.setTimeout(pauseAtCurrentPosition, PAUSE_HOVER_DELAY_MS);
   };
@@ -153,7 +189,7 @@ export function OrderCoveragePopoverContent() {
     <div className="efficiency-popover">
       <div className="efficiency-popover-header">需求工单覆盖明细</div>
       <div
-        className={`efficiency-popover-viewport${paused ? ' efficiency-popover-viewport--interactive' : ''}`}
+        className={`efficiency-popover-viewport${paused && shouldScroll ? ' efficiency-popover-viewport--interactive' : ''}`}
         style={{ height: SCROLL_VIEWPORT_HEIGHT }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -161,15 +197,17 @@ export function OrderCoveragePopoverContent() {
       >
         <div
           ref={trackRef}
-          className="efficiency-popover-track"
+          className={`efficiency-popover-track${shouldScroll ? '' : ' efficiency-popover-track--static'}`}
           style={{
             ['--scroll-duration' as string]: `${scrollDuration}s`,
-            ['--item-height' as string]: `${ROW_HEIGHT}px`,
-            ['--item-count' as string]: String(sortedItems.length),
+            ['--loop-height' as string]: `${loopHeight}px`,
           }}
         >
-          {loopItems.map((item, index) => (
-            <CoverageOrderRow key={`${item.id}-${index}`} item={item} />
+          {displayItems.map((item, index) => (
+            <Fragment key={shouldScroll ? `${item.id}-${index}` : item.id}>
+              {shouldScroll && index === loopSplitIndex ? <ScrollLoopDivider /> : null}
+              <CoverageOrderRow item={item} />
+            </Fragment>
           ))}
         </div>
       </div>

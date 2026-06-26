@@ -15,6 +15,11 @@ export function getPersonWorkloadBarGap(rowCount: number): number {
   return rowCount > PERSON_WORKLOAD_DENSE_THRESHOLD ? 4 : PERSON_WORKLOAD_BAR_GAP;
 }
 
+/** 并排卡片（饼图 + 人员工作量）布局用行数：数据较少时也保持 Top N 高度，避免饼图过小 */
+export function calcChartPairLayoutRowCount(actualRowCount: number): number {
+  return Math.max(actualRowCount, 1, PERSON_WORKLOAD_DISPLAY_LIMIT);
+}
+
 /** 条形图绘图区高度（不含 X 轴） */
 export function calcPersonWorkloadPlotHeight(rowCount: number): number {
   const barSize = getPersonWorkloadBarSize(rowCount);

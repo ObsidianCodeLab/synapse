@@ -1,7 +1,6 @@
-import { Card, Dropdown, Popover } from 'antd';
-import { CaretUpOutlined, CaretDownOutlined, MoreOutlined } from '@ant-design/icons';
+import { Card, Popover } from 'antd';
+import { CaretUpOutlined, CaretDownOutlined } from '@ant-design/icons';
 import { useMemo, useState, type ComponentType } from 'react';
-import { getProductAssistantOutputByTimeRange, kpiData } from '@rd-view/data/mockData';
 import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { KpiItem } from '@rd-view/types';
 import { getTimeRangeTrendLabel, sumAssistantOutput } from '@rd-view/utils/assistantOutput';
@@ -23,11 +22,11 @@ const KPI_POPOVER_CONTENT: Record<string, ComponentType> = {
 };
 
 function AssistantOutputKpiValue() {
-  const { state } = useDashboard();
-  const summary = useMemo(() => {
-    const products = getProductAssistantOutputByTimeRange(state.timeRange);
-    return sumAssistantOutput(products);
-  }, [state.timeRange]);
+  const { dashboard } = useDashboard();
+  const summary = useMemo(
+    () => sumAssistantOutput(dashboard.details.assistantOutput),
+    [dashboard.details.assistantOutput],
+  );
 
   return (
     <div className="assistant-output-kpi-value">
@@ -45,26 +44,10 @@ function AssistantOutputKpiValue() {
 
 function KpiCardBody({ item }: { item: KpiItem }) {
   const { state } = useDashboard();
-  const trendLabel = item.key === 'assistantOutput'
-    ? getTimeRangeTrendLabel(state.timeRange)
-    : item.trendLabel;
+  const trendLabel = item.trendLabel || getTimeRangeTrendLabel(state.timeRange);
 
   return (
     <>
-      <div className="dropdown-trigger" style={{ position: 'absolute', top: 4, right: 6, zIndex: 1 }}>
-        <Dropdown
-          menu={{
-            items: [
-              { key: '1', label: '查看详情' },
-              { key: '2', label: '按人员下钻' },
-              { key: '3', label: '按工单下钻' },
-            ],
-          }}
-          trigger={['click']}
-        >
-          <MoreOutlined style={{ fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer' }} />
-        </Dropdown>
-      </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4, lineHeight: 1.2 }}>{item.title}</div>
       {item.key === 'assistantOutput' ? (
         <AssistantOutputKpiValue />
@@ -91,6 +74,8 @@ function KpiCardBody({ item }: { item: KpiItem }) {
 }
 
 export function KpiCards() {
+  const { dashboard } = useDashboard();
+  const kpiData = dashboard.kpiCards;
   const [popoverKeys, setPopoverKeys] = useState<Record<string, number>>({
     efficiencyGain: 0,
     aiCoverage: 0,

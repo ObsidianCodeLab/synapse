@@ -1,42 +1,60 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { LikeFilled, DislikeFilled } from '@ant-design/icons';
-import { orderSatisfactionDetailData } from '@rd-view/data/mockData';
-import type { OrderSatisfactionDetailItem } from '@rd-view/types';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { LikeFilled, DislikeFilled, MinusCircleOutlined } from '@ant-design/icons';
+import { useDashboard } from '@rd-view/context/DashboardContext';
+import type { DemandPriorityLevel, OrderSatisfactionDetailItem } from '@rd-view/types';
+import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
+import { buildPopoverScrollModel } from '../../utils/popoverScrollList';
 
 const ROW_HEIGHT = 40;
 const SCROLL_VIEWPORT_HEIGHT = 200;
 const PAUSE_HOVER_DELAY_MS = 120;
 
-const PRIORITY_COLOR: Record<OrderSatisfactionDetailItem['priority'], string> = {
-  高: '#F53F3F',
-  中: '#FF7D00',
-  低: '#86909C',
+const PRIORITY_COLOR: Record<DemandPriorityLevel, string> = {
+  非常紧急: '#F53F3F',
+  紧急: '#F76560',
+  普通: '#FF7D00',
+  较低: '#86909C',
 };
 
-const PRIORITY_WEIGHT: Record<OrderSatisfactionDetailItem['priority'], number> = {
-  高: 0,
-  中: 1,
-  低: 2,
+const PRIORITY_SORT_WEIGHT: Record<DemandPriorityLevel, number> = {
+  非常紧急: 0,
+  紧急: 1,
+  普通: 2,
+  较低: 3,
 };
+
+const NO_PRIORITY_SORT_WEIGHT = 4;
+
+function prioritySortWeight(priority?: DemandPriorityLevel): number {
+  if (!priority) return NO_PRIORITY_SORT_WEIGHT;
+  return PRIORITY_SORT_WEIGHT[priority];
+}
 
 function SatisfactionOrderRow({ item }: { item: OrderSatisfactionDetailItem }) {
   return (
     <div className="order-coverage-row" style={{ height: ROW_HEIGHT }}>
-      <span
-        className="order-coverage-dot"
-        style={{ backgroundColor: PRIORITY_COLOR[item.priority] }}
-        title={`${item.priority}优先级`}
-      />
+      {item.priority && (
+        <span
+          className="order-coverage-dot"
+          style={{ backgroundColor: PRIORITY_COLOR[item.priority] }}
+          title={`${item.priority}优先级`}
+        />
+      )}
       <div className="order-coverage-title-wrap">
         <span className="order-coverage-id">{item.id}</span>
         <span className="order-coverage-title" title={item.title}>
           {item.title}
         </span>
       </div>
-      {item.liked ? (
+      {item.liked === true ? (
         <LikeFilled className="order-coverage-icon order-satisfaction-icon--liked" />
-      ) : (
+      ) : item.liked === false ? (
         <DislikeFilled className="order-coverage-icon order-satisfaction-icon--disliked" />
+      ) : (
+        <MinusCircleOutlined
+          className="order-coverage-icon order-satisfaction-icon--unset"
+          title="未评价"
+        />
       )}
     </div>
   );
@@ -52,23 +70,25 @@ function readTrackOffset(track: HTMLDivElement | null): number {
 }
 
 export function OrderSatisfactionPopoverContent() {
+  const { dashboard } = useDashboard();
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const pauseTimerRef = useRef<number>();
 
   const sortedItems = useMemo(
-    () => [...orderSatisfactionDetailData].sort((a, b) => {
-      const priorityDiff = PRIORITY_WEIGHT[a.priority] - PRIORITY_WEIGHT[b.priority];
+    () => [...dashboard.details.satisfaction].sort((a, b) => {
+      const priorityDiff = prioritySortWeight(a.priority) - prioritySortWeight(b.priority);
       if (priorityDiff !== 0) return priorityDiff;
       return a.title.localeCompare(b.title, 'zh-CN');
     }),
-    [],
+    [dashboard.details.satisfaction],
   );
 
-  const loopItems = useMemo(() => [...sortedItems, ...sortedItems], [sortedItems]);
-  const scrollDuration = Math.max(sortedItems.length * 2.8, 16);
-  const loopHeight = sortedItems.length * ROW_HEIGHT;
+  const { displayItems, shouldScroll, scrollDuration, loopHeight, loopSplitIndex } = useMemo(
+    () => buildPopoverScrollModel(sortedItems, ROW_HEIGHT, SCROLL_VIEWPORT_HEIGHT),
+    [sortedItems],
+  );
 
   useEffect(() => () => {
     window.clearTimeout(pauseTimerRef.current);
@@ -109,6 +129,7 @@ export function OrderSatisfactionPopoverContent() {
   };
 
   const handleMouseEnter = () => {
+    if (!shouldScroll) return;
     window.clearTimeout(pauseTimerRef.current);
     pauseTimerRef.current = window.setTimeout(pauseAtCurrentPosition, PAUSE_HOVER_DELAY_MS);
   };
@@ -134,7 +155,7 @@ export function OrderSatisfactionPopoverContent() {
     <div className="efficiency-popover">
       <div className="efficiency-popover-header">工单处理满意度明细</div>
       <div
-        className={`efficiency-popover-viewport${paused ? ' efficiency-popover-viewport--interactive' : ''}`}
+        className={`efficiency-popover-viewport${paused && shouldScroll ? ' efficiency-popover-viewport--interactive' : ''}`}
         style={{ height: SCROLL_VIEWPORT_HEIGHT }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -142,20 +163,22 @@ export function OrderSatisfactionPopoverContent() {
       >
         <div
           ref={trackRef}
-          className="efficiency-popover-track"
+          className={`efficiency-popover-track${shouldScroll ? '' : ' efficiency-popover-track--static'}`}
           style={{
             ['--scroll-duration' as string]: `${scrollDuration}s`,
-            ['--item-height' as string]: `${ROW_HEIGHT}px`,
-            ['--item-count' as string]: String(sortedItems.length),
+            ['--loop-height' as string]: `${loopHeight}px`,
           }}
         >
-          {loopItems.map((item, index) => (
-            <SatisfactionOrderRow key={`${item.id}-${index}`} item={item} />
+          {displayItems.map((item, index) => (
+            <Fragment key={shouldScroll ? `${item.id}-${index}` : item.id}>
+              {shouldScroll && index === loopSplitIndex ? <ScrollLoopDivider /> : null}
+              <SatisfactionOrderRow item={item} />
+            </Fragment>
           ))}
         </div>
       </div>
       <div className="efficiency-popover-formula">
-        满意度 = 点赞工单数 / 总工单数 × 5.0
+        满意度 = 点赞工单数 / 已评价工单数 × 5.0
       </div>
       <div className="efficiency-popover-legend">
         <span className="efficiency-popover-legend-item">
@@ -165,6 +188,10 @@ export function OrderSatisfactionPopoverContent() {
         <span className="efficiency-popover-legend-item">
           <DislikeFilled className="order-satisfaction-icon--disliked" />
           点踩
+        </span>
+        <span className="efficiency-popover-legend-item">
+          <MinusCircleOutlined className="order-satisfaction-icon--unset" />
+          未评价
         </span>
       </div>
     </div>
