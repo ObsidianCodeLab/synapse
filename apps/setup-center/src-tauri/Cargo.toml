@@ -1,6 +1,6 @@
 [package]
 name = "synapse-desktop"
-version = "1.27.18"
+version = "1.27.19"
 description = "Synapse Setup Center"
 authors = ["Synapse"]
 edition = "2021"
@@ -37,8 +37,6 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-notification = "2"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

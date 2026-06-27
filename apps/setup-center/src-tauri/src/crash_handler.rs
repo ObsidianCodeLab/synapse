@@ -84,7 +84,13 @@ static EVENTS_RING: Lazy<Mutex<VecDeque<String>>> =
 /// produce the kind of hang we're trying to diagnose.
 pub fn record_event(msg: &str) {
     let body = if msg.len() > EVENT_MAX_LEN {
-        format!("{}\u{2026}[+{} bytes]", &msg[..EVENT_MAX_LEN], msg.len() - EVENT_MAX_LEN)
+        // `msg.len()` is a BYTE count; slicing at a fixed byte offset panics
+        // if that byte falls inside a multi-byte UTF-8 char (common for CJK).
+        let mut end = EVENT_MAX_LEN;
+        while end > 0 && !msg.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}\u{2026}[+{} bytes]", &msg[..end], msg.len() - end)
     } else {
         msg.to_string()
     };
