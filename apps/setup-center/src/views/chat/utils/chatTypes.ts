@@ -13,6 +13,7 @@ import type {
   ChatSource,
   ChatMcpCall,
   ChatErrorInfo,
+  MessagePart,
   OrgTimelineEntry,
   ChatConversation,
   ChatDisplayMode,
@@ -23,6 +24,7 @@ import type {
   ChainToolCall,
   ChainEntry,
   ChainSummaryItem,
+  ChainTimelineGroup,
 } from "../../../types";
 
 export type {
@@ -37,6 +39,7 @@ export type {
   ChatSource,
   ChatMcpCall,
   ChatErrorInfo,
+  MessagePart,
   OrgTimelineEntry,
   ChatConversation,
   ChatDisplayMode,
@@ -47,6 +50,7 @@ export type {
   ChainToolCall,
   ChainEntry,
   ChainSummaryItem,
+  ChainTimelineGroup,
 };
 
 /** Lazy-loaded markdown rendering modules */
