@@ -1,11 +1,14 @@
 import { Card } from 'antd';
 import { PieChartOutlined } from '@ant-design/icons';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { demandStatusData, personDemandPreviewData } from '@rd-view/data/mockData';
+import { useMemo } from 'react';
+import { useDashboard } from '@rd-view/context/DashboardContext';
 import {
   CHART_CARD_BODY_PADDING,
   CHART_LEGEND_HEIGHT,
+  PERSON_WORKLOAD_DISPLAY_LIMIT,
   PERSON_WORKLOAD_X_AXIS_HEIGHT,
+  calcChartPairLayoutRowCount,
   calcPersonWorkloadPlotHeight,
   calcPersonWorkloadChartHeight,
 } from '@rd-view/constants/chartLayout';
@@ -28,10 +31,17 @@ const cardBodyStyle = {
 };
 
 export function DemandStatusCard() {
+  const { dashboard } = useDashboard();
+  const demandStatusData = dashboard.demandStatus;
+  const personDemandPreviewData = useMemo(
+    () => dashboard.personWorkload.slice(0, PERSON_WORKLOAD_DISPLAY_LIMIT),
+    [dashboard.personWorkload],
+  );
   const total = demandStatusData.reduce((sum, item) => sum + item.value, 0);
-  const rowCount = personDemandPreviewData.length;
-  const plotHeight = calcPersonWorkloadPlotHeight(rowCount);
-  const chartBlockHeight = calcPersonWorkloadChartHeight(rowCount);
+  const safeTotal = total > 0 ? total : 1;
+  const layoutRowCount = calcChartPairLayoutRowCount(personDemandPreviewData.length);
+  const plotHeight = calcPersonWorkloadPlotHeight(layoutRowCount);
+  const chartBlockHeight = calcPersonWorkloadChartHeight(layoutRowCount);
 
   return (
     <Card
@@ -74,7 +84,7 @@ export function DemandStatusCard() {
                   <div className="demand-pie-side-text">
                     <div>{item.name}</div>
                     <div className="demand-pie-side-meta">
-                      {item.value} ({((item.value / total) * 100).toFixed(0)}%)
+                      {item.value} ({((item.value / safeTotal) * 100).toFixed(0)}%)
                     </div>
                   </div>
                 </li>

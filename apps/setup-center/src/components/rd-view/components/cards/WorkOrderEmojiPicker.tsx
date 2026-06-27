@@ -1,49 +1,26 @@
 import { useState } from 'react';
 import { Popover } from 'antd';
 import { SmileOutlined } from '@ant-design/icons';
+import { PersonName } from '@rd-view/components/PersonName';
+import {
+  ENJOY_EMOJI_ITEMS,
+  enjoyIdToEmoji,
+} from '@rd-view/utils/enjoyEmojiCatalog';
 
-export const EMOJI_CATEGORIES = [
-  {
-    key: 'smile',
-    icon: '😀',
-    label: '表情',
-    emojis: [
-      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂',
-      '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩',
-      '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜',
-      '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐',
-      '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮‍💨',
-      '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒',
-    ],
-  },
-  {
-    key: 'gesture',
-    icon: '👍',
-    label: '手势',
-    emojis: [
-      '👍', '👎', '👊', '✊', '🤛', '🤜', '🤞', '✌️',
-      '🤟', '🤘', '👌', '🤌', '🤏', '👈', '👉', '👆',
-      '👇', '☝️', '👋', '🤚', '🖐️', '✋', '🖖', '👏',
-      '🙌', '🤲', '🙏', '💪', '🦾', '🫶', '🤝', '👐',
-    ],
-  }
-] as const;
-
-type EmojiCategoryKey = (typeof EMOJI_CATEGORIES)[number]['key'];
+export { ENJOY_EMOJI_ITEMS } from '@rd-view/utils/enjoyEmojiCatalog';
 
 export interface EmojiReaction {
-  emoji: string;
+  enjoyId: string;
   personName: string;
 }
 
 interface WorkOrderEmojiPickerProps {
   value?: EmojiReaction;
-  onSelect: (emoji: string) => void;
+  onSelect: (enjoyId: string) => void;
   onOpenChange?: (open: boolean) => void;
 }
 
 export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrderEmojiPickerProps) {
-  const [activeCategory, setActiveCategory] = useState<EmojiCategoryKey>(EMOJI_CATEGORIES[0].key);
   const [open, setOpen] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -55,10 +32,8 @@ export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrde
     event.stopPropagation();
   };
 
-  const currentCategory = EMOJI_CATEGORIES.find((cat) => cat.key === activeCategory) ?? EMOJI_CATEGORIES[0];
-
-  const handleSelect = (emoji: string) => {
-    onSelect(emoji);
+  const handleSelect = (enjoyId: number) => {
+    onSelect(String(enjoyId));
     handleOpenChange(false);
   };
 
@@ -66,28 +41,15 @@ export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrde
     <div className="work-order-emoji-panel" onClick={(e) => e.stopPropagation()}>
       <div className="work-order-emoji-panel-title">选择表情包</div>
       <div className="work-order-emoji-grid" onWheel={handleGridWheel}>
-        {currentCategory.emojis.map((emoji) => (
+        {ENJOY_EMOJI_ITEMS.map((item) => (
           <button
-            key={emoji}
+            key={item.id}
             type="button"
-            className={`work-order-emoji-item${value?.emoji === emoji ? ' work-order-emoji-item--active' : ''}`}
-            onClick={() => handleSelect(emoji)}
-            title={emoji}
+            className={`work-order-emoji-item${value?.enjoyId === String(item.id) ? ' work-order-emoji-item--active' : ''}`}
+            onClick={() => handleSelect(item.id)}
+            title={item.label}
           >
-            {emoji}
-          </button>
-        ))}
-      </div>
-      <div className="work-order-emoji-tabs">
-        {EMOJI_CATEGORIES.map((category) => (
-          <button
-            key={category.key}
-            type="button"
-            className={`work-order-emoji-tab${activeCategory === category.key ? ' work-order-emoji-tab--active' : ''}`}
-            onClick={() => setActiveCategory(category.key)}
-            title={category.label}
-          >
-            {category.icon}
+            {item.emoji}
           </button>
         ))}
       </div>
@@ -114,8 +76,10 @@ export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrde
         >
           {value ? (
             <>
-              <span className="work-order-emoji-trigger-emoji">{value.emoji}</span>
-              <span className="work-order-emoji-trigger-name">{value.personName}</span>
+              <span className="work-order-emoji-trigger-emoji">{enjoyIdToEmoji(value.enjoyId)}</span>
+              <span className="work-order-emoji-trigger-name">
+                <PersonName name={value.personName} />
+              </span>
             </>
           ) : (
             <>

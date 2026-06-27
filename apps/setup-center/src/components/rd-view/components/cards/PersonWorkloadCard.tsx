@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { Card, Drawer, Button } from 'antd';
 import { BarChartOutlined } from '@ant-design/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { personDemandData, personDemandPreviewData } from '@rd-view/data/mockData';
+import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { PersonDemandItem } from '@rd-view/types';
 import {
   CHART_CARD_BODY_PADDING,
+  PERSON_WORKLOAD_DISPLAY_LIMIT,
   getPersonWorkloadBarGap,
   getPersonWorkloadBarSize,
+  calcChartPairLayoutRowCount,
   calcPersonWorkloadChartHeight,
 } from '@rd-view/constants/chartLayout';
 import {
@@ -17,6 +19,7 @@ import {
   dashboardCardStyle,
 } from '@rd-view/constants/dashboardTheme';
 import { useRdViewColors } from '@rd-view/theme';
+import { PersonAxisTick } from '@rd-view/components/charts/PersonAxisTick';
 
 const cardStyle = dashboardCardStyle;
 
@@ -90,7 +93,16 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fontSize: rowCount > 8 ? 9 : 11, fill: chart.axisTick }}
+            tick={(props) => (
+              <PersonAxisTick
+                {...props}
+                fill={chart.axisTick}
+                fontSize={rowCount > 8 ? 9 : 11}
+                textAnchor="end"
+                dx={-4}
+                dy={4}
+              />
+            )}
             axisLine={false}
             tickLine={false}
             width={42}
@@ -116,10 +128,17 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
 }
 
 export function PersonWorkloadCard() {
+  const { dashboard } = useDashboard();
+  const personDemandData = dashboard.personWorkload;
+  const personDemandPreviewData = useMemo(
+    () => personDemandData.slice(0, PERSON_WORKLOAD_DISPLAY_LIMIT),
+    [personDemandData],
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const totalCount = personDemandData.length;
-  const previewHeight = calcPersonWorkloadChartHeight(personDemandPreviewData.length);
-  const fullHeight = calcPersonWorkloadChartHeight(totalCount);
+  const layoutRowCount = calcChartPairLayoutRowCount(personDemandPreviewData.length);
+  const previewHeight = calcPersonWorkloadChartHeight(layoutRowCount);
+  const fullHeight = calcPersonWorkloadChartHeight(calcChartPairLayoutRowCount(totalCount));
   const showViewAll = totalCount > personDemandPreviewData.length;
 
   return (

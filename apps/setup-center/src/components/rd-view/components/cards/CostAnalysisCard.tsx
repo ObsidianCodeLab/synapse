@@ -11,7 +11,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { personCostUsageData } from '@rd-view/data/mockData';
+import { useDashboard } from '@rd-view/context/DashboardContext';
+import { PersonAxisTick } from '@rd-view/components/charts/PersonAxisTick';
 import {
   chartCardTitleIconStyle,
   chartCardTitleStyle,
@@ -90,6 +91,8 @@ function useContainerHeight() {
 }
 
 export function CostAnalysisCard() {
+  const { dashboard } = useDashboard();
+  const personCostUsageData = dashboard.personCostUsage;
   const personCount = personCostUsageData.length;
   const { ref: chartWrapRef, height: chartHeight } = useContainerHeight();
   const barSize = personCount > 12
@@ -126,7 +129,17 @@ export function CostAnalysisCard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                 <XAxis
                   dataKey="name"
-                  tick={{ fontSize: xTickFontSize, fill: 'var(--text-secondary)' }}
+                  tick={(props) => (
+                    <PersonAxisTick
+                      {...props}
+                      fill="var(--text-secondary)"
+                      fontSize={xTickFontSize}
+                      textAnchor={xLabelAnchor}
+                      angle={xLabelAngle}
+                      dx={personCount > 10 ? -6 : 0}
+                      dy={personCount > 10 ? 4 : 12}
+                    />
+                  )}
                   axisLine={false}
                   tickLine={false}
                   interval={0}

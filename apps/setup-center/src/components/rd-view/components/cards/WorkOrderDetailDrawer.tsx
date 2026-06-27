@@ -1,6 +1,7 @@
 import { Drawer, Divider } from 'antd';
 import type { WorkOrderTicket } from '@rd-view/types';
 import { formatDateTime } from '@rd-view/utils/workOrder';
+import { PersonName } from '@rd-view/components/PersonName';
 import { WorkOrderSopTimeline } from './WorkOrderSopTimeline';
 
 const ORDER_STATUS_TAG: Record<WorkOrderTicket['status'], { label: string; color: string }> = {
@@ -57,7 +58,7 @@ export function WorkOrderDetailDrawer({ order, open, onClose }: WorkOrderDetailD
       <div className="work-order-drawer-section">
         <div className="work-order-drawer-meta-grid">
           <div><span className="label">工单编号</span><span>{order.id}</span></div>
-          <div><span className="label">处理人</span><span>{order.assignee}</span></div>
+          <div><span className="label">处理人</span><span><PersonName name={order.assignee} /></span></div>
           <div><span className="label">创建时间</span><span>{formatDateTime(order.createdAt)}</span></div>
           <div><span className="label">计划完成</span><span>{order.plannedEnd}</span></div>
           <div>
@@ -79,7 +80,7 @@ export function WorkOrderDetailDrawer({ order, open, onClose }: WorkOrderDetailD
           {order.comments.map((comment) => (
             <div key={`${comment.author}-${comment.time}`} className="work-order-comment-item">
               <div className="work-order-comment-head">
-                <span className="author">{comment.author}</span>
+                <span className="author"><PersonName name={comment.author} /></span>
                 <span className="time">{comment.time}</span>
               </div>
               <div className="work-order-comment-body">{comment.content}</div>
@@ -92,7 +93,7 @@ export function WorkOrderDetailDrawer({ order, open, onClose }: WorkOrderDetailD
 
       <div className="work-order-drawer-section work-order-drawer-section--sop">
         <div className="work-order-drawer-section-title">SOP 节点</div>
-        <WorkOrderSopTimeline nodes={order.sopNodes} />
+        <WorkOrderSopTimeline nodes={order.sopNodes} orderStatus={order.status} />
       </div>
     </Drawer>
   );

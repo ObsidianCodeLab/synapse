@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { orderEfficiencyDetailData } from '@rd-view/data/mockData';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { OrderEfficiencyDetailView } from '@rd-view/types';
 import { calcOrderEfficiencyGain } from '@rd-view/utils/orderEfficiency';
-
+import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
+import { buildPopoverScrollModel } from '../../utils/popoverScrollList';
 const ROW_HEIGHT = 48;
 const SCROLL_VIEWPORT_HEIGHT = 200;
 const PAUSE_HOVER_DELAY_MS = 120;
@@ -60,29 +61,30 @@ function readTrackOffset(track: HTMLDivElement | null): number {
 }
 
 export function EfficiencyGainPopoverContent() {
+  const { dashboard } = useDashboard();
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const pauseTimerRef = useRef<number>();
 
   const sortedItems = useMemo<OrderEfficiencyDetailView[]>(() => (
-    orderEfficiencyDetailData
+    dashboard.details.efficiencyGain
       .map((item) => ({
         ...item,
         efficiencyGain: calcOrderEfficiencyGain(item.aiHours, item.manualHours),
       }))
       .sort((a, b) => b.efficiencyGain - a.efficiencyGain)
-  ), []);
+  ), [dashboard.details.efficiencyGain]);
 
   const maxHours = useMemo(
     () => Math.max(...sortedItems.map((item) => Math.max(item.aiHours, item.manualHours)), 1),
     [sortedItems],
   );
 
-  const loopItems = useMemo(() => [...sortedItems, ...sortedItems], [sortedItems]);
-  const scrollDuration = Math.max(sortedItems.length * 2.8, 16);
-  const loopHeight = sortedItems.length * ROW_HEIGHT;
-
+  const { displayItems, shouldScroll, scrollDuration, loopHeight, loopSplitIndex } = useMemo(
+    () => buildPopoverScrollModel(sortedItems, ROW_HEIGHT, SCROLL_VIEWPORT_HEIGHT),
+    [sortedItems],
+  );
   useEffect(() => () => {
     window.clearTimeout(pauseTimerRef.current);
   }, []);
@@ -122,6 +124,7 @@ export function EfficiencyGainPopoverContent() {
   };
 
   const handleMouseEnter = () => {
+    if (!shouldScroll) return;
     window.clearTimeout(pauseTimerRef.current);
     pauseTimerRef.current = window.setTimeout(pauseAtCurrentPosition, PAUSE_HOVER_DELAY_MS);
   };
@@ -147,7 +150,7 @@ export function EfficiencyGainPopoverContent() {
     <div className="efficiency-popover">
       <div className="efficiency-popover-header">工单提效明细</div>
       <div
-        className={`efficiency-popover-viewport${paused ? ' efficiency-popover-viewport--interactive' : ''}`}
+        className={`efficiency-popover-viewport${paused && shouldScroll ? ' efficiency-popover-viewport--interactive' : ''}`}
         style={{ height: SCROLL_VIEWPORT_HEIGHT }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -155,17 +158,18 @@ export function EfficiencyGainPopoverContent() {
       >
         <div
           ref={trackRef}
-          className="efficiency-popover-track"
+          className={`efficiency-popover-track${shouldScroll ? '' : ' efficiency-popover-track--static'}`}
           style={{
             ['--scroll-duration' as string]: `${scrollDuration}s`,
-            ['--item-height' as string]: `${ROW_HEIGHT}px`,
-            ['--item-count' as string]: String(sortedItems.length),
+            ['--loop-height' as string]: `${loopHeight}px`,
           }}
         >
-          {loopItems.map((item, index) => (
-            <EfficiencyRow key={`${item.id}-${index}`} item={item} maxHours={maxHours} />
-          ))}
-        </div>
+          {displayItems.map((item, index) => (
+            <Fragment key={shouldScroll ? `${item.id}-${index}` : item.id}>
+              {shouldScroll && index === loopSplitIndex ? <ScrollLoopDivider /> : null}
+              <EfficiencyRow item={item} maxHours={maxHours} />
+            </Fragment>
+          ))}        </div>
       </div>
       <div className="efficiency-popover-formula">
         提效率 = (人工耗时 - AI耗时) / 人工耗时 × 100%

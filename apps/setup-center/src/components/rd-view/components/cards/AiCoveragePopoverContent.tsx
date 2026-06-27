@@ -1,7 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { personAiCoverageDetailData } from '@rd-view/data/mockData';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { PersonName } from '@rd-view/components/PersonName';
+import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { PersonAiCoverageView } from '@rd-view/types';
 import { calcPersonAiCoverageRate } from '@rd-view/utils/aiCoverage';
+import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
+import { buildPopoverScrollModel } from '../../utils/popoverScrollList';
 
 const ROW_HEIGHT = 48;
 const SCROLL_VIEWPORT_HEIGHT = 200;
@@ -19,8 +22,8 @@ function CoverageRow({
 
   return (
     <div className="efficiency-popover-row efficiency-popover-row--person" style={{ height: ROW_HEIGHT }}>
-      <div className="efficiency-popover-name" title={item.name}>
-        {item.name}
+      <div className="efficiency-popover-name">
+        <PersonName name={item.name} />
       </div>
       <div className="efficiency-popover-bar-area">
         <div className="efficiency-popover-compare">
@@ -58,29 +61,31 @@ function readTrackOffset(track: HTMLDivElement | null): number {
 }
 
 export function AiCoveragePopoverContent() {
+  const { dashboard } = useDashboard();
   const [paused, setPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const pauseTimerRef = useRef<number>();
 
   const sortedItems = useMemo<PersonAiCoverageView[]>(() => (
-    personAiCoverageDetailData
+    dashboard.details.aiCoverage
       .map((item) => ({
         ...item,
         manualOrders: item.totalOrders - item.aiOrders,
         coverageRate: calcPersonAiCoverageRate(item.aiOrders, item.totalOrders),
       }))
       .sort((a, b) => b.coverageRate - a.coverageRate)
-  ), []);
+  ), [dashboard.details.aiCoverage]);
 
   const maxOrders = useMemo(
     () => Math.max(...sortedItems.map((item) => Math.max(item.aiOrders, item.manualOrders)), 1),
     [sortedItems],
   );
 
-  const loopItems = useMemo(() => [...sortedItems, ...sortedItems], [sortedItems]);
-  const scrollDuration = Math.max(sortedItems.length * 2.8, 16);
-  const loopHeight = sortedItems.length * ROW_HEIGHT;
+  const { displayItems, shouldScroll, scrollDuration, loopHeight, loopSplitIndex } = useMemo(
+    () => buildPopoverScrollModel(sortedItems, ROW_HEIGHT, SCROLL_VIEWPORT_HEIGHT),
+    [sortedItems],
+  );
 
   useEffect(() => () => {
     window.clearTimeout(pauseTimerRef.current);
@@ -121,6 +126,7 @@ export function AiCoveragePopoverContent() {
   };
 
   const handleMouseEnter = () => {
+    if (!shouldScroll) return;
     window.clearTimeout(pauseTimerRef.current);
     pauseTimerRef.current = window.setTimeout(pauseAtCurrentPosition, PAUSE_HOVER_DELAY_MS);
   };
@@ -146,7 +152,7 @@ export function AiCoveragePopoverContent() {
     <div className="efficiency-popover">
       <div className="efficiency-popover-header">智能助手使用率明细</div>
       <div
-        className={`efficiency-popover-viewport${paused ? ' efficiency-popover-viewport--interactive' : ''}`}
+        className={`efficiency-popover-viewport${paused && shouldScroll ? ' efficiency-popover-viewport--interactive' : ''}`}
         style={{ height: SCROLL_VIEWPORT_HEIGHT }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -154,15 +160,17 @@ export function AiCoveragePopoverContent() {
       >
         <div
           ref={trackRef}
-          className="efficiency-popover-track"
+          className={`efficiency-popover-track${shouldScroll ? '' : ' efficiency-popover-track--static'}`}
           style={{
             ['--scroll-duration' as string]: `${scrollDuration}s`,
-            ['--item-height' as string]: `${ROW_HEIGHT}px`,
-            ['--item-count' as string]: String(sortedItems.length),
+            ['--loop-height' as string]: `${loopHeight}px`,
           }}
         >
-          {loopItems.map((item, index) => (
-            <CoverageRow key={`${item.name}-${index}`} item={item} maxOrders={maxOrders} />
+          {displayItems.map((item, index) => (
+            <Fragment key={shouldScroll ? `${item.name}-${index}` : item.name}>
+              {shouldScroll && index === loopSplitIndex ? <ScrollLoopDivider /> : null}
+              <CoverageRow item={item} maxOrders={maxOrders} />
+            </Fragment>
           ))}
         </div>
       </div>

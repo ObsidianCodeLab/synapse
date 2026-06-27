@@ -9,9 +9,9 @@ import { CostAnalysisCard } from '@rd-view/components/cards/CostAnalysisCard';
 import { ScrollChartPanel } from '@rd-view/components/cards/ScrollChartPanel';
 import { useAntThemeDark } from '@rd-view/useAntThemeDark';
 
-function TeamDashboardBody() {
+function TeamDashboardBody({ synapseApiBase }: { synapseApiBase: string }) {
   return (
-    <DashboardProvider>
+    <DashboardProvider synapseApiBase={synapseApiBase}>
       <div className="dashboard-shell">
         <DashboardToolbar />
         <div className="dashboard-body">
@@ -36,7 +36,7 @@ function TeamDashboardBody() {
   );
 }
 
-export function TeamDashboardWithTheme() {
+export function TeamDashboardWithTheme({ synapseApiBase }: { synapseApiBase: string }) {
   const antDark = useAntThemeDark();
 
   return (
@@ -55,7 +55,7 @@ export function TeamDashboardWithTheme() {
         },
       }}
     >
-      <TeamDashboardBody />
+      <TeamDashboardBody synapseApiBase={synapseApiBase} />
     </ConfigProvider>
   );
 }

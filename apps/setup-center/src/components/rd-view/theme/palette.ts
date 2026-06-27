@@ -63,11 +63,13 @@ export interface RdViewThemePalette {
   woItemBgInProgress: string;
   woItemBgPending: string;
   woItemBgError: string;
+  woItemBgManual: string;
   woItemBorder: string;
   woItemBorderCompleted: string;
   woItemBorderInProgress: string;
   woItemBorderPending: string;
   woItemBorderError: string;
+  woItemBorderManual: string;
   woItemBorderWidth: string;
   woItemRadius: string;
   woItemMainBg: string;
@@ -93,6 +95,9 @@ export interface RdViewThemePalette {
   woTagErrorFg: string;
   woTagErrorBg: string;
   woTagErrorBorder: string;
+  woTagManualFg: string;
+  woTagManualBg: string;
+  woTagManualBorder: string;
   woTagSopCompletedFg: string;
   woTagSopCompletedBg: string;
   woTagSopCompletedBorder: string;
@@ -112,6 +117,7 @@ export interface RdViewThemePalette {
   woAccentInProgress: string;
   woAccentPending: string;
   woAccentError: string;
+  woAccentManual: string;
 }
 
 export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
@@ -164,11 +170,13 @@ export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
   woItemBgInProgress: '#FFFFFF',
   woItemBgPending: '#FFFFFF',
   woItemBgError: '#FFF1F0',
+  woItemBgManual: '#FFF9F8',
   woItemBorder: '#E5E6EB',
   woItemBorderCompleted: '#7BE188',
   woItemBorderInProgress: '#E5E6EB',
   woItemBorderPending: '#E5E6EB',
   woItemBorderError: '#FFCCC7',
+  woItemBorderManual: '#FFCCC7',
   woItemBorderWidth: '1px',
   woItemRadius: '8px',
   woItemMainBg: 'transparent',
@@ -194,6 +202,9 @@ export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
   woTagErrorFg: '#F53F3F',
   woTagErrorBg: '#FFF1F0',
   woTagErrorBorder: '#FFCCC7',
+  woTagManualFg: '#FF7875',
+  woTagManualBg: '#FFF2F0',
+  woTagManualBorder: '#FFCCC7',
   woTagSopCompletedFg: '#00B42A',
   woTagSopCompletedBg: '#F0FBF2',
   woTagSopCompletedBorder: '#7BE188',
@@ -213,6 +224,7 @@ export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
   woAccentInProgress: '#165DFF',
   woAccentPending: '#FF7D00',
   woAccentError: '#F53F3F',
+  woAccentManual: '#FF7875',
 };
 
 export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
@@ -265,11 +277,13 @@ export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
   woItemBgInProgress: '#000000',
   woItemBgPending: '#000000',
   woItemBgError: '#000000',
+  woItemBgManual: '#000000',
   woItemBorder: '#2a2a2a',
   woItemBorderCompleted: '#2a2a2a',
   woItemBorderInProgress: '#2a2a2a',
   woItemBorderPending: '#2a2a2a',
   woItemBorderError: '#2a2a2a',
+  woItemBorderManual: '#2a2a2a',
   woItemBorderWidth: '1px',
   woItemRadius: '8px',
   woItemMainBg: '#000000',
@@ -295,6 +309,9 @@ export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
   woTagErrorFg: '#F76560',
   woTagErrorBg: 'rgba(247, 101, 96, 0.15)',
   woTagErrorBorder: 'rgba(247, 101, 96, 0.35)',
+  woTagManualFg: '#FFA39E',
+  woTagManualBg: 'rgba(255, 163, 158, 0.12)',
+  woTagManualBorder: 'rgba(255, 163, 158, 0.35)',
   woTagSopCompletedFg: '#7BE188',
   woTagSopCompletedBg: 'rgba(0, 180, 42, 0.15)',
   woTagSopCompletedBorder: 'rgba(123, 225, 136, 0.35)',
@@ -314,6 +331,7 @@ export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
   woAccentInProgress: '#6AA1FF',
   woAccentPending: '#FF9A2E',
   woAccentError: '#F76560',
+  woAccentManual: '#FFA39E',
 };
 
 export function getRdViewPalette(isDark: boolean): RdViewThemePalette {

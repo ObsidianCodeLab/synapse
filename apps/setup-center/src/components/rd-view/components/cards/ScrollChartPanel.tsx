@@ -1,21 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card } from 'antd';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, message } from 'antd';
 import { UnorderedListOutlined } from '@ant-design/icons';
-import { workOrderTicketData } from '@rd-view/data/mockData';
-import { getActiveSopNode } from '@rd-view/data/buildWorkOrderTickets';
-import type { RequirementStatus, WorkOrderTicket, SopNodeRunStatus } from '@rd-view/types';
-import { CURRENT_USER_NAME } from '@rd-view/types';
+import { updateRdViewDemandEnjoyFeedback } from '@rd-view/api/rdViewService';
+import { useDashboard } from '@rd-view/context/DashboardContext';
+import { buildWorkOrderStatusPresentation } from '@rd-view/utils/workOrder';
+import type { DemandEnjoyComment, WorkOrderTicket } from '@rd-view/types';
 import { formatElapsedSince } from '@rd-view/utils/workOrder';
+import { formatPersonDisplayName, personNameTitle } from '@rd-view/utils/personName';
+import { PersonName } from '@rd-view/components/PersonName';
+import { mergeOwnEnjoyComment } from '@rd-view/utils/demandEnjoyFeedback';
+import { AUTO_SCROLL_LOOP_DIVIDER_HEIGHT } from '../../utils/popoverScrollList';
+import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
 import { WorkOrderDetailDrawer } from './WorkOrderDetailDrawer';
-import { RUN_STATUS_CONFIG } from './WorkOrderSopTimeline';
-import { WorkOrderEmojiPicker, type EmojiReaction } from './WorkOrderEmojiPicker';
+import { WorkOrderEnjoyBar } from './WorkOrderEnjoyBar';
 import { chartCardTitleIconStyle, chartCardTitleStyle, chartCardTitleTextStyle, dashboardCardStyle } from '@rd-view/constants/dashboardTheme';
-
-const ORDER_STATUS_TAG: Record<RequirementStatus, { label: string }> = {
-  pending: { label: '待处理' },
-  inProgress: { label: '在途' },
-  completed: { label: '完成' },
-};
+import type { WorkOrderNodeTagVariant, WorkOrderStatusTagVariant } from '@rd-view/utils/workOrder';
 
 const PRIORITY_COLOR: Record<WorkOrderTicket['priority'], string> = {
   高: '#F53F3F',
@@ -27,28 +26,20 @@ const ITEM_HEIGHT = 156;
 const SCROLL_SECONDS_PER_ITEM = 3.6;
 const PAUSE_HOVER_DELAY_MS = 120;
 
-type WorkOrderCardTone = RequirementStatus | 'error';
-
-function getWorkOrderCardTone(item: WorkOrderTicket): WorkOrderCardTone {
-  const activeNode = getActiveSopNode(item);
-  if (activeNode?.runStatus === 'abnormal') return 'error';
-  return item.status;
-}
-
-function StatusTag({ variant, label }: { variant: RequirementStatus | 'error'; label: string }) {
+function StatusTag({ variant, label }: { variant: WorkOrderStatusTagVariant; label: string }) {
   return <span className={`work-order-status-tag work-order-status-tag--${variant}`}>{label}</span>;
 }
 
-function getStatusTagVariant(item: WorkOrderTicket): RequirementStatus | 'error' {
-  const activeNode = getActiveSopNode(item);
-  if (item.status === 'inProgress' && activeNode?.runStatus === 'abnormal') return 'error';
-  return item.status;
-}
-
-function SopInlineTag({ runStatus, label }: { runStatus: SopNodeRunStatus; label: string }) {
-  return (
-    <span className={`work-order-sop-inline-tag work-order-sop-inline-tag--${runStatus}`}>{label}</span>
-  );
+function CurrentNodeStatusTag({
+  variant,
+  nodeName,
+  runStatusLabel,
+}: {
+  variant: WorkOrderNodeTagVariant;
+  nodeName: string;
+  runStatusLabel: string;
+}) {
+  return <StatusTag variant={variant} label={`${nodeName} · ${runStatusLabel}`} />;
 }
 
 function readTrackOffset(track: HTMLDivElement | null): number {
@@ -62,36 +53,39 @@ function readTrackOffset(track: HTMLDivElement | null): number {
 
 function WorkOrderRow({
   item,
-  emojiReaction,
+  enjoyComments,
+  currentEmployeeId,
+  currentUserName,
   onOpen,
-  onEmojiSelect,
+  onOwnEnjoySelect,
   onEmojiPickerOpenChange,
 }: {
   item: WorkOrderTicket;
-  emojiReaction?: EmojiReaction;
+  enjoyComments: DemandEnjoyComment[];
+  currentEmployeeId: string;
+  currentUserName: string;
   onOpen: (order: WorkOrderTicket) => void;
-  onEmojiSelect: (orderId: string, emoji: string) => void;
+  onOwnEnjoySelect: (orderId: string, enjoyId: string) => void;
   onEmojiPickerOpenChange: (open: boolean) => void;
 }) {
-  const statusTag = ORDER_STATUS_TAG[item.status];
-  const statusTagVariant = getStatusTagVariant(item);
-  const activeNode = getActiveSopNode(item);
-  const cardTone = getWorkOrderCardTone(item);
+  const statusPresentation = buildWorkOrderStatusPresentation(item);
   const elapsedLabel = item.status === 'completed' ? '总耗时' : '至今';
   const elapsedValue = formatElapsedSince(item.createdAt);
 
   return (
     <div className="work-scroll-item work-order-card-wrap" style={{ height: ITEM_HEIGHT }}>
-      <div className={`work-order-card work-order-card--${cardTone}`}>
+      <div className={`work-order-card work-order-card--${statusPresentation.cardTone}`}>
         <div className="work-order-card-inner">
           <button type="button" className="work-order-card-main" onClick={() => onOpen(item)}>
-            <div className="work-scroll-avatar">
-              {item.assignee.slice(-1)}
+            <div className="work-scroll-avatar" title={personNameTitle(item.assignee)}>
+              {formatPersonDisplayName(item.assignee)}
             </div>
             <div className="work-scroll-body">
               <div className="work-scroll-header">
-                <span className="work-scroll-name">{item.assignee}</span>
-                <StatusTag variant={statusTagVariant} label={statusTag.label} />
+                <span className="work-scroll-name">
+                  <PersonName name={item.assignee} />
+                </span>
+                <StatusTag variant={statusPresentation.headerTagVariant} label={statusPresentation.label} />
               </div>
 
               <div className="work-order-row-title">
@@ -111,17 +105,20 @@ function WorkOrderRow({
 
           <div className="work-order-emoji-bar">
             <div className="work-order-row-status-line">
-              {activeNode?.runStatus === 'abnormal' ? (
-                <SopInlineTag
-                  runStatus={activeNode.runStatus}
-                  label={`${RUN_STATUS_CONFIG[activeNode.runStatus].label} · ${activeNode.name}`}
+              {statusPresentation.currentNodeTag && item.currentNodeName ? (
+                <CurrentNodeStatusTag
+                  variant={statusPresentation.currentNodeTag.variant}
+                  nodeName={item.currentNodeName}
+                  runStatusLabel={statusPresentation.currentNodeTag.runStatusLabel}
                 />
               ) : null}
             </div>
-            <WorkOrderEmojiPicker
-              value={emojiReaction}
-              onSelect={(emoji) => onEmojiSelect(item.id, emoji)}
-              onOpenChange={onEmojiPickerOpenChange}
+            <WorkOrderEnjoyBar
+              comments={enjoyComments}
+              currentEmployeeId={currentEmployeeId}
+              currentUserName={currentUserName}
+              onOwnEnjoySelect={(enjoyId) => onOwnEnjoySelect(item.id, enjoyId)}
+              onPickerOpenChange={onEmojiPickerOpenChange}
             />
           </div>
         </div>
@@ -131,10 +128,12 @@ function WorkOrderRow({
 }
 
 export function ScrollChartPanel() {
+  const { dashboard, currentUser, synapseApiBase } = useDashboard();
+  const workOrderTicketData = dashboard.workOrders;
   const [interactive, setInteractive] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrderTicket | null>(null);
-  const [orderEmojis, setOrderEmojis] = useState<Record<string, EmojiReaction>>({});
+  const [enjoyOverrides, setEnjoyOverrides] = useState<Record<string, DemandEnjoyComment[]>>({});
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -145,12 +144,32 @@ export function ScrollChartPanel() {
   const emojiPickerOpenRef = useRef(false);
   const viewportHoveredRef = useRef(false);
 
-  const loopItems = useMemo(() => [...workOrderTicketData, ...workOrderTicketData], []);
-  const durationSec = useMemo(
-    () => Math.max(workOrderTicketData.length * SCROLL_SECONDS_PER_ITEM, 30),
-    [],
+  const currentEmployeeId = currentUser?.employeeId ?? '';
+  const currentUserName = currentUser?.name ?? '';
+
+  const resolveEnjoyComments = useCallback(
+    (ticket: WorkOrderTicket) => enjoyOverrides[ticket.id] ?? ticket.enjoyComments,
+    [enjoyOverrides],
   );
-  const loopHeight = workOrderTicketData.length * ITEM_HEIGHT;
+
+  const shouldLoop = workOrderTicketData.length > 1;
+  const loopSplitIndex = workOrderTicketData.length;
+  const loopItems = useMemo(
+    () => (shouldLoop ? [...workOrderTicketData, ...workOrderTicketData] : workOrderTicketData),
+    [workOrderTicketData, shouldLoop],
+  );
+  const durationSec = useMemo(
+    () => (shouldLoop ? Math.max(workOrderTicketData.length * SCROLL_SECONDS_PER_ITEM, 30) : 0),
+    [workOrderTicketData.length, shouldLoop],
+  );
+  const loopHeight = useMemo(
+    () => (shouldLoop ? workOrderTicketData.length * ITEM_HEIGHT + AUTO_SCROLL_LOOP_DIVIDER_HEIGHT : 0),
+    [workOrderTicketData.length, shouldLoop],
+  );
+
+  useEffect(() => {
+    setEnjoyOverrides({});
+  }, [workOrderTicketData]);
 
   useEffect(() => () => {
     window.clearTimeout(pauseTimerRef.current);
@@ -259,11 +278,27 @@ export function ScrollChartPanel() {
     window.requestAnimationFrame(() => tryResumeScroll());
   };
 
-  const handleEmojiSelect = (orderId: string, emoji: string) => {
-    setOrderEmojis((prev) => ({
+  const handleOwnEnjoySelect = (orderId: string, enjoyId: string) => {
+    if (!currentEmployeeId || !synapseApiBase?.trim()) return;
+
+    const ticket = workOrderTicketData.find((item) => item.id === orderId);
+    const base = enjoyOverrides[orderId] ?? ticket?.enjoyComments ?? [];
+    const next = mergeOwnEnjoyComment(base, enjoyId, currentEmployeeId, currentUserName);
+
+    setEnjoyOverrides((prev) => ({
       ...prev,
-      [orderId]: { emoji, personName: CURRENT_USER_NAME },
+      [orderId]: next,
     }));
+
+    void updateRdViewDemandEnjoyFeedback(synapseApiBase, orderId, next).catch((e) => {
+      setEnjoyOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[orderId];
+        return copy;
+      });
+      const msg = e instanceof Error ? e.message : String(e);
+      message.error(`表情保存失败：${msg}`);
+    });
   };
 
   return (
@@ -288,22 +323,25 @@ export function ScrollChartPanel() {
         >
           <div
             ref={trackRef}
-            className="work-scroll-track"
+            className={`work-scroll-track${shouldLoop ? '' : ' work-scroll-track--static'}`}
             style={{
               ['--scroll-duration' as string]: `${durationSec}s`,
-              ['--item-height' as string]: `${ITEM_HEIGHT}px`,
-              ['--item-count' as string]: String(workOrderTicketData.length),
+              ['--loop-height' as string]: `${loopHeight}px`,
             }}
           >
             {loopItems.map((item, index) => (
-              <WorkOrderRow
-                key={`${item.id}-${index}`}
-                item={item}
-                emojiReaction={orderEmojis[item.id]}
-                onOpen={handleOpenOrder}
-                onEmojiSelect={handleEmojiSelect}
-                onEmojiPickerOpenChange={handleEmojiPickerOpenChange}
-              />
+              <Fragment key={`${item.id}-${index}`}>
+                {shouldLoop && index === loopSplitIndex ? <ScrollLoopDivider /> : null}
+                <WorkOrderRow
+                  item={item}
+                  enjoyComments={resolveEnjoyComments(item)}
+                  currentEmployeeId={currentEmployeeId}
+                  currentUserName={currentUserName}
+                  onOpen={handleOpenOrder}
+                  onOwnEnjoySelect={handleOwnEnjoySelect}
+                  onEmojiPickerOpenChange={handleEmojiPickerOpenChange}
+                />
+              </Fragment>
             ))}
           </div>
         </div>

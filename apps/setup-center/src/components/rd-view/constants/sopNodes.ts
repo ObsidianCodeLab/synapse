@@ -1,5 +1,3 @@
-import type { RequirementStatus, SopNodeDetail } from '@rd-view/types';
-
 /** SOP 节点定义（顺序固定：分析 → 设计 → 环境 → 开发 → 走查） */
 export const SOP_NODES = [
   {
@@ -48,24 +46,3 @@ export const SOP_NODES = [
     description: '代码走查、联调验证与缺陷修复',
   },
 ] as const;
-
-export function buildSopNodeStatuses(status: RequirementStatus): RequirementStatus[] {
-  if (status === 'completed') {
-    return ['completed', 'completed', 'completed', 'completed', 'completed'];
-  }
-  if (status === 'inProgress') {
-    return ['completed', 'completed', 'completed', 'inProgress', 'pending'];
-  }
-  return ['pending', 'pending', 'pending', 'pending', 'pending'];
-}
-
-export function buildRequirementSopNodes(status: RequirementStatus): SopNodeDetail[] {
-  const nodeStatuses = buildSopNodeStatuses(status);
-  return SOP_NODES.map((node, index) => ({
-    key: node.key,
-    name: node.label,
-    status: nodeStatuses[index],
-    hours: node.defaultHours,
-    description: node.description,
-  }));
-}
