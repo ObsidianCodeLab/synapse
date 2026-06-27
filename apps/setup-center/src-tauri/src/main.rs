@@ -266,6 +266,7 @@ fn log_to_file(msg: &str) {
         .append(true)
         .open(&path)
         .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
+    crash_handler::record_event(msg);
 }
 
 fn crashdumps_dir() -> PathBuf {
@@ -293,6 +294,8 @@ fn clear_exit_handled_marker() {
     let _ = fs::remove_file(exit_handled_marker_path());
 }
 
+/// 看门狗断路器标记（`~/.synapse/watchdog-relaunch.marker`）：每行存一次
+/// 自动拉起的 epoch 秒。用于在"启动即崩 / 确定性崩溃循环"时彻底停手。
 #[cfg(windows)]
 fn watchdog_relaunch_marker_path() -> PathBuf {
     let base = synapse_root_dir();
@@ -300,8 +303,11 @@ fn watchdog_relaunch_marker_path() -> PathBuf {
     base.join("watchdog-relaunch.marker")
 }
 
+/// 断路器：滑动窗口长度（秒）与窗口内允许的最大自动拉起次数。
 #[cfg(windows)]
-const WATCHDOG_RELAUNCH_COOLDOWN_SECS: u64 = 30;
+const WATCHDOG_BREAKER_WINDOW_SECS: u64 = 180;
+#[cfg(windows)]
+const WATCHDOG_BREAKER_MAX_RELAUNCHES: usize = 3;
 
 const SELF_HEAL_COOLDOWN_SECS: u64 = 30;
 
@@ -418,21 +424,35 @@ fn run_watchdog(parent_pid: u32) {
     }
 
     let now = now_epoch_secs();
-    if let Some(last) = fs::read_to_string(watchdog_relaunch_marker_path())
+    let window_start = now.saturating_sub(WATCHDOG_BREAKER_WINDOW_SECS);
+    let mut recent: Vec<u64> = fs::read_to_string(watchdog_relaunch_marker_path())
         .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
-    {
-        if now >= last && now.saturating_sub(last) < WATCHDOG_RELAUNCH_COOLDOWN_SECS {
-            log_to_file(&format!(
-                "[watchdog] skip relaunch: last relaunch {}s ago < {}s cooldown",
-                now.saturating_sub(last),
-                WATCHDOG_RELAUNCH_COOLDOWN_SECS
-            ));
-            return;
-        }
+        .map(|s| {
+            s.lines()
+                .filter_map(|l| l.trim().parse::<u64>().ok())
+                .filter(|&t| t <= now && t >= window_start)
+                .collect()
+        })
+        .unwrap_or_default();
+    if recent.len() >= WATCHDOG_BREAKER_MAX_RELAUNCHES {
+        log_to_file(&format!(
+            "[watchdog] circuit breaker tripped: {} relaunches within {}s; \
+             giving up to avoid a crash-loop relaunch storm (user must launch manually)",
+            recent.len(),
+            WATCHDOG_BREAKER_WINDOW_SECS
+        ));
+        return;
     }
 
-    let _ = fs::write(watchdog_relaunch_marker_path(), now.to_string());
+    recent.push(now);
+    let _ = fs::write(
+        watchdog_relaunch_marker_path(),
+        recent
+            .iter()
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
     match std::env::current_exe() {
         Ok(exe) => {
             use std::os::windows::process::CommandExt as _;
@@ -3271,8 +3291,6 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_notification::init())
         .manage(rd_terminal::PtyManager::new())
         .setup(|app| {
             let result: Result<(), Box<dyn std::error::Error>> = (|| {
