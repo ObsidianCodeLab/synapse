@@ -1,19 +1,17 @@
 // ─── ChatView: 完整 AI 聊天页面 ───
 // 组装层: 通过 hooks + 子组件构建完整聊天界面
 
-import { useEffect, useMemo, useRef, useState, useCallback, memo } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { setLanguage } from "../i18n";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ProviderIcon } from "../components/ProviderIcon";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { setThemePref } from "../theme";
 import type { Theme } from "../theme";
-import { invoke, downloadFile, openFileWithDefault, showInFolder, readFileBase64, onDragDrop, IS_TAURI, IS_WEB, IS_MOBILE_BROWSER, onWsEvent, logger, getAssetUrl } from "../platform";
-import { getAccessToken } from "../platform/auth";
+import { downloadFile, showInFolder, readFileBase64, onDragDrop, IS_TAURI, IS_WEB, IS_MOBILE_BROWSER, onWsEvent, logger } from "../platform";
 import { safeFetch } from "../providers";
 import type {
   ChatMessage,
@@ -24,7 +22,6 @@ import type {
   ChatTodo,
   ChatTodoStep,
   ChatAskUser,
-  ChatAskQuestion,
   ChatAttachment,
   ChatArtifact,
   ChatSource,
@@ -35,52 +32,49 @@ import type {
   ChainToolCall,
   ChainEntry,
   ChainSummaryItem,
+  ChainTimelineGroup,
   ChatDisplayMode,
   PlanApprovalEvent,
   OrgTimelineEntry,
+  MessagePart,
 } from "../types";
-import { genId, formatTime, formatDate, timeAgo } from "../utils";
+import { genId, timeAgo } from "../utils";
 import { notifyError } from "../utils/notify";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import {
   IconSend, IconPaperclip, IconMic, IconStopCircle,
   IconPlan, IconPlus, IconMenu, IconStop, IconX,
-  IconCheck, IconLoader, IconCircle, IconPlay, IconMinus,
+  IconCheck, IconLoader, IconCircle,
   IconChevronDown, IconChevronUp, IconMessageCircle, IconChevronRight,
-  IconImage, IconRefresh, IconClipboard, IconTrash, IconZap,
-  IconMask, IconBot, IconUsers, IconHelp, IconEdit, IconDownload,
+  IconClipboard, IconTrash, IconZap,
+  IconBot, IconEdit, IconDownload,
   IconPin, IconSearch, IconCircleDot, IconXCircle,
-  IconBuilding, IconShield, IconAlertCircle,
+  IconBuilding, IconAlertCircle,
   IconHourglass, IconTarget, IconCheckCircle, IconPlug, IconClock, IconBarChart, IconGlobe, IconMail,
-  getFileTypeIcon,
 } from "../icons";
 
 // ─── Chat module imports ───
 import type {
-  MdModules, QueuedMessage, StreamEvent,
+  QueuedMessage, StreamEvent,
   SubAgentEntry, SubAgentTask, StreamContext, AgentProfile,
 } from "./chat/utils/chatTypes";
 import {
   IDLE_THRESHOLD_MS, IDLE_TOKEN_THRESHOLD, PASTE_CHAR_THRESHOLD, UNDO_MAX_STEPS,
-  exportConversation, appendAuthToken, stripLegacySummary,
-  sanitizeStoredMessages, loadMessagesFromStorage, saveMessagesToStorage, STORED_MESSAGE_WINDOW,
-  buildChainFromSummary, formatAskUserAnswer, patchMessagesWithBackend, patchMessagesWithBackendDetailed,
-  classifyError, basename, formatToolDescription, generateGroupSummary,
-  ERROR_META, SVG_PATHS, getNextSpinnerTip, shouldRenderConversationMessages,
+  exportConversation,
+  loadMessagesFromStorage, saveMessagesToStorage, STORED_MESSAGE_WINDOW,
+  buildChainFromSummary, buildChainFromTimeline, formatAskUserAnswer, patchMessagesWithBackend, patchMessagesWithBackendDetailed,
+  classifyError, formatToolDescription,
+  shouldRenderConversationMessages,
 } from "./chat/utils/chatHelpers";
 import { useMdModules } from "./chat/hooks/useMdModules";
 import { useMessageReducer, useConversationReducer } from "./chat/hooks/useMessages";
-import type { MessageAction, ConversationAction } from "./chat/hooks/useMessages";
 import { useQueryGuard } from "./chat/hooks/useQueryGuard";
-import type { QueryState } from "./chat/hooks/useQueryGuard";
 import { useSecurityPolicy } from "./chat/hooks/useSecurityPolicy";
 import {
-  SpinnerTipDisplay, AttachmentPreview, ErrorCard,
-  ThinkingBlock, ToolCallDetail, ToolCallsGroup, ThinkingChain,
-  FloatingPlanBar, AskUserBlock, ArtifactList, PlanApprovalPanel,
+  AttachmentPreview,
+  FloatingPlanBar, PlanApprovalPanel,
   SlashCommandPanel, RenderIcon, SubAgentCards,
   SecurityConfirmModal, ContextMenuInner, LightboxOverlay,
-  MessageBubble, FlatMessageItem,
   MessageList,
 } from "./chat/components";
 import type { SecurityCloseInfo } from "./chat/components";
@@ -95,29 +89,6 @@ function _cmdPrefix(cmd: string): string {
 
 const HISTORY_PAGE_LIMIT = 80;
 type EndpointPolicy = "prefer" | "require";
-
-function formatOrgCommandPhase(phase?: string, openChainCount?: number): string {
-  switch (phase) {
-    case "awaiting_summary":
-      return "正在等待主编汇总最终结果";
-    case "done":
-      return "组织命令已完成";
-    case "error":
-      return "组织命令执行出错";
-    case "running":
-    default:
-      if (typeof openChainCount === "number" && openChainCount > 0) {
-        return `正在等待 ${openChainCount} 条下级任务链收口`;
-      }
-      return "组织正在协调任务";
-  }
-}
-
-const SOFT_ORG_EXIT_REASONS = new Set(["normal", "ask_user", "waiting_user", "verify_incomplete"]);
-
-function isSoftOrgExitReason(reason?: string): boolean {
-  return !reason || SOFT_ORG_EXIT_REASONS.has(reason);
-}
 
 type HistoryPageState = {
   total: number;
@@ -312,7 +283,6 @@ export function ChatView({
   const [selectedEndpoint, setSelectedEndpoint] = useState("auto");
   const [selectedEndpointPolicy, setSelectedEndpointPolicy] = useState<EndpointPolicy>("prefer");
   const [chatMode, setChatMode] = useState<"agent" | "plan" | "ask">("agent");
-  const planMode = chatMode === "plan";
   const [pendingApproval, setPendingApproval] = useState<PlanApprovalEvent | null>(null);
   const pendingApprovalRef = useRef<PlanApprovalEvent | null>(null);
   const [deathSwitchActive, setDeathSwitchActive] = useState(false);
@@ -430,7 +400,7 @@ export function ChatView({
     },
     [apiBaseUrl, securityAggWindow],
   );
-  const [winSize, setWinSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const [, setWinSize] = useState({ w: window.innerWidth, h: window.innerHeight });
   useEffect(() => {
     if (!lightbox) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
@@ -833,20 +803,48 @@ export function ChatView({
   const hydrateSeqRef = useRef(0);
 
   const mapBackendHistoryToMessages = useCallback(
-    (rows: { id: string; index?: number; role: string; content: string; timestamp: number; chain_summary?: ChainSummaryItem[]; artifacts?: ChatArtifact[]; attachments?: ChatAttachment[]; org_timeline?: OrgTimelineEntry[]; ask_user?: { question: string; options?: { id: string; label: string }[]; questions?: ChatAskQuestion[] }; usage?: ChatMessage["usage"] }[]): ChatMessage[] => {
+    (rows: { id: string; index?: number; role: string; content: string; timestamp: number; chain_summary?: ChainSummaryItem[]; chain_timeline?: ChainTimelineGroup[]; artifacts?: ChatArtifact[]; attachments?: ChatAttachment[]; org_timeline?: OrgTimelineEntry[]; ask_user?: ChatAskUser; todo?: ChatTodo; parts?: MessagePart[]; usage?: ChatMessage["usage"] }[]): ChatMessage[] => {
       return rows.map((m) => ({
         id: m.id,
         ...(typeof m.index === "number" ? { historyIndex: m.index } : {}),
         role: m.role as "user" | "assistant" | "system",
         content: m.content,
         timestamp: m.timestamp,
-        ...(m.chain_summary?.length ? { thinkingChain: buildChainFromSummary(m.chain_summary) } : {}),
+        // Prefer the faithful causal timeline; fall back to the lossy summary
+        // for messages persisted before chain_timeline existed.
+        ...(m.chain_timeline?.length
+          ? { thinkingChain: buildChainFromTimeline(m.chain_timeline) }
+          : m.chain_summary?.length
+            ? { thinkingChain: buildChainFromSummary(m.chain_summary) }
+            : {}),
         ...(m.artifacts?.length ? { artifacts: m.artifacts } : {}),
         ...(m.attachments?.length ? { attachments: m.attachments } : {}),
         ...(m.org_timeline?.length ? { orgTimeline: m.org_timeline } : {}),
+        ...(m.todo?.steps?.length ? { todo: m.todo } : {}),
         ...(m.ask_user ? { askUser: m.ask_user, content: "" } : {}),
+        ...(m.parts?.length ? { parts: m.parts } : {}),
         ...(m.usage ? { usage: m.usage } : {}),
       }));
+    },
+    [],
+  );
+
+  // Re-attach a still-executing plan (not yet finalized into history) to the
+  // latest assistant message so switching windows / reloading mid-run does not
+  // drop the live plan card (#615).
+  const mergeActiveTodo = useCallback(
+    (msgs: ChatMessage[], activeTodo: ChatTodo | null | undefined): ChatMessage[] => {
+      if (!activeTodo || !activeTodo.steps?.length) return msgs;
+      let lastAssistant = -1;
+      for (let i = msgs.length - 1; i >= 0; i -= 1) {
+        if (msgs[i].role === "assistant") { lastAssistant = i; break; }
+      }
+      if (lastAssistant < 0) return msgs;
+      const target = msgs[lastAssistant];
+      if (target.todo && target.todo.id === activeTodo.id) return msgs;
+      const next = msgs.slice();
+      next[lastAssistant] = { ...target, todo: activeTodo };
+      return next;
     },
     [],
   );
@@ -880,7 +878,7 @@ export function ChatView({
       const data = await res.json();
       const backendMsgs = Array.isArray(data?.messages) ? mapBackendHistoryToMessages(data.messages) : [];
 
-      const chosen = backendMsgs.length > 0 ? backendMsgs : localMsgs;
+      const chosen = mergeActiveTodo(backendMsgs.length > 0 ? backendMsgs : localMsgs, data?.active_todo);
       if (seq === hydrateSeqRef.current) {
         setMessages(chosen);
         setHistoryPage({
@@ -907,7 +905,7 @@ export function ChatView({
         setHydrating(false);
       }
     }
-  }, [serviceRunning, apiBaseUrl, mapBackendHistoryToMessages, STORAGE_KEY_MSGS_PREFIX]);
+  }, [serviceRunning, apiBaseUrl, mapBackendHistoryToMessages, mergeActiveTodo, STORAGE_KEY_MSGS_PREFIX]);
 
   const loadOlderMessages = useCallback(async () => {
     const convId = activeConvIdRef.current;
@@ -1593,8 +1591,8 @@ export function ChatView({
   }, []);
 
   // ── 自动滚到底部 ──
-  // Virtuoso 的 followOutput 已自动处理流式追踪；
-  // 此处处理: (1) 切换对话后 hydrate 完成 (2) 从隐藏变可见。
+  // MessageList 内部的 sticky-bottom 状态机负责流式追踪与"上滚即停"；
+  // 此处只处理: (1) 切换对话后 hydrate 完成 (2) 从隐藏变可见。
   const needsScrollOnVisible = useRef(false);
   const convSwitchScrollRef = useRef(false);
 
@@ -2274,6 +2272,15 @@ export function ChatView({
       const _recoverMsgId = assistantMsg.id;
       const _recoverUserTs = userMsg.timestamp;
       const _recoverKey = STORAGE_KEY_MSGS_PREFIX + thisConvId;
+      // Recovery only fires when the stream was interrupted / incomplete, so the
+      // local bubble's text is suspect. Flag it as a stream fallback up front:
+      // any backend reconciliation that follows (recovery poll, cross-window
+      // history patch, idle re-sync) will then prefer the persisted answer over
+      // this partial copy, even if the backend text is shorter. See
+      // ChatMessage.streamFallback and patchMessagesWithBackendDetailed.
+      updateMessages((prev) =>
+        prev.map((m) => (m.id === _recoverMsgId && !m.streamFallback ? { ...m, streamFallback: true } : m)),
+      );
       let attempts = 0;
       const maxAttempts = 40;
       const basePollInterval = 3000;
@@ -2323,14 +2330,20 @@ export function ChatView({
               const baseMessages = isActiveRecovery ? prev : loadMessagesFromStorage(_recoverKey);
               const updated = baseMessages.map((m) => {
                 if (m.id !== _recoverMsgId) return m;
-                if (m.content && !m.streaming && m.content.length >= contentLen) return m;
-                const patched: ChatMessage = { ...m, content: lastAssistant.content, streaming: false, streamStatus: null };
-                if (
-                  (!m.thinkingChain || m.thinkingChain.length === 0) &&
-                  Array.isArray(lastAssistant.chain_summary) &&
-                  lastAssistant.chain_summary.length > 0
-                ) {
-                  patched.thinkingChain = buildChainFromSummary(lastAssistant.chain_summary);
+                // A stream-fallback bubble holds untrustworthy text (e.g. a
+                // "connection failed" notice that may be *longer* than the real
+                // answer), so the length guard would wrongly keep it. Adopt the
+                // backend copy regardless of length and clear the flag; the guard
+                // still applies once the bubble is reconciled.
+                if (!m.streamFallback && m.content && !m.streaming && m.content.length >= contentLen) return m;
+                const patched: ChatMessage = { ...m, content: lastAssistant.content, streaming: false, streamStatus: null, streamFallback: undefined };
+                if (!m.thinkingChain || m.thinkingChain.length === 0) {
+                  // Prefer the faithful timeline; fall back to the lossy summary.
+                  if (Array.isArray(lastAssistant.chain_timeline) && lastAssistant.chain_timeline.length > 0) {
+                    patched.thinkingChain = buildChainFromTimeline(lastAssistant.chain_timeline);
+                  } else if (Array.isArray(lastAssistant.chain_summary) && lastAssistant.chain_summary.length > 0) {
+                    patched.thinkingChain = buildChainFromSummary(lastAssistant.chain_summary);
+                  }
                 }
                 return patched;
               });
@@ -2473,7 +2486,6 @@ export function ChatView({
       let buffer = "";
       let currentContent = "";
       let currentThinking = "";
-      let isThinking = false;
       let currentToolCalls: ChatToolCall[] = [];
       const currentToolCallsByKey = new Map<string, ChatToolCall>();
       const currentToolCallOrder: string[] = [];
@@ -2713,7 +2725,6 @@ export function ChatView({
                 break;
               }
               case "thinking_start":
-                isThinking = true;
                 thinkingStartTime = Date.now();
                 currentThinkingContent = "";
                 if (!currentChainGroup) {
@@ -2738,7 +2749,6 @@ export function ChatView({
                 }
                 break;
               case "thinking_end": {
-                isThinking = false;
                 const _thinkDuration = event.duration_ms || (Date.now() - thinkingStartTime);
                 const _hasThinking = event.has_thinking ?? (currentThinkingContent.length > 0);
                 if (currentChainGroup) {
@@ -4458,9 +4468,9 @@ export function ChatView({
   );
 
   const quickStartItems = useMemo(() => [
-    { id: "research", icon: <IconBarChart size={20} />, text: t("chat.quickStart.research", "帮我做一份 Synapse 竞品分析") },
+    { id: "research", icon: <IconBarChart size={20} />, text: t("chat.quickStart.research", "帮我做一份 OpenAkita 竞品分析") },
     { id: "ppt", icon: <IconPlan size={20} />, text: t("chat.quickStart.ppt", "帮我生成一份项目汇报 PPT 大纲") },
-    { id: "search", icon: <IconGlobe size={20} />, text: t("chat.quickStart.search", "帮我搜索 Synapse 的最新动态") },
+    { id: "search", icon: <IconGlobe size={20} />, text: t("chat.quickStart.search", "帮我搜索 OpenAkita 的最新动态") },
     { id: "email", icon: <IconMail size={20} />, text: t("chat.quickStart.email", "帮我写一封商务邮件") },
     { id: "summary", icon: <IconClipboard size={20} />, text: t("chat.quickStart.summary", "帮我总结一下今天的工作内容") },
     { id: "translate", icon: <IconGlobe size={20} />, text: t("chat.quickStart.translate", "帮我把这段话翻译成英文") },

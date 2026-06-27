@@ -109,7 +109,6 @@ function ToolCallsGroupInner({
 
   if (toolCalls.length === 0) return null;
 
-  const doneCount = toolCalls.filter((tc) => tc.status === "done").length;
   const errorCount = toolCalls.filter((tc) => tc.status === "error").length;
   const runningCount = toolCalls.filter((tc) => tc.status === "running").length;
   const hasError = errorCount > 0;
