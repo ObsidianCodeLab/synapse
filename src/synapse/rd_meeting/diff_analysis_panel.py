@@ -251,6 +251,26 @@ def _initial_code_commit_display(scope_id: str) -> dict[str, Any] | None:
     return display if isinstance(display, dict) else None
 
 
+def _resolve_flight_has_issues(
+    scope_id: str,
+    *,
+    commit_phase: str,
+    flight_status: str,
+    flight_failed: Any,
+) -> bool:
+    """本轮试飞优化提交状态优先；gate 仅用于尚未提交试飞的阶段。"""
+    status = (flight_status or "").strip().lower()
+    bad_status = status in ("failed", "timeout", "partial")
+    phase = (commit_phase or "").strip()
+    if phase == "done":
+        if flight_failed is False:
+            return False
+        return bad_status
+    if phase == "running":
+        return bad_status
+    return bad_status or evaluate_flight_optimize_need(scope_id) == "needed"
+
+
 def resolve_flight_key_content(
     scope_id: str,
     payload: dict[str, Any] | None,
@@ -295,12 +315,22 @@ def resolve_flight_key_content(
             "source": source,
             "display": None,
             "markdown": archive_text.strip() or None,
-            "has_issues": evaluate_flight_optimize_need(sid) == "needed",
+            "has_issues": _resolve_flight_has_issues(
+                sid,
+                commit_phase=commit_phase,
+                flight_status="",
+                flight_failed=data.get("flight_failed"),
+            ),
         }
 
     flight = display.get("flight") if isinstance(display.get("flight"), dict) else {}
     status = str(flight.get("status") or display.get("status") or "").strip().lower()
-    has_issues = status in ("failed", "timeout", "partial") or evaluate_flight_optimize_need(sid) == "needed"
+    has_issues = _resolve_flight_has_issues(
+        sid,
+        commit_phase=commit_phase,
+        flight_status=status,
+        flight_failed=data.get("flight_failed"),
+    )
 
     from synapse.rd_meeting.code_commit_assets import format_flight_result_report
 

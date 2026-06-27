@@ -70,3 +70,51 @@ def test_resolve_identified_issues_markdown(monkeypatch: pytest.MonkeyPatch) -> 
     assert "已识别问题清单" in out
     assert "CCN" in out
     assert "优化研发计划" not in out
+
+
+def test_resolve_flight_key_content_done_ignores_exception_check_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """本轮提交试飞已通过时，不因 exception_check 旧失败而 has_issues=true。"""
+    monkeypatch.setattr(
+        "synapse.rd_meeting.diff_analysis_panel.evaluate_flight_optimize_need",
+        lambda _sid: "needed",
+    )
+    from synapse.rd_meeting.diff_analysis_panel import resolve_flight_key_content
+
+    payload = {
+        "commit_phase": "done",
+        "flight_failed": False,
+        "optimization_round": 1,
+        "code_commit": {
+            "status": "ok",
+            "optimization_round": 1,
+            "flight": {"status": "ok"},
+            "tasks": [{"task_no": "T1", "flight": {"status": "ok"}}],
+        },
+    }
+    out = resolve_flight_key_content("21942031", payload)
+    assert out["has_issues"] is False
+    assert out["source"] == "diff_analysis_commit"
+
+
+def test_resolve_flight_key_content_await_confirm_uses_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "synapse.rd_meeting.diff_analysis_panel.evaluate_flight_optimize_need",
+        lambda _sid: "needed",
+    )
+    monkeypatch.setattr(
+        "synapse.rd_meeting.diff_analysis_panel._initial_code_commit_display",
+        lambda _sid: {"status": "ok", "flight": {"status": "ok"}},
+    )
+    from synapse.rd_meeting.diff_analysis_panel import resolve_flight_key_content
+
+    payload = {
+        "commit_phase": "await_confirm",
+        "flight_failed": False,
+        "code_commit": None,
+    }
+    out = resolve_flight_key_content("21942031", payload)
+    assert out["has_issues"] is True
