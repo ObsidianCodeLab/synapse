@@ -371,6 +371,13 @@ export async function relaunchApp(): Promise<void> {
     window.location.reload();
     return;
   }
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("prepare_relaunch");
+  } catch {
+    // Non-fatal: worst case the watchdog spawns a duplicate that
+    // single-instance immediately dedups to "focus existing window".
+  }
   const { relaunch } = await import("@tauri-apps/plugin-process");
   await relaunch();
 }

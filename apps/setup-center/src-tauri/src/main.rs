@@ -2,6 +2,7 @@
 
 mod migrations;
 mod rd_terminal;
+mod crash_handler;
 
 use base64::Engine as _;
 use dirs_next::home_dir;
@@ -265,6 +266,188 @@ fn log_to_file(msg: &str) {
         .append(true)
         .open(&path)
         .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
+}
+
+fn crashdumps_dir() -> PathBuf {
+    synapse_root_dir().join("crashdumps")
+}
+
+/// Defence-in-depth self-heal: crash restart marker file path (tao#1180 fallback).
+fn restart_marker_path() -> PathBuf {
+    let base = synapse_root_dir();
+    let _ = fs::create_dir_all(&base);
+    base.join("restart.marker")
+}
+
+fn exit_handled_marker_path() -> PathBuf {
+    let base = synapse_root_dir();
+    let _ = fs::create_dir_all(&base);
+    base.join("exit-handled.marker")
+}
+
+fn mark_exit_handled() {
+    let _ = fs::write(exit_handled_marker_path(), std::process::id().to_string());
+}
+
+fn clear_exit_handled_marker() {
+    let _ = fs::remove_file(exit_handled_marker_path());
+}
+
+#[cfg(windows)]
+fn watchdog_relaunch_marker_path() -> PathBuf {
+    let base = synapse_root_dir();
+    let _ = fs::create_dir_all(&base);
+    base.join("watchdog-relaunch.marker")
+}
+
+#[cfg(windows)]
+const WATCHDOG_RELAUNCH_COOLDOWN_SECS: u64 = 30;
+
+const SELF_HEAL_COOLDOWN_SECS: u64 = 30;
+
+/// 前端在调用 `@tauri-apps/plugin-process` 的 `relaunch()` 之前应先 invoke 此命令，
+/// 写入 exit-handled 标记，避免看门狗把 intentional restart 误判为 hard crash。
+#[tauri::command]
+fn prepare_relaunch() {
+    mark_exit_handled();
+}
+
+fn try_self_heal_relaunch(panic_msg: &str) {
+    mark_exit_handled();
+
+    let ts = now_epoch_secs();
+    let last_ws = read_state_file().current_workspace_id.unwrap_or_default();
+    if let Ok(prev) = fs::read_to_string(restart_marker_path()) {
+        if let Ok(prev_json) = serde_json::from_str::<serde_json::Value>(&prev) {
+            if let Some(prev_ts) = prev_json.get("ts").and_then(|v| v.as_u64()) {
+                if ts.saturating_sub(prev_ts) < SELF_HEAL_COOLDOWN_SECS {
+                    log_to_file(&format!(
+                        "[self-heal] skip relaunch: last self-heal {}s ago < cooldown",
+                        ts.saturating_sub(prev_ts)
+                    ));
+                    return;
+                }
+            }
+        }
+    }
+    let marker = serde_json::json!({
+        "ts": ts,
+        "panic_brief": panic_msg.chars().take(200).collect::<String>(),
+        "last_workspace_id": last_ws,
+        "reason": "tao_destroyed_panic",
+    });
+    let _ = fs::write(
+        restart_marker_path(),
+        serde_json::to_string_pretty(&marker).unwrap_or_else(|_| "{}".into()),
+    );
+
+    if let Ok(exe) = std::env::current_exe() {
+        let mut cmd = Command::new(&exe);
+        cmd.arg("--auto-restarted");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt as _;
+            const DETACHED_PROCESS: u32 = 0x00000008;
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+            cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+        }
+        match cmd.spawn() {
+            Ok(_) => log_to_file(&format!(
+                "[self-heal] relaunched {} after tao panic",
+                exe.display()
+            )),
+            Err(e) => log_to_file(&format!("[self-heal] relaunch FAILED: {e}")),
+        }
+    }
+}
+
+#[cfg(windows)]
+fn spawn_watchdog() {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    use std::os::windows::process::CommandExt as _;
+    const DETACHED_PROCESS: u32 = 0x00000008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            log_to_file(&format!("[watchdog] current_exe failed: {e}"));
+            return;
+        }
+    };
+    let mut cmd = Command::new(&exe);
+    cmd.arg("--watchdog").arg(std::process::id().to_string());
+    cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+    match cmd.spawn() {
+        Ok(child) => log_to_file(&format!(
+            "[watchdog] spawned (pid={}) watching parent {}",
+            child.id(),
+            std::process::id()
+        )),
+        Err(e) => log_to_file(&format!("[watchdog] spawn failed: {e}")),
+    }
+}
+
+#[cfg(not(windows))]
+fn spawn_watchdog() {}
+
+#[cfg(windows)]
+fn run_watchdog(parent_pid: u32) {
+    let handle = unsafe { win::OpenProcess(win::SYNCHRONIZE, 0, parent_pid) };
+    if !handle.is_null() {
+        unsafe {
+            win::WaitForSingleObject(handle, win::INFINITE);
+            win::CloseHandle(handle);
+        }
+    } else {
+        log_to_file(&format!(
+            "[watchdog] OpenProcess({parent_pid}) failed; parent likely already gone"
+        ));
+    }
+
+    let handled = fs::read_to_string(exit_handled_marker_path())
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .map(|pid| pid == parent_pid)
+        .unwrap_or(false);
+    if handled {
+        log_to_file("[watchdog] parent exited cleanly or self-healed; no relaunch");
+        return;
+    }
+
+    let now = now_epoch_secs();
+    if let Some(last) = fs::read_to_string(watchdog_relaunch_marker_path())
+        .ok()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+    {
+        if now >= last && now.saturating_sub(last) < WATCHDOG_RELAUNCH_COOLDOWN_SECS {
+            log_to_file(&format!(
+                "[watchdog] skip relaunch: last relaunch {}s ago < {}s cooldown",
+                now.saturating_sub(last),
+                WATCHDOG_RELAUNCH_COOLDOWN_SECS
+            ));
+            return;
+        }
+    }
+
+    let _ = fs::write(watchdog_relaunch_marker_path(), now.to_string());
+    match std::env::current_exe() {
+        Ok(exe) => {
+            use std::os::windows::process::CommandExt as _;
+            const DETACHED_PROCESS: u32 = 0x00000008;
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+            let mut cmd = Command::new(&exe);
+            cmd.arg("--auto-restarted");
+            cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
+            match cmd.spawn() {
+                Ok(_) => log_to_file("[watchdog] relaunched app after hard crash"),
+                Err(e) => log_to_file(&format!("[watchdog] relaunch failed: {e}")),
+            }
+        }
+        Err(e) => log_to_file(&format!("[watchdog] relaunch current_exe failed: {e}")),
+    }
 }
 
 /// 开始写入安装配置日志，创建带日期的日志文件。返回完整路径供前端展示。
@@ -2031,6 +2214,7 @@ mod win {
         ) -> *mut std::ffi::c_void;
         pub fn TerminateProcess(hProcess: *mut std::ffi::c_void, uExitCode: u32) -> i32;
         pub fn CloseHandle(hObject: *mut std::ffi::c_void) -> i32;
+        pub fn WaitForSingleObject(hHandle: *mut std::ffi::c_void, dwMilliseconds: u32) -> u32;
         pub fn CreateToolhelp32Snapshot(dwFlags: u32, th32ProcessID: u32) -> *mut std::ffi::c_void;
         pub fn Process32FirstW(
             hSnapshot: *mut std::ffi::c_void,
@@ -2043,6 +2227,8 @@ mod win {
     }
     pub const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
     pub const PROCESS_TERMINATE: u32 = 0x0001;
+    pub const SYNCHRONIZE: u32 = 0x0010_0000;
+    pub const INFINITE: u32 = 0xFFFF_FFFF;
     pub const TH32CS_SNAPPROCESS: u32 = 0x00000002;
     pub const INVALID_HANDLE_VALUE: *mut std::ffi::c_void = -1_isize as *mut std::ffi::c_void;
 
@@ -2986,12 +3172,48 @@ fn write_crash_log(message: &str, show_dialog: bool) -> PathBuf {
 }
 
 fn main() {
+    #[cfg(windows)]
+    {
+        let args: Vec<String> = std::env::args().collect();
+        if let Some(pos) = args.iter().position(|a| a == "--watchdog") {
+            let parent_pid = args
+                .get(pos + 1)
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0);
+            if parent_pid != 0 {
+                run_watchdog(parent_pid);
+            }
+            return;
+        }
+    }
+
+    if std::env::args().any(|a| a == "--auto-restarted") {
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+    }
+
+    clear_exit_handled_marker();
+
+    crash_handler::install(crashdumps_dir());
+
     // Global panic hook: capture panics to crash.log + show dialog.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        let msg = format!("PANIC: {info}");
+        let payload = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown>".to_string());
+        let msg = format!("PANIC at {location}: {payload}");
         eprintln!("{msg}");
         write_crash_log(&msg, true);
+        if payload.contains("cannot move state from Destroyed") {
+            try_self_heal_relaunch(&payload);
+        }
         default_hook(info);
     }));
 
@@ -3081,6 +3303,9 @@ fn main() {
 
             // ── 启动对账：清理残留 .lock 和 stale PID 文件 ──
             startup_reconcile();
+
+            #[cfg(windows)]
+            spawn_watchdog();
 
             #[cfg(target_os = "windows")]
             rd_terminal::kill_psmux_hard();
@@ -3195,6 +3420,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_platform_info,
+            prepare_relaunch,
             toggle_pet_window,
             get_root_dir_info,
             set_custom_root_dir,
@@ -3334,6 +3560,7 @@ fn main() {
             }
         }
         if let tauri::RunEvent::Exit = event {
+            mark_exit_handled();
             // Safety-net: clean up backend processes on ANY exit path
             // (SIGTERM, system shutdown, unexpected termination, etc.)
             // Idempotent — harmless if tray-quit already stopped everything.

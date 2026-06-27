@@ -17,7 +17,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue.svg?style=flat-square" alt="Python" height="20" />
   <img src="https://img.shields.io/badge/平台-Tauri_2_+_FastAPI-purple?style=flat-square" alt="Stack" height="20" />
-  <img src="https://img.shields.io/badge/版本-v1.27.17-blue?style=flat-square" alt="Version" height="20" />
+  <img src="https://img.shields.io/badge/版本-v1.27.18-blue?style=flat-square" alt="Version" height="20" />
   <a href="https://dev.iwhalecloud.com"><img src="https://img.shields.io/badge/☁️_研发云-dev.iwhalecloud.com-orange?style=flat-square" alt="研发云" height="20" /></a>
   <img src="https://img.shields.io/badge/覆盖产品-30-green?style=flat-square" alt="覆盖产品" height="20" />
   <img src="https://img.shields.io/badge/处理工单-1200+-blue?style=flat-square" alt="处理工单" height="20" />
