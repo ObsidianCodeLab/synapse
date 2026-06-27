@@ -1,6 +1,6 @@
 [package]
 name = "synapse-desktop"
-version = "1.27.17"
+version = "1.27.18"
 description = "Synapse Setup Center"
 authors = ["Synapse"]
 edition = "2021"
@@ -45,4 +45,15 @@ libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+# crash_handler.rs: SetUnhandledExceptionFilter + MiniDumpWriteDump (SEH crashes).
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_Security",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Kernel",
+  "Win32_System_Memory",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+] }
 

@@ -4538,7 +4538,7 @@ dependencies = [
 
 [[package]]
 name = "synapse-desktop"
-version = "1.27.17"
+version = "1.27.18"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4565,6 +4565,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tokio",
+ "windows-sys 0.59.0",
  "winreg 0.55.0",
  "zip 2.4.2",
 ]
