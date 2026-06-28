@@ -15,7 +15,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::collections::{HashMap, VecDeque};
 use tauri::Emitter;
@@ -38,6 +38,51 @@ static MANAGED_CHILD: Lazy<Mutex<Option<ManagedProcess>>> = Lazy::new(|| Mutex::
 /// Rust 自动启动后端时置 true，启动完成（成功/失败）后置 false。
 /// 前端可查询该标记以显示"正在自动启动服务"并禁用启动/重启按钮。
 static AUTO_START_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum UiLifecycle {
+    Starting = 0,
+    Running = 1,
+    Quiescing = 2,
+    Exited = 3,
+}
+
+static UI_LIFECYCLE: AtomicU8 = AtomicU8::new(UiLifecycle::Starting as u8);
+
+fn set_ui_lifecycle(state: UiLifecycle) {
+    UI_LIFECYCLE.store(state as u8, Ordering::SeqCst);
+}
+
+fn ui_accepts_tauri_ops() -> bool {
+    matches!(
+        UI_LIFECYCLE.load(Ordering::SeqCst),
+        x if x == UiLifecycle::Starting as u8 || x == UiLifecycle::Running as u8
+    )
+}
+
+fn emit_if_ui_live<S: Serialize + Clone>(app: &tauri::AppHandle, event: &str, payload: S) {
+    if !ui_accepts_tauri_ops() {
+        return;
+    }
+    if let Err(e) = app.emit(event, payload) {
+        log_to_file(&format!("[ui] emit {event} failed: {e}"));
+    }
+}
+
+/// Set from RunEvent::Exit so detached loops (heartbeat, etc.) stop before
+/// touching a partially-dropped Tauri runtime (issue #591 teardown race).
+static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+
+/// AUTO_START_IN_PROGRESS 置 true 时记录的 wall-clock 毫秒；超时后强制清 flag。
+static AUTO_START_STARTED_AT_MS: AtomicU64 = AtomicU64::new(0);
+const AUTO_START_TIMEOUT_MS: u64 = 180_000;
+
+/// 后端 cold-start 宽限：HTTP 未就绪时不判 down、不 auto-spawn。
+const BACKEND_BOOT_GRACE_SEC: u64 = 150;
+const BACKEND_BOOT_GRACE_PID_DEAD_SEC: u64 = 30;
+
+const EXTERNAL_BACKEND_DEV_ENV: &str = "SYNAPSE_EXTERNAL_BACKEND_DEV";
 
 static ROOT_CONFIG_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 static STATE_FILE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
@@ -2184,6 +2229,52 @@ fn remove_heartbeat_file(workspace_id: &str) {
     let _ = fs::remove_file(service_heartbeat_file(workspace_id));
 }
 
+fn external_backend_dev_mode() -> bool {
+    matches!(
+        std::env::var(EXTERNAL_BACKEND_DEV_ENV).ok().as_deref(),
+        Some("1") | Some("true") | Some("TRUE") | Some("yes") | Some("YES")
+    )
+}
+
+fn is_backend_http_healthy(port: Option<u16>) -> bool {
+    let effective_port = port.unwrap_or(18900);
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .no_proxy()
+        .build()
+        .ok()
+        .and_then(|client| {
+            client
+                .get(format!("http://127.0.0.1:{effective_port}/api/health"))
+                .send()
+                .ok()
+        })
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+}
+
+fn backend_in_boot_grace(workspace_id: &str) -> bool {
+    let Some(data) = read_pid_file(workspace_id) else {
+        return false;
+    };
+    if data.started_at == 0 {
+        return false;
+    }
+    let age = now_epoch_secs().saturating_sub(data.started_at);
+    if age >= BACKEND_BOOT_GRACE_SEC {
+        return false;
+    }
+    if is_pid_running(data.pid) {
+        return true;
+    }
+    age < BACKEND_BOOT_GRACE_PID_DEAD_SEC
+}
+
+#[tauri::command]
+fn backend_in_boot_grace_cmd(workspace_id: String) -> bool {
+    backend_in_boot_grace(&workspace_id)
+}
+
 /// 检测指定端口是否可用（未被占用）。
 /// 尝试绑定端口，成功则可用，失败则被占用。
 fn check_port_available(port: u16) -> bool {
@@ -3595,7 +3686,7 @@ fn main() {
             // ── 首次运行检测 (NSIS 安装后自动启动时传入 --first-run) ──
             let is_first_run_arg = std::env::args().any(|a| a == "--first-run");
             let launch_mode = if is_first_run_arg { "first-run" } else { "normal" };
-            app.emit("app-launch-mode", launch_mode).ok();
+            emit_if_ui_live(app.handle(), "app-launch-mode", launch_mode);
 
             // 后台启动时：不弹出主窗口，只保留托盘/菜单栏常驻
             let is_background = std::env::args().any(|a| a == "--background");
@@ -3629,6 +3720,7 @@ fn main() {
                         log_to_file("[auto-start] skipped: pip install is still running");
                     } else {
                     AUTO_START_IN_PROGRESS.store(true, Ordering::SeqCst);
+                    AUTO_START_STARTED_AT_MS.store(now_ms(), Ordering::SeqCst);
                     let venv_dir = synapse_root_dir().join("venv").to_string_lossy().to_string();
                     let ws_clone = ws_id.clone();
                     std::thread::spawn(move || {
@@ -3644,12 +3736,140 @@ fn main() {
                             }
                         }
                         AUTO_START_IN_PROGRESS.store(false, Ordering::SeqCst);
+                        AUTO_START_STARTED_AT_MS.store(0, Ordering::SeqCst);
                     });
                     }
                 }
             } else {
                 log_to_file("[auto-start] skipped: no current_workspace_id in state");
             }
+
+            // PR-F1: 常驻 5s 心跳 — 后端崩溃时尝试 auto-spawn。
+            // 刻意不向 webview emit backend:* 事件；前端 App.tsx 自有 /api/health 轮询。
+            {
+                let app_version_for_hb = app_version.clone();
+                std::thread::spawn(move || {
+                    let mut consecutive_failures: u32 = 0;
+                    let mut last_status_was_healthy: Option<bool> = None;
+                    let mut last_starting_log_at: u64 = 0;
+                    loop {
+                        for _ in 0..5 {
+                            std::thread::sleep(std::time::Duration::from_secs(1));
+                            if SHUTDOWN.load(Ordering::SeqCst) {
+                                log_to_file("[heartbeat] shutdown signaled, exiting loop");
+                                return;
+                            }
+                        }
+                        if SHUTDOWN.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        let state_snap = read_state_file();
+                        let ws_id = match state_snap.current_workspace_id {
+                            Some(s) => s,
+                            None => continue,
+                        };
+                        let port = read_workspace_api_port(&ws_id).unwrap_or(18900);
+                        let healthy = is_backend_http_healthy(Some(port));
+                        if SHUTDOWN.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        if healthy {
+                            consecutive_failures = 0;
+                            last_status_was_healthy = Some(true);
+                            continue;
+                        }
+
+                        if backend_in_boot_grace(&ws_id) {
+                            let now = now_epoch_secs();
+                            if now.saturating_sub(last_starting_log_at) >= 30 {
+                                log_to_file(&format!(
+                                    "[heartbeat] backend in boot-grace (port={port}) — skipping down/spawn",
+                                ));
+                                last_starting_log_at = now;
+                            }
+                            consecutive_failures = 0;
+                            continue;
+                        }
+
+                        consecutive_failures = consecutive_failures.saturating_add(1);
+                        if consecutive_failures < 3 {
+                            continue;
+                        }
+                        if let Some(pid_data) = read_pid_file(&ws_id) {
+                            if is_pid_running(pid_data.pid) {
+                                log_to_file(&format!(
+                                    "[heartbeat] backend PID {} still alive — skipping down/spawn",
+                                    pid_data.pid
+                                ));
+                                consecutive_failures = 0;
+                                continue;
+                            }
+                        }
+                        if last_status_was_healthy != Some(false) {
+                            log_to_file(&format!(
+                                "[heartbeat] backend down for {}s, attempting auto spawn (port={port})",
+                                consecutive_failures * 5,
+                            ));
+                            last_status_was_healthy = Some(false);
+                        }
+                        if SHUTDOWN.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        if AUTO_START_IN_PROGRESS.load(Ordering::SeqCst) || pip_install_is_running() {
+                            continue;
+                        }
+                        if external_backend_dev_mode() {
+                            let now = now_epoch_secs();
+                            if now.saturating_sub(last_starting_log_at) >= 30 {
+                                log_to_file(
+                                    "[heartbeat] external-backend dev mode: backend is down; skip auto-spawn",
+                                );
+                                last_starting_log_at = now;
+                            }
+                            consecutive_failures = 0;
+                            continue;
+                        }
+                        let venv_dir = synapse_root_dir().join("venv");
+                        let bundled_exe = if cfg!(windows) {
+                            bundled_backend_dir().join("synapse-server.exe")
+                        } else {
+                            bundled_backend_dir().join("synapse-server")
+                        };
+                        let venv_dir_str = venv_dir.to_string_lossy().to_string();
+                        if !bundled_exe.exists() && !legacy_venv_has_synapse_backend(&venv_dir_str) {
+                            let now = now_epoch_secs();
+                            if now.saturating_sub(last_starting_log_at) >= 30 {
+                                log_to_file(
+                                    "[heartbeat] backend environment is not installed; skip auto-spawn",
+                                );
+                                last_starting_log_at = now;
+                            }
+                            consecutive_failures = 0;
+                            continue;
+                        }
+                        let check_result = startup_version_check(&app_version_for_hb, port);
+                        let need_start = !matches!(check_result, VersionCheckResult::RunningOk);
+                        if !need_start {
+                            consecutive_failures = 0;
+                            continue;
+                        }
+                        AUTO_START_IN_PROGRESS.store(true, Ordering::SeqCst);
+                        AUTO_START_STARTED_AT_MS.store(now_ms(), Ordering::SeqCst);
+                        let ws_clone = ws_id.clone();
+                        match synapse_service_start(venv_dir_str, ws_clone) {
+                            Ok(status) => log_to_file(&format!(
+                                "[heartbeat] auto-spawn returned: running={}, pid={:?}",
+                                status.running, status.pid
+                            )),
+                            Err(e) => log_to_file(&format!("[heartbeat] auto-spawn FAILED: {e}")),
+                        }
+                        AUTO_START_IN_PROGRESS.store(false, Ordering::SeqCst);
+                        AUTO_START_STARTED_AT_MS.store(0, Ordering::SeqCst);
+                        consecutive_failures = 0;
+                    }
+                });
+            }
+
             Ok(())
             })();
 
@@ -3662,7 +3882,9 @@ fn main() {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 // 默认行为：关闭窗口 -> 隐藏到托盘/菜单栏常驻（用户从托盘 Quit 退出）
                 api.prevent_close();
-                let _ = window.hide();
+                if ui_accepts_tauri_ops() {
+                    let _ = window.hide();
+                }
             }
             _ => {}
         })
@@ -3700,6 +3922,7 @@ fn main() {
             synapse_check_pid_alive,
             set_tray_backend_status,
             is_backend_auto_starting,
+            backend_in_boot_grace_cmd,
             get_auto_start_backend,
             set_auto_start_backend,
             get_auto_update,
@@ -3799,6 +4022,9 @@ fn main() {
     };
 
     app.run(|_app_handle, event| {
+        if matches!(UI_LIFECYCLE.load(Ordering::SeqCst), x if x == UiLifecycle::Starting as u8) {
+            set_ui_lifecycle(UiLifecycle::Running);
+        }
         #[cfg(target_os = "macos")]
         if let tauri::RunEvent::Reopen { has_visible_windows, .. } = &event {
             if !has_visible_windows {
@@ -3809,6 +4035,8 @@ fn main() {
             }
         }
         if let tauri::RunEvent::Exit = event {
+            set_ui_lifecycle(UiLifecycle::Quiescing);
+            SHUTDOWN.store(true, Ordering::SeqCst);
             mark_exit_handled();
             // Safety-net: clean up backend processes on ANY exit path
             // (SIGTERM, system shutdown, unexpected termination, etc.)
@@ -3831,6 +4059,7 @@ fn main() {
                 remove_heartbeat_file(&ent.workspace_id);
             }
             kill_synapse_orphans();
+            set_ui_lifecycle(UiLifecycle::Exited);
         }
     });
 }
@@ -4531,7 +4760,34 @@ fn autostart_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), Str
 /// 返回 true 时前端应禁用启动/重启按钮并显示"正在自动启动服务"提示。
 #[tauri::command]
 fn is_backend_auto_starting() -> bool {
-    AUTO_START_IN_PROGRESS.load(Ordering::SeqCst)
+    if AUTO_START_IN_PROGRESS.load(Ordering::SeqCst) {
+        let started_at = AUTO_START_STARTED_AT_MS.load(Ordering::SeqCst);
+        if started_at > 0 {
+            let elapsed = now_ms().saturating_sub(started_at);
+            if elapsed >= AUTO_START_TIMEOUT_MS {
+                log_to_file(&format!(
+                    "[auto-start] is_backend_auto_starting timeout after {}ms, clearing flag",
+                    elapsed
+                ));
+                AUTO_START_IN_PROGRESS.store(false, Ordering::SeqCst);
+                AUTO_START_STARTED_AT_MS.store(0, Ordering::SeqCst);
+            } else {
+                return true;
+            }
+        } else {
+            return true;
+        }
+    }
+    let state = read_state_file();
+    if let Some(ws_id) = state.current_workspace_id {
+        if backend_in_boot_grace(&ws_id) {
+            let port = read_workspace_api_port(&ws_id).unwrap_or(18900);
+            if !is_backend_http_healthy(Some(port)) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[tauri::command]
@@ -4740,8 +4996,8 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                         "\u{9000}\u{51fa}\u{5931}\u{8d25}\u{ff1a}\u{540e}\u{53f0}\u{670d}\u{52a1}\u{4ecd}\u{5728}\u{8fd0}\u{884c}\u{3002}\n\n\u{8bf7}\u{5148}\u{5728}\u{201c}\u{72b6}\u{6001}\u{9762}\u{677f}\u{201d}\u{70b9}\u{51fb}\u{201c}\u{505c}\u{6b62}\u{670d}\u{52a1}\u{201d}\u{ff0c}\u{786e}\u{8ba4}\u{72b6}\u{6001}\u{53d8}\u{4e3a}\u{201c}\u{672a}\u{8fd0}\u{884c}\u{201d}\u{540e}\u{518d}\u{9000}\u{51fa}\u{3002}\n\n\u{4ecd}\u{5728}\u{8fd0}\u{884c}\u{7684}\u{8fdb}\u{7a0b}\u{ff1a}{}",
                         detail.join("; ")
                     );
-                    let _ = app.emit("open_status", serde_json::json!({}));
-                    let _ = app.emit("quit_failed", serde_json::json!({ "message": msg }));
+                    emit_if_ui_live(app, "open_status", serde_json::json!({}));
+                    emit_if_ui_live(app, "quit_failed", serde_json::json!({ "message": msg }));
                 }
             }
             "show" => {
@@ -4772,7 +5028,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = w.show();
                     let _ = w.set_focus();
                 }
-                let _ = app.emit("open_status", serde_json::json!({}));
+                emit_if_ui_live(&app, "open_status", serde_json::json!({}));
             }
             _ => {}
         })
@@ -4788,7 +5044,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = w.unminimize();
                     let _ = w.set_focus();
                 }
-                let _ = app.emit("open_status", serde_json::json!({}));
+                emit_if_ui_live(&app, "open_status", serde_json::json!({}));
             }
             TrayIconEvent::DoubleClick {
                 button: MouseButton::Left,
@@ -4800,7 +5056,7 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let _ = w.unminimize();
                     let _ = w.set_focus();
                 }
-                let _ = app.emit("open_status", serde_json::json!({}));
+                emit_if_ui_live(&app, "open_status", serde_json::json!({}));
             }
             _ => {}
         })
@@ -8419,14 +8675,16 @@ fn claude_code_check() -> ClaudeCodeCheckResult {
 }
 
 fn emit_dev_tools_install_line(app: &tauri::AppHandle, text: &str) {
-    let _ = app.emit(
+    emit_if_ui_live(
+        app,
         DEV_TOOLS_INSTALL_LOG_EVENT,
         serde_json::json!({ "text": text }),
     );
 }
 
 fn emit_install_done_footer(app: &tauri::AppHandle) {
-    let _ = app.emit(
+    emit_if_ui_live(
+        app,
         DEV_TOOLS_INSTALL_LOG_EVENT,
         serde_json::json!({ "text": "\n=== 安装步骤已结束 ===\n" }),
     );
@@ -8638,7 +8896,8 @@ async fn opencode_cli_install(app: tauri::AppHandle) -> Result<String, String> {
 const CURSOR_AGENT_INSTALL_LOG_EVENT: &str = "cursor_agent_install_log";
 
 fn emit_cursor_agent_install_line(app: &tauri::AppHandle, text: &str) {
-    let _ = app.emit(
+    emit_if_ui_live(
+        app,
         CURSOR_AGENT_INSTALL_LOG_EVENT,
         serde_json::json!({ "text": text }),
     );
