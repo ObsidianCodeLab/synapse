@@ -249,7 +249,7 @@ let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -300,7 +300,7 @@ function copyToClipboard(text) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload; _bridgeConnected = true;
     if (_ctx.theme) document.documentElement.setAttribute("data-theme", _ctx.theme.includes("dark") ? "dark" : "light");
@@ -334,8 +334,8 @@ function uploadFile(file) {
 }
 
 function _tr(key, vars, fallback) {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.t) {
-    var v = window.OpenAkitaI18n.t(key, vars);
+  if (window.SynapseI18n && window.SynapseI18n.t) {
+    var v = window.SynapseI18n.t(key, vars);
     if (v && v !== key) return v;
   }
   if (fallback) {
@@ -767,14 +767,14 @@ const I18N_DICT = {
   },
 };
 
-if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.register === "function") {
-  window.OpenAkitaI18n.register(I18N_DICT);
+if (window.SynapseI18n && typeof window.SynapseI18n.register === "function") {
+  window.SynapseI18n.register(I18N_DICT);
 }
 
 function _currentLocale() {
-  if (window.OpenAkitaI18n) {
-    if (typeof window.OpenAkitaI18n.locale === "function") return window.OpenAkitaI18n.locale();
-    if (typeof window.OpenAkitaI18n.getLocale === "function") return window.OpenAkitaI18n.getLocale();
+  if (window.SynapseI18n) {
+    if (typeof window.SynapseI18n.locale === "function") return window.SynapseI18n.locale();
+    if (typeof window.SynapseI18n.getLocale === "function") return window.SynapseI18n.getLocale();
   }
   return "zh";
 }
@@ -792,16 +792,16 @@ function _localT(key, vars) {
 
 const _i18n = {
   t: function(key, vars) {
-    if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.t === "function") {
-      const v = window.OpenAkitaI18n.t(key, vars);
+    if (window.SynapseI18n && typeof window.SynapseI18n.t === "function") {
+      const v = window.SynapseI18n.t(key, vars);
       if (v && v !== key) return v;
     }
     return _localT(key, vars);
   },
   locale: _currentLocale,
   onChange: function(fn) {
-    if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.onChange === "function") {
-      return window.OpenAkitaI18n.onChange(fn);
+    if (window.SynapseI18n && typeof window.SynapseI18n.onChange === "function") {
+      return window.SynapseI18n.onChange(fn);
     }
     return function(){};
   },
@@ -810,8 +810,8 @@ const _i18n = {
 function useT() {
   const [, force] = useState(0);
   useEffect(() => {
-    if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.onChange === "function") {
-      return window.OpenAkitaI18n.onChange(() => force(n => n + 1));
+    if (window.SynapseI18n && typeof window.SynapseI18n.onChange === "function") {
+      return window.SynapseI18n.onChange(() => force(n => n + 1));
     }
     return undefined;
   }, []);
@@ -821,8 +821,8 @@ function useT() {
 function useLocale() {
   const [locale, setLocale] = useState(() => (_i18n.locale && _i18n.locale()) || "zh");
   useEffect(() => {
-    if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.onChange === "function") {
-      return window.OpenAkitaI18n.onChange(() => setLocale(_i18n.locale()));
+    if (window.SynapseI18n && typeof window.SynapseI18n.onChange === "function") {
+      return window.SynapseI18n.onChange(() => setLocale(_i18n.locale()));
     }
     return undefined;
   }, []);
@@ -873,7 +873,7 @@ const ICONIFY_SVG = {
 function Ico(props) {
   const name = props.name || "";
   if (ICONIFY_SVG[name]) return <span className="oa-icon" dangerouslySetInnerHTML={{__html: ICONIFY_SVG[name]}} />;
-  const lib = window.OpenAkitaIcons;
+  const lib = window.SynapseIcons;
   if (lib) {
     const key = typeof lib[name] === "function" ? name
               : typeof lib[ICON_ALIAS[name]] === "function" ? ICON_ALIAS[name] : "";
@@ -2419,8 +2419,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </PluginErrorBoundary>
 );
 
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
 </script>
 </body>

@@ -727,7 +727,7 @@ let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 function post(msg) {
-  if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*");
+  if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*");
 }
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -768,7 +768,7 @@ function pluginApi(method, path, body) {
 }
 window.addEventListener("message", function (e) {
   const d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload;
     _bridgeConnected = true;
@@ -1545,10 +1545,10 @@ const I18N_DICT = {
 };
 
 const _i18n = (function () {
-  if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.register === "function") {
-    window.OpenAkitaI18n.register(I18N_DICT);
+  if (window.SynapseI18n && typeof window.SynapseI18n.register === "function") {
+    window.SynapseI18n.register(I18N_DICT);
   }
-  let loc = (window.OpenAkitaI18n && window.OpenAkitaI18n.getLocale && window.OpenAkitaI18n.getLocale()) || "zh";
+  let loc = (window.SynapseI18n && window.SynapseI18n.getLocale && window.SynapseI18n.getLocale()) || "zh";
   const subs = new Set();
   return {
     t: function (k, vars) {
@@ -5598,8 +5598,8 @@ class PluginErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <PluginErrorBoundary><App /></PluginErrorBoundary>
 );
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
 </script>
 </body>

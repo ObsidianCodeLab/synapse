@@ -6,7 +6,7 @@
  * Why this exists:
  *   - The host (setup-center) tells each plugin iframe the current UI locale
  *     via `bridge:init` payload and re-broadcasts changes via the custom
- *     event `openakita:locale-change` (see bootstrap.js).
+ *     event `synapse:locale-change` (see bootstrap.js).
  *   - Without a shared helper every plugin would re-implement: read the
  *     current locale, normalize "zh-CN" → "zh", subscribe to changes, and
  *     re-render its UI. This module does it once.
@@ -16,20 +16,20 @@
  *   <script src="/api/plugins/_sdk/ui-kit/i18n.js"></script>
  *
  *   // 1) Register the dictionary once at boot.
- *   OpenAkitaI18n.register({
+ *   SynapseI18n.register({
  *     zh: { "tabs.create": "创建", "tabs.tasks": "任务列表" },
  *     en: { "tabs.create": "Create", "tabs.tasks": "Tasks" },
  *   });
  *
  *   // 2) Translate a key (with optional vars: t("hello", { name: "Akita" }))
- *   OpenAkitaI18n.t("tabs.create");      // → "创建" or "Create"
+ *   SynapseI18n.t("tabs.create");      // → "创建" or "Create"
  *
  *   // 3) Subscribe to locale changes (returns an unsubscribe fn).
  *   //    Use this in React with useState + useEffect to force re-render.
- *   const off = OpenAkitaI18n.onChange((locale) => { ... });
+ *   const off = SynapseI18n.onChange((locale) => { ... });
  *
  *   // 4) Read the current normalized locale ("zh" / "en" / etc.).
- *   OpenAkitaI18n.locale();
+ *   SynapseI18n.locale();
  *
  *   // 5) Vanilla DOM helper — annotate static markup once and keep it
  *   //    in sync with locale changes:
@@ -40,7 +40,7 @@
  *   //
  *   //    Then, after the dictionary is registered, call ONCE:
  *   //
- *   //      OpenAkitaI18n.bindDom(document.body);
+ *   //      SynapseI18n.bindDom(document.body);
  *   //
  *   //    bindDom() = applyDom(root) + auto re-apply on every locale change.
  *   //    Returns an unbind function. Safe to call multiple times.
@@ -56,7 +56,7 @@
  */
 (function () {
   if (typeof window === "undefined") return;
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.__loaded) return;
+  if (window.SynapseI18n && window.SynapseI18n.__loaded) return;
 
   // The dictionary is intentionally a plain object that can be merged
   // multiple times so plugins (and even ui-kit modules) can each contribute
@@ -68,8 +68,8 @@
   // Fall back to the browser's language and finally to "zh" (project default).
   function readInitialLocale() {
     try {
-      if (window.OpenAkita && window.OpenAkita.meta && window.OpenAkita.meta.locale) {
-        return window.OpenAkita.meta.locale;
+      if (window.Synapse && window.Synapse.meta && window.Synapse.meta.locale) {
+        return window.Synapse.meta.locale;
       }
     } catch (_e) { /* meta is a getter; ignore */ }
     if (navigator && navigator.language) return navigator.language;
@@ -174,19 +174,19 @@
 
   // Subscribe to host → iframe locale broadcasts. bootstrap.js dispatches
   // this exact custom event whenever the host sends bridge:locale-change.
-  window.addEventListener("openakita:locale-change", function (e) {
+  window.addEventListener("synapse:locale-change", function (e) {
     const loc = e && e.detail && e.detail.locale;
     if (loc) setLocale(loc);
   });
 
   // Some plugin code paths (e.g. when the bridge handshake completes after
-  // i18n.js loads) update window.OpenAkita.meta.locale without firing the
+  // i18n.js loads) update window.Synapse.meta.locale without firing the
   // event. Poll once on next tick so the initial render uses the right
   // locale even in that race.
   setTimeout(function () {
     try {
-      if (window.OpenAkita && window.OpenAkita.meta && window.OpenAkita.meta.locale) {
-        setLocale(window.OpenAkita.meta.locale);
+      if (window.Synapse && window.Synapse.meta && window.Synapse.meta.locale) {
+        setLocale(window.Synapse.meta.locale);
       }
     } catch (_e) { /* ignore */ }
   }, 0);
@@ -253,7 +253,7 @@
     return off;
   }
 
-  window.OpenAkitaI18n = {
+  window.SynapseI18n = {
     __loaded: true,
     register: register,
     t: t,

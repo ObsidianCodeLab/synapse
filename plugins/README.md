@@ -1,4 +1,4 @@
-# Synapse 内置插件（来自上游 openakita/plugins）
+# Synapse 内置插件（来自上游 openakita 仓库 `plugins/`）
 
 本目录为 **可选一等公民插件源码**，已从上游同步并完成 Synapse 品牌化（`synapse.plugins.api`、`requires.synapse` 等）。
 
@@ -41,7 +41,7 @@ D:\github\openakita_jyhk\plugins\tongyi-image
 
 ## UI 协议
 
-预构建的 `ui/dist/` 仍使用 **`window.OpenAkita`** 与 `openakita:*` 事件名，与 Setup Center 内建 Plugin Bridge 协议一致，请勿在 dist 资源中改名。
+预构建的 `ui/dist/` 使用 **`window.Synapse`**、`SynapseIcons` / `SynapseI18n` 与 `synapse:*` 事件名，Bridge 信封字段为 **`__synapse_bridge`**，与 Setup Center 内建 Plugin Bridge 一致。
 
 ## 再同步上游
 

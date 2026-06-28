@@ -889,7 +889,7 @@
   <div id="toast" class="toast" hidden></div>
 </div>
 <script>
-const API = window.OpenAkitaPlugin.apiBase;
+const API = window.SynapsePlugin.apiBase;
 const FALLBACK_PACKAGE_OPTIONS = [
   ['taiwan','台海观察'], ['policy','时政政策'], ['economy','经济财经'],
   ['world','国际局势'], ['tech','科技产业'], ['platform','平台热点']
@@ -957,8 +957,8 @@ async function api(path, opts={}) {
 async function openExternalLink(url){
   const raw = String(url || '').trim();
   if(!/^https?:\/\//i.test(raw)) throw new Error('只允许打开 http/https 链接');
-  if(window.OpenAkitaPlugin?.openExternal){
-    await window.OpenAkitaPlugin.openExternal(raw);
+  if(window.SynapsePlugin?.openExternal){
+    await window.SynapsePlugin.openExternal(raw);
     return;
   }
   try{
@@ -1101,8 +1101,8 @@ function reportDownloadUrl(report, fmt){
 }
 async function openDownloadUrl(url){
   if(!url) throw new Error('缺少报告 ID，无法下载');
-  if(window.OpenAkitaPlugin?.openExternal && /^https?:\/\//i.test(url)){
-    await window.OpenAkitaPlugin.openExternal(url);
+  if(window.SynapsePlugin?.openExternal && /^https?:\/\//i.test(url)){
+    await window.SynapsePlugin.openExternal(url);
     return;
   }
   window.open(url, '_blank', 'noopener,noreferrer') || (window.location.href = url);

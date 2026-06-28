@@ -7,7 +7,7 @@
  */
 
 export interface BridgeMessage {
-  __akita_bridge: true;
+  __synapse_bridge: true;
   version: number;
   type: string;
   requestId?: string;
@@ -47,7 +47,7 @@ function isBridgeMessage(data: unknown): data is BridgeMessage {
   return (
     typeof data === "object" &&
     data !== null &&
-    (data as BridgeMessage).__akita_bridge === true &&
+    (data as BridgeMessage).__synapse_bridge === true &&
     typeof (data as BridgeMessage).type === "string"
   );
 }
@@ -80,10 +80,10 @@ export class PluginBridgeHost {
     window.removeEventListener("message", this.boundHandler);
   }
 
-  private post(msg: Omit<BridgeMessage, "__akita_bridge" | "version">) {
+  private post(msg: Omit<BridgeMessage, "__synapse_bridge" | "version">) {
     if (this.disposed || !this.iframe.contentWindow) return;
     const full: BridgeMessage = {
-      __akita_bridge: true,
+      __synapse_bridge: true,
       version: BRIDGE_VERSION,
       ...msg,
     };

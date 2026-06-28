@@ -12,7 +12,6 @@ SKIP_DIRS = {
     "__pycache__",
     "node_modules",
     ".venv",
-    "dist",
     ".mypy_cache",
     ".ruff_cache",
 }
@@ -34,26 +33,37 @@ SKIP_EXT = {
     ".min.js.map",
 }
 
-_UI_PLACEHOLDERS = {
-    "window.OpenAkita": "\x00OA_WIN\x00",
-    "OpenAkitaI18n": "\x00OA_I18N\x00",
-    "OpenAkitaIcons": "\x00OA_ICONS\x00",
-    "openakita:ready": "\x00OA_EVT_READY\x00",
-    "openakita:theme-change": "\x00OA_EVT_THEME\x00",
-    "openakita:locale-change": "\x00OA_EVT_LOCALE\x00",
-    "openakita:event": "\x00OA_EVT_EVENT\x00",
-    "__akita_bridge": "\x00OA_BRIDGE\x00",
-}
+_UI_BRIDGE_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    ("window.OpenAkita", "window.Synapse"),
+    ("OpenAkitaI18n", "SynapseI18n"),
+    ("OpenAkitaIcons", "SynapseIcons"),
+    ("OpenAkitaMD", "SynapseMD"),
+    ("openakita:ready", "synapse:ready"),
+    ("openakita:theme-change", "synapse:theme-change"),
+    ("openakita:locale-change", "synapse:locale-change"),
+    ("openakita:event", "synapse:event"),
+    ("__akita_bridge", "__synapse_bridge"),
+)
 
 
-def _is_ui_dist(path: Path) -> bool:
-    return "ui" in path.parts and "dist" in path.parts
+def _is_plugin_ui_dist(path: Path) -> bool:
+    parts = path.parts
+    return "plugins" in parts and "ui" in parts and "dist" in parts
 
 
-def transform_text(text: str, *, ui_dist: bool) -> str:
-    if ui_dist:
-        for orig, ph in _UI_PLACEHOLDERS.items():
-            text = text.replace(orig, ph)
+def _should_skip_path(path: Path) -> bool:
+    parts = path.parts
+    if any(p in SKIP_DIRS for p in parts):
+        return True
+    # Skip generic build output, but keep plugin prebuilt UI bundles.
+    if "dist" in parts and not _is_plugin_ui_dist(path):
+        return True
+    return False
+
+
+def transform_text(text: str) -> str:
+    for old, new in _UI_BRIDGE_REPLACEMENTS:
+        text = text.replace(old, new)
 
     text = text.replace("openakita_plugin_sdk", "synapse_plugin_sdk")
     text = text.replace("openakita-plugin-sdk", "synapse-plugin-sdk")
@@ -67,12 +77,9 @@ def transform_text(text: str, *, ui_dist: bool) -> str:
     text = text.replace("MIN_OPENAKITA_VERSION", "MIN_SYNAPSE_VERSION")
     text = text.replace("~/.openakita/", "~/.synapse/")
     text = text.replace("~/.openakita", "~/.synapse")
+    text = text.replace("openakita_jyhk", "\x00REPO_SLUG\x00")
     text = text.replace("openakita", "synapse")
-
-    if ui_dist:
-        rev = {v: k for k, v in _UI_PLACEHOLDERS.items()}
-        for ph, orig in rev.items():
-            text = text.replace(ph, orig)
+    text = text.replace("\x00REPO_SLUG\x00", "openakita_jyhk")
 
     return text
 
@@ -85,7 +92,7 @@ def brand_tree(root: Path) -> int:
     for path in root.rglob("*"):
         if path.is_dir():
             continue
-        if any(p in SKIP_DIRS for p in path.parts):
+        if _should_skip_path(path):
             continue
         if path.suffix.lower() in SKIP_EXT:
             continue
@@ -94,7 +101,7 @@ def brand_tree(root: Path) -> int:
         except (UnicodeDecodeError, OSError):
             continue
 
-        new = transform_text(raw, ui_dist=_is_ui_dist(path))
+        new = transform_text(raw)
         if new != raw:
             path.write_text(new, encoding="utf-8", newline="\n")
             changed += 1

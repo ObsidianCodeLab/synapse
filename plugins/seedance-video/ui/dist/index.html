@@ -679,7 +679,7 @@ let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -735,7 +735,7 @@ function pluginApi(method, path, body) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload;
     _bridgeConnected = true;
@@ -791,12 +791,12 @@ function showToast(body, type) {
   console.log("[Toast]", type, body);
 }
 
-// Bridge-layer i18n shim: prefers OpenAkitaI18n (which has built-in bridge.*
+// Bridge-layer i18n shim: prefers SynapseI18n (which has built-in bridge.*
 // defaults, see ui-kit/i18n.js), and falls back to the literal English text
 // when i18n.js is not yet loaded so we never show raw "bridge.x.y" keys.
 function _bt(key, vars, fallback) {
-  if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.t === "function") {
-    var v = window.OpenAkitaI18n.t(key, vars);
+  if (window.SynapseI18n && typeof window.SynapseI18n.t === "function") {
+    var v = window.SynapseI18n.t(key, vars);
     if (v && v !== key) return v;
   }
   if (!fallback) return key;
@@ -1867,9 +1867,9 @@ const I18N_DICT = {
 };
 
 const _i18n = (function () {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.register) {
-    window.OpenAkitaI18n.register(I18N_DICT);
-    return window.OpenAkitaI18n;
+  if (window.SynapseI18n && window.SynapseI18n.register) {
+    window.SynapseI18n.register(I18N_DICT);
+    return window.SynapseI18n;
   }
   let loc = (navigator && navigator.language) || "zh";
   const subs = new Set();
@@ -1903,8 +1903,8 @@ function useLocale() {
 }
 
 function _tr(key, vars, fallback) {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.t) {
-    const v = window.OpenAkitaI18n.t(key, vars);
+  if (window.SynapseI18n && window.SynapseI18n.t) {
+    const v = window.SynapseI18n.t(key, vars);
     if (v && v !== key) return v;
   }
   if (fallback) {
@@ -3670,8 +3670,8 @@ function PromptGuideTab() {
     !search || t.name.includes(search) || (t.name_en||"").toLowerCase().includes(search.toLowerCase()) || t.description.includes(search)
   );
 
-  const tipsHtml = (window.OpenAkitaMD && typeof window.OpenAkitaMD.render === "function")
-    ? window.OpenAkitaMD.render(t("guide.tips.body"))
+  const tipsHtml = (window.SynapseMD && typeof window.SynapseMD.render === "function")
+    ? window.SynapseMD.render(t("guide.tips.body"))
     : null;
 
   return (
@@ -4078,8 +4078,8 @@ function StoryboardTab({ onGoToSettings }) {
   const segCountEst = Math.max(1, Math.round(totalDuration / segDuration));
 
   if (step === "input") {
-    const usageHtml = (window.OpenAkitaMD && typeof window.OpenAkitaMD.render === "function")
-      ? window.OpenAkitaMD.render(t("story.usage.body") + "\n\n" + t("story.usage.warn"))
+    const usageHtml = (window.SynapseMD && typeof window.SynapseMD.render === "function")
+      ? window.SynapseMD.render(t("story.usage.body") + "\n\n" + t("story.usage.warn"))
       : null;
     return (
       <div className="storyboard-workspace">
@@ -5490,7 +5490,7 @@ function App() {
         <div className="oa-config-banner" role="alert"
              style={{margin:"12px 16px 0", flexShrink:0}}>
           <span className="oa-icon oa-config-banner__icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{t("banner.noKey.title")}</strong>
             <div style={{fontSize:12, color:"var(--text-muted)", marginTop:2}}>
@@ -5501,7 +5501,7 @@ function App() {
                   onClick={() => setActiveTab(settingsIdx)}>
             {t("banner.noKey.cta")}
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.arrowRight() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
         </div>
       )}
@@ -5511,7 +5511,7 @@ function App() {
                      borderColor:"var(--warning, #f59e0b)"}}>
           <span className="oa-icon oa-config-banner__icon"
                 style={{color:"var(--warning, #f59e0b)"}}
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{t("banner.perms.title")}</strong>
             <div style={{fontSize:12, color:"var(--text-muted)", marginTop:2}}>
@@ -5522,7 +5522,7 @@ function App() {
                   onClick={() => setActiveTab(settingsIdx)}>
             {t("banner.perms.cta")}
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.arrowRight() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
         </div>
       )}
@@ -5581,7 +5581,7 @@ class PluginErrorBoundary extends React.Component {
       <div style={{padding: 24, maxWidth: 820, margin: "0 auto"}}>
         <div className="oa-config-banner" role="alert" style={{borderColor: "var(--danger, #ef4444)"}}>
           <span className="oa-icon oa-config-banner__icon" style={{color: "var(--danger, #ef4444)"}}
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{tr("err.title")}</strong>
             <div style={{fontSize: 12, color: "var(--text-muted)", marginTop: 4}}>
@@ -5610,8 +5610,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 // Tell the host we have rendered the first frame so it can dismiss the
 // loading overlay accurately (instead of guessing from iframe.onLoad,
 // which fires before Babel-standalone compiles this script).
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
 </script>
 </body>

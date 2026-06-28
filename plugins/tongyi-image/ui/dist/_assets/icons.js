@@ -13,7 +13,7 @@
  *     <!-- inject via innerHTML / dangerouslySetInnerHTML -->
  *   </span>
  *
- *   const html = OpenAkitaIcons.warning();   // returns SVG string (no <span>)
+ *   const html = SynapseIcons.warning();   // returns SVG string (no <span>)
  *   el.innerHTML = `<span class="oa-icon">${html}</span>`;
  *
  * All icons are 24x24 viewBox, stroke-based (currentColor), so they inherit
@@ -24,7 +24,7 @@
  */
 (function () {
   if (typeof window === "undefined") return;
-  if (window.OpenAkitaIcons) return;
+  if (window.SynapseIcons) return;
 
   // Common SVG attributes baked into a helper to keep individual icons short.
   function svg(inner) {
@@ -240,5 +240,5 @@
     },
   };
 
-  window.OpenAkitaIcons = I;
+  window.SynapseIcons = I;
 })();

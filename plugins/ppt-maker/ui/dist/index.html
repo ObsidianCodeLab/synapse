@@ -48,7 +48,7 @@
       ];
 
       function request(path, options = {}) {
-        const api = window.OpenAkita;
+        const api = window.Synapse;
         const url = path.startsWith("/api/") ? path : `${PLUGIN_BASE}${path}`;
         if (api && typeof api.request === "function") {
           return api.request(url, options);

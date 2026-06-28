@@ -1,7 +1,7 @@
 /* idea-research UI i18n strings — Phase 5 full dictionary.
  *
  * Loaded BEFORE the React bundle so the workbench can call
- * ``window.OpenAkita.i18n.t(locale, key, vars)`` synchronously.
+ * ``window.Synapse.i18n.t(locale, key, vars)`` synchronously.
  */
 (function () {
   "use strict";
@@ -373,6 +373,6 @@
     });
   }
 
-  window.OpenAkita = window.OpenAkita || {};
-  window.OpenAkita.i18n = { t: t, dict: DICT };
+  window.Synapse = window.Synapse || {};
+  window.Synapse.i18n = { t: t, dict: DICT };
 })();

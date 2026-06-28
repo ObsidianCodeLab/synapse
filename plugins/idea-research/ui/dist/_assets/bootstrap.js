@@ -10,7 +10,7 @@
  *   events.
  *
  * The React workbench (index.html bottom of file) relies on these
- * globals: ``window.OpenAkita.idea_research.api`` /
+ * globals: ``window.Synapse.idea_research.api`` /
  * ``.subscribe`` / ``.locale`` / ``.theme``.
  */
 (function () {
@@ -66,24 +66,24 @@
   function onMessage(event) {
     var data = event && event.data;
     if (!data || typeof data !== "object") return;
-    if (data.__akita_bridge === true && (data.type === "bridge:init" || data.type === "bridge:handshake-ack")) {
+    if (data.__synapse_bridge === true && (data.type === "bridge:init" || data.type === "bridge:handshake-ack")) {
       var payload = data.payload || {};
       if (payload.theme) applyTheme(payload.theme);
       if (payload.locale) applyLocale(payload.locale);
       return;
     }
-    if (data.__akita_bridge === true && data.requestId && pending[data.requestId]) {
+    if (data.__synapse_bridge === true && data.requestId && pending[data.requestId]) {
       var slot = pending[data.requestId];
       delete pending[data.requestId];
       if (data.error) slot.resolve(null);
       else slot.resolve(data.payload || data);
       return;
     }
-    if (data.__akita_bridge === true && data.type === "bridge:theme-change") {
+    if (data.__synapse_bridge === true && data.type === "bridge:theme-change") {
       applyTheme(data.payload && data.payload.theme);
       return;
     }
-    if (data.__akita_bridge === true && data.type === "bridge:locale-change") {
+    if (data.__synapse_bridge === true && data.type === "bridge:locale-change") {
       applyLocale(data.payload && data.payload.locale);
       return;
     }
@@ -167,7 +167,7 @@
       };
       try {
         window.parent && window.parent.postMessage({
-          __akita_bridge: true,
+          __synapse_bridge: true,
           version: 1,
           type: "bridge:pick-folder",
           requestId: id,
@@ -216,12 +216,12 @@
   window.addEventListener("message", onMessage, false);
   window.addEventListener("DOMContentLoaded", postReady, { once: true });
   try {
-    window.parent && window.parent.postMessage({ __akita_bridge: true, version: 1, type: "bridge:ready" }, "*");
-    window.parent && window.parent.postMessage({ __akita_bridge: true, version: 1, type: "bridge:handshake" }, "*");
+    window.parent && window.parent.postMessage({ __synapse_bridge: true, version: 1, type: "bridge:ready" }, "*");
+    window.parent && window.parent.postMessage({ __synapse_bridge: true, version: 1, type: "bridge:handshake" }, "*");
   } catch (_) {}
 
-  window.OpenAkita = window.OpenAkita || {};
-  window.OpenAkita.idea_research = {
+  window.Synapse = window.Synapse || {};
+  window.Synapse.idea_research = {
     version: "1.0.0",
     state: state,
     api: apiFetch,

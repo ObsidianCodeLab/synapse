@@ -3,7 +3,7 @@
  */
 (function () {
   if (typeof window === "undefined") return;
-  if (window.OpenAkita && window.OpenAkita.__bootstrapped) return;
+  if (window.Synapse && window.Synapse.__bootstrapped) return;
 
   var meta = { theme: "light", locale: "zh-CN", apiBase: "", pluginId: "ppt-maker" };
   var pending = Object.create(null);
@@ -15,7 +15,7 @@
   function send(type, payload, requestId) {
     if (window.parent === window) return;
     window.parent.postMessage(
-      { __akita_bridge: true, version: 1, type: type, payload: payload, requestId: requestId },
+      { __synapse_bridge: true, version: 1, type: type, payload: payload, requestId: requestId },
       "*",
     );
   }
@@ -39,7 +39,7 @@
     });
   }
 
-  window.OpenAkita = {
+  window.Synapse = {
     __bootstrapped: true,
     meta: meta,
     request: request,
@@ -48,11 +48,11 @@
 
   window.addEventListener("message", function (event) {
     var msg = event.data || {};
-    if (!msg.__akita_bridge) return;
+    if (!msg.__synapse_bridge) return;
     if (msg.type === "bridge:config" || msg.type === "bridge:ready") {
       Object.assign(meta, msg.payload || {});
       applyTheme(meta.theme);
-      window.dispatchEvent(new CustomEvent("openakita:ready", { detail: meta }));
+      window.dispatchEvent(new CustomEvent("synapse:ready", { detail: meta }));
     }
     if (msg.requestId && pending[msg.requestId]) {
       pending[msg.requestId](msg.payload);
