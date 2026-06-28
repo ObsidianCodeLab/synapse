@@ -8,6 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from synapse.agents.identity_files import PROFILE_IDENTITY_FILENAMES
 from synapse.memory.json_utils import coerce_text
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,18 @@ def _invalidate_profile_agents(request: Request, profile_id: str) -> None:
                     f"[Agents API] Failed to invalidate profile pool "
                     f"({pool_attr}, profile={profile_id}): {e}"
                 )
+
+
+def _invalidate_profile_runtime(request: Request, profile_id: str, reason: str) -> None:
+    """Invalidate prompt and pooled runtime state after profile-affecting edits."""
+    try:
+        from synapse.prompt.builder import clear_prompt_section_cache
+
+        clear_prompt_section_cache()
+    except Exception as exc:
+        logger.warning(f"[Agents API] Failed to clear prompt cache ({reason}): {exc}")
+
+    _invalidate_profile_agents(request, profile_id)
 
 
 # ─── Pydantic models ─────────────────────────────────────────────────────
@@ -430,11 +443,6 @@ async def list_agent_profiles(include_hidden: bool = False):
     Query params:
         include_hidden: if True, also return hidden profiles (default False).
     """
-    from synapse.config import settings
-
-    if not settings.multi_agent_enabled:
-        return {"profiles": [], "multi_agent_enabled": False}
-
     from synapse.agents.presets import SYSTEM_PRESETS
     from synapse.agents.profile import get_profile_store
 
@@ -469,11 +477,6 @@ async def list_agent_profiles(include_hidden: bool = False):
 @router.post("/api/agents/profiles")
 async def create_agent_profile(body: ProfileCreateRequest):
     """Create a new custom agent profile."""
-    from synapse.config import settings
-
-    if not settings.multi_agent_enabled:
-        raise HTTPException(status_code=400, detail="Multi-agent mode is not enabled")
-
     from synapse.agents.profile import AgentProfile, AgentType, SkillsMode, get_profile_store
 
     valid_modes = {"all", "inclusive", "exclusive"}
@@ -533,11 +536,6 @@ async def create_agent_profile(body: ProfileCreateRequest):
 @router.put("/api/agents/profiles/{profile_id}")
 async def update_agent_profile(profile_id: str, body: ProfileUpdateRequest, request: Request):
     """Update a custom agent profile (system profiles have restricted updates)."""
-    from synapse.config import settings
-
-    if not settings.multi_agent_enabled:
-        raise HTTPException(status_code=400, detail="Multi-agent mode is not enabled")
-
     from synapse.agents.profile import get_profile_store
 
     if body.skills_mode is not None:
@@ -565,11 +563,6 @@ async def update_agent_profile(profile_id: str, body: ProfileUpdateRequest, requ
 @router.delete("/api/agents/profiles/{profile_id}")
 async def delete_agent_profile(profile_id: str):
     """Delete a custom agent profile."""
-    from synapse.config import settings
-
-    if not settings.multi_agent_enabled:
-        raise HTTPException(status_code=400, detail="Multi-agent mode is not enabled")
-
     from synapse.agents.profile import get_profile_store
 
     store = get_profile_store()
@@ -589,11 +582,6 @@ async def delete_agent_profile(profile_id: str):
 @router.post("/api/agents/profiles/{profile_id}/reset")
 async def reset_agent_profile(profile_id: str, request: Request):
     """Reset a system agent profile to its factory defaults."""
-    from synapse.config import settings
-
-    if not settings.multi_agent_enabled:
-        raise HTTPException(status_code=400, detail="Multi-agent mode is not enabled")
-
     from synapse.agents.presets import get_preset_by_id
     from synapse.agents.profile import get_profile_store
 
@@ -645,11 +633,8 @@ class IdentityFileRequest(BaseModel):
     content: str = ""
 
 
-_ALLOWED_IDENTITY_FILES = frozenset({"SOUL.md", "AGENT.md", "USER.md", "MEMORY.md"})
-
-
 @router.post("/api/agents/profiles/{profile_id}/identity/init")
-async def init_profile_identity(profile_id: str):
+async def init_profile_identity(profile_id: str, request: Request):
     """Initialize the profile-specific identity directory."""
     from synapse.agents.profile import get_profile_store
 
@@ -667,13 +652,14 @@ async def init_profile_identity(profile_id: str):
     resolver = ProfileIdentityResolver(identity_dir, settings.identity_path)
     resolver.ensure_independent_files()
 
+    _invalidate_profile_runtime(request, profile_id, "profile identity init")
     return {"status": "ok", "identity_dir": str(identity_dir)}
 
 
 @router.get("/api/agents/profiles/{profile_id}/identity/{filename}")
 async def read_profile_identity_file(profile_id: str, filename: str):
     """Read a profile-specific identity file. Returns global content if profile has none."""
-    if filename not in _ALLOWED_IDENTITY_FILES:
+    if filename not in PROFILE_IDENTITY_FILENAMES:
         raise HTTPException(status_code=400, detail=f"Invalid identity file: {filename}")
 
     from synapse.agents.profile import get_profile_store
@@ -701,9 +687,14 @@ async def read_profile_identity_file(profile_id: str, filename: str):
 
 
 @router.put("/api/agents/profiles/{profile_id}/identity/{filename}")
-async def write_profile_identity_file(profile_id: str, filename: str, body: IdentityFileRequest):
+async def write_profile_identity_file(
+    profile_id: str,
+    filename: str,
+    body: IdentityFileRequest,
+    request: Request,
+):
     """Write a profile-specific identity file."""
-    if filename not in _ALLOWED_IDENTITY_FILES:
+    if filename not in PROFILE_IDENTITY_FILENAMES:
         raise HTTPException(status_code=400, detail=f"Invalid identity file: {filename}")
 
     from synapse.agents.profile import get_profile_store
@@ -720,6 +711,7 @@ async def write_profile_identity_file(profile_id: str, filename: str, body: Iden
     fp = identity_dir / filename
     fp.write_text(body.content, encoding="utf-8")
 
+    _invalidate_profile_runtime(request, profile_id, f"profile identity {filename} write")
     logger.info(f"[Agents API] Wrote identity file {filename} for profile {profile_id}")
     return {"status": "ok", "filename": filename}
 

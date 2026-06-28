@@ -36,6 +36,6 @@ Search for Agents on the Synapse Platform Agent Store.
 ## Fallback
 
 If the remote Agent Store is unavailable:
-- Local Agent import/export via `.akita-agent` files still works
+- Local Agent import/export via `.synapse-agent` files still works
 - Use `list_exportable_agents` to see local Agents
 - Suggest user retry later or check network

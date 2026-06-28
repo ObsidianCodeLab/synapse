@@ -1,6 +1,6 @@
 ---
 name: export-agent
-description: Export a local Agent profile as a portable .akita-agent package file. Use when user wants to share, backup, or distribute an Agent with its skills and configuration.
+description: Export a local Agent profile as a portable .synapse-agent package file. Use when user wants to share, backup, or distribute an Agent with its skills and configuration.
 system: true
 handler: agent_package
 tool-name: export_agent
@@ -9,7 +9,7 @@ category: Agent Package
 
 # Export Agent
 
-将本地 Agent 导出为 `.akita-agent` 包文件，包含 Agent 配置、提示词和捆绑技能。
+将本地 Agent 导出为 `.synapse-agent` 包文件，包含 Agent 配置、提示词和捆绑技能。
 
 ## Parameters
 
@@ -22,7 +22,7 @@ category: Agent Package
 
 ## Usage
 
-导出后的 `.akita-agent` 文件可以：
+导出后的 `.synapse-agent` 文件可以：
 - 发送给其他用户导入使用
 - 上传到 Agent Store 分享
 - 作为 Agent 备份

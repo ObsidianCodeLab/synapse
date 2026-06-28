@@ -37,7 +37,6 @@ export type SidebarProps = {
   isWeb?: boolean;
   mobileOpen?: boolean;
   httpApiBase?: string;
-  unreadFeedbackCount?: number;
   pendingApprovalsCount?: number;
 };
 
@@ -101,7 +100,7 @@ export function Sidebar({
   storeVisible,
   desktopVersion, backendVersion, serviceRunning,
   onBugReport, onRefreshStatus, isWeb, mobileOpen, httpApiBase,
-  unreadFeedbackCount, pendingApprovalsCount,
+  pendingApprovalsCount,
 }: SidebarProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -500,13 +499,6 @@ export function Sidebar({
                 >
                   <IconBug size={12} />
                   <span className="myFeedbackText" style={{ fontSize: 11 }}>{t("sidebar.myFeedback")}</span>
-                  {(unreadFeedbackCount ?? 0) > 0 && (
-                    <span style={{
-                      position: "absolute", top: -4, right: -6,
-                      width: 7, height: 7, borderRadius: "50%",
-                      background: "#ef4444",
-                    }} />
-                  )}
                 </span>
               </>
             )}
@@ -563,13 +555,6 @@ export function Sidebar({
                   style={{ color: view === "my_feedback" ? "var(--fg)" : "var(--accent, #5B8DEF)", opacity: view === "my_feedback" ? 1 : 0.5, display: "flex", cursor: "pointer", position: "relative" }}
                 >
                   <IconBug size={14} />
-                  {(unreadFeedbackCount ?? 0) > 0 && (
-                    <span style={{
-                      position: "absolute", top: -2, right: -2,
-                      width: 6, height: 6, borderRadius: "50%",
-                      background: "#ef4444",
-                    }} />
-                  )}
                 </span>
               </>
             )}

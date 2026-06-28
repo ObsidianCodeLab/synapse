@@ -25,7 +25,7 @@
  */
 (function () {
   if (typeof window === "undefined") return;
-  if (window.OpenAkitaMD) return;
+  if (window.SynapseMD) return;
 
   function escapeHtml(s) {
     return String(s == null ? "" : s)
@@ -148,5 +148,5 @@
     return out.join("\n");
   }
 
-  window.OpenAkitaMD = { render: render, escapeHtml: escapeHtml };
+  window.SynapseMD = { render: render, escapeHtml: escapeHtml };
 })();

@@ -6,7 +6,7 @@
  */
 
 export interface BridgeMessage {
-  __akita_bridge: true;
+  __synapse_bridge: true;
   version: number;
   type: string;
   requestId?: string;
@@ -36,7 +36,7 @@ function isBridgeMessage(data: unknown): data is BridgeMessage {
   return (
     typeof data === "object" &&
     data !== null &&
-    (data as BridgeMessage).__akita_bridge === true
+    (data as BridgeMessage).__synapse_bridge === true
   );
 }
 
@@ -187,9 +187,9 @@ export class PluginBridge {
     this._eventHandlers.clear();
   }
 
-  private _post(msg: Omit<BridgeMessage, "__akita_bridge" | "version">): void {
+  private _post(msg: Omit<BridgeMessage, "__synapse_bridge" | "version">): void {
     const full: BridgeMessage = {
-      __akita_bridge: true,
+      __synapse_bridge: true,
       version: PROTOCOL_VERSION,
       ...msg,
     };

@@ -441,10 +441,10 @@ class TestProfileStore:
         stale_path = profiles_dir / "default.json"
         stale_payload = {
             "id": "default",
-            "name": "中秋",
+            "name": "小鲸",
             "description": "新描述",
             "type": "system",
-            "name_i18n": {"zh": "小秋", "en": "Akita"},
+            "name_i18n": {"zh": "小鲸", "en": "Synapse"},
             "description_i18n": {"zh": "旧描述", "en": "Stale"},
         }
         stale_path.write_text(
@@ -455,15 +455,15 @@ class TestProfileStore:
         healed = store.get("default")
         assert healed is not None
         # 内存对象按 name 兜底回正
-        assert healed.name == "中秋"
-        assert healed.name_i18n["zh"] == "中秋"
+        assert healed.name == "小鲸"
+        assert healed.name_i18n["zh"] == "小鲸"
         # `en` 译名属于合法独立本地化，必须保留
-        assert healed.name_i18n["en"] == "Akita"
+        assert healed.name_i18n["en"] == "Synapse"
         assert healed.description_i18n["zh"] == "新描述"
         # 落盘也应回正，避免下次加载时再走一遍 heal
         on_disk = _json.loads(stale_path.read_text(encoding="utf-8"))
-        assert on_disk["name_i18n"]["zh"] == "中秋"
-        assert on_disk["name_i18n"]["en"] == "Akita"
+        assert on_disk["name_i18n"]["zh"] == "小鲸"
+        assert on_disk["name_i18n"]["en"] == "Synapse"
         assert on_disk["description_i18n"]["zh"] == "新描述"
 
     def test_load_does_not_heal_custom_profile_with_diverged_name_i18n_zh(
@@ -513,9 +513,9 @@ class TestProfileStore:
         path = profiles_dir / "default.json"
         payload = {
             "id": "default",
-            "name": "小秋",
+            "name": "小鲸",
             "type": "system",
-            "name_i18n": {"zh": "小秋", "en": "Akita"},
+            "name_i18n": {"zh": "小鲸", "en": "Synapse"},
         }
         raw_before = _json.dumps(payload, ensure_ascii=False)
         path.write_text(raw_before, encoding="utf-8")
@@ -991,11 +991,27 @@ class TestAgentOrchestrator:
     async def test_handle_message_routes_correctly(self, orchestrator, mock_pool):
         session = _make_session(agent_profile_id="default")
         result = await orchestrator.handle_message(session, "Hello")
-        # orchestrator 现在通过 ``DelegationResult.to_tool_response`` 给响应加结构化 header
-        # （``[任务完成通知] Agent: ... | 状态: ... | 耗时: ...`` + ``工具调用:`` 一行 + 原文）
-        # ，所以这里改为 substring 断言。
-        assert "Agent response" in result
+        assert result == "Agent response"
+        assert "任务完成通知" not in result
+        assert "工具调用:" not in result
         mock_pool.get_or_create.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_sub_agent_dispatch_keeps_structured_tool_response(self, orchestrator):
+        session = _make_session()
+
+        result = await orchestrator._dispatch(
+            session,
+            "sub task",
+            "helper",
+            depth=1,
+            from_agent="default",
+        )
+
+        assert "Agent response" in result
+        assert "任务完成通知" in result
+        assert "Agent:" in result
+        assert "工具调用: 0 次" in result
 
     @pytest.mark.asyncio
     async def test_handle_message_resets_delegation_chain(self, orchestrator):

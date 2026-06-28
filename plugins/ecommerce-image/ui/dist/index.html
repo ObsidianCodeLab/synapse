@@ -317,7 +317,7 @@ var _ctx = null, _caps = [], _pending = {}, _handlers = {};
 var _bridgeConnected = false;
 var _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -339,15 +339,15 @@ function directFetch(method, path, body) {
 }
 
 function apiCall(method, path, body) {
-  // Preferred: use the shared bootstrap.js bridge (window.OpenAkita.api) if it
+  // Preferred: use the shared bootstrap.js bridge (window.Synapse.api) if it
   // has finished its handshake. Falls back to the legacy inline postMessage
   // plumbing when bootstrap is present but not yet ready, and finally to
   // directFetch in dev / non-iframe mode. 5s timeout protects against a host
   // that accepts the message but never answers.
-  if (window.OpenAkita && typeof window.OpenAkita.api === "function" && window.OpenAkita.__ready) {
+  if (window.Synapse && typeof window.Synapse.api === "function" && window.Synapse.__ready) {
     var TIMEOUT_MARK = { __timeout: true };
     return Promise.race([
-      window.OpenAkita.api(method, path, body),
+      window.Synapse.api(method, path, body),
       new Promise(function(resolve) { setTimeout(function() { resolve(TIMEOUT_MARK); }, 5000); })
     ]).then(function(r) {
       if (r === TIMEOUT_MARK) return directFetch(method, path, body);
@@ -372,7 +372,7 @@ function pluginApi(method, path, body) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload; _bridgeConnected = true;
     if (_ctx.theme) document.documentElement.setAttribute("data-theme", _ctx.theme.includes("dark") ? "dark" : "light");
@@ -426,8 +426,8 @@ async function downloadAsset(taskId, idx, isVideo) {
 
 function showToast(body, type) {
   type = type || "success";
-  if (window.OpenAkita && typeof window.OpenAkita.notify === "function" && window.OpenAkita.__ready) {
-    try { window.OpenAkita.notify({ title: "", body: body, type: type }); return; } catch (_) { /* fall through */ }
+  if (window.Synapse && typeof window.Synapse.notify === "function" && window.Synapse.__ready) {
+    try { window.Synapse.notify({ title: "", body: body, type: type }); return; } catch (_) { /* fall through */ }
   }
   if (_inIframe && _bridgeConnected) { post({ type: "bridge:notification", payload: { title: "", body: body, type: type } }); return; }
   var toast = document.createElement("div");
@@ -462,10 +462,10 @@ const KNOWN_ICONS = new Set([
   "party","confetti","upload","clipboard","file","book",
   "target","check","close","palette","brush","film",
 ]);
-// Names whose ecommerce sprite has a same-meaning OpenAkitaIcons sibling.
+// Names whose ecommerce sprite has a same-meaning SynapseIcons sibling.
 // Render those via the shared UI Kit so all plugins use identical glyphs;
 // keep the inline sprite as authoritative source for the 19 ecommerce-only
-// icons that OpenAkitaIcons does not ship (clapperboard / camera / masks /
+// icons that SynapseIcons does not ship (clapperboard / camera / masks /
 // copy / package / images / layers / ruler / rocket / message / megaphone /
 // party / confetti / clipboard / file / arrow-left / detail / poster / flame).
 const OA_ICON_KEYS = {
@@ -476,8 +476,8 @@ const OA_ICON_KEYS = {
 function Ic({ name, className = "", size }) {
   const cls = "ic" + (size === "lg" ? " ic-lg" : size === "xl" ? " ic-xl" : "") + (className ? " " + className : "");
   const oaName = OA_ICON_KEYS[name];
-  if (oaName && typeof window !== "undefined" && window.OpenAkitaIcons && typeof window.OpenAkitaIcons[oaName] === "function") {
-    return <span className={cls + " oa-icon"} dangerouslySetInnerHTML={{ __html: window.OpenAkitaIcons[oaName]() }} />;
+  if (oaName && typeof window !== "undefined" && window.SynapseIcons && typeof window.SynapseIcons[oaName] === "function") {
+    return <span className={cls + " oa-icon"} dangerouslySetInnerHTML={{ __html: window.SynapseIcons[oaName]() }} />;
   }
   let id = name;
   if (id && !KNOWN_ICONS.has(id)) {
@@ -595,7 +595,7 @@ function ImageUpload({ value, onChange, label }) {
       ) : (
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           <span className="oa-icon" style={{fontSize:24,opacity:.6}}
-            dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.upload() : ""}} />
+            dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.upload() : ""}} />
           <div>{label || "点击或拖拽上传图片"}</div>
         </div>
       )}
@@ -663,7 +663,7 @@ function MultiImageUpload({ value, onChange, label, max }) {
         ) : (
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
             <span className="oa-icon" style={{fontSize:24,opacity:.6}}
-              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.upload() : ""}} />
+              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.upload() : ""}} />
             <div>{label || "点击或拖拽上传多张图片"}</div>
           </div>
         )}
@@ -796,7 +796,7 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
                 {optimizing[p.id]
                   ? <span className="spinner-sm" style={{width:11,height:11,borderWidth:1.5}} />
                   : <span className="oa-ai-btn__icon"
-                      dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.sparkles() : ""}} />}
+                      dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.sparkles() : ""}} />}
                 AI 优化
               </button>
             </div>
@@ -1998,7 +1998,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
         ) : (
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
-              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.sparkles() : ""}} />
+              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.sparkles() : ""}} />
             <div className="oa-preview-empty__title">选择一个功能开始创作</div>
             <div className="oa-preview-empty__hint">或查看历史记录</div>
           </div>
@@ -2106,7 +2106,7 @@ function TasksTab({ pluginApi }) {
         ) : (
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
-              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.listTask ? window.OpenAkitaIcons.listTask() : (window.OpenAkitaIcons.layers ? window.OpenAkitaIcons.layers() : "") : ""}} />
+              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask ? window.SynapseIcons.listTask() : (window.SynapseIcons.layers ? window.SynapseIcons.layers() : "") : ""}} />
             <div className="oa-preview-empty__title">未选择任务</div>
             <div className="oa-preview-empty__hint">从左侧列表选择一个任务查看详情</div>
           </div>
@@ -2273,7 +2273,7 @@ function App() {
         && !cfgMeta.has_dashscope_key && !cfgMeta.has_ark_key && (
         <div className="oa-config-banner" role="alert" style={{margin:"12px 16px 0",flexShrink:0}}>
           <span className="oa-icon oa-config-banner__icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>未配置 API Key</strong>
             <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>
@@ -2283,7 +2283,7 @@ function App() {
           <button className="oa-config-banner__action" type="button" onClick={() => setTab("settings")}>
             前往设置
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.arrowRight() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
         </div>
       )}
@@ -2351,7 +2351,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   <PluginErrorBoundary><App /></PluginErrorBoundary>
 );
 // Tell the host its loading overlay can dismiss now (no-op outside iframe).
-try { window.OpenAkita && window.OpenAkita.ready && window.OpenAkita.ready(); } catch (_) {}
+try { window.Synapse && window.Synapse.ready && window.Synapse.ready(); } catch (_) {}
 </script>
 </body>
 </html>

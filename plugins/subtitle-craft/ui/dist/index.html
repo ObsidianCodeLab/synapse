@@ -529,7 +529,7 @@ let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -591,12 +591,12 @@ function bridgeShowInFolder(path) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload; _bridgeConnected = true;
     if (_ctx.theme) document.documentElement.setAttribute("data-theme", _ctx.theme.includes("dark") ? "dark" : "light");
-    if (_ctx.locale && window.OpenAkitaI18n && window.OpenAkitaI18n.setLocale) {
-      window.OpenAkitaI18n.setLocale(_ctx.locale.startsWith("zh") ? "zh" : "en");
+    if (_ctx.locale && window.SynapseI18n && window.SynapseI18n.setLocale) {
+      window.SynapseI18n.setLocale(_ctx.locale.startsWith("zh") ? "zh" : "en");
     }
   }
   if (d.type === "bridge:handshake-ack" && d.payload) { _caps = d.payload.capabilities || []; _bridgeConnected = true; }
@@ -607,8 +607,8 @@ window.addEventListener("message", function(e) {
   if (d.type === "bridge:theme-change" && d.payload) {
     document.documentElement.setAttribute("data-theme", (d.payload.theme || "").includes("dark") ? "dark" : "light");
   }
-  if (d.type === "bridge:locale-change" && d.payload && window.OpenAkitaI18n && window.OpenAkitaI18n.setLocale) {
-    window.OpenAkitaI18n.setLocale((d.payload.locale || "").startsWith("zh") ? "zh" : "en");
+  if (d.type === "bridge:locale-change" && d.payload && window.SynapseI18n && window.SynapseI18n.setLocale) {
+    window.SynapseI18n.setLocale((d.payload.locale || "").startsWith("zh") ? "zh" : "en");
   }
   if (d.type === "bridge:event" && d.payload) {
     var h = _handlers[d.payload.eventType];
@@ -631,8 +631,8 @@ function uploadFile(file) {
 }
 
 function _tr(key, vars, fallback) {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.t) {
-    var v = window.OpenAkitaI18n.t(key, vars);
+  if (window.SynapseI18n && window.SynapseI18n.t) {
+    var v = window.SynapseI18n.t(key, vars);
     if (v && v !== key) return v;
   }
   if (fallback) {
@@ -705,13 +705,13 @@ console.log("[subtitle-craft] CDN loaded: React=" + typeof React + ", ReactDOM="
 console.log("[subtitle-craft] Babel script executing...");
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// Plugin-local SVG icon set — extends the shared OpenAkitaIcons registry
+// Plugin-local SVG icon set — extends the shared SynapseIcons registry
 // (icons.js, byte-identical across plugins) with a small handful of icons
 // the shared kit does not include yet. We add them via in-place patch so
-// `OpenAkitaIcons.subtitles()` etc. work the same as any other icon and
+// `SynapseIcons.subtitles()` etc. work the same as any other icon and
 // the patch is idempotent across hot reloads.
 (function patchIcons() {
-  if (!window.OpenAkitaIcons) return;
+  if (!window.SynapseIcons) return;
   function svg(inner) {
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
   }
@@ -719,8 +719,8 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
   // caption text bars inside. More representative of a subtitle tool
   // than the generic "mic" icon (which signals ASR only and misses the
   // translate / repair / burn modes).
-  if (!window.OpenAkitaIcons.subtitles) {
-    window.OpenAkitaIcons.subtitles = function () {
+  if (!window.SynapseIcons.subtitles) {
+    window.SynapseIcons.subtitles = function () {
       return svg(
         '<rect x="2.5" y="5" width="19" height="14" rx="2.5" ry="2.5"/>' +
         '<line x1="6" y1="11" x2="11" y2="11"/>' +
@@ -731,16 +731,16 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
     };
   }
   // Wrench / build — used in the "repair" mode tile
-  if (!window.OpenAkitaIcons.wrench) {
-    window.OpenAkitaIcons.wrench = function () {
+  if (!window.SynapseIcons.wrench) {
+    window.SynapseIcons.wrench = function () {
       return svg(
         '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/>'
       );
     };
   }
   // Translate / language — used in the "translate" mode tile
-  if (!window.OpenAkitaIcons.translate) {
-    window.OpenAkitaIcons.translate = function () {
+  if (!window.SynapseIcons.translate) {
+    window.SynapseIcons.translate = function () {
       return svg(
         '<path d="M4 5h7"/>' +
         '<path d="M9 3v2c0 4.42-2.69 8-6 8"/>' +
@@ -751,16 +751,16 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
     };
   }
   // Flame / burn — used in the "burn" mode tile
-  if (!window.OpenAkitaIcons.flame) {
-    window.OpenAkitaIcons.flame = function () {
+  if (!window.SynapseIcons.flame) {
+    window.SynapseIcons.flame = function () {
       return svg(
         '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'
       );
     };
   }
   // Package — system component card icon (mirror of seedance's I.package)
-  if (!window.OpenAkitaIcons.package) {
-    window.OpenAkitaIcons.package = function () {
+  if (!window.SynapseIcons.package) {
+    window.SynapseIcons.package = function () {
       return svg(
         '<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/>' +
         '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>' +
@@ -770,8 +770,8 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
     };
   }
   // Trash — uninstall button on system component card
-  if (!window.OpenAkitaIcons.trash) {
-    window.OpenAkitaIcons.trash = function () {
+  if (!window.SynapseIcons.trash) {
+    window.SynapseIcons.trash = function () {
       return svg(
         '<polyline points="3,6 5,6 21,6"/>' +
         '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
@@ -779,8 +779,8 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
     };
   }
   // Link — "open homepage" external link
-  if (!window.OpenAkitaIcons.link) {
-    window.OpenAkitaIcons.link = function () {
+  if (!window.SynapseIcons.link) {
+    window.SynapseIcons.link = function () {
       return svg(
         '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>' +
         '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
@@ -796,7 +796,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
   // that mode tiles / pills already use elsewhere.  Force-overwrites
   // (not guarded by `if (!...)`) so the hero always uses our mark even
   // if the host registry preloads a different ``subtitleCraft`` later.
-  window.OpenAkitaIcons.subtitleCraft = function () {
+  window.SynapseIcons.subtitleCraft = function () {
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ' +
         'fill="none" stroke="currentColor" stroke-width="1.7" ' +
@@ -825,13 +825,13 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
   };
 })();
 
-// Tiny inline icon helper — wraps OpenAkitaIcons in an `oa-icon` span so
+// Tiny inline icon helper — wraps SynapseIcons in an `oa-icon` span so
 // every icon usage stays consistent (16x16, currentColor). Falls back to
 // a no-op span if the icon name isn't registered, so a typo never breaks
 // the whole React tree.
 function OAIcon({ name, size }) {
-  const svg = window.OpenAkitaIcons && window.OpenAkitaIcons[name]
-    ? window.OpenAkitaIcons[name]() : "";
+  const svg = window.SynapseIcons && window.SynapseIcons[name]
+    ? window.SynapseIcons[name]() : "";
   const style = size ? { width: size, height: size } : undefined;
   return <span className="oa-icon" style={style}
                dangerouslySetInnerHTML={{__html: svg}} />;
@@ -1524,22 +1524,22 @@ const I18N_DICT = {
 // (_assets/i18n.js exposes `register` / `t` / `locale` / `onChange` —
 // NOT `registerDict` / `getLocale`, which were the original typos that
 // caused every visible label to render as the raw dot-notation key).
-if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.register === "function") {
-  window.OpenAkitaI18n.register(I18N_DICT);
+if (window.SynapseI18n && typeof window.SynapseI18n.register === "function") {
+  window.SynapseI18n.register(I18N_DICT);
 }
 
 function useT() {
   const [, force] = useState(0);
   useEffect(() => {
-    if (!window.OpenAkitaI18n || !window.OpenAkitaI18n.onChange) return;
-    return window.OpenAkitaI18n.onChange(() => force(n => n + 1));
+    if (!window.SynapseI18n || !window.SynapseI18n.onChange) return;
+    return window.SynapseI18n.onChange(() => force(n => n + 1));
   }, []);
   return useCallback((key, vars) => _tr(key, vars, key), []);
 }
 
 function useLocale() {
   const _read = () => {
-    const i = window.OpenAkitaI18n;
+    const i = window.SynapseI18n;
     if (!i) return "zh";
     if (typeof i.locale === "function") return i.locale() || "zh";
     if (typeof i.getLocale === "function") return i.getLocale() || "zh";
@@ -1547,8 +1547,8 @@ function useLocale() {
   };
   const [loc, setLoc] = useState(_read);
   useEffect(() => {
-    if (!window.OpenAkitaI18n || !window.OpenAkitaI18n.onChange) return;
-    return window.OpenAkitaI18n.onChange(() => setLoc(_read()));
+    if (!window.SynapseI18n || !window.SynapseI18n.onChange) return;
+    return window.SynapseI18n.onChange(() => setLoc(_read()));
   }, []);
   return loc;
 }
@@ -1751,7 +1751,7 @@ function App() {
         <div className="oa-config-banner" role="alert"
              style={{margin:"12px 16px 0", flexShrink:0}}>
           <span className="oa-icon oa-config-banner__icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{t("banner.noKey.title")}</strong>
             <div style={{fontSize:12, color:"var(--text-muted)", marginTop:2}}>
@@ -1762,7 +1762,7 @@ function App() {
                   onClick={() => goToTab("settings")}>
             {t("banner.noKey.cta")}
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.arrowRight() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
         </div>
       )}
@@ -2359,7 +2359,7 @@ function CreateTab({ apiReady, goToTasks }) {
             <div className="oa-preview-card__head">
               <h3 className="oa-preview-card__title">
                 <span className="oa-preview-card__title-chip"
-                      dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons && window.OpenAkitaIcons.sparkles ? window.OpenAkitaIcons.sparkles() : ""}} />
+                      dangerouslySetInnerHTML={{__html: window.SynapseIcons && window.SynapseIcons.sparkles ? window.SynapseIcons.sparkles() : ""}} />
                 {t("create.preview.title")}
               </h3>
               <button className={"oa-preview-card__refresh" + (costRefreshing ? " is-spinning" : "")}
@@ -3869,8 +3869,8 @@ try {
     '<div style="padding:24px;color:#ef4444"><b>[subtitle-craft mount error]</b><pre style="margin-top:8px;white-space:pre-wrap;font-size:11px">' +
     (mountErr && mountErr.stack ? mountErr.stack : String(mountErr)) + '</pre></div>';
 }
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
 </script>
 

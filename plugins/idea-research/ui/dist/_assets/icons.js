@@ -73,6 +73,6 @@
 
   function get(name) { return ICONS[name] || ""; }
 
-  window.OpenAkita = window.OpenAkita || {};
-  window.OpenAkita.icons = { get: get, list: Object.keys(ICONS) };
+  window.Synapse = window.Synapse || {};
+  window.Synapse.icons = { get: get, list: Object.keys(ICONS) };
 })();

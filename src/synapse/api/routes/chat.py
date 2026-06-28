@@ -788,19 +788,19 @@ async def _stream_chat(
                 pass
         return False
 
-    # ── C17 Phase B.1/B.2: SSE replay session ──
+    # ── SSE replay session ──
     # 每个 conversation_id 对应一个 SSESession（per-session ringbuffer +
-    # 单调 seq）。客户端断线后 ``fetch /api/chat`` 带 ``Last-Event-ID``
-    # header 时，我们先 flush ringbuffer 里 seq > last_seq 的事件再接
-    # active 流。新连接（没带 Last-Event-ID）则 seq 从已有计数继续累加，
-    # 客户端要么从 0 开始接（首次 fetch），要么自己处理 dedup。
+    # 单调 seq）。每条 SSE event 都会 ``add_event`` 进 ringbuffer 并带一行
+    # ``id: <seq>``，供断点续传去重。ringbuffer 与 seq 是 per-conversation、
+    # 跨 turn 持续累积的，所以本函数（= 一个全新 turn）在下方 try 块开头会调
+    # ``begin_turn()`` 把 replay floor 推到当前 max seq——确保后续的
+    # ``/api/chat/resume`` 只能 replay 本 turn 内的事件，绝不会把上一 turn 已
+    # 完成的尾巴（最终答复）回放到新 turn 里。
+    # POST 本身不做任何 replay：一条全新消息不是断点重连。
     # 注意：``conversation_id`` 在下方 try 块里才会被赋值（包含 uuid 补全
     # 逻辑），这里直接读 ``chat_request.conversation_id``——足够当 session
-    # key；如果用户传空字符串就降级回不带 replay 的旧行为。
-    from ...core.sse_replay import (
-        format_sse_frame,
-        parse_last_event_id,
-    )
+    # key；如果用户传空字符串就降级回不带 ringbuffer 的旧行为。
+    from ...core.sse_replay import format_sse_frame
     from ...core.sse_replay import (
         get_registry as _get_sse_registry,
     )
@@ -811,14 +811,6 @@ async def _stream_chat(
         if _sse_conv_key
         else None
     )
-
-    _last_event_id_header = None
-    if http_request is not None:
-        try:
-            _last_event_id_header = http_request.headers.get("last-event-id")
-        except Exception:
-            _last_event_id_header = None
-    _last_event_id = parse_last_event_id(_last_event_id_header)
 
     def _sse(event_type: str, data: dict | None = None) -> str:
         nonlocal _reply_chars, _reply_preview, _full_reply, _chain_reply, _done_sent
@@ -871,28 +863,23 @@ async def _stream_chat(
     conversation_id = chat_request.conversation_id or ""
 
     try:
-        # ── C17 Phase B.2: replay buffered events for reconnecting clients ──
-        # When the client sets ``Last-Event-ID``, flush ringbuffer events
-        # with ``seq > last_seq`` **before** anything new. These frames
-        # carry their original seq so the client can dedup based on
-        # ``seenSequenceNums``; we don't push them back into the buffer
-        # (they're already there) and don't bump _reply_chars / preview
-        # (those state vars only reflect the *new* turn we're about to
-        # generate).
-        if _sse_session is not None and _last_event_id is not None:
-            _missed = _sse_session.replay_from(_last_event_id)
-            if _missed:
-                logger.info(
-                    "[Chat API] replaying %d SSE event(s) for conv=%s after "
-                    "Last-Event-ID=%s",
-                    len(_missed),
-                    conversation_id,
-                    _last_event_id,
-                )
-                for evt in _missed:
-                    yield format_sse_frame(
-                        evt, data_json=json.dumps(evt.payload, ensure_ascii=False)
-                    )
+        # ── Turn-scoped replay floor (cross-turn replay guard) ──
+        # A POST /api/chat ALWAYS starts a brand-new turn. The per-conversation
+        # ringbuffer + monotonic seq persist across turns, so we seal a fresh
+        # replay scope here by advancing the session's floor to the current max
+        # seq. From now on any /api/chat/resume (or a stale Last-Event-ID from
+        # some other client) can only replay events generated DURING this turn —
+        # never the tail of a previous, completed turn. That is what stops a
+        # finished turn's answer from being replayed on top of the next
+        # question (the bug users hit after backgrounding mid-stream).
+        #
+        # We deliberately do NOT replay anything on the POST itself: a new turn
+        # is not a reconnect. The official client no longer sends Last-Event-ID
+        # on POST, and reconnect / catch-up is handled out-of-band by
+        # ``attemptRecovery`` (REST history) and GET /api/chat/resume (which
+        # re-attaches WITHIN the active turn and is now floor-clamped too).
+        if _sse_session is not None:
+            _sse_session.begin_turn()
 
         # Yield an SSE comment keepalive before Agent resolution.
         # Agent lazy-init (Brain/tools/memory/prompt) can take several
@@ -2048,10 +2035,27 @@ async def chat(request: Request, body: ChatRequest):
     # before falling back to 409.  Header X-Synapse-DoubleTexting can
     # override per request (used by frontend "force interrupt" button when
     # double_texting_allow_interrupt is enabled).
-    from .double_texting import resolve_policy
+    from .double_texting import DoubleTextingPolicy, resolve_policy
 
-    _dt_header = request.headers.get("x-openakita-doubletexting")
+    _dt_header = request.headers.get("x-synapse-doubletexting")
     _dt_policy = resolve_policy(channel="desktop", header_value=_dt_header)
+
+    # STEER hands the new message to the running ReAct loop via
+    # insert_user_message, which is text-only.  If this request carries
+    # attachments, steering would silently drop them — so downgrade to
+    # QUEUE here and let the message run as its own turn (with the
+    # attachments intact) once the current turn settles.  The frontend
+    # makes the same decision client-side, but a desktop client on an
+    # older build (or any non-desktop caller) could still POST attachments
+    # under a STEER policy, so we must guard the backend too.
+    if _dt_policy is DoubleTextingPolicy.STEER and body.attachments:
+        logger.info(
+            "[Chat API] STEER downgraded to QUEUE: conv=%s carries %d "
+            "attachment(s) that cannot be steered into the running turn.",
+            conversation_id,
+            len(body.attachments),
+        )
+        _dt_policy = DoubleTextingPolicy.QUEUE
 
     lifecycle = get_lifecycle_manager()
     busy_gen = 0
@@ -2143,7 +2147,12 @@ async def chat(request: Request, body: ChatRequest):
         ):
             from synapse.config import settings
 
-            _queue_timeout_s = max(0.5, settings.preempt_settle_timeout_ms / 1000.0)
+            # Queue wait uses its own (generous) timeout — NOT
+            # preempt_settle_timeout_ms.  Waiting for a still-running
+            # predecessor turn to finish naturally can legitimately take
+            # minutes; the 6s settle window is for cancelled tasks, not for
+            # queued ones.  Decoupling these is what stops "排队超过 6s 报错".
+            _queue_timeout_s = max(0.5, settings.queue_wait_timeout_ms / 1000.0)
             _queued_after_gen = start_result.queued_after_generation
             logger.info(
                 "[Chat API] QUEUE wait conv=%s after gen=%d (timeout=%.1fs)",
@@ -2162,7 +2171,7 @@ async def chat(request: Request, body: ChatRequest):
                             "type": "queued",
                             "conversation_id": conversation_id,
                             "after_generation": _queued_after_gen,
-                            "timeout_ms": settings.preempt_settle_timeout_ms,
+                            "timeout_ms": settings.queue_wait_timeout_ms,
                         },
                         ensure_ascii=False,
                     )
@@ -2207,7 +2216,7 @@ async def chat(request: Request, body: ChatRequest):
                                 "type": "error",
                                 "error": "queue_timeout",
                                 "message": (
-                                    f"等待上一次任务结束超过 {settings.preempt_settle_timeout_ms}ms，"
+                                    f"等待上一次任务结束超过 {settings.queue_wait_timeout_ms}ms，"
                                     "请稍后重试或显式取消上一次任务。"
                                 ),
                             },

@@ -2121,7 +2121,7 @@ export function OrgEditorView({
             <input
               ref={orgImportRef}
               type="file"
-              accept=".json,.akita-org"
+              accept=".json,.synapse-org"
               style={{ display: "none" }}
               onChange={handleImportOrg}
             />

@@ -509,6 +509,25 @@ class TaskState:
             self.pending_user_inserts.clear()
             return msgs
 
+    @staticmethod
+    def build_user_insert_message(text: str) -> dict:
+        """把一条用户插入消息包装成可追加进 working_messages 的 user 消息。
+
+        单一来源：post-tool drain（:meth:`process_post_tool_signals`）和
+        final-answer done-drain（reasoning_engine 在循环终止前的二次 drain）
+        都用这同一段措辞，避免两处文案漂移。
+        """
+        return {
+            "role": "user",
+            "content": (
+                f"[用户插入消息] {text}\n"
+                "[系统提示] 以上是用户在任务执行期间插入的消息。"
+                "请判断: 1) 这是对当前任务的补充（融入决策继续）"
+                "还是 2) 一个全新任务（告知用户收到，完成当前任务后执行）。"
+                "如不确定，使用 ask_user 工具向用户确认。"
+            ),
+        }
+
     async def process_post_tool_signals(self, working_messages: list[dict]) -> None:
         """工具执行后的统一信号处理：skip 反思提示 + 用户插入消息注入。
 
@@ -537,18 +556,7 @@ class TaskState:
         # 2) 检查用户插入消息
         _inserts = await self.drain_user_inserts()
         for _ins_text in _inserts:
-            working_messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        f"[用户插入消息] {_ins_text}\n"
-                        "[系统提示] 以上是用户在任务执行期间插入的消息。"
-                        "请判断: 1) 这是对当前任务的补充（融入决策继续）"
-                        "还是 2) 一个全新任务（告知用户收到，完成当前任务后执行）。"
-                        "如不确定，使用 ask_user 工具向用户确认。"
-                    ),
-                }
-            )
+            working_messages.append(self.build_user_insert_message(_ins_text))
             logger.info(f"[UserInsert] Injected user insert into context: {_ins_text[:60]}")
 
     def reset_for_model_switch(self) -> None:

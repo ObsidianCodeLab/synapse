@@ -1600,10 +1600,10 @@ const I18N_DICT = {
   },
 };
 
-if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.register === "function") {
-  window.OpenAkitaI18n.register(I18N_DICT);
+if (window.SynapseI18n && typeof window.SynapseI18n.register === "function") {
+  window.SynapseI18n.register(I18N_DICT);
 }
-const _i18n = (window.OpenAkitaI18n && window.OpenAkitaI18n.api) || {
+const _i18n = (window.SynapseI18n && window.SynapseI18n.api) || {
   t: function (k) { var d = I18N_DICT.zh; return (d && d[k]) || k; },
   locale: function () { return "zh"; },
 };
@@ -1641,8 +1641,8 @@ function useT() {
   const [, setTick] = useState(0);
   useEffect(function () {
     function onLoc() { setTick(function (n) { return n + 1; }); }
-    window.addEventListener("openakita:locale-change", onLoc);
-    return function () { window.removeEventListener("openakita:locale-change", onLoc); };
+    window.addEventListener("synapse:locale-change", onLoc);
+    return function () { window.removeEventListener("synapse:locale-change", onLoc); };
   }, []);
   return function (k) { return _i18n.t(k); };
 }
@@ -1651,7 +1651,7 @@ function useT() {
 const TAB_IDS = ["today", "digests", "radar", "settings"];
 const TAB_ICONS = { today: "news", digests: "doc", radar: "radar", settings: "cog" };
 
-/* ── Icon shim — binds to window.OpenAkitaIcons (from icons.js).
+/* ── Icon shim — binds to window.SynapseIcons (from icons.js).
    Short aliases keep call-sites terse while the bundle stays ~3KB. */
 const ICON_ALIAS = {
   /* tabs */
@@ -1687,7 +1687,7 @@ function Ico(props) {
   if (ICONIFY_SVG[name]) {
     return <span className="oa-icon" dangerouslySetInnerHTML={{__html: ICONIFY_SVG[name]}} />;
   }
-  const lib = window.OpenAkitaIcons;
+  const lib = window.SynapseIcons;
   if (lib) {
     const key = (typeof lib[name] === "function") ? name
               : (typeof lib[ICON_ALIAS[name]] === "function") ? ICON_ALIAS[name] : "";
@@ -1796,8 +1796,8 @@ function _normalizeBridgeApiResult(res) {
 }
 async function api(method, path, body) {
   const fullPath = _finPulsePath(path);
-  if (window.OpenAkita && typeof window.OpenAkita.api === "function") {
-    const res = await window.OpenAkita.api(method, fullPath, body);
+  if (window.Synapse && typeof window.Synapse.api === "function") {
+    const res = await window.Synapse.api(method, fullPath, body);
     return _normalizeBridgeApiResult(res);
   }
   const resp = await fetch(fullPath, {
@@ -2054,13 +2054,13 @@ window.oaConfirm = function (opts) {
 };
 window.oaToast = function (opts) {
   try {
-    if (window.OpenAkita && typeof window.OpenAkita.notify === "function") {
+    if (window.Synapse && typeof window.Synapse.notify === "function") {
       const level = (opts && opts.level) || "info";
       const message = (opts && opts.message) || "";
       /* Host PluginAppHost.handleNotification consumes `{type, body}`.
          Keep `{level, message}` for backward compatibility with any
          older bridges. */
-      window.OpenAkita.notify({
+      window.Synapse.notify({
         type: level,
         body: message,
         level: level,
@@ -5645,7 +5645,7 @@ function App() {
 
   /* theme sync from host ctx */
   useEffect(function () {
-    return onEvent("openakita:theme-change", function (d) {
+    return onEvent("synapse:theme-change", function (d) {
       const theme = (d && d.theme) || "light";
       document.documentElement.setAttribute("data-theme", theme.indexOf("dark") >= 0 ? "dark" : "light");
     });
@@ -5731,8 +5731,8 @@ class PluginErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <PluginErrorBoundary><App /></PluginErrorBoundary>
 );
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
   </script>
 </body>

@@ -1,4 +1,4 @@
 (function () {
-  window.OpenAkitaPlugin = window.OpenAkitaPlugin || {};
-  window.OpenAkitaPlugin.apiBase = window.OpenAkitaPlugin.apiBase || "/api/plugins/media-strategy";
+  window.SynapsePlugin = window.SynapsePlugin || {};
+  window.SynapsePlugin.apiBase = window.SynapsePlugin.apiBase || "/api/plugins/media-strategy";
 })();

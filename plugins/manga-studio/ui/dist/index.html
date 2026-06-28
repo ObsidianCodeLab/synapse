@@ -979,7 +979,7 @@ let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -1026,7 +1026,7 @@ function pluginApi(method, path, body) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload;
     _bridgeConnected = true;
@@ -1767,8 +1767,8 @@ const I18N = {
 };
 
 function _detectLang() {
-  if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.getLocale === "function") {
-    var loc = (window.OpenAkitaI18n.getLocale() || "zh").toLowerCase();
+  if (window.SynapseI18n && typeof window.SynapseI18n.getLocale === "function") {
+    var loc = (window.SynapseI18n.getLocale() || "zh").toLowerCase();
     return loc.startsWith("zh") ? "zh" : "en";
   }
   try {
@@ -1827,8 +1827,8 @@ function App() {
   // Subscribe to host language changes (kept in sync with the rest of the
   // app — no per-plugin language toggle, that's a host-level concern).
   useEffect(function() {
-    if (window.OpenAkitaI18n && typeof window.OpenAkitaI18n.subscribe === "function") {
-      return window.OpenAkitaI18n.subscribe(function(loc) {
+    if (window.SynapseI18n && typeof window.SynapseI18n.subscribe === "function") {
+      return window.SynapseI18n.subscribe(function(loc) {
         setLang((loc || "zh").toLowerCase().startsWith("zh") ? "zh" : "en");
       });
     }

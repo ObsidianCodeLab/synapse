@@ -58,6 +58,15 @@ rg "InternalSkills|internal\"|label:" apps/setup-center/src/views/SkillManager.t
 
 ---
 
+## 上游合并保护项：Inbox 统一服务推送（v1.27.21）
+
+- **推送 API**：`POST /api/inbox/push`（见 `src/synapse/api/routes/inbox.py`）
+- **配置**：`inbox_push_enabled`、`inbox_push_token`（`config.py`）；默认不拉 upstream L0/L1
+- **前端**：Topbar 角标 + `InboxView` 对话框；WS 事件 `inbox:new_message` / `inbox:unread_changed`
+- **禁止**：修改 `tauri.conf.json` 的 `plugins.updater` endpoints/pubkey
+
+---
+
 1. **提交前**：用根目录 skill `synapse-localized-sync` 中的「提交前：setup-center DIFF 回写」步骤，对 `apps/setup-center/` 跑 `git diff` / `git diff --cached` / 未跟踪列表，更新上表「当前未提交批次」；无待提交改动时可删除该节或改为「（无）」。  
 2. **合并进 main 后**：将已上线行为吸收进仓库根 `DIFF.md` 对应小节（若属于长期与上游差异），并精简本节重复描述。
 

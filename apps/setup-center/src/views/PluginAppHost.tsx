@@ -144,7 +144,7 @@ export default function PluginAppHost({ pluginId, apiBase, onViewChange }: Plugi
     const onBridgeReady = (e: MessageEvent) => {
       if (e.source !== iframe.contentWindow) return;
       const d = e.data;
-      if (!d || d.__akita_bridge !== true) return;
+      if (!d || d.__synapse_bridge !== true) return;
       // Mark "bridge connected" on either handshake message — but do NOT
       // dismiss the overlay yet, because handshake fires at DOMContentLoaded,
       // i.e. before SPAs render their first frame.

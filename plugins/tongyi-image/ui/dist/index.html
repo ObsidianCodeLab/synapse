@@ -177,7 +177,7 @@ let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
 const _inIframe = window.parent !== window;
 function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-function post(msg) { if (_inIframe) window.parent.postMessage({ __akita_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
+function post(msg) { if (_inIframe) window.parent.postMessage({ __synapse_bridge: true, version: BRIDGE_VER, ...msg }, "*"); }
 
 function _detectApiBase() {
   if (_ctx && _ctx.apiBase) return _ctx.apiBase;
@@ -246,7 +246,7 @@ function bridgeShowInFolder(path) {
 
 window.addEventListener("message", function(e) {
   var d = e.data;
-  if (!d || !d.__akita_bridge) return;
+  if (!d || !d.__synapse_bridge) return;
   if (d.type === "bridge:init" && d.payload) {
     _ctx = d.payload; _bridgeConnected = true;
     if (_ctx.theme) document.documentElement.setAttribute("data-theme", _ctx.theme.includes("dark") ? "dark" : "light");
@@ -280,11 +280,11 @@ function uploadFile(file) {
 }
 
 // i18n shim for the bridge layer (which runs BEFORE the babel script
-// registers its dictionary). We look up window.OpenAkitaI18n.t at call
+// registers its dictionary). We look up window.SynapseI18n.t at call
 // time so we always pick up the latest dictionary registered later.
 function _tr(key, vars, fallback) {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.t) {
-    var v = window.OpenAkitaI18n.t(key, vars);
+  if (window.SynapseI18n && window.SynapseI18n.t) {
+    var v = window.SynapseI18n.t(key, vars);
     if (v && v !== key) return v;
   }
   if (fallback) {
@@ -714,9 +714,9 @@ const I18N_DICT = {
 // helper failed to load (e.g. dev preview without backend) we still fall
 // back to a built-in micro-implementation so the UI never crashes.
 const _i18n = (function () {
-  if (window.OpenAkitaI18n && window.OpenAkitaI18n.register) {
-    window.OpenAkitaI18n.register(I18N_DICT);
-    return window.OpenAkitaI18n;
+  if (window.SynapseI18n && window.SynapseI18n.register) {
+    window.SynapseI18n.register(I18N_DICT);
+    return window.SynapseI18n;
   }
   // Defensive fallback: keep the same .t / .onChange / .locale shape.
   let loc = (navigator && navigator.language) || "zh";
@@ -773,9 +773,9 @@ function modeList(t) {
   return MODE_DEFS.map(m => ({ id: m.id, iconKey: m.iconKey, name: t("modes." + m.id) }));
 }
 
-// Inline SVG icon helper (uses window.OpenAkitaIcons loaded from _assets/icons.js).
+// Inline SVG icon helper (uses window.SynapseIcons loaded from _assets/icons.js).
 function OAIcon({ name, style }) {
-  const svg = (window.OpenAkitaIcons && window.OpenAkitaIcons[name]) ? window.OpenAkitaIcons[name]() : "";
+  const svg = (window.SynapseIcons && window.SynapseIcons[name]) ? window.SynapseIcons[name]() : "";
   return <span className="oa-icon" style={style} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
@@ -880,7 +880,7 @@ function App() {
         <div className="oa-config-banner" role="alert"
              style={{margin:"12px 20px 0", flexShrink:0}}>
           <span className="oa-icon oa-config-banner__icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{t("banner.noKey.title")}</strong>
             <div style={{fontSize:12, color:"var(--text-muted)", marginTop:2}}>
@@ -891,7 +891,7 @@ function App() {
                   onClick={() => setTab("settings")}>
             {t("banner.noKey.cta")}
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.arrowRight() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
         </div>
       )}
@@ -1173,7 +1173,7 @@ function CreateTab({ apiReady, goToTasks }) {
                     {optimizing
                       ? <span className="spinner-sm" style={{width:11, height:11, borderWidth:1.5}} />
                       : <span className="oa-ai-btn__icon"
-                              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.sparkles() : ""}} />}
+                              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.sparkles() : ""}} />}
                     {t("create.aiOptimize")}
                   </button>
                 )}
@@ -1312,7 +1312,7 @@ function CreateTab({ apiReady, goToTasks }) {
             {creating ? <><span className="spinner-sm" /> {t("create.btn.generating")}</> : (
               <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
                 <span className="oa-icon"
-                      dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? (mode === "ecommerce" ? window.OpenAkitaIcons.cart() : window.OpenAkitaIcons.sparkles()) : ""}} />
+                      dangerouslySetInnerHTML={{__html: window.SynapseIcons ? (mode === "ecommerce" ? window.SynapseIcons.cart() : window.SynapseIcons.sparkles()) : ""}} />
                 {mode === "ecommerce" ? t("create.btn.ecommerceSuite", { n: ecScenes.length }) : t("create.btn.start")}
               </span>
             )}
@@ -1327,7 +1327,7 @@ function CreateTab({ apiReady, goToTasks }) {
               <div className="flex items-center justify-between" style={{marginBottom: 12}}>
                 <span className="card-title" style={{marginBottom: 0, display:"inline-flex", alignItems:"center", gap:6}}>
                   <span className="oa-icon"
-                        dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.cart() : ""}} />
+                        dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.cart() : ""}} />
                   {t("preview.ec.title")}
                 </span>
                 <span className="text-xs text-dim">{t("preview.ec.totalCount", { n: ecResults.total })}</span>
@@ -1386,7 +1386,7 @@ function CreateTab({ apiReady, goToTasks }) {
                   <span className="text-sm text-muted">{t("preview.result.runningHint")}</span>
                   <button className="btn btn-sm" style={{marginTop: 12, display:"inline-flex", alignItems:"center", gap:6}} onClick={goToTasks}>
                     <span className="oa-icon"
-                          dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.listTask() : ""}} />
+                          dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask() : ""}} />
                     {t("preview.result.viewInTasks")}
                   </button>
                 </div>
@@ -1415,7 +1415,7 @@ function CreateTab({ apiReady, goToTasks }) {
                 ) : (
                   <div className="empty-state" style={{padding: "30px 20px"}}>
                     <span className="oa-icon" style={{fontSize: 28, marginBottom: 8, opacity: .5, color:"var(--success)"}}
-                          dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.check() : ""}} />
+                          dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.check() : ""}} />
                     <span className="text-sm text-muted">{t("preview.result.completedNoImages")}</span>
                     <button className="btn btn-sm" style={{marginTop: 8, display:"inline-flex", alignItems:"center", gap:6}} onClick={() => {
                       pluginApi("GET", "/tasks/" + result.id).then(r => {
@@ -1423,12 +1423,12 @@ function CreateTab({ apiReady, goToTasks }) {
                       });
                     }}>
                       <span className="oa-icon"
-                            dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.refresh() : ""}} />
+                            dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.refresh() : ""}} />
                       {t("preview.result.refreshResult")}
                     </button>
                     <button className="btn btn-sm" style={{marginTop: 4, display:"inline-flex", alignItems:"center", gap:6}} onClick={goToTasks}>
                       <span className="oa-icon"
-                            dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.listTask() : ""}} />
+                            dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask() : ""}} />
                       {t("preview.result.viewInTasks")}
                     </button>
                   </div>
@@ -1438,7 +1438,7 @@ function CreateTab({ apiReady, goToTasks }) {
               {result.status === "failed" && (
                 <div className="empty-state" style={{padding: "40px 20px"}}>
                   <span className="oa-icon text-danger" style={{fontSize: 32, marginBottom: 8}}
-                        dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.close() : ""}} />
+                        dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.close() : ""}} />
                   <span className="text-sm text-danger">{result.error_message || t("preview.result.genFailed")}</span>
                 </div>
               )}
@@ -1453,7 +1453,7 @@ function CreateTab({ apiReady, goToTasks }) {
         ) : (
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? (mode === "ecommerce" ? window.OpenAkitaIcons.cart() : window.OpenAkitaIcons.image()) : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? (mode === "ecommerce" ? window.SynapseIcons.cart() : window.SynapseIcons.image()) : ""}} />
             <div className="oa-preview-empty__title">
               {mode === "ecommerce" ? t("preview.empty.ecommerce.title") : t("preview.empty.text2img.title")}
             </div>
@@ -1601,7 +1601,7 @@ function TasksTab({ refreshSignal = 0 }) {
           ) : tasks.length === 0 ? (
             <div className="oa-preview-empty" style={{minHeight: 160, padding: "24px 16px"}}>
               <span className="oa-preview-empty__icon"
-                    dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.listTask() : ""}} />
+                    dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask() : ""}} />
               <div className="oa-preview-empty__title">{t("tasks.empty.title")}</div>
               <div className="oa-preview-empty__hint">{t("tasks.empty.hint")}</div>
             </div>
@@ -1680,13 +1680,13 @@ function TasksTab({ refreshSignal = 0 }) {
                 ) : (
                   <div className="empty-state" style={{padding: "30px 20px"}}>
                     <span className="oa-icon" style={{fontSize: 28, marginBottom: 8, opacity: .5, color:"var(--success)"}}
-                          dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.check() : ""}} />
+                          dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.check() : ""}} />
                     <span className="text-sm text-muted">{t("tasks.detail.completedNoImages")}</span>
                     {selected.api_task_id && (
                       <button className="btn btn-sm btn-primary" style={{marginTop: 8, display:"inline-flex", alignItems:"center", gap:6}}
                               onClick={() => handleRecheck(selected.id)}>
                         <span className="oa-icon"
-                              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.refresh() : ""}} />
+                              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.refresh() : ""}} />
                         {t("tasks.detail.recheck")}
                       </button>
                     )}
@@ -1726,7 +1726,7 @@ function TasksTab({ refreshSignal = 0 }) {
         ) : (
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.listTask() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask() : ""}} />
             <div className="oa-preview-empty__title">{t("tasks.empty.noSelection.title")}</div>
             <div className="oa-preview-empty__hint">{t("tasks.empty.noSelection.hint")}</div>
           </div>
@@ -1773,7 +1773,7 @@ function GuideTab() {
 
   const guideIcon = (name) => (
     <span className="oa-icon" style={{color:"var(--primary)", marginRight:6, fontSize:15}}
-          dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? (window.OpenAkitaIcons[name] ? window.OpenAkitaIcons[name]() : "") : ""}} />
+          dangerouslySetInnerHTML={{__html: window.SynapseIcons ? (window.SynapseIcons[name] ? window.SynapseIcons[name]() : "") : ""}} />
   );
 
   return (
@@ -1873,7 +1873,7 @@ function Collapsible({ title, children, defaultOpen }) {
       <div className="collapsible-header" onClick={() => setOpen(!open)}>
         <span style={{display:"inline-flex", alignItems:"center"}}>{title}</span>
         <span className="arrow oa-icon"
-              dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.chevronRight() : "&#9656;"}} />
+              dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.chevronRight() : "&#9656;"}} />
       </div>
       <div className="collapsible-body">{children}</div>
     </div>
@@ -1919,7 +1919,7 @@ function SettingsTab({ onApiKeyChange }) {
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.key() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.key() : ""}} />
           {t("settings.api.title")}
         </h3>
         <div className={"form-row" + (config.dashscope_api_key ? "" : " oa-config-field-callout")}
@@ -1983,7 +1983,7 @@ function SettingsTab({ onApiKeyChange }) {
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.settings() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.settings() : ""}} />
           {t("settings.defaults.title")}
         </h3>
         <div className="grid-2">
@@ -2037,7 +2037,7 @@ function SettingsTab({ onApiKeyChange }) {
         <div className="setting-section oa-settings-section">
           <h3 className="oa-settings-section__title">
             <span className="oa-icon"
-                  dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.folder() : ""}} />
+                  dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.folder() : ""}} />
             {t("settings.storage.title")}
           </h3>
           {Object.entries(stats).map(([k, v]) => (
@@ -2092,7 +2092,7 @@ class PluginErrorBoundary extends React.Component {
       <div style={{padding: 24, maxWidth: 820, margin: "0 auto"}}>
         <div className="oa-config-banner" role="alert" style={{borderColor: "var(--danger, #ef4444)"}}>
           <span className="oa-icon oa-config-banner__icon" style={{color: "var(--danger, #ef4444)"}}
-                dangerouslySetInnerHTML={{__html: window.OpenAkitaIcons ? window.OpenAkitaIcons.warning() : ""}} />
+                dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
             <strong>{tr("err.title")}</strong>
             <div style={{fontSize: 12, color: "var(--text-muted)", marginTop: 4}}>
@@ -2124,8 +2124,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 // Tell the host we have rendered the first frame so it can dismiss the
 // loading overlay accurately (instead of guessing from iframe.onLoad,
 // which fires before Babel-standalone compiles this script).
-if (window.OpenAkita && typeof window.OpenAkita.ready === "function") {
-  window.OpenAkita.ready();
+if (window.Synapse && typeof window.Synapse.ready === "function") {
+  window.Synapse.ready();
 }
 </script>
 </body>

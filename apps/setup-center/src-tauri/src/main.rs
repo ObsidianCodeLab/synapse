@@ -801,7 +801,7 @@ fn bundled_backend_dir() -> PathBuf {
         let static_names: &[&str] = &[
             "synapse-desktop",       // Cargo.toml package name (Tauri 2.x default)
             "synapse-setup-center", // legacy deb 安装路径
-            "open-akita-desktop",
+            "synapse-desktop",
         ];
 
         // deb 常见布局: /usr/lib/<app-name>/resources/synapse-server/
@@ -1204,7 +1204,7 @@ fn module_definitions() -> Vec<(&'static str, &'static str, &'static str, &'stat
     // 其余轻量包(文档处理/图像处理/桌面自动化/IM适配器等)已直接打包进 PyInstaller bundle。
     // browser (playwright + browser-use + langchain-openai) 已内置到 core 包，不再作为外置模块
     vec![
-        ("vector-memory", "向量记忆增强", "让 Akita 拥有长期记忆，能根据语义搜索历史对话。体积较大（约 2.5GB，含 PyTorch），安装耗时较长", &["sentence-transformers", "chromadb", "regex>=2023.6.3"], 2500, "core"),
+        ("vector-memory", "向量记忆增强", "让 Synapse 拥有长期记忆，能根据语义搜索历史对话。体积较大（约 2.5GB，含 PyTorch），安装耗时较长", &["sentence-transformers", "chromadb", "regex>=2023.6.3"], 2500, "core"),
         ("whisper", "语音识别", "支持语音消息自动转文字，无需联网即可识别。体积较大（约 2.5GB，含 PyTorch），安装耗时较长", &["openai-whisper", "static-ffmpeg"], 2500, "core"),
     ]
 }
@@ -2525,8 +2525,8 @@ fn kill_synapse_orphans() -> Vec<u32> {
     {
         // 搜索 synapse.main serve (venv 模式) 和 synapse-server (PyInstaller 模式)
         let patterns = [
-            "ps aux | grep '[o]penakita\\.main.*serve' | awk '{print $2}'",
-            "ps aux | grep '[o]penakita-server' | awk '{print $2}'",
+            "ps aux | grep '[s]ynapse\\.main.*serve' | awk '{print $2}'",
+            "ps aux | grep '[s]ynapse-server' | awk '{print $2}'",
         ];
         let mut pids_to_kill: Vec<u32> = Vec::new();
         for pattern in &patterns {
@@ -2647,7 +2647,7 @@ fn synapse_list_processes() -> Vec<SynapseProcess> {
     {
         // ps aux | grep synapse.main.*serve  —— 精确匹配模块调用
         if let Ok(ps_out) = Command::new("sh")
-            .args(["-c", "ps aux | grep '[o]penakita\\.main.*serve'"])
+            .args(["-c", "ps aux | grep '[s]ynapse\\.main.*serve'"])
             .output()
         {
             let stdout = String::from_utf8_lossy(&ps_out.stdout);

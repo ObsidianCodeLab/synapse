@@ -43,9 +43,11 @@ type ViewFilter = "active" | "all";
 export function PendingApprovalsView({
   serviceRunning,
   apiBaseUrl,
+  focusPendingId,
 }: {
   serviceRunning: boolean;
   apiBaseUrl: string;
+  focusPendingId?: string | null;
 }) {
   const { t } = useTranslation();
   const [entries, setEntries] = useState<PendingApprovalEntry[]>([]);
@@ -93,6 +95,18 @@ export function PendingApprovalsView({
     fetchEntries();
     fetchStats();
   }, [fetchEntries, fetchStats]);
+
+  useEffect(() => {
+    if (!focusPendingId) return;
+    setFilter("active");
+    setExpandedId(focusPendingId);
+  }, [focusPendingId]);
+
+  useEffect(() => {
+    if (!expandedId || entries.length === 0) return;
+    const el = document.getElementById(`pending-approval-${expandedId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [expandedId, entries]);
 
   // Auto-refresh every 30s
   useEffect(() => {
@@ -261,6 +275,7 @@ export function PendingApprovalsView({
           {entries.map((entry) => (
             <Card
               key={entry.id}
+              id={`pending-approval-${entry.id}`}
               className={cn(
                 "transition-all",
                 entry.status === "pending" && "border-amber-200 dark:border-amber-800",

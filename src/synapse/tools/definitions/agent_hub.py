@@ -39,7 +39,7 @@ AGENT_HUB_TOOLS = [
     {
         "name": "install_hub_agent",
         "category": "Agent Hub",
-        "description": "Download and install an Agent from the Synapse Platform Agent Store. Downloads the .akita-agent package and runs the local installer.",
+        "description": "Download and install an Agent from the Synapse Platform Agent Store. Downloads the .synapse-agent package and runs the local installer.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -58,7 +58,7 @@ AGENT_HUB_TOOLS = [
     {
         "name": "publish_agent",
         "category": "Agent Hub",
-        "description": "Publish a local Agent to the Synapse Platform Agent Store. The Agent is first exported as a .akita-agent package, then uploaded.",
+        "description": "Publish a local Agent to the Synapse Platform Agent Store. The Agent is first exported as a .synapse-agent package, then uploaded.",
         "input_schema": {
             "type": "object",
             "properties": {

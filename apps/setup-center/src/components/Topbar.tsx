@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MeetingRoomListItem } from "../api/meetingRoomService";
 import type { EnvMap, ViewId, WorkspaceSummary } from "../types";
 import type { Theme } from "../theme";
 import { setLanguage, getLanguagePref } from "../i18n";
@@ -8,7 +7,7 @@ import {
   DotGreen, DotGray,
   IconX, IconLink, IconPower, IconRefresh,
   IconLaptop, IconMoon, IconSun, IconGlobe, IconClipboard,
-  IconCheck,
+  IconCheck, IconInbox,
 } from "../icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +21,7 @@ import { toast } from "sonner";
 import { openExternalUrl } from "../platform";
 import { copyToClipboard } from "../utils/clipboard";
 import { RemoteAccessDialog } from "./RemoteAccessDialog";
-import { TopbarNotificationButton } from "./TopbarNotificationButton";
+import { InboxBadge } from "./InboxBadge";
 
 export type TopbarProps = {
   wsDropdownOpen: boolean;
@@ -60,10 +59,8 @@ export type TopbarProps = {
   restartService?: () => Promise<void>;
   askConfirm?: (msg: string, onConfirm: () => void) => void;
   setView?: (view: ViewId) => void;
-  unreadFeedbackCount?: number;
-  pendingApprovalsCount?: number;
-  pendingHumanInterventions?: MeetingRoomListItem[];
-  onOpenMeetingRoom?: (item: MeetingRoomListItem) => void;
+  inboxUnreadCount?: number;
+  onOpenInbox?: () => void;
 };
 
 export function Topbar({
@@ -78,8 +75,8 @@ export function Topbar({
   onSetTheme, themePrefState, isWeb, onLogout, webAccessUrl, apiBaseUrl,
   onToggleMobileSidebar, serverName, onServerManager,
   envDraft, setEnvDraft, restartService, askConfirm,
-  setView, unreadFeedbackCount, pendingApprovalsCount,
-  pendingHumanInterventions, onOpenMeetingRoom,
+  setView,
+  inboxUnreadCount, onOpenInbox,
 }: TopbarProps) {
   const { t, i18n } = useTranslation();
   const [remoteCopyState, setRemoteCopyState] = useState<"idle" | "copied" | "no_ip">("idle");
@@ -315,15 +312,27 @@ export function Topbar({
       </div>
       <TooltipProvider delayDuration={300}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {serviceRunning && (
+          {onOpenInbox && serviceRunning && (
             <>
-              <TopbarNotificationButton
-                unreadFeedbackCount={unreadFeedbackCount}
-                pendingApprovalsCount={pendingApprovalsCount}
-                pendingHumanInterventions={pendingHumanInterventions}
-                onNavigate={setView}
-                onOpenMeetingRoom={onOpenMeetingRoom}
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={`topbarInboxButton${(inboxUnreadCount || 0) > 0 ? " topbarInboxButton--pulse" : ""}`}
+                    onClick={onOpenInbox}
+                    aria-label={t("inbox.openInbox")}
+                  >
+                    <IconInbox size={16} />
+                    <InboxBadge
+                      apiBaseUrl={apiBaseUrl || "http://127.0.0.1:18900"}
+                      serviceRunning={serviceRunning}
+                      countOverride={inboxUnreadCount}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{t("inbox.openInbox")}</TooltipContent>
+              </Tooltip>
               <div className="h-4 w-px bg-border" />
             </>
           )}
