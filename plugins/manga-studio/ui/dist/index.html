@@ -1,23 +1,23 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>漫剧工作室 · Manga Studio</title>
+  <title>婕墽宸ヤ綔瀹?路 Manga Studio</title>
   <!--
     Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
     All glyphs are inlined SVGs (Iconify-style line icons); no emoji, no
     arrow-y subtitles, no "(Phase N)" labels. Theme, language and dark
-    mode are inherited from the host shell — no per-plugin toggles.
+    mode are inherited from the host shell 鈥?no per-plugin toggles.
   -->
   <script src="_assets/bootstrap.js"></script>
   <link rel="stylesheet" href="_assets/styles.css">
   <script src="_assets/icons.js"></script>
   <script src="_assets/i18n.js"></script>
   <script src="_assets/markdown-mini.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -57,7 +57,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Layout shell ── */
+    /* 鈹€鈹€ Layout shell 鈹€鈹€ */
     .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     .header {
       display: flex; align-items: center; justify-content: space-between;
@@ -103,7 +103,7 @@
     .content { flex: 1; min-height: 0; overflow: hidden; padding: 16px 20px; position: relative; }
     .content > div { max-height: 100%; overflow-y: auto; }
 
-    /* ── Inline SVG icon ── */
+    /* 鈹€鈹€ Inline SVG icon 鈹€鈹€ */
     .ico {
       display: inline-flex; align-items: center; justify-content: center;
       width: 1em; height: 1em; vertical-align: -0.125em; flex-shrink: 0;
@@ -113,7 +113,7 @@
     .ico--lg { width: 22px; height: 22px; }
     .ico--xl { width: 28px; height: 28px; }
 
-    /* ── Cards & forms ── */
+    /* 鈹€鈹€ Cards & forms 鈹€鈹€ */
     .card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
@@ -149,7 +149,7 @@
       background-repeat: no-repeat; background-position: right 10px center;
     }
 
-    /* ── Buttons ── */
+    /* 鈹€鈹€ Buttons 鈹€鈹€ */
     .btn {
       padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
       background: var(--bg-card); color: var(--text); font-size: 13px;
@@ -182,7 +182,7 @@
       border-radius: 7px;
     }
 
-    /* ── Helpers ── */
+    /* 鈹€鈹€ Helpers 鈹€鈹€ */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
@@ -195,7 +195,7 @@
     .mt-2 { margin-top: 8px; } .mt-3 { margin-top: 12px; } .mt-4 { margin-top: 16px; }
     .mb-2 { margin-bottom: 8px; } .mb-3 { margin-bottom: 12px; }
 
-    /* ── Style chip / ratio button ── */
+    /* 鈹€鈹€ Style chip / ratio button 鈹€鈹€ */
     .style-chip {
       padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
       background: var(--bg-card); color: var(--text-muted); font-size: 12px;
@@ -221,7 +221,7 @@
       box-shadow: 0 0 0 1px var(--primary) inset;
     }
 
-    /* ── Backend chip group ── */
+    /* 鈹€鈹€ Backend chip group 鈹€鈹€ */
     .backend-group {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px;
@@ -244,7 +244,7 @@
     .backend-chip__title .ico { color: var(--primary); }
     .backend-chip__desc { font-size: 11px; color: var(--text-muted); line-height: 1.45; }
 
-    /* ── Slider ── */
+    /* 鈹€鈹€ Slider 鈹€鈹€ */
     .slider-wrap { display: flex; align-items: center; gap: 14px; }
     .slider-wrap input[type=range] { flex: 1; accent-color: var(--primary); }
     .slider-val {
@@ -253,7 +253,7 @@
       padding: 4px 10px; border-radius: 6px; background: var(--primary-soft);
     }
 
-    /* ── Switch ── */
+    /* 鈹€鈹€ Switch 鈹€鈹€ */
     .switch {
       position: relative; width: 38px; height: 22px; border-radius: 11px;
       background: var(--border); cursor: pointer; transition: .2s; flex-shrink: 0;
@@ -275,7 +275,7 @@
     .toggle-row__label { font-size: 13px; color: var(--text); flex: 1; }
     .toggle-row__hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-    /* ── Prompt textarea ── */
+    /* 鈹€鈹€ Prompt textarea 鈹€鈹€ */
     .prompt-wrap { position: relative; }
     .prompt-counter {
       position: absolute; bottom: 8px; right: 12px;
@@ -284,7 +284,7 @@
       padding: 2px 4px 2px 16px; border-radius: 4px;
     }
 
-    /* ── Cost card ── */
+    /* 鈹€鈹€ Cost card 鈹€鈹€ */
     .cost-card {
       background: linear-gradient(135deg, var(--primary-soft), var(--accent-soft));
       border: 1px solid rgba(225,29,72,.25);
@@ -310,7 +310,7 @@
     }
     .threshold-warn .ico { color: var(--warning); margin-top: 2px; }
 
-    /* ── Task card ── */
+    /* 鈹€鈹€ Task card 鈹€鈹€ */
     .task-card {
       padding: 14px; border: 1px solid var(--border); border-radius: 9px;
       margin-bottom: 10px; background: var(--bg-card);
@@ -352,7 +352,7 @@
     }
     .task-card__error .ico { flex-shrink: 0; margin-top: 2px; }
 
-    /* ── Status badge ── */
+    /* 鈹€鈹€ Status badge 鈹€鈹€ */
     .status-chip {
       font-size: 10px; padding: 2px 9px; border-radius: 999px;
       font-weight: 600; flex-shrink: 0; text-transform: uppercase;
@@ -364,7 +364,7 @@
     .status-chip--failed { background: rgba(239,68,68,.15); color: var(--danger); }
     .status-chip--cancelled { background: rgba(148,163,184,.18); color: var(--text-muted); }
 
-    /* ── Empty state ── */
+    /* 鈹€鈹€ Empty state 鈹€鈹€ */
     .empty-state {
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; padding: 56px 20px; color: var(--text-dim);
@@ -374,7 +374,7 @@
     .empty-state__title { font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; }
     .empty-state__hint { font-size: 12px; max-width: 360px; }
 
-    /* ── Modal ── */
+    /* 鈹€鈹€ Modal 鈹€鈹€ */
     .modal-mask {
       position: fixed; inset: 0; background: rgba(15,23,42,.55);
       display: flex; align-items: center; justify-content: center;
@@ -396,7 +396,7 @@
     .modal-desc { font-size: 13px; color: var(--text-muted); line-height: 1.65; margin-bottom: 18px; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
-    /* ── Split layout ── */
+    /* 鈹€鈹€ Split layout 鈹€鈹€ */
     .split-layout { display: flex; gap: 18px; height: 100%; overflow: hidden; }
     .split-left { width: 58%; min-width: 380px; overflow-y: auto; flex-shrink: 0; padding-right: 4px; }
     .split-right { flex: 1; min-width: 0; overflow-y: auto; padding-left: 4px; }
@@ -405,7 +405,7 @@
       .split-left { width: 100%; min-width: unset; flex-shrink: 0; }
     }
 
-    /* ── Tab header ── */
+    /* 鈹€鈹€ Tab header 鈹€鈹€ */
     .tab-header {
       display: flex; justify-content: space-between; align-items: flex-end;
       margin-bottom: 18px; gap: 12px; flex-wrap: wrap;
@@ -421,7 +421,7 @@
     }
     .tab-header__sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
-    /* ── Character grid ── */
+    /* 鈹€鈹€ Character grid 鈹€鈹€ */
     .char-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -464,7 +464,7 @@
       overflow: hidden;
     }
 
-    /* ── Character editor ── */
+    /* 鈹€鈹€ Character editor 鈹€鈹€ */
     .char-editor {
       display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
       background: var(--bg-card); border: 1px solid var(--border);
@@ -510,7 +510,7 @@
       .char-editor { grid-template-columns: 1fr; }
     }
 
-    /* ── Workflows tab ── */
+    /* 鈹€鈹€ Workflows tab 鈹€鈹€ */
     .wf-card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
@@ -551,7 +551,7 @@
     .wf-probe-banner__title { font-weight: 600; margin-bottom: 4px; }
     .wf-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
 
-    /* ── Series tab ── */
+    /* 鈹€鈹€ Series tab 鈹€鈹€ */
     .series-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -623,7 +623,7 @@
       .series-editor { grid-template-columns: 1fr; }
     }
 
-    /* ── Episode list ── */
+    /* 鈹€鈹€ Episode list 鈹€鈹€ */
     .ep-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
     .ep-item {
       padding: 10px 14px; border-radius: 7px;
@@ -634,7 +634,7 @@
     .ep-item__title { font-size: 13px; color: var(--text); font-weight: 500; }
     .ep-item__meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-    /* ── Templates modal ── */
+    /* 鈹€鈹€ Templates modal 鈹€鈹€ */
     .tpl-modal {
       position: fixed; inset: 0;
       background: rgba(15,23,42,.55);
@@ -685,7 +685,7 @@
     }
     .tpl-modal__footer { display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid var(--border); }
 
-    /* ── Settings sections (oa-settings-section style) ── */
+    /* 鈹€鈹€ Settings sections (oa-settings-section style) 鈹€鈹€ */
     .oa-settings-section {
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -706,7 +706,7 @@
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
 
-    /* ── Settings: required-field callout (yellow soft frame) ── */
+    /* 鈹€鈹€ Settings: required-field callout (yellow soft frame) 鈹€鈹€ */
     .oa-config-field-callout {
       position: relative;
       padding: 12px 14px;
@@ -736,7 +736,7 @@
     }
     .oa-saved-badge .ico { width: 11px; height: 11px; }
 
-    /* ── ValidatedInput — small red corner badge + tooltip ── */
+    /* 鈹€鈹€ ValidatedInput 鈥?small red corner badge + tooltip 鈹€鈹€ */
     .field-wrap {
       position: relative;
       display: block;
@@ -778,7 +778,7 @@
     .field-warn-icon:hover .field-warn-tip,
     .field-warn-icon:focus .field-warn-tip { opacity: 1; }
 
-    /* ── Settings: collapsible disclosure ── */
+    /* 鈹€鈹€ Settings: collapsible disclosure 鈹€鈹€ */
     .oa-collapsible {
       border-top: 1px dashed var(--border);
       margin-top: 14px;
@@ -807,7 +807,7 @@
     }
     .oa-cost-hint strong { display: block; font-size: 12px; color: var(--primary); margin-bottom: 3px; }
 
-    /* ── Storage stat cards ── */
+    /* 鈹€鈹€ Storage stat cards 鈹€鈹€ */
     .storage-grid {
       display: grid; gap: 10px;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -829,7 +829,7 @@
     }
     .storage-stat__sub { font-size: 11px; color: var(--text-muted); }
 
-    /* ── Config banner ── */
+    /* 鈹€鈹€ Config banner 鈹€鈹€ */
     .oa-config-banner {
       display: flex; align-items: center; gap: 12px;
       padding: 12px 14px;
@@ -863,7 +863,7 @@
     }
     .init-error-banner .ico { color: var(--danger); margin-top: 2px; }
 
-    /* ── Spinner ── */
+    /* 鈹€鈹€ Spinner 鈹€鈹€ */
     .spinner-sm {
       width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35);
       border-top-color: #fff; border-radius: 50%;
@@ -875,7 +875,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Toast ── */
+    /* 鈹€鈹€ Toast 鈹€鈹€ */
     .toast-stack {
       position: fixed; top: 16px; right: 20px; z-index: 3000;
       display: flex; flex-direction: column; gap: 8px;
@@ -901,7 +901,7 @@
     .toast--info .ico--toast { color: var(--accent); }
     @keyframes ak-slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-    /* ── Settings dependency check section ───────────────────────── */
+    /* 鈹€鈹€ Settings dependency check section 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
     .deps-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -958,11 +958,11 @@
       max-width: 260px;
     }
 
-    /* ── Ghost variant of the standard button (used in section headers
+    /* 鈹€鈹€ Ghost variant of the standard button (used in section headers
          and in the dependency installer footer for non-primary actions
-         like 「重新检测」 / 「强制重装」). Keeps the icon-and-label
+         like 銆岄噸鏂版娴嬨€?/ 銆屽己鍒堕噸瑁呫€?. Keeps the icon-and-label
          affordance of .btn but removes the filled background so multiple
-         buttons can sit next to a primary CTA without competing. ── */
+         buttons can sit next to a primary CTA without competing. 鈹€鈹€ */
     .btn-ghost {
       background: transparent;
       border: 1px solid var(--border);
@@ -1059,16 +1059,16 @@ if (_inIframe) {
 
 window.__bridge = { apiCall: apiCall, pluginApi: pluginApi, getCtx: function() { return _ctx; } };
 </script>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 <script type="text/babel" data-type="module">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 const { pluginApi } = window.__bridge;
 
-// ─── Inline icon set (Iconify-style line icons, 24x24 viewBox) ────────
+// 鈹€鈹€鈹€ Inline icon set (Iconify-style line icons, 24x24 viewBox) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const ICONS = {
-  // Plugin glyph (arcticons:browndust-ii — used as an inline option for
+  // Plugin glyph (arcticons:browndust-ii 鈥?used as an inline option for
   // toolbar slots; the header uses the SVG file directly).
   app: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M19.6 16.5h-.59s-2.06-1.04-2.16-1.16c-.1-.12.67-.56.62-1c-.05-.43-.24-1.09-.26-1.21c-.02-.13 1.5-.74.55-2.08c-.95-1.34-.93-1.26-1.15-1.88c-.22-.62.08-1.64-1.45-3.29c-1.53-1.66-3.04-2.03-4.59-2.16c-1.55-.14-3.54.7-4.48 1.99c-.94 1.29-1.34 2.9-1.57 4.39c-.23 1.48-.54 2.43-.46 2.96c.09.53.94 1.1.94 1.1s-.3-1.02-.19-1.66c.1-.64.11-.39.11-.39s.07 1.65.87 2.2c.79.55 1.58.45 1.58.45s-.24-.21-.41-.76c-.17-.55-.16-.54-.16-.54s.41 1.17 1.85 1.42l.04.63s-.52-.32-2.06-.53c-1.54-.21-2.21-.83-3.3-.83H2"/><path d="M14.6 4.83s2.63.99 3.33 4.64m-6.05 4.65s1.11.14 1.41.16s.72-.51 1.05-.87s.73-.81.85-1.54c.12-.79-.01-1.26.34-2.02c.36-.76.51-1.77.51-1.77"/><path d="M10.1 9.04c.68-.63 1-1.92 1-1.92l.16.67s.16-.83.18-1.12c.02-.28.06-.9.06-.9s.34.6.57 1.38c.23.78.34 1.58.34 1.58c.23.11.52.08.52.08l-.09-1.43s.33.66.43 1.05l.11.39l.98.02s.18-.36.22-.55c.04-.19.11-.76.11-.76s.15.5.14.85c0 .35-.01.48-.01.48l.45-.3l.32 1.17"/></g>',
   // Tabs
@@ -1126,325 +1126,325 @@ function Ico({ name, cls, size }) {
   );
 }
 
-// ── i18n dictionary ──
+// 鈹€鈹€ i18n dictionary 鈹€鈹€
 const I18N = {
   zh: {
-    "app.title": "漫剧工作室",
+    "app.title": "婕墽宸ヤ綔瀹?,
     "app.subtitle": "Manga Studio",
-    "tabs.studio": "工作室",
-    "tabs.series": "剧集",
-    "tabs.characters": "角色",
-    "tabs.settings": "设置",
-    "studio.btn.templates": "故事模板",
-    "studio.templates.title": "故事模板",
-    "studio.templates.subtitle": "选择一个预置故事一键导入，自动套用对应的风格、画面比例和分镜。",
-    "studio.templates.apply": "套用此模板",
-    "studio.templates.applied": "已套用模板「{title}」",
-    "studio.templates.close": "关闭",
-    "studio.section.series": "绑定剧集",
-    "studio.label.series": "选择剧集",
-    "studio.option.no_series": "独立单集（不绑定剧集）",
-    "studio.series.applied": "已套用「{title}」的默认风格、比例与角色",
-    "studio.hint.ratio_inherited": "已继承本剧集的画面比例。",
-    "studio.hint.ratio_override": "本集覆盖剧集默认比例 {def}。",
-    "studio.hint.style_override": "本集覆盖剧集默认风格 {def}。",
-    "studio.hint.backend_override": "本集覆盖剧集默认后端 {def}。",
-    "studio.section.characters": "出演角色",
-    "studio.characters.empty": "未绑定角色，可在「角色」标签页创建后回到「剧集」绑定。",
-    "studio.section.story": "剧情输入",
-    "studio.label.story": "故事大纲",
-    "studio.placeholder.story": "用一段话描述你想生成的漫剧故事，例如：\n少年李雷意外觉醒了上古剑灵的力量，在剑道部社团发现自己同班同学韩梅梅其实是一位转世剑仙……",
-    "studio.section.style": "美术风格",
-    "studio.section.layout": "分镜配置",
-    "studio.label.ratio": "画面比例",
-    "studio.label.panels": "分镜数",
-    "studio.label.duration": "每镜时长",
-    "studio.section.output": "出片设置",
-    "studio.label.subtitles": "烧录字幕",
-    "studio.label.subtitles.hint": "把对白字幕直接合成进 final.mp4 视频流",
-    "studio.label.backend": "生成后端",
-    "studio.backend.direct": "直连 Seedance",
-    "studio.backend.direct.desc": "走火山方舟 + 通义万相，无需自建工作流",
-    "studio.backend.runninghub": "RunningHub 工作流",
-    "studio.backend.runninghub.desc": "云端 ComfyUI，按 ID 调用已发布工作流",
-    "studio.backend.comfyui_local": "本地 ComfyUI",
-    "studio.backend.comfyui_local.desc": "调用本机 ComfyUI 服务，零调用费",
-    "studio.section.cost": "费用预估",
-    "studio.cost.total": "预估总价",
-    "studio.cost.exceeds": "预估费用超过设置中的成本阈值，请确认后再提交。",
-    "studio.btn.submit": "生成漫剧",
-    "studio.btn.submit.loading": "提交中…",
-    "studio.confirm.title": "费用超出阈值",
-    "studio.confirm.desc": "本次生成预估费用 {cost}，超过你设置的 {threshold} 阈值。继续将扣费生成。",
-    "studio.confirm.ok": "确认提交",
-    "studio.confirm.cancel": "取消",
-    "studio.section.tasks": "任务进度",
-    "tasks.empty.title": "还没有生成任务",
-    "tasks.empty.hint": "提交左侧表单后，本次生成的进度会在这里实时更新。",
-    "tasks.step.queued": "排队中",
-    "tasks.step.compose": "拼装提示词",
-    "tasks.step.script": "撰写剧本",
-    "tasks.step.images": "生成分镜图",
-    "tasks.step.videos": "图生视频",
-    "tasks.step.tts": "合成台词",
-    "tasks.step.subtitles": "字幕轨",
-    "tasks.step.assemble": "拼接音视频",
-    "tasks.cancel": "取消",
-    "tasks.delete": "删除",
-    "tasks.detail.show": "查看详情",
-    "tasks.detail.hide": "收起",
-    "tasks.detail.params": "请求参数",
-    "tasks.detail.cost": "成本明细",
-    "tasks.detail.hints": "排错提示",
-    "tasks.detail.empty": "无可显示的详情。",
-    "studio.tab.title": "工作室",
-    "studio.tab.subtitle": "把一段故事变成一集漫剧",
-    "settings.subtitle": "API Key 与默认偏好",
-    "char.title": "角色",
-    "char.subtitle": "复用角色与参考图，跨集保持人物一致性",
-    "char.btn.new": "新建角色",
-    "char.list.empty.title": "还没有角色卡",
-    "char.list.empty.hint": "新建一张角色卡，上传 1-3 张参考图，每集生成时勾选即可保持人物一致性。",
-    "char.label.name": "姓名",
-    "char.label.role": "角色定位",
-    "char.label.gender": "性别",
-    "char.label.age": "年龄段",
-    "char.label.appearance": "外观特征",
-    "char.label.personality": "性格 / 气质",
-    "char.label.description": "一句话介绍",
-    "char.label.voice": "默认语音",
-    "char.label.refs": "参考图（用于角色一致性）",
-    "char.role.protagonist": "主角",
-    "char.role.supporting": "配角",
-    "char.role.antagonist": "反派",
-    "char.role.cameo": "客串",
-    "char.gender.female": "女",
-    "char.gender.male": "男",
-    "char.gender.neutral": "中性",
-    "char.gender.unknown": "未指定",
-    "char.refs.upload": "上传参考图",
-    "char.refs.uploading": "上传中…",
-    "char.refs.empty": "暂无参考图，强烈建议至少上传 1 张正面参考。",
-    "char.refs.hint": "1-3 张为佳，过多反而会让模型困惑。支持 PNG/JPG，单张 ≤ 5 MB。",
-    "char.refs.remove": "移除",
-    "char.btn.save": "保存",
-    "char.btn.cancel": "取消",
-    "char.btn.delete": "删除",
-    "char.confirm.delete": "确定删除该角色卡？此操作不可撤销。",
-    "char.placeholder.name": "如：李雷",
-    "char.placeholder.appearance": "黑色短发，校服，戴黑框眼镜",
-    "char.placeholder.personality": "内向但坚定，遇事冷静",
-    "char.placeholder.description": "高一新生，意外觉醒上古剑灵的力量",
-    "char.toast.created": "角色已创建",
-    "char.toast.updated": "角色已更新",
-    "char.toast.deleted": "角色已删除",
-    "char.toast.upload_failed": "参考图上传失败：{msg}",
-    "char.toast.save_failed": "保存失败：{msg}",
-    "wf.title": "工作流后端",
-    "wf.subtitle": "RunningHub 云端 / 本地 ComfyUI 配置与连通性测试",
-    "wf.section.backend": "后端类型",
-    "wf.option.runninghub": "RunningHub（云端）",
-    "wf.option.comfyui_local": "本地 ComfyUI",
-    "wf.section.runninghub": "RunningHub 配置",
-    "wf.section.comfyui_local": "本地 ComfyUI 配置",
+    "tabs.studio": "宸ヤ綔瀹?,
+    "tabs.series": "鍓ч泦",
+    "tabs.characters": "瑙掕壊",
+    "tabs.settings": "璁剧疆",
+    "studio.btn.templates": "鏁呬簨妯℃澘",
+    "studio.templates.title": "鏁呬簨妯℃澘",
+    "studio.templates.subtitle": "閫夋嫨涓€涓缃晠浜嬩竴閿鍏ワ紝鑷姩濂楃敤瀵瑰簲鐨勯鏍笺€佺敾闈㈡瘮渚嬪拰鍒嗛暅銆?,
+    "studio.templates.apply": "濂楃敤姝ゆā鏉?,
+    "studio.templates.applied": "宸插鐢ㄦā鏉裤€寋title}銆?,
+    "studio.templates.close": "鍏抽棴",
+    "studio.section.series": "缁戝畾鍓ч泦",
+    "studio.label.series": "閫夋嫨鍓ч泦",
+    "studio.option.no_series": "鐙珛鍗曢泦锛堜笉缁戝畾鍓ч泦锛?,
+    "studio.series.applied": "宸插鐢ㄣ€寋title}銆嶇殑榛樿椋庢牸銆佹瘮渚嬩笌瑙掕壊",
+    "studio.hint.ratio_inherited": "宸茬户鎵挎湰鍓ч泦鐨勭敾闈㈡瘮渚嬨€?,
+    "studio.hint.ratio_override": "鏈泦瑕嗙洊鍓ч泦榛樿姣斾緥 {def}銆?,
+    "studio.hint.style_override": "鏈泦瑕嗙洊鍓ч泦榛樿椋庢牸 {def}銆?,
+    "studio.hint.backend_override": "鏈泦瑕嗙洊鍓ч泦榛樿鍚庣 {def}銆?,
+    "studio.section.characters": "鍑烘紨瑙掕壊",
+    "studio.characters.empty": "鏈粦瀹氳鑹诧紝鍙湪銆岃鑹层€嶆爣绛鹃〉鍒涘缓鍚庡洖鍒般€屽墽闆嗐€嶇粦瀹氥€?,
+    "studio.section.story": "鍓ф儏杈撳叆",
+    "studio.label.story": "鏁呬簨澶х翰",
+    "studio.placeholder.story": "鐢ㄤ竴娈佃瘽鎻忚堪浣犳兂鐢熸垚鐨勬极鍓ф晠浜嬶紝渚嬪锛歕n灏戝勾鏉庨浄鎰忓瑙夐啋浜嗕笂鍙ゅ墤鐏电殑鍔涢噺锛屽湪鍓戦亾閮ㄧぞ鍥㈠彂鐜拌嚜宸卞悓鐝悓瀛﹂煩姊呮鍏跺疄鏄竴浣嶈浆涓栧墤浠欌€︹€?,
+    "studio.section.style": "缇庢湳椋庢牸",
+    "studio.section.layout": "鍒嗛暅閰嶇疆",
+    "studio.label.ratio": "鐢婚潰姣斾緥",
+    "studio.label.panels": "鍒嗛暅鏁?,
+    "studio.label.duration": "姣忛暅鏃堕暱",
+    "studio.section.output": "鍑虹墖璁剧疆",
+    "studio.label.subtitles": "鐑у綍瀛楀箷",
+    "studio.label.subtitles.hint": "鎶婂鐧藉瓧骞曠洿鎺ュ悎鎴愯繘 final.mp4 瑙嗛娴?,
+    "studio.label.backend": "鐢熸垚鍚庣",
+    "studio.backend.direct": "鐩磋繛 Seedance",
+    "studio.backend.direct.desc": "璧扮伀灞辨柟鑸?+ 閫氫箟涓囩浉锛屾棤闇€鑷缓宸ヤ綔娴?,
+    "studio.backend.runninghub": "RunningHub 宸ヤ綔娴?,
+    "studio.backend.runninghub.desc": "浜戠 ComfyUI锛屾寜 ID 璋冪敤宸插彂甯冨伐浣滄祦",
+    "studio.backend.comfyui_local": "鏈湴 ComfyUI",
+    "studio.backend.comfyui_local.desc": "璋冪敤鏈満 ComfyUI 鏈嶅姟锛岄浂璋冪敤璐?,
+    "studio.section.cost": "璐圭敤棰勪及",
+    "studio.cost.total": "棰勪及鎬讳环",
+    "studio.cost.exceeds": "棰勪及璐圭敤瓒呰繃璁剧疆涓殑鎴愭湰闃堝€硷紝璇风‘璁ゅ悗鍐嶆彁浜ゃ€?,
+    "studio.btn.submit": "鐢熸垚婕墽",
+    "studio.btn.submit.loading": "鎻愪氦涓€?,
+    "studio.confirm.title": "璐圭敤瓒呭嚭闃堝€?,
+    "studio.confirm.desc": "鏈鐢熸垚棰勪及璐圭敤 {cost}锛岃秴杩囦綘璁剧疆鐨?{threshold} 闃堝€笺€傜户缁皢鎵ｈ垂鐢熸垚銆?,
+    "studio.confirm.ok": "纭鎻愪氦",
+    "studio.confirm.cancel": "鍙栨秷",
+    "studio.section.tasks": "浠诲姟杩涘害",
+    "tasks.empty.title": "杩樻病鏈夌敓鎴愪换鍔?,
+    "tasks.empty.hint": "鎻愪氦宸︿晶琛ㄥ崟鍚庯紝鏈鐢熸垚鐨勮繘搴︿細鍦ㄨ繖閲屽疄鏃舵洿鏂般€?,
+    "tasks.step.queued": "鎺掗槦涓?,
+    "tasks.step.compose": "鎷艰鎻愮ず璇?,
+    "tasks.step.script": "鎾板啓鍓ф湰",
+    "tasks.step.images": "鐢熸垚鍒嗛暅鍥?,
+    "tasks.step.videos": "鍥剧敓瑙嗛",
+    "tasks.step.tts": "鍚堟垚鍙拌瘝",
+    "tasks.step.subtitles": "瀛楀箷杞?,
+    "tasks.step.assemble": "鎷兼帴闊宠棰?,
+    "tasks.cancel": "鍙栨秷",
+    "tasks.delete": "鍒犻櫎",
+    "tasks.detail.show": "鏌ョ湅璇︽儏",
+    "tasks.detail.hide": "鏀惰捣",
+    "tasks.detail.params": "璇锋眰鍙傛暟",
+    "tasks.detail.cost": "鎴愭湰鏄庣粏",
+    "tasks.detail.hints": "鎺掗敊鎻愮ず",
+    "tasks.detail.empty": "鏃犲彲鏄剧ず鐨勮鎯呫€?,
+    "studio.tab.title": "宸ヤ綔瀹?,
+    "studio.tab.subtitle": "鎶婁竴娈垫晠浜嬪彉鎴愪竴闆嗘极鍓?,
+    "settings.subtitle": "API Key 涓庨粯璁ゅ亸濂?,
+    "char.title": "瑙掕壊",
+    "char.subtitle": "澶嶇敤瑙掕壊涓庡弬鑰冨浘锛岃法闆嗕繚鎸佷汉鐗╀竴鑷存€?,
+    "char.btn.new": "鏂板缓瑙掕壊",
+    "char.list.empty.title": "杩樻病鏈夎鑹插崱",
+    "char.list.empty.hint": "鏂板缓涓€寮犺鑹插崱锛屼笂浼?1-3 寮犲弬鑰冨浘锛屾瘡闆嗙敓鎴愭椂鍕鹃€夊嵆鍙繚鎸佷汉鐗╀竴鑷存€с€?,
+    "char.label.name": "濮撳悕",
+    "char.label.role": "瑙掕壊瀹氫綅",
+    "char.label.gender": "鎬у埆",
+    "char.label.age": "骞撮緞娈?,
+    "char.label.appearance": "澶栬鐗瑰緛",
+    "char.label.personality": "鎬ф牸 / 姘旇川",
+    "char.label.description": "涓€鍙ヨ瘽浠嬬粛",
+    "char.label.voice": "榛樿璇煶",
+    "char.label.refs": "鍙傝€冨浘锛堢敤浜庤鑹蹭竴鑷存€э級",
+    "char.role.protagonist": "涓昏",
+    "char.role.supporting": "閰嶈",
+    "char.role.antagonist": "鍙嶆淳",
+    "char.role.cameo": "瀹覆",
+    "char.gender.female": "濂?,
+    "char.gender.male": "鐢?,
+    "char.gender.neutral": "涓€?,
+    "char.gender.unknown": "鏈寚瀹?,
+    "char.refs.upload": "涓婁紶鍙傝€冨浘",
+    "char.refs.uploading": "涓婁紶涓€?,
+    "char.refs.empty": "鏆傛棤鍙傝€冨浘锛屽己鐑堝缓璁嚦灏戜笂浼?1 寮犳闈㈠弬鑰冦€?,
+    "char.refs.hint": "1-3 寮犱负浣筹紝杩囧鍙嶈€屼細璁╂ā鍨嬪洶鎯戙€傛敮鎸?PNG/JPG锛屽崟寮?鈮?5 MB銆?,
+    "char.refs.remove": "绉婚櫎",
+    "char.btn.save": "淇濆瓨",
+    "char.btn.cancel": "鍙栨秷",
+    "char.btn.delete": "鍒犻櫎",
+    "char.confirm.delete": "纭畾鍒犻櫎璇ヨ鑹插崱锛熸鎿嶄綔涓嶅彲鎾ら攢銆?,
+    "char.placeholder.name": "濡傦細鏉庨浄",
+    "char.placeholder.appearance": "榛戣壊鐭彂锛屾牎鏈嶏紝鎴撮粦妗嗙溂闀?,
+    "char.placeholder.personality": "鍐呭悜浣嗗潥瀹氾紝閬囦簨鍐烽潤",
+    "char.placeholder.description": "楂樹竴鏂扮敓锛屾剰澶栬閱掍笂鍙ゅ墤鐏电殑鍔涢噺",
+    "char.toast.created": "瑙掕壊宸插垱寤?,
+    "char.toast.updated": "瑙掕壊宸叉洿鏂?,
+    "char.toast.deleted": "瑙掕壊宸插垹闄?,
+    "char.toast.upload_failed": "鍙傝€冨浘涓婁紶澶辫触锛歿msg}",
+    "char.toast.save_failed": "淇濆瓨澶辫触锛歿msg}",
+    "wf.title": "宸ヤ綔娴佸悗绔?,
+    "wf.subtitle": "RunningHub 浜戠 / 鏈湴 ComfyUI 閰嶇疆涓庤繛閫氭€ф祴璇?,
+    "wf.section.backend": "鍚庣绫诲瀷",
+    "wf.option.runninghub": "RunningHub锛堜簯绔級",
+    "wf.option.comfyui_local": "鏈湴 ComfyUI",
+    "wf.section.runninghub": "RunningHub 閰嶇疆",
+    "wf.section.comfyui_local": "鏈湴 ComfyUI 閰嶇疆",
     "wf.label.rh_api_key": "RunningHub API Key",
     "wf.placeholder.rh_api_key": "rhk-...",
-    "wf.hint.rh_api_key": "在 RunningHub 控制台 → 我的 → API 钥匙 中获取。",
+    "wf.hint.rh_api_key": "鍦?RunningHub 鎺у埗鍙?鈫?鎴戠殑 鈫?API 閽ュ寵 涓幏鍙栥€?,
     "wf.label.local_url": "ComfyUI URL",
     "wf.placeholder.local_url": "http://127.0.0.1:8188",
-    "wf.hint.local_url": "运行 ComfyUI 时显示的地址，通常是 8188 端口。需要保持 ComfyUI 进程在线。",
-    "wf.section.workflows": "工作流映射",
-    "wf.workflow.hint.runninghub": "在 RunningHub 工作坊创建分享版本后，工作流 ID 会显示在 URL 上（数字字符串）。",
-    "wf.workflow.hint.comfyui_local": "导出工作流为 .json，填入文件路径（支持相对/绝对路径）。",
-    "wf.label.image": "分镜生图工作流",
-    "wf.label.animate": "图生视频工作流",
-    "wf.label.t2v": "文生视频工作流（可选 · 用于人脸审核失败时降级）",
+    "wf.hint.local_url": "杩愯 ComfyUI 鏃舵樉绀虹殑鍦板潃锛岄€氬父鏄?8188 绔彛銆傞渶瑕佷繚鎸?ComfyUI 杩涚▼鍦ㄧ嚎銆?,
+    "wf.section.workflows": "宸ヤ綔娴佹槧灏?,
+    "wf.workflow.hint.runninghub": "鍦?RunningHub 宸ヤ綔鍧婂垱寤哄垎浜増鏈悗锛屽伐浣滄祦 ID 浼氭樉绀哄湪 URL 涓婏紙鏁板瓧瀛楃涓诧級銆?,
+    "wf.workflow.hint.comfyui_local": "瀵煎嚭宸ヤ綔娴佷负 .json锛屽～鍏ユ枃浠惰矾寰勶紙鏀寔鐩稿/缁濆璺緞锛夈€?,
+    "wf.label.image": "鍒嗛暅鐢熷浘宸ヤ綔娴?,
+    "wf.label.animate": "鍥剧敓瑙嗛宸ヤ綔娴?,
+    "wf.label.t2v": "鏂囩敓瑙嗛宸ヤ綔娴侊紙鍙€?路 鐢ㄤ簬浜鸿劯瀹℃牳澶辫触鏃堕檷绾э級",
     "wf.placeholder.workflow_id_rh": "1234567890",
     "wf.placeholder.workflow_path_local": "/path/to/workflow.json",
-    "wf.section.probe": "连接测试",
-    "wf.btn.probe": "测试连接",
-    "wf.btn.probe.loading": "测试中…",
-    "wf.btn.save": "保存",
-    "wf.btn.save.loading": "保存中…",
-    "wf.toast.saved": "工作流配置已保存",
-    "wf.probe.title": "探活结果",
-    "wf.probe.idle": "点击「测试连接」运行一次探活。RunningHub 仅检查 API Key + 客户端是否可构造，不会发送真实任务（不计费）。本地 ComfyUI 会发起一次 GET /system_stats 探测。",
-    "wf.probe.ok": "已连接",
-    "wf.probe.fail": "连接失败",
-    "wf.probe.dependency_hint": "提示：RunningHub 工作流需要 comfykit Python 包，请运行 pip install comfykit>=0.1.12 后重启服务。",
-    "series.title": "剧集",
-    "series.subtitle": "多集系列管理，跨集复用角色、风格和后端偏好",
-    "series.btn.new": "新建剧集",
-    "series.list.empty.title": "还没有剧集",
-    "series.list.empty.hint": "新建一个系列，把每一集都挂在它下面，可复用同一组角色和默认风格。",
-    "series.label.title": "标题",
-    "series.label.summary": "简介",
-    "series.label.style": "默认美术风格",
-    "series.label.ratio": "默认画面比例",
-    "series.label.backend": "默认生成后端",
-    "series.label.characters": "默认绑定角色",
-    "series.label.cover": "封面图 URL",
-    "series.placeholder.title": "如：剑灵觉醒之李雷",
-    "series.placeholder.summary": "一句话剧情简介",
-    "series.placeholder.cover": "https://... 留空使用默认封面",
-    "series.btn.save": "保存",
-    "series.btn.cancel": "取消",
-    "series.btn.delete": "删除",
-    "series.confirm.delete": "确定删除该剧集？所有挂在它下面的剧集 episode 不会被删除，但会失去关联。",
-    "series.toast.created": "剧集已创建",
-    "series.toast.updated": "剧集已更新",
-    "series.toast.deleted": "剧集已删除",
-    "series.card.no_chars": "未绑定角色",
-    "series.card.chars_count": "{n} 个角色",
-    "series.section.episodes": "本剧集已出片",
-    "series.episodes.empty": "还没有 episode，去 Studio 选择「绑定剧集」生成一集吧。",
-    "series.episodes.delete": "删除该集（连同 final.mp4）",
-    "series.episodes.confirm_delete": "确定删除「{title}」？该集的视频与中间产物会一并清理，不可恢复。",
-    "series.episodes.delete_failed": "删除失败：{msg}",
-    "settings.title": "设置",
-    "settings.subtitle": "API Key、后端配置、存储与默认偏好都在这里",
-    "settings.btn.save": "保存全部",
-    "settings.btn.saved.badge": "已保存",
-    "settings.btn.test": "测试连接",
-    "settings.btn.show": "显示",
-    "settings.btn.hide": "隐藏",
-    "settings.btn.browse": "浏览…",
-    "settings.btn.open": "打开",
-    "settings.btn.refresh": "刷新",
-    "settings.toast.saved": "设置已保存",
-    "settings.toast.savedField": "{field} 已保存",
-    "settings.toast.failed": "保存失败：{msg}",
-    "settings.toast.testOk": "{label} 连接成功",
-    "settings.toast.testFail": "{label} 连接失败：{msg}",
-    "settings.toast.cleanupOk": "已清理 {n} 条任务，{dirs} 个目录被删除",
-    "settings.callout.required": "必填项",
-    "settings.section.backend": "默认生成后端",
-    "settings.section.backend.hint": "新建剧集时如果没有特别指定，使用这里选的后端。每个剧集和每次任务都可以单独覆盖。",
-    "settings.backend.direct.title": "直连云端",
-    "settings.backend.direct.desc": "Ark Seedance + 通义万相 + DashScope 通过 API 直接调用，不需要 ComfyUI 工作流。",
-    "settings.backend.runninghub.title": "RunningHub 工作流",
-    "settings.backend.runninghub.desc": "云端 ComfyUI 工作流（按算力计费），可复用社区分享的 workflow_id。",
-    "settings.backend.comfyui_local.title": "本地 ComfyUI",
-    "settings.backend.comfyui_local.desc": "对接你本机或局域网内自建的 ComfyUI 服务，需提前准备好 workflow JSON。",
-    "settings.section.workflow_backend": "工作流后端（云端 / 本地）",
-    "settings.section.workflow_backend.hint": "当生成后端选择 RunningHub 或本地 ComfyUI 时，这里指定具体走哪一个。",
-    "settings.section.deps": "依赖检测",
-    "settings.section.deps.hint": "插件运行所需的可选 Python 包。✓ 已就绪可立即使用；⚠ 未安装可一键自动安装到插件私有目录。",
-    "settings.deps.installed": "已就绪",
-    "settings.deps.missing": "未安装",
-    "settings.deps.installing": "正在安装…",
-    "settings.deps.btn.install": "一键安装",
-    "settings.deps.btn.reinstall": "强制重装",
-    "settings.deps.btn.recheck": "重新检测",
-    "settings.deps.target": "安装目标：{target}",
-    "settings.deps.error": "上次失败：{msg}",
-    "settings.deps.toast.started": "{name} 安装已开始，请稍候…",
-    "settings.deps.toast.failed": "{name} 触发安装失败：{msg}",
+    "wf.section.probe": "杩炴帴娴嬭瘯",
+    "wf.btn.probe": "娴嬭瘯杩炴帴",
+    "wf.btn.probe.loading": "娴嬭瘯涓€?,
+    "wf.btn.save": "淇濆瓨",
+    "wf.btn.save.loading": "淇濆瓨涓€?,
+    "wf.toast.saved": "宸ヤ綔娴侀厤缃凡淇濆瓨",
+    "wf.probe.title": "鎺㈡椿缁撴灉",
+    "wf.probe.idle": "鐐瑰嚮銆屾祴璇曡繛鎺ャ€嶈繍琛屼竴娆℃帰娲汇€俁unningHub 浠呮鏌?API Key + 瀹㈡埛绔槸鍚﹀彲鏋勯€狅紝涓嶄細鍙戦€佺湡瀹炰换鍔★紙涓嶈璐癸級銆傛湰鍦?ComfyUI 浼氬彂璧蜂竴娆?GET /system_stats 鎺㈡祴銆?,
+    "wf.probe.ok": "宸茶繛鎺?,
+    "wf.probe.fail": "杩炴帴澶辫触",
+    "wf.probe.dependency_hint": "鎻愮ず锛歊unningHub 宸ヤ綔娴侀渶瑕?comfykit Python 鍖咃紝璇疯繍琛?pip install comfykit>=0.1.12 鍚庨噸鍚湇鍔°€?,
+    "series.title": "鍓ч泦",
+    "series.subtitle": "澶氶泦绯诲垪绠＄悊锛岃法闆嗗鐢ㄨ鑹层€侀鏍煎拰鍚庣鍋忓ソ",
+    "series.btn.new": "鏂板缓鍓ч泦",
+    "series.list.empty.title": "杩樻病鏈夊墽闆?,
+    "series.list.empty.hint": "鏂板缓涓€涓郴鍒楋紝鎶婃瘡涓€闆嗛兘鎸傚湪瀹冧笅闈紝鍙鐢ㄥ悓涓€缁勮鑹插拰榛樿椋庢牸銆?,
+    "series.label.title": "鏍囬",
+    "series.label.summary": "绠€浠?,
+    "series.label.style": "榛樿缇庢湳椋庢牸",
+    "series.label.ratio": "榛樿鐢婚潰姣斾緥",
+    "series.label.backend": "榛樿鐢熸垚鍚庣",
+    "series.label.characters": "榛樿缁戝畾瑙掕壊",
+    "series.label.cover": "灏侀潰鍥?URL",
+    "series.placeholder.title": "濡傦細鍓戠伒瑙夐啋涔嬫潕闆?,
+    "series.placeholder.summary": "涓€鍙ヨ瘽鍓ф儏绠€浠?,
+    "series.placeholder.cover": "https://... 鐣欑┖浣跨敤榛樿灏侀潰",
+    "series.btn.save": "淇濆瓨",
+    "series.btn.cancel": "鍙栨秷",
+    "series.btn.delete": "鍒犻櫎",
+    "series.confirm.delete": "纭畾鍒犻櫎璇ュ墽闆嗭紵鎵€鏈夋寕鍦ㄥ畠涓嬮潰鐨勫墽闆?episode 涓嶄細琚垹闄わ紝浣嗕細澶卞幓鍏宠仈銆?,
+    "series.toast.created": "鍓ч泦宸插垱寤?,
+    "series.toast.updated": "鍓ч泦宸叉洿鏂?,
+    "series.toast.deleted": "鍓ч泦宸插垹闄?,
+    "series.card.no_chars": "鏈粦瀹氳鑹?,
+    "series.card.chars_count": "{n} 涓鑹?,
+    "series.section.episodes": "鏈墽闆嗗凡鍑虹墖",
+    "series.episodes.empty": "杩樻病鏈?episode锛屽幓 Studio 閫夋嫨銆岀粦瀹氬墽闆嗐€嶇敓鎴愪竴闆嗗惂銆?,
+    "series.episodes.delete": "鍒犻櫎璇ラ泦锛堣繛鍚?final.mp4锛?,
+    "series.episodes.confirm_delete": "纭畾鍒犻櫎銆寋title}銆嶏紵璇ラ泦鐨勮棰戜笌涓棿浜х墿浼氫竴骞舵竻鐞嗭紝涓嶅彲鎭㈠銆?,
+    "series.episodes.delete_failed": "鍒犻櫎澶辫触锛歿msg}",
+    "settings.title": "璁剧疆",
+    "settings.subtitle": "API Key銆佸悗绔厤缃€佸瓨鍌ㄤ笌榛樿鍋忓ソ閮藉湪杩欓噷",
+    "settings.btn.save": "淇濆瓨鍏ㄩ儴",
+    "settings.btn.saved.badge": "宸蹭繚瀛?,
+    "settings.btn.test": "娴嬭瘯杩炴帴",
+    "settings.btn.show": "鏄剧ず",
+    "settings.btn.hide": "闅愯棌",
+    "settings.btn.browse": "娴忚鈥?,
+    "settings.btn.open": "鎵撳紑",
+    "settings.btn.refresh": "鍒锋柊",
+    "settings.toast.saved": "璁剧疆宸蹭繚瀛?,
+    "settings.toast.savedField": "{field} 宸蹭繚瀛?,
+    "settings.toast.failed": "淇濆瓨澶辫触锛歿msg}",
+    "settings.toast.testOk": "{label} 杩炴帴鎴愬姛",
+    "settings.toast.testFail": "{label} 杩炴帴澶辫触锛歿msg}",
+    "settings.toast.cleanupOk": "宸叉竻鐞?{n} 鏉′换鍔★紝{dirs} 涓洰褰曡鍒犻櫎",
+    "settings.callout.required": "蹇呭～椤?,
+    "settings.section.backend": "榛樿鐢熸垚鍚庣",
+    "settings.section.backend.hint": "鏂板缓鍓ч泦鏃跺鏋滄病鏈夌壒鍒寚瀹氾紝浣跨敤杩欓噷閫夌殑鍚庣銆傛瘡涓墽闆嗗拰姣忔浠诲姟閮藉彲浠ュ崟鐙鐩栥€?,
+    "settings.backend.direct.title": "鐩磋繛浜戠",
+    "settings.backend.direct.desc": "Ark Seedance + 閫氫箟涓囩浉 + DashScope 閫氳繃 API 鐩存帴璋冪敤锛屼笉闇€瑕?ComfyUI 宸ヤ綔娴併€?,
+    "settings.backend.runninghub.title": "RunningHub 宸ヤ綔娴?,
+    "settings.backend.runninghub.desc": "浜戠 ComfyUI 宸ヤ綔娴侊紙鎸夌畻鍔涜璐癸級锛屽彲澶嶇敤绀惧尯鍒嗕韩鐨?workflow_id銆?,
+    "settings.backend.comfyui_local.title": "鏈湴 ComfyUI",
+    "settings.backend.comfyui_local.desc": "瀵规帴浣犳湰鏈烘垨灞€鍩熺綉鍐呰嚜寤虹殑 ComfyUI 鏈嶅姟锛岄渶鎻愬墠鍑嗗濂?workflow JSON銆?,
+    "settings.section.workflow_backend": "宸ヤ綔娴佸悗绔紙浜戠 / 鏈湴锛?,
+    "settings.section.workflow_backend.hint": "褰撶敓鎴愬悗绔€夋嫨 RunningHub 鎴栨湰鍦?ComfyUI 鏃讹紝杩欓噷鎸囧畾鍏蜂綋璧板摢涓€涓€?,
+    "settings.section.deps": "渚濊禆妫€娴?,
+    "settings.section.deps.hint": "鎻掍欢杩愯鎵€闇€鐨勫彲閫?Python 鍖呫€傗湏 宸插氨缁彲绔嬪嵆浣跨敤锛涒殸 鏈畨瑁呭彲涓€閿嚜鍔ㄥ畨瑁呭埌鎻掍欢绉佹湁鐩綍銆?,
+    "settings.deps.installed": "宸插氨缁?,
+    "settings.deps.missing": "鏈畨瑁?,
+    "settings.deps.installing": "姝ｅ湪瀹夎鈥?,
+    "settings.deps.btn.install": "涓€閿畨瑁?,
+    "settings.deps.btn.reinstall": "寮哄埗閲嶈",
+    "settings.deps.btn.recheck": "閲嶆柊妫€娴?,
+    "settings.deps.target": "瀹夎鐩爣锛歿target}",
+    "settings.deps.error": "涓婃澶辫触锛歿msg}",
+    "settings.deps.toast.started": "{name} 瀹夎宸插紑濮嬶紝璇风◢鍊欌€?,
+    "settings.deps.toast.failed": "{name} 瑙﹀彂瀹夎澶辫触锛歿msg}",
     "settings.section.api": "API Keys",
-    "settings.section.oss": "OSS 对象存储",
+    "settings.section.oss": "OSS 瀵硅薄瀛樺偍",
     "settings.section.runninghub": "RunningHub",
-    "settings.section.comfyui": "本地 ComfyUI",
-    "settings.section.tts": "TTS 引擎",
-    "settings.section.defaults": "默认偏好",
-    "settings.section.storage": "存储与清理",
-    "settings.section.advanced": "高级",
-    "settings.section.about": "关于",
-    "settings.label.ark": "火山方舟 API Key",
-    "settings.label.ark.hint": "用于调用 Seedance 视频生成模型。获取地址：",
-    "settings.label.ark.console": "火山方舟控制台",
-    "settings.label.dashscope": "阿里 DashScope API Key",
-    "settings.label.dashscope.hint": "用于通义万相生图与 CosyVoice 语音合成。获取地址：",
-    "settings.label.dashscope.console": "阿里云百炼控制台",
-    "settings.label.dashscope.region": "DashScope 区域",
-    "settings.label.dashscope.region.bj": "中国大陆（北京）",
-    "settings.label.dashscope.region.sg": "国际（新加坡）",
-    "settings.label.tts": "TTS 引擎",
-    "settings.tts.edge": "Edge-TTS（免费，微软 SDK）",
-    "settings.tts.cosyvoice": "CosyVoice-v2（DashScope 计费）",
-    "settings.tts.edgeVoice": "Edge-TTS 默认音色",
-    "settings.tts.cosyHint": "CosyVoice 音色在创建剧集时按角色选择，按 ¥0.20 / 万字计费。",
-    "settings.label.threshold": "单集费用上限（CNY）",
-    "settings.threshold.hint.title": "费用是怎么算出来的？",
-    "settings.threshold.hint.body": "估算公式 = 剧本（qwen-vl-max ≈ ¥0.044/k token）+ 分镜出图（{img} × ¥{imgPrice}/张）+ 图生视频（时长 × ¥{vidPrice}/秒）+ TTS（CosyVoice ¥0.20/万字 或 Edge 免费）。超过此阈值时会弹窗二次确认；设为 0 = 永不拦截。",
-    "settings.label.defaults.resolution": "默认分辨率",
-    "settings.oss.hint": "RunningHub / DashScope 需要从 OSS 签名 URL 拉取素材，4 个字段必须同时填好。",
-    "settings.oss.console": "OSS 控制台",
-    "settings.label.oss_endpoint": "终端地址 (Endpoint)",
-    "settings.label.oss_bucket": "存储桶 (Bucket)",
-    "settings.label.oss_ak": "访问密钥 ID (AccessKey ID)",
-    "settings.label.oss_sk": "访问密钥 Secret (AccessKey Secret)",
-    "settings.label.oss_prefix": "对象路径前缀（可选）",
-    "settings.oss.prefix.hint": "所有对象会写到 {prefix}/uploads/... 下。",
-    "settings.oss.savedSecret": "已保存（重新输入将覆盖）",
-    "settings.oss.err.endpoint": "Endpoint 应当以 .aliyuncs.com 结尾，例如 https://oss-cn-beijing.aliyuncs.com",
-    "settings.oss.err.endpointBucket": "看起来 bucket 也粘进来了；这里只填地域 endpoint，bucket 名移到下一字段。",
-    "settings.oss.err.bucketDot": "Bucket 字段不能包含 . — 你可能把完整域名填到了这里。",
-    "settings.oss.err.bucketShape": "Bucket 名只能含小写字母 / 数字 / 连字符 (-)，长度 3-63，首尾必须是字母或数字。",
-    "settings.oss.err.akShape": "AccessKey ID 通常以 LTAI 开头，且长度 ≥ 14 位；请确认未把 Secret 粘到这里。",
-    "settings.oss.err.skShort": "Secret 长度看起来不够（实际通常为 30 位）。",
+    "settings.section.comfyui": "鏈湴 ComfyUI",
+    "settings.section.tts": "TTS 寮曟搸",
+    "settings.section.defaults": "榛樿鍋忓ソ",
+    "settings.section.storage": "瀛樺偍涓庢竻鐞?,
+    "settings.section.advanced": "楂樼骇",
+    "settings.section.about": "鍏充簬",
+    "settings.label.ark": "鐏北鏂硅垷 API Key",
+    "settings.label.ark.hint": "鐢ㄤ簬璋冪敤 Seedance 瑙嗛鐢熸垚妯″瀷銆傝幏鍙栧湴鍧€锛?,
+    "settings.label.ark.console": "鐏北鏂硅垷鎺у埗鍙?,
+    "settings.label.dashscope": "闃块噷 DashScope API Key",
+    "settings.label.dashscope.hint": "鐢ㄤ簬閫氫箟涓囩浉鐢熷浘涓?CosyVoice 璇煶鍚堟垚銆傝幏鍙栧湴鍧€锛?,
+    "settings.label.dashscope.console": "闃块噷浜戠櫨鐐兼帶鍒跺彴",
+    "settings.label.dashscope.region": "DashScope 鍖哄煙",
+    "settings.label.dashscope.region.bj": "涓浗澶ч檰锛堝寳浜級",
+    "settings.label.dashscope.region.sg": "鍥介檯锛堟柊鍔犲潯锛?,
+    "settings.label.tts": "TTS 寮曟搸",
+    "settings.tts.edge": "Edge-TTS锛堝厤璐癸紝寰蒋 SDK锛?,
+    "settings.tts.cosyvoice": "CosyVoice-v2锛圖ashScope 璁¤垂锛?,
+    "settings.tts.edgeVoice": "Edge-TTS 榛樿闊宠壊",
+    "settings.tts.cosyHint": "CosyVoice 闊宠壊鍦ㄥ垱寤哄墽闆嗘椂鎸夎鑹查€夋嫨锛屾寜 楼0.20 / 涓囧瓧璁¤垂銆?,
+    "settings.label.threshold": "鍗曢泦璐圭敤涓婇檺锛圕NY锛?,
+    "settings.threshold.hint.title": "璐圭敤鏄€庝箞绠楀嚭鏉ョ殑锛?,
+    "settings.threshold.hint.body": "浼扮畻鍏紡 = 鍓ф湰锛坬wen-vl-max 鈮?楼0.044/k token锛? 鍒嗛暅鍑哄浘锛坽img} 脳 楼{imgPrice}/寮狅級+ 鍥剧敓瑙嗛锛堟椂闀?脳 楼{vidPrice}/绉掞級+ TTS锛圕osyVoice 楼0.20/涓囧瓧 鎴?Edge 鍏嶈垂锛夈€傝秴杩囨闃堝€兼椂浼氬脊绐椾簩娆＄‘璁わ紱璁句负 0 = 姘镐笉鎷︽埅銆?,
+    "settings.label.defaults.resolution": "榛樿鍒嗚鲸鐜?,
+    "settings.oss.hint": "RunningHub / DashScope 闇€瑕佷粠 OSS 绛惧悕 URL 鎷夊彇绱犳潗锛? 涓瓧娈靛繀椤诲悓鏃跺～濂姐€?,
+    "settings.oss.console": "OSS 鎺у埗鍙?,
+    "settings.label.oss_endpoint": "缁堢鍦板潃 (Endpoint)",
+    "settings.label.oss_bucket": "瀛樺偍妗?(Bucket)",
+    "settings.label.oss_ak": "璁块棶瀵嗛挜 ID (AccessKey ID)",
+    "settings.label.oss_sk": "璁块棶瀵嗛挜 Secret (AccessKey Secret)",
+    "settings.label.oss_prefix": "瀵硅薄璺緞鍓嶇紑锛堝彲閫夛級",
+    "settings.oss.prefix.hint": "鎵€鏈夊璞′細鍐欏埌 {prefix}/uploads/... 涓嬨€?,
+    "settings.oss.savedSecret": "宸蹭繚瀛橈紙閲嶆柊杈撳叆灏嗚鐩栵級",
+    "settings.oss.err.endpoint": "Endpoint 搴斿綋浠?.aliyuncs.com 缁撳熬锛屼緥濡?https://oss-cn-beijing.aliyuncs.com",
+    "settings.oss.err.endpointBucket": "鐪嬭捣鏉?bucket 涔熺矘杩涙潵浜嗭紱杩欓噷鍙～鍦板煙 endpoint锛宐ucket 鍚嶇Щ鍒颁笅涓€瀛楁銆?,
+    "settings.oss.err.bucketDot": "Bucket 瀛楁涓嶈兘鍖呭惈 . 鈥?浣犲彲鑳芥妸瀹屾暣鍩熷悕濉埌浜嗚繖閲屻€?,
+    "settings.oss.err.bucketShape": "Bucket 鍚嶅彧鑳藉惈灏忓啓瀛楁瘝 / 鏁板瓧 / 杩炲瓧绗?(-)锛岄暱搴?3-63锛岄灏惧繀椤绘槸瀛楁瘝鎴栨暟瀛椼€?,
+    "settings.oss.err.akShape": "AccessKey ID 閫氬父浠?LTAI 寮€澶达紝涓旈暱搴?鈮?14 浣嶏紱璇风‘璁ゆ湭鎶?Secret 绮樺埌杩欓噷銆?,
+    "settings.oss.err.skShort": "Secret 闀垮害鐪嬭捣鏉ヤ笉澶燂紙瀹為檯閫氬父涓?30 浣嶏級銆?,
     "settings.label.rh_api_key": "RunningHub API Key",
-    "settings.label.rh_api_key.hint": "获取地址：",
-    "settings.label.rh_console": "RunningHub 控制台",
-    "settings.label.rh_instance": "实例规格",
-    "settings.label.rh_instance.standard": "Standard（基础）",
-    "settings.label.rh_instance.plus": "Plus（推荐 / 含高显存模型）",
-    "settings.label.rh_workflows": "Workflow 预设",
-    "settings.label.rh_workflows.hint": "为每个生成模式预设 RunningHub workflow_id（在 RH 控制台拷贝）。留空则使用 Studio tab 现填的工作流。",
-    "settings.label.cf_url": "ComfyUI 地址",
+    "settings.label.rh_api_key.hint": "鑾峰彇鍦板潃锛?,
+    "settings.label.rh_console": "RunningHub 鎺у埗鍙?,
+    "settings.label.rh_instance": "瀹炰緥瑙勬牸",
+    "settings.label.rh_instance.standard": "Standard锛堝熀纭€锛?,
+    "settings.label.rh_instance.plus": "Plus锛堟帹鑽?/ 鍚珮鏄惧瓨妯″瀷锛?,
+    "settings.label.rh_workflows": "Workflow 棰勮",
+    "settings.label.rh_workflows.hint": "涓烘瘡涓敓鎴愭ā寮忛璁?RunningHub workflow_id锛堝湪 RH 鎺у埗鍙版嫹璐濓級銆傜暀绌哄垯浣跨敤 Studio tab 鐜板～鐨勫伐浣滄祦銆?,
+    "settings.label.cf_url": "ComfyUI 鍦板潃",
     "settings.label.cf_url.placeholder": "http://127.0.0.1:8188",
-    "settings.label.cf_api_key": "API Key（可选）",
-    "settings.label.cf_api_key.placeholder": "留空则不鉴权",
-    "settings.label.cf_workflows.hint": "为每个生成模式预设本地 workflow_id 或 .json 文件路径。",
-    "settings.workflow.image": "生图工作流（image）",
-    "settings.workflow.animate": "图生视频工作流（i2v）",
-    "settings.workflow.t2v": "文生视频工作流（t2v）",
-    "settings.workflow.placeholder.id": "粘贴 workflow_id",
-    "settings.workflow.placeholder.path": "workflow_id 或本地路径",
-    "settings.storage.dir": "数据目录",
-    "settings.storage.dir.placeholder": "留空 = 使用默认 (~/.synapse/...)",
-    "settings.storage.dir.hint": "所有生成产物（final.mp4 / 中间帧 / 角色参考图）都存放在该目录。改路径需要重新加载插件后生效。",
-    "settings.storage.dir.active": "当前生效目录：",
-    "settings.storage.dir.pendingReload": "新路径将在下次加载插件时生效。",
-    "settings.storage.subdir": "输出子目录",
-    "settings.storage.subdir.task": "task — outputs/{task_id}/...",
-    "settings.storage.subdir.date": "date — outputs/2026-04-22/...",
-    "settings.storage.subdir.mode": "mode — outputs/photo_speak/...",
-    "settings.storage.subdir.dateMode": "date_mode — outputs/2026-04-22/photo_speak/...",
-    "settings.storage.subdir.flat": "flat — outputs/...",
-    "settings.storage.naming": "命名规则",
-    "settings.storage.naming.filename": "{filename} — 保留 CDN 原名",
-    "settings.storage.naming.task": "{task_id} — 任务 ID",
+    "settings.label.cf_api_key": "API Key锛堝彲閫夛級",
+    "settings.label.cf_api_key.placeholder": "鐣欑┖鍒欎笉閴存潈",
+    "settings.label.cf_workflows.hint": "涓烘瘡涓敓鎴愭ā寮忛璁炬湰鍦?workflow_id 鎴?.json 鏂囦欢璺緞銆?,
+    "settings.workflow.image": "鐢熷浘宸ヤ綔娴侊紙image锛?,
+    "settings.workflow.animate": "鍥剧敓瑙嗛宸ヤ綔娴侊紙i2v锛?,
+    "settings.workflow.t2v": "鏂囩敓瑙嗛宸ヤ綔娴侊紙t2v锛?,
+    "settings.workflow.placeholder.id": "绮樿创 workflow_id",
+    "settings.workflow.placeholder.path": "workflow_id 鎴栨湰鍦拌矾寰?,
+    "settings.storage.dir": "鏁版嵁鐩綍",
+    "settings.storage.dir.placeholder": "鐣欑┖ = 浣跨敤榛樿 (~/.synapse/...)",
+    "settings.storage.dir.hint": "鎵€鏈夌敓鎴愪骇鐗╋紙final.mp4 / 涓棿甯?/ 瑙掕壊鍙傝€冨浘锛夐兘瀛樻斁鍦ㄨ鐩綍銆傛敼璺緞闇€瑕侀噸鏂板姞杞芥彃浠跺悗鐢熸晥銆?,
+    "settings.storage.dir.active": "褰撳墠鐢熸晥鐩綍锛?,
+    "settings.storage.dir.pendingReload": "鏂拌矾寰勫皢鍦ㄤ笅娆″姞杞芥彃浠舵椂鐢熸晥銆?,
+    "settings.storage.subdir": "杈撳嚭瀛愮洰褰?,
+    "settings.storage.subdir.task": "task 鈥?outputs/{task_id}/...",
+    "settings.storage.subdir.date": "date 鈥?outputs/2026-04-22/...",
+    "settings.storage.subdir.mode": "mode 鈥?outputs/photo_speak/...",
+    "settings.storage.subdir.dateMode": "date_mode 鈥?outputs/2026-04-22/photo_speak/...",
+    "settings.storage.subdir.flat": "flat 鈥?outputs/...",
+    "settings.storage.naming": "鍛藉悕瑙勫垯",
+    "settings.storage.naming.filename": "{filename} 鈥?淇濈暀 CDN 鍘熷悕",
+    "settings.storage.naming.task": "{task_id} 鈥?浠诲姟 ID",
     "settings.storage.naming.dateMode": "{date}_{mode}_{short_id}",
     "settings.storage.naming.dateTime": "{date}_{time}_{short_id}",
     "settings.storage.naming.modeShort": "{mode}_{short_id}",
-    "settings.storage.naming.hint": "占位符：{task_id} {short_id} {date} {time} {datetime} {mode} {filename}",
-    "settings.storage.retention": "保留天数",
-    "settings.storage.retention.hint": "{n} 天前完成（成功/失败/取消）的任务会被「立即清理」按钮一并删除。",
-    "settings.storage.cleanup.btn": "立即清理",
-    "settings.storage.stat.dataDir": "数据目录",
-    "settings.storage.stat.episodes": "剧集产物",
-    "settings.storage.stat.uploads": "上传素材",
-    "settings.storage.stat.tasks": "任务缓存",
-    "settings.storage.stat.fileCount": "{n} 个文件",
-    "settings.storage.size": "总大小",
-    "settings.storage.files": "文件数",
-    "settings.storage.refresh": "刷新",
-    "settings.storage.loading": "正在统计…",
-    "settings.storage.failed": "无法获取存储信息：{msg}",
-    "settings.label.timeout": "请求超时（秒）",
-    "settings.label.maxRetry": "最大重试次数",
-    "settings.about.version": "版本",
-    "settings.about.engine": "引擎矩阵",
-    "common.loading": "加载中…",
-    "common.error": "出错了：{msg}",
-    "common.empty": "暂无数据",
-    "common.copy": "复制",
-    "common.copied": "已复制",
-    "init.error.title": "插件初始化失败",
-    "init.error.hint": "请查看后端日志或重启 Synapse。如反复出现，可清空 data/manga.db 触发重建。",
-    "banner.noKey.title": "尚未配置 API Key",
-    "banner.noKey.desc": "至少需要配置「火山方舟」或「DashScope」其中一个 Key，才能在工作室提交生成任务。",
-    "banner.noKey.cta": "前往配置",
+    "settings.storage.naming.hint": "鍗犱綅绗︼細{task_id} {short_id} {date} {time} {datetime} {mode} {filename}",
+    "settings.storage.retention": "淇濈暀澶╂暟",
+    "settings.storage.retention.hint": "{n} 澶╁墠瀹屾垚锛堟垚鍔?澶辫触/鍙栨秷锛夌殑浠诲姟浼氳銆岀珛鍗虫竻鐞嗐€嶆寜閽竴骞跺垹闄ゃ€?,
+    "settings.storage.cleanup.btn": "绔嬪嵆娓呯悊",
+    "settings.storage.stat.dataDir": "鏁版嵁鐩綍",
+    "settings.storage.stat.episodes": "鍓ч泦浜х墿",
+    "settings.storage.stat.uploads": "涓婁紶绱犳潗",
+    "settings.storage.stat.tasks": "浠诲姟缂撳瓨",
+    "settings.storage.stat.fileCount": "{n} 涓枃浠?,
+    "settings.storage.size": "鎬诲ぇ灏?,
+    "settings.storage.files": "鏂囦欢鏁?,
+    "settings.storage.refresh": "鍒锋柊",
+    "settings.storage.loading": "姝ｅ湪缁熻鈥?,
+    "settings.storage.failed": "鏃犳硶鑾峰彇瀛樺偍淇℃伅锛歿msg}",
+    "settings.label.timeout": "璇锋眰瓒呮椂锛堢锛?,
+    "settings.label.maxRetry": "鏈€澶ч噸璇曟鏁?,
+    "settings.about.version": "鐗堟湰",
+    "settings.about.engine": "寮曟搸鐭╅樀",
+    "common.loading": "鍔犺浇涓€?,
+    "common.error": "鍑洪敊浜嗭細{msg}",
+    "common.empty": "鏆傛棤鏁版嵁",
+    "common.copy": "澶嶅埗",
+    "common.copied": "宸插鍒?,
+    "init.error.title": "鎻掍欢鍒濆鍖栧け璐?,
+    "init.error.hint": "璇锋煡鐪嬪悗绔棩蹇楁垨閲嶅惎 Synapse銆傚鍙嶅鍑虹幇锛屽彲娓呯┖ data/manga.db 瑙﹀彂閲嶅缓銆?,
+    "banner.noKey.title": "灏氭湭閰嶇疆 API Key",
+    "banner.noKey.desc": "鑷冲皯闇€瑕侀厤缃€岀伀灞辨柟鑸熴€嶆垨銆孌ashScope銆嶅叾涓竴涓?Key锛屾墠鑳藉湪宸ヤ綔瀹ゆ彁浜ょ敓鎴愪换鍔°€?,
+    "banner.noKey.cta": "鍓嶅線閰嶇疆",
   },
   en: {
     "app.title": "Manga Studio",
@@ -1462,7 +1462,7 @@ const I18N = {
     "studio.section.series": "Bind to Series",
     "studio.label.series": "Series",
     "studio.option.no_series": "Standalone (no series binding)",
-    "studio.series.applied": "Applied defaults from \"{title}\" — style / ratio / backend / characters",
+    "studio.series.applied": "Applied defaults from \"{title}\" 鈥?style / ratio / backend / characters",
     "studio.hint.ratio_inherited": "Inherited from this series.",
     "studio.hint.ratio_override": "Overrides series default {def} (this episode only).",
     "studio.hint.style_override": "Overrides series default style {def} (this episode only).",
@@ -1491,7 +1491,7 @@ const I18N = {
     "studio.cost.total": "Estimated Total",
     "studio.cost.exceeds": "Estimated cost exceeds the configured threshold; confirm before submitting.",
     "studio.btn.submit": "Generate Drama",
-    "studio.btn.submit.loading": "Submitting…",
+    "studio.btn.submit.loading": "Submitting鈥?,
     "studio.confirm.title": "Cost exceeds threshold",
     "studio.confirm.desc": "Estimated cost is {cost}, above your {threshold} threshold. Continue to charge and generate.",
     "studio.confirm.ok": "Confirm",
@@ -1522,7 +1522,7 @@ const I18N = {
     "char.subtitle": "Reusable characters and reference images for cross-panel consistency",
     "char.btn.new": "New Character",
     "char.list.empty.title": "No characters yet",
-    "char.list.empty.hint": "Create a character with 1–3 reference images; pick it on each generation to keep the same look across panels.",
+    "char.list.empty.hint": "Create a character with 1鈥? reference images; pick it on each generation to keep the same look across panels.",
     "char.label.name": "Name",
     "char.label.role": "Role",
     "char.label.gender": "Gender",
@@ -1541,9 +1541,9 @@ const I18N = {
     "char.gender.neutral": "Neutral",
     "char.gender.unknown": "Unspecified",
     "char.refs.upload": "Upload reference",
-    "char.refs.uploading": "Uploading…",
+    "char.refs.uploading": "Uploading鈥?,
     "char.refs.empty": "No reference images yet. We strongly recommend at least one front-facing photo for consistent results.",
-    "char.refs.hint": "1–3 references work best; more often confuses the model. PNG/JPG up to 5 MB each.",
+    "char.refs.hint": "1鈥? references work best; more often confuses the model. PNG/JPG up to 5 MB each.",
     "char.refs.remove": "Remove",
     "char.btn.save": "Save",
     "char.btn.cancel": "Cancel",
@@ -1567,7 +1567,7 @@ const I18N = {
     "wf.section.comfyui_local": "Local ComfyUI Configuration",
     "wf.label.rh_api_key": "RunningHub API Key",
     "wf.placeholder.rh_api_key": "rhk-...",
-    "wf.hint.rh_api_key": "Get this from RunningHub console → My → API Keys.",
+    "wf.hint.rh_api_key": "Get this from RunningHub console 鈫?My 鈫?API Keys.",
     "wf.label.local_url": "ComfyUI URL",
     "wf.placeholder.local_url": "http://127.0.0.1:8188",
     "wf.hint.local_url": "The address ComfyUI prints on start-up, usually port 8188. The ComfyUI process must stay running.",
@@ -1581,15 +1581,15 @@ const I18N = {
     "wf.placeholder.workflow_path_local": "/path/to/workflow.json",
     "wf.section.probe": "Connection Test",
     "wf.btn.probe": "Test Connection",
-    "wf.btn.probe.loading": "Testing…",
+    "wf.btn.probe.loading": "Testing鈥?,
     "wf.btn.save": "Save",
-    "wf.btn.save.loading": "Saving…",
+    "wf.btn.save.loading": "Saving鈥?,
     "wf.toast.saved": "Workflow settings saved",
     "wf.probe.title": "Probe Result",
     "wf.probe.idle": "Click \"Test Connection\" to run a probe. RunningHub only validates the API key + that the client can be constructed (no billable workflow run). Local ComfyUI issues a single GET /system_stats.",
     "wf.probe.ok": "Connected",
     "wf.probe.fail": "Failed",
-    "wf.probe.dependency_hint": "Tip: RunningHub workflow execution needs the comfykit Python package — run pip install comfykit>=0.1.12 and restart the server.",
+    "wf.probe.dependency_hint": "Tip: RunningHub workflow execution needs the comfykit Python package 鈥?run pip install comfykit>=0.1.12 and restart the server.",
     "series.title": "Series",
     "series.subtitle": "Multi-episode container; reuse characters, style and backend across episodes",
     "series.btn.new": "New Series",
@@ -1617,16 +1617,16 @@ const I18N = {
     "series.section.episodes": "Episodes in this series",
     "series.episodes.empty": "No episodes yet. Open Studio, select \"Bind to series\" and generate one.",
     "series.episodes.delete": "Delete this episode (and its final.mp4)",
-    "series.episodes.confirm_delete": "Delete \"{title}\"? Its final video and intermediate files will be wiped — this can't be undone.",
+    "series.episodes.confirm_delete": "Delete \"{title}\"? Its final video and intermediate files will be wiped 鈥?this can't be undone.",
     "series.episodes.delete_failed": "Delete failed: {msg}",
     "settings.title": "Settings",
-    "settings.subtitle": "API keys, backend wiring, storage and default preferences — all in one place.",
+    "settings.subtitle": "API keys, backend wiring, storage and default preferences 鈥?all in one place.",
     "settings.btn.save": "Save all",
     "settings.btn.saved.badge": "saved",
     "settings.btn.test": "Test connection",
     "settings.btn.show": "Show",
     "settings.btn.hide": "Hide",
-    "settings.btn.browse": "Browse…",
+    "settings.btn.browse": "Browse鈥?,
     "settings.btn.open": "Open",
     "settings.btn.refresh": "Refresh",
     "settings.toast.saved": "Settings saved",
@@ -1647,16 +1647,16 @@ const I18N = {
     "settings.section.workflow_backend": "Workflow backend (cloud / local)",
     "settings.section.workflow_backend.hint": "Picks which workflow runner to use when the generation backend is set to RunningHub or local ComfyUI.",
     "settings.section.deps": "Dependency check",
-    "settings.section.deps.hint": "Optional Python packages this plugin can use. ✓ ready means you're set; ⚠ missing offers a one-click install into a plugin-private folder.",
+    "settings.section.deps.hint": "Optional Python packages this plugin can use. 鉁?ready means you're set; 鈿?missing offers a one-click install into a plugin-private folder.",
     "settings.deps.installed": "Ready",
     "settings.deps.missing": "Not installed",
-    "settings.deps.installing": "Installing…",
+    "settings.deps.installing": "Installing鈥?,
     "settings.deps.btn.install": "Install",
     "settings.deps.btn.reinstall": "Reinstall",
     "settings.deps.btn.recheck": "Re-check",
     "settings.deps.target": "Install target: {target}",
     "settings.deps.error": "Last error: {msg}",
-    "settings.deps.toast.started": "Started installing {name}, please wait…",
+    "settings.deps.toast.started": "Started installing {name}, please wait鈥?,
     "settings.deps.toast.failed": "Failed to start install for {name}: {msg}",
     "settings.section.api": "API Keys",
     "settings.section.oss": "OSS Object Storage",
@@ -1680,10 +1680,10 @@ const I18N = {
     "settings.tts.edge": "Edge-TTS (free, Microsoft SDK)",
     "settings.tts.cosyvoice": "CosyVoice-v2 (DashScope billed)",
     "settings.tts.edgeVoice": "Edge-TTS default voice",
-    "settings.tts.cosyHint": "CosyVoice voices are picked per-character at episode time. Billed at ¥0.20 / 10k chars.",
+    "settings.tts.cosyHint": "CosyVoice voices are picked per-character at episode time. Billed at 楼0.20 / 10k chars.",
     "settings.label.threshold": "Per-episode cost cap (CNY)",
     "settings.threshold.hint.title": "How is the cost computed?",
-    "settings.threshold.hint.body": "Estimate = script (qwen-vl-max ≈ ¥0.044/k tokens) + panel images ({img} × ¥{imgPrice}/img) + image-to-video (duration_s × ¥{vidPrice}/s) + TTS (CosyVoice ¥0.20/10k chars or Edge free). Above this cap a confirmation modal pops up; set to 0 to disable.",
+    "settings.threshold.hint.body": "Estimate = script (qwen-vl-max 鈮?楼0.044/k tokens) + panel images ({img} 脳 楼{imgPrice}/img) + image-to-video (duration_s 脳 楼{vidPrice}/s) + TTS (CosyVoice 楼0.20/10k chars or Edge free). Above this cap a confirmation modal pops up; set to 0 to disable.",
     "settings.label.defaults.resolution": "Default resolution",
     "settings.oss.hint": "RunningHub / DashScope must fetch assets via OSS signed URL. All four fields are required together.",
     "settings.oss.console": "OSS Console",
@@ -1696,9 +1696,9 @@ const I18N = {
     "settings.oss.savedSecret": "saved (typing replaces it)",
     "settings.oss.err.endpoint": "Endpoint should end with .aliyuncs.com (e.g. https://oss-cn-beijing.aliyuncs.com).",
     "settings.oss.err.endpointBucket": "Looks like the bucket name is glued in here; only put the regional endpoint above, bucket goes in the next field.",
-    "settings.oss.err.bucketDot": "Bucket must not contain '.' — you may have pasted a full domain.",
+    "settings.oss.err.bucketDot": "Bucket must not contain '.' 鈥?you may have pasted a full domain.",
     "settings.oss.err.bucketShape": "Bucket: lower-case letters, digits and hyphens only; length 3-63; first/last char must be alnum.",
-    "settings.oss.err.akShape": "AccessKey ID usually starts with LTAI and is ≥ 14 chars; double-check you didn't paste the Secret here.",
+    "settings.oss.err.akShape": "AccessKey ID usually starts with LTAI and is 鈮?14 chars; double-check you didn't paste the Secret here.",
     "settings.oss.err.skShort": "Secret looks too short (real ones are typically 30 chars).",
     "settings.label.rh_api_key": "RunningHub API Key",
     "settings.label.rh_api_key.hint": "Get yours at:",
@@ -1724,14 +1724,14 @@ const I18N = {
     "settings.storage.dir.active": "Active path:",
     "settings.storage.dir.pendingReload": "New path will take effect on next plugin reload.",
     "settings.storage.subdir": "Output subdir",
-    "settings.storage.subdir.task": "task — outputs/{task_id}/...",
-    "settings.storage.subdir.date": "date — outputs/2026-04-22/...",
-    "settings.storage.subdir.mode": "mode — outputs/photo_speak/...",
-    "settings.storage.subdir.dateMode": "date_mode — outputs/2026-04-22/photo_speak/...",
-    "settings.storage.subdir.flat": "flat — outputs/...",
+    "settings.storage.subdir.task": "task 鈥?outputs/{task_id}/...",
+    "settings.storage.subdir.date": "date 鈥?outputs/2026-04-22/...",
+    "settings.storage.subdir.mode": "mode 鈥?outputs/photo_speak/...",
+    "settings.storage.subdir.dateMode": "date_mode 鈥?outputs/2026-04-22/photo_speak/...",
+    "settings.storage.subdir.flat": "flat 鈥?outputs/...",
     "settings.storage.naming": "Filename rule",
-    "settings.storage.naming.filename": "{filename} — keep CDN-supplied name",
-    "settings.storage.naming.task": "{task_id} — task id",
+    "settings.storage.naming.filename": "{filename} 鈥?keep CDN-supplied name",
+    "settings.storage.naming.task": "{task_id} 鈥?task id",
     "settings.storage.naming.dateMode": "{date}_{mode}_{short_id}",
     "settings.storage.naming.dateTime": "{date}_{time}_{short_id}",
     "settings.storage.naming.modeShort": "{mode}_{short_id}",
@@ -1747,13 +1747,13 @@ const I18N = {
     "settings.storage.size": "Total size",
     "settings.storage.files": "Files",
     "settings.storage.refresh": "Refresh",
-    "settings.storage.loading": "Calculating…",
+    "settings.storage.loading": "Calculating鈥?,
     "settings.storage.failed": "Could not load storage info: {msg}",
     "settings.label.timeout": "Request timeout (s)",
     "settings.label.maxRetry": "Max retries",
     "settings.about.version": "Version",
     "settings.about.engine": "Engine matrix",
-    "common.loading": "Loading…",
+    "common.loading": "Loading鈥?,
     "common.error": "Error: {msg}",
     "common.empty": "Nothing to show",
     "common.copy": "Copy",
@@ -1786,7 +1786,7 @@ function format(s, vars) {
   });
 }
 
-// ── Toast manager ──
+// 鈹€鈹€ Toast manager 鈹€鈹€
 function useToasts() {
   const [toasts, setToasts] = useState([]);
   const push = useCallback(function(msg, type) {
@@ -1810,7 +1810,7 @@ const TAB_DEFS = [
 
 const TOAST_ICON = { success: "check", error: "warn", warning: "warn", info: "info" };
 
-// ── App root ──
+// 鈹€鈹€ App root 鈹€鈹€
 function App() {
   const [lang, setLang] = useState(_detectLang);
   const t = useCallback(function(key, vars) {
@@ -1825,7 +1825,7 @@ function App() {
   const toast = toaster.push;
 
   // Subscribe to host language changes (kept in sync with the rest of the
-  // app — no per-plugin language toggle, that's a host-level concern).
+  // app 鈥?no per-plugin language toggle, that's a host-level concern).
   useEffect(function() {
     if (window.SynapseI18n && typeof window.SynapseI18n.subscribe === "function") {
       return window.SynapseI18n.subscribe(function(loc) {
@@ -1899,7 +1899,7 @@ function App() {
             <div>
               <strong>{t("init.error.title")}</strong>
               <span style={{ marginLeft: 8 }}>
-                {health.init_error.phase} · {health.init_error.type}: {health.init_error.message}
+                {health.init_error.phase} 路 {health.init_error.type}: {health.init_error.message}
               </span>
               <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
                 {t("init.error.hint")}
@@ -1930,7 +1930,7 @@ function App() {
   );
 }
 
-// ── Studio tab ──
+// 鈹€鈹€ Studio tab 鈹€鈹€
 const STEP_KEYS = {
   queued: "tasks.step.queued",
   compose: "tasks.step.compose",
@@ -1989,7 +1989,7 @@ function Studio({ t, lang, catalog, settings, toast }) {
     }
     var r = await pluginApi("GET", "/series/" + encodeURIComponent(sid));
     if (!r || !r.ok || !r.body || !r.body.series) {
-      toast(lang === "zh" ? "剧集加载失败" : "Failed to load series", "error");
+      toast(lang === "zh" ? "鍓ч泦鍔犺浇澶辫触" : "Failed to load series", "error");
       return;
     }
     var s = r.body.series;
@@ -2089,7 +2089,7 @@ function Studio({ t, lang, catalog, settings, toast }) {
 
   async function submit(confirmed) {
     if (!story.trim()) {
-      toast(lang === "zh" ? "请先填写故事内容" : "Please enter the story first", "warning");
+      toast(lang === "zh" ? "璇峰厛濉啓鏁呬簨鍐呭" : "Please enter the story first", "warning");
       return;
     }
     setSubmitting(true);
@@ -2099,16 +2099,16 @@ function Studio({ t, lang, catalog, settings, toast }) {
         var detail = r.body.detail;
         setConfirming({
           cost: detail.cost_preview && detail.cost_preview.formatted_total,
-          threshold: detail.cost_preview && ("¥" + detail.cost_preview.threshold.toFixed(2)),
+          threshold: detail.cost_preview && ("楼" + detail.cost_preview.threshold.toFixed(2)),
         });
         return;
       }
       if (!r.ok) {
         var msg = (r.body && (r.body.detail || r.body.message)) || ("HTTP " + r.status);
-        toast(lang === "zh" ? "提交失败：" + msg : "Submit failed: " + msg, "error");
+        toast(lang === "zh" ? "鎻愪氦澶辫触锛? + msg : "Submit failed: " + msg, "error");
         return;
       }
-      toast(lang === "zh" ? "已提交，开始生成…" : "Queued — generation started", "success");
+      toast(lang === "zh" ? "宸叉彁浜わ紝寮€濮嬬敓鎴愨€? : "Queued 鈥?generation started", "success");
       setConfirming(null);
       pluginApi("GET", "/tasks?limit=10").then(function(rr) {
         if (rr && rr.ok && rr.body && Array.isArray(rr.body.tasks)) setTasks(rr.body.tasks);
@@ -2120,7 +2120,7 @@ function Studio({ t, lang, catalog, settings, toast }) {
 
   async function cancelTask(taskId) {
     var r = await pluginApi("POST", "/tasks/" + taskId + "/cancel", {});
-    if (r.ok) toast(lang === "zh" ? "已取消" : "Cancelled", "info");
+    if (r.ok) toast(lang === "zh" ? "宸插彇娑? : "Cancelled", "info");
     pluginApi("GET", "/tasks?limit=10").then(function(rr) {
       if (rr && rr.ok && rr.body && Array.isArray(rr.body.tasks)) setTasks(rr.body.tasks);
     });
@@ -2175,7 +2175,7 @@ function Studio({ t, lang, catalog, settings, toast }) {
                           key={c.id}
                           className="series-editor__charchip active"
                           onClick={function() { unbindChar(c.id); }}
-                          title={lang === "zh" ? "点击移除" : "Click to remove"}
+                          title={lang === "zh" ? "鐐瑰嚮绉婚櫎" : "Click to remove"}
                         >
                           {thumb ? (
                             <img
@@ -2400,7 +2400,7 @@ function Studio({ t, lang, catalog, settings, toast }) {
               {tplList === null ? (
                 <div className="text-muted">{t("common.loading")}</div>
               ) : tplList.length === 0 ? (
-                <div className="text-muted">—</div>
+                <div className="text-muted">鈥?/div>
               ) : (
                 <div className="tpl-grid">
                   {tplList.map(function(tpl) {
@@ -2560,7 +2560,7 @@ function TaskCard({ task, t, onCancel }) {
   );
 }
 
-// ── Characters tab ──
+// 鈹€鈹€ Characters tab 鈹€鈹€
 function Characters({ t, catalog, toast }) {
   const [items, setItems] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -2856,7 +2856,7 @@ function CharacterEditor({ t, catalog, toast, initial, onCancel, onSaved }) {
             value={draft.default_voice_id}
             onChange={function(e) { patch({ default_voice_id: e.target.value }); }}
           >
-            <option value="">—</option>
+            <option value="">鈥?/option>
             {voices.map(function(v) {
               return <option key={v.id} value={v.id}>{v.label || v.id}</option>;
             })}
@@ -2938,16 +2938,16 @@ function CharacterEditor({ t, catalog, toast, initial, onCancel, onSaved }) {
   );
 }
 
-// NOTE — 2026-05: the standalone Workflows tab has been folded into the
+// NOTE 鈥?2026-05: the standalone Workflows tab has been folded into the
 // Settings tab.  All backend selection (direct / runninghub / comfyui_local)
 // now lives under "Generation backend" and "Workflow backend" sections of
 // `<Settings>`, so users only need one place to look and the toolbar isn't
 // cluttered with a tab whose every field also exists in Settings.  The
 // /workflows/probe route is still available for legacy callers, but the UI
-// no longer has an entry point — Settings' "Test connection" button calls
+// no longer has an entry point 鈥?Settings' "Test connection" button calls
 // /test-backend instead, with override-on-the-fly support.
 
-// ── Series tab ──
+// 鈹€鈹€ Series tab 鈹€鈹€
 function Series({ t, lang, catalog, toast }) {
   const [items, setItems] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -3245,7 +3245,7 @@ function SeriesEditor({ t, lang, catalog, toast, initial, onCancel, onSaved }) {
                   var prefix = ep.episode_no ? "EP" + String(ep.episode_no).padStart(2, "0") : "";
                   var dur = ep.duration_sec ? Math.round(ep.duration_sec) + "s" : null;
                   var when = ep.created_at ? new Date(ep.created_at * 1000).toLocaleString() : null;
-                  var meta = [prefix, dur, when].filter(function(x) { return !!x; }).join(" · ");
+                  var meta = [prefix, dur, when].filter(function(x) { return !!x; }).join(" 路 ");
                   return (
                     <div key={ep.id} className="ep-item">
                       <div style={{ minWidth: 0, flex: 1 }}>
@@ -3308,32 +3308,32 @@ function SeriesEditor({ t, lang, catalog, toast, initial, onCancel, onSaved }) {
   );
 }
 
-// ── Settings: option lists ──
+// 鈹€鈹€ Settings: option lists 鈹€鈹€
 const SETTINGS_RESOLUTIONS = ["480P", "720P"];
 const SETTINGS_IMAGE_MODELS = [
-  { id: "wan2.7-image", label: "wan2.7-image · ¥0.20/张" },
-  { id: "wan2.7-image-pro", label: "wan2.7-image-pro · ¥0.50/张（更稳）" },
+  { id: "wan2.7-image", label: "wan2.7-image 路 楼0.20/寮? },
+  { id: "wan2.7-image-pro", label: "wan2.7-image-pro 路 楼0.50/寮狅紙鏇寸ǔ锛? },
 ];
 const SETTINGS_VIDEO_MODELS = [
-  { id: "seedance-1.0-lite-i2v", label: "seedance-1.0-lite-i2v · 480P ¥0.40/秒 · 720P ¥0.65/秒" },
-  { id: "seedance-1.0-lite-t2v", label: "seedance-1.0-lite-t2v · 480P ¥0.50/秒 · 720P ¥0.75/秒" },
+  { id: "seedance-1.0-lite-i2v", label: "seedance-1.0-lite-i2v 路 480P 楼0.40/绉?路 720P 楼0.65/绉? },
+  { id: "seedance-1.0-lite-t2v", label: "seedance-1.0-lite-t2v 路 480P 楼0.50/绉?路 720P 楼0.75/绉? },
 ];
 const SETTINGS_EDGE_VOICES = [
-  { id: "zh-CN-XiaoxiaoNeural", label: "晓晓（女-温柔）" },
-  { id: "zh-CN-XiaoyiNeural",  label: "晓伊（女-活泼）" },
-  { id: "zh-CN-XiaochenNeural", label: "晓辰（女-知性）" },
-  { id: "zh-CN-XiaohanNeural",  label: "晓涵（女-沉静）" },
-  { id: "zh-CN-XiaomoNeural",   label: "晓墨（女-柔美）" },
-  { id: "zh-CN-XiaoqiuNeural",  label: "晓秋（女-优雅）" },
-  { id: "zh-CN-XiaoruiNeural",  label: "晓睿（女-甜美）" },
-  { id: "zh-CN-XiaoshuangNeural", label: "晓双（女-童声）" },
-  { id: "zh-CN-YunxiNeural",    label: "云希（男-阳光）" },
-  { id: "zh-CN-YunjianNeural",  label: "云健（男-沉稳）" },
-  { id: "zh-CN-YunxiaNeural",   label: "云夏（男-少年）" },
-  { id: "zh-CN-YunyangNeural",  label: "云扬（男-新闻）" },
+  { id: "zh-CN-XiaoxiaoNeural", label: "鏅撴檽锛堝コ-娓╂煍锛? },
+  { id: "zh-CN-XiaoyiNeural",  label: "鏅撲紛锛堝コ-娲绘臣锛? },
+  { id: "zh-CN-XiaochenNeural", label: "鏅撹景锛堝コ-鐭ユ€э級" },
+  { id: "zh-CN-XiaohanNeural",  label: "鏅撴兜锛堝コ-娌夐潤锛? },
+  { id: "zh-CN-XiaomoNeural",   label: "鏅撳ⅷ锛堝コ-鏌旂編锛? },
+  { id: "zh-CN-XiaoqiuNeural",  label: "鏅撶锛堝コ-浼橀泤锛? },
+  { id: "zh-CN-XiaoruiNeural",  label: "鏅撶澘锛堝コ-鐢滅編锛? },
+  { id: "zh-CN-XiaoshuangNeural", label: "鏅撳弻锛堝コ-绔ュ０锛? },
+  { id: "zh-CN-YunxiNeural",    label: "浜戝笇锛堢敺-闃冲厜锛? },
+  { id: "zh-CN-YunjianNeural",  label: "浜戝仴锛堢敺-娌夌ǔ锛? },
+  { id: "zh-CN-YunxiaNeural",   label: "浜戝锛堢敺-灏戝勾锛? },
+  { id: "zh-CN-YunyangNeural",  label: "浜戞壃锛堢敺-鏂伴椈锛? },
 ];
 
-// ── OSS field validators (mirror backend OssConfig.from_settings) ──
+// 鈹€鈹€ OSS field validators (mirror backend OssConfig.from_settings) 鈹€鈹€
 function validateOssEndpoint(t, v) {
   const s = (v || "").trim();
   if (!s) return "";
@@ -3362,7 +3362,7 @@ function validateOssSecret(t, v) {
   return "";
 }
 
-// ── ValidatedInput — input + corner badge + tooltip ──
+// 鈹€鈹€ ValidatedInput 鈥?input + corner badge + tooltip 鈹€鈹€
 function ValidatedInput(props) {
   const error = props.error;
   const hasError = !!error;
@@ -3386,7 +3386,7 @@ function ValidatedInput(props) {
   );
 }
 
-// ── Collapsible disclosure (used for OSS / RunningHub workflows etc.) ──
+// 鈹€鈹€ Collapsible disclosure (used for OSS / RunningHub workflows etc.) 鈹€鈹€
 function Collapsible({ title, defaultOpen, children }) {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
@@ -3399,11 +3399,11 @@ function Collapsible({ title, defaultOpen, children }) {
   );
 }
 
-// ── Dependency check section (mirrors avatar-studio's installer) ──
+// 鈹€鈹€ Dependency check section (mirrors avatar-studio's installer) 鈹€鈹€
 // Lists every entry from the backend's PYTHON_DEPS and offers a one-click
 // install button when an entry is missing.  Polls /system/python-deps
 // every 1.5s while any background install is busy so the UI flips to
-// 「已就绪」 the moment the install thread finishes — no manual refresh.
+// 銆屽凡灏辩华銆?the moment the install thread finishes 鈥?no manual refresh.
 function DependenciesSection({ t, toast }) {
   const [items, setItems] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -3422,7 +3422,7 @@ function DependenciesSection({ t, toast }) {
 
   // While at least one component reports ``busy: true`` the install is
   // running in a background thread on the server.  Poll every 1.5 s so
-  // the chip flips from 「正在安装…」 to 「已就绪」 the moment pip exits.
+  // the chip flips from 銆屾鍦ㄥ畨瑁呪€︺€?to 銆屽凡灏辩华銆?the moment pip exits.
   useEffect(function() {
     if (!items) return undefined;
     var anyBusy = items.some(function(c) { return c.busy; });
@@ -3497,7 +3497,7 @@ function DependenciesSection({ t, toast }) {
                   {busy
                     ? t("settings.deps.installing")
                     : ok
-                      ? t("settings.deps.installed") + (c.version ? " · " + c.version : "")
+                      ? t("settings.deps.installed") + (c.version ? " 路 " + c.version : "")
                       : t("settings.deps.missing")}
                 </div>
               </div>
@@ -3534,9 +3534,9 @@ function DependenciesSection({ t, toast }) {
   );
 }
 
-// ── Settings tab — comprehensively redesigned to mirror avatar-studio's
+// 鈹€鈹€ Settings tab 鈥?comprehensively redesigned to mirror avatar-studio's
 //    SettingsTab. Each row commits its own value onBlur (patch save), so
-//    the bottom 「保存全部」 button is now a fallback rather than the only
+//    the bottom 銆屼繚瀛樺叏閮ㄣ€?button is now a fallback rather than the only
 //    way to persist. The backend echoes the *raw* value back (no redact)
 //    so the input can be re-populated reliably across saves.
 function Settings({ t, settings, setSettings, toast }) {
@@ -3580,7 +3580,7 @@ function Settings({ t, settings, setSettings, toast }) {
   async function saveAll() {
     setSaving(true);
     try {
-      // The full draft — every key the backend recognises, with an
+      // The full draft 鈥?every key the backend recognises, with an
       // explicit fallback so undefined never leaks into the PUT.
       var payload = {
         ark_api_key: (draft.ark_api_key || "").trim(),
@@ -3623,7 +3623,7 @@ function Settings({ t, settings, setSettings, toast }) {
     }
   }
 
-  // ── Connection probes ─────────────────────────────────────────
+  // 鈹€鈹€ Connection probes 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   async function testVendor(vendor) {
     var label = vendor === "ark" ? "Volcano Ark" : "DashScope";
     setTestBusy(function(prev) { return Object.assign({}, prev, vendor === "ark" ? { ark: true } : { dashscope: true }); });
@@ -3668,14 +3668,14 @@ function Settings({ t, settings, setSettings, toast }) {
     }
   }
 
-  // ── Has-key helpers (no redaction; we know the raw value) ────
+  // 鈹€鈹€ Has-key helpers (no redaction; we know the raw value) 鈹€鈹€鈹€鈹€
   function isSavedSame(key) {
     var d = (draft[key] || "").trim();
     var s = (settings && settings[key] || "").trim();
     return !!d && d === s;
   }
 
-  // ── Cost preview hint dynamic numbers ─────────────────────────
+  // 鈹€鈹€ Cost preview hint dynamic numbers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   var imgPriceMap = { "wan2.7-image": "0.20", "wan2.7-image-pro": "0.50" };
   var vidPriceMap = { "seedance-1.0-lite-i2v": "0.40~0.65", "seedance-1.0-lite-t2v": "0.50~0.75" };
   var imgPrice = imgPriceMap[draft.default_image_model] || "0.20";
@@ -3693,7 +3693,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── Default generation backend ───────────────────────── */}
+      {/* 鈹€鈹€ Default generation backend 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="zap" />
@@ -3731,17 +3731,17 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── Dependency check ─────────────────────────────────── */}
+      {/* 鈹€鈹€ Dependency check 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <DependenciesSection t={t} toast={toast} />
 
-      {/* ── API Keys ─────────────────────────────────────────── */}
+      {/* 鈹€鈹€ API Keys 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="key" />
           {t("settings.section.api")}
         </h3>
 
-        {/* Ark — required for direct backend (Seedance video) */}
+        {/* Ark 鈥?required for direct backend (Seedance video) */}
         {(function() {
           var hasKey = !!(draft.ark_api_key || "").trim();
           var keySaved = isSavedSame("ark_api_key");
@@ -3781,7 +3781,7 @@ function Settings({ t, settings, setSettings, toast }) {
           );
         })()}
 
-        {/* DashScope — required for image gen + CosyVoice TTS */}
+        {/* DashScope 鈥?required for image gen + CosyVoice TTS */}
         {(function() {
           var hasKey = !!(draft.dashscope_api_key || "").trim();
           var keySaved = isSavedSame("dashscope_api_key");
@@ -3836,49 +3836,49 @@ function Settings({ t, settings, setSettings, toast }) {
             </select>
           </div>
         </Collapsible>
-        <Collapsible title="共享中转站">
+        <Collapsible title="鍏变韩涓浆绔?>
           <div className="grid-2">
             <div className="form-row">
-              <div className="label">Ark 中转站（视频）</div>
+              <div className="label">Ark 涓浆绔欙紙瑙嗛锛?/div>
               <input className="input"
                      value={draft.ark_relay_endpoint || ""}
-                     placeholder="例如: yunwu-video"
+                     placeholder="渚嬪: yunwu-video"
                      onChange={function(e) { patch({ ark_relay_endpoint: e.target.value }); }}
                      onBlur={function() { savePatch({ ark_relay_endpoint: (draft.ark_relay_endpoint || "").trim() }, { silent: true }); }} />
-              <div className="text-xs text-muted mt-2">来自 LLM 配置页 relay_endpoints；用于 Seedance 视频生成。</div>
+              <div className="text-xs text-muted mt-2">鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涚敤浜?Seedance 瑙嗛鐢熸垚銆?/div>
             </div>
             <div className="form-row">
-              <div className="label">Ark 失败策略</div>
+              <div className="label">Ark 澶辫触绛栫暐</div>
               <select className="input select"
                       value={draft.ark_relay_fallback_policy || "official"}
                       onChange={function(e) { patch({ ark_relay_fallback_policy: e.target.value }); savePatch({ ark_relay_fallback_policy: e.target.value }, { silent: true }); }}>
-                <option value="official">official：失败时回官方/插件配置</option>
-                <option value="strict">strict：失败时阻止提交</option>
+                <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+                <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
               </select>
             </div>
             <div className="form-row">
-              <div className="label">DashScope 中转站（图像）</div>
+              <div className="label">DashScope 涓浆绔欙紙鍥惧儚锛?/div>
               <input className="input"
                      value={draft.dashscope_relay_endpoint || ""}
-                     placeholder="例如: yunwu-image"
+                     placeholder="渚嬪: yunwu-image"
                      onChange={function(e) { patch({ dashscope_relay_endpoint: e.target.value }); }}
                      onBlur={function() { savePatch({ dashscope_relay_endpoint: (draft.dashscope_relay_endpoint || "").trim() }, { silent: true }); }} />
-              <div className="text-xs text-muted mt-2">来自 LLM 配置页 relay_endpoints；用于 Wanxiang 图像生成。</div>
+              <div className="text-xs text-muted mt-2">鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涚敤浜?Wanxiang 鍥惧儚鐢熸垚銆?/div>
             </div>
             <div className="form-row">
-              <div className="label">DashScope 失败策略</div>
+              <div className="label">DashScope 澶辫触绛栫暐</div>
               <select className="input select"
                       value={draft.dashscope_relay_fallback_policy || "official"}
                       onChange={function(e) { patch({ dashscope_relay_fallback_policy: e.target.value }); savePatch({ dashscope_relay_fallback_policy: e.target.value }, { silent: true }); }}>
-                <option value="official">official：失败时回官方/插件配置</option>
-                <option value="strict">strict：失败时阻止提交</option>
+                <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+                <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
               </select>
             </div>
           </div>
         </Collapsible>
       </div>
 
-      {/* ── OSS ──────────────────────────────────────────────── */}
+      {/* 鈹€鈹€ OSS 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title oa-settings-section__title-spread">
           <span style={{display: "inline-flex", alignItems: "center", gap: 8}}>
@@ -3967,7 +3967,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── RunningHub ──────────────────────────────────────── */}
+      {/* 鈹€鈹€ RunningHub 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title oa-settings-section__title-spread">
           <span style={{display: "inline-flex", alignItems: "center", gap: 8}}>
@@ -4047,7 +4047,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </Collapsible>
       </div>
 
-      {/* ── Local ComfyUI ───────────────────────────────────── */}
+      {/* 鈹€鈹€ Local ComfyUI 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title oa-settings-section__title-spread">
           <span style={{display: "inline-flex", alignItems: "center", gap: 8}}>
@@ -4120,7 +4120,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </Collapsible>
       </div>
 
-      {/* ── TTS engine ──────────────────────────────────────── */}
+      {/* 鈹€鈹€ TTS engine 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="mic" />
@@ -4173,7 +4173,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── Defaults & cost cap ─────────────────────────────── */}
+      {/* 鈹€鈹€ Defaults & cost cap 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="cog" />
@@ -4217,10 +4217,10 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── Storage & cleanup ───────────────────────────────── */}
+      {/* 鈹€鈹€ Storage & cleanup 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <StorageSection t={t} draft={draft} settings={settings} patch={patch} savePatch={savePatch} toast={toast} />
 
-      {/* ── Advanced ─────────────────────────────────────────── */}
+      {/* 鈹€鈹€ Advanced 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="cog" />
@@ -4248,7 +4248,7 @@ function Settings({ t, settings, setSettings, toast }) {
         </div>
       </div>
 
-      {/* ── About ───────────────────────────────────────────── */}
+      {/* 鈹€鈹€ About 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">
           <Ico name="info" />
@@ -4262,13 +4262,13 @@ function Settings({ t, settings, setSettings, toast }) {
         <div className="flex items-center justify-between" style={{padding: "6px 0"}}>
           <div className="text-sm text-muted">{t("settings.about.engine")}</div>
           <div className="text-xs text-muted">
-            Seedance · Wanxiang 2.7 · CosyVoice-v2 · ComfyUI / RunningHub
+            Seedance 路 Wanxiang 2.7 路 CosyVoice-v2 路 ComfyUI / RunningHub
           </div>
         </div>
       </div>
 
-      {/* ── Save-all fallback (each row already saves onBlur, this is the
-          兜底 for users who prefer one-click). ── */}
+      {/* 鈹€鈹€ Save-all fallback (each row already saves onBlur, this is the
+          鍏滃簳 for users who prefer one-click). 鈹€鈹€ */}
       <button className="btn btn-primary btn-block" onClick={saveAll} disabled={saving}
               style={{marginTop: 14, marginBottom: 24}}>
         {saving ? <span className="spinner-sm"/> : <Ico name="check"/>}
@@ -4278,7 +4278,7 @@ function Settings({ t, settings, setSettings, toast }) {
   );
 }
 
-// ── Storage & cleanup section ────────────────────────────────────
+// 鈹€鈹€ Storage & cleanup section 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Receives the parent's draft + savePatch so the data-dir input and
 // retention-days field commit through the same patch-save plumbing
 // (avoids a second source of truth for the same backend keys).
@@ -4369,7 +4369,7 @@ function StorageSection({ t, draft, settings, patch, savePatch, toast }) {
         </button>
       </h3>
 
-      {/* ── Data directory ── */}
+      {/* 鈹€鈹€ Data directory 鈹€鈹€ */}
       <div className="form-row">
         <div className="label">{t("settings.storage.dir")}</div>
         <div className="flex gap-2">
@@ -4394,7 +4394,7 @@ function StorageSection({ t, draft, settings, patch, savePatch, toast }) {
         <div className="text-xs text-muted mt-2">{t("settings.storage.dir.hint")}</div>
       </div>
 
-      {/* ── Subdir + naming ── */}
+      {/* 鈹€鈹€ Subdir + naming 鈹€鈹€ */}
       <div className="grid-2">
         <div className="form-row" style={{marginBottom: 0}}>
           <div className="label">{t("settings.storage.subdir")}</div>
@@ -4433,7 +4433,7 @@ function StorageSection({ t, draft, settings, patch, savePatch, toast }) {
       </div>
       <div className="text-xs text-muted mt-2">{t("settings.storage.naming.hint")}</div>
 
-      {/* ── Per-folder usage cards ── */}
+      {/* 鈹€鈹€ Per-folder usage cards 鈹€鈹€ */}
       {err ? (
         <div className="text-danger" style={{marginTop: 10}}>
           {t("settings.storage.failed", { msg: err })}
@@ -4463,7 +4463,7 @@ function StorageSection({ t, draft, settings, patch, savePatch, toast }) {
         </div>
       )}
 
-      {/* ── Retention + cleanup ── */}
+      {/* 鈹€鈹€ Retention + cleanup 鈹€鈹€ */}
       <div className="form-row" style={{marginTop: 14, marginBottom: 0}}>
         <div className="label">{t("settings.storage.retention")}</div>
         <div className="flex gap-2 items-center">

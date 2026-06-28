@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
@@ -19,12 +19,12 @@
     Preload CDN deps in parallel (script tags below remain synchronous so
     React/ReactDOM/Babel still execute in declared order; preload only
     starts the downloads earlier so they finish faster). The `crossorigin`
-    attribute on the preload links MUST match the script tag — react /
+    attribute on the preload links MUST match the script tag 鈥?react /
     react-dom use crossorigin, babel does not.
   -->
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -73,7 +73,7 @@
     .input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(124,58,237,.15); }
     .textarea { resize: vertical; min-height: 80px; font-family: inherit; }
     .select { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
-    /* Form-field label — upgraded to a "section label" look (small accent
+    /* Form-field label 鈥?upgraded to a "section label" look (small accent
      * bar + slightly heavier weight) to give each field a clear hierarchy.
      * Mirrors .oa-section-label from the UI Kit. */
     .label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 8px; line-height: 1.3; }
@@ -148,16 +148,16 @@
     .style-option:hover { border-color: var(--primary); }
     .style-option.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
     @media (max-width: 860px) { .split-layout { flex-direction: column; } .split-left { width: 100%; min-width: unset; } }
-    /* ── compact overrides ── */
+    /* 鈹€鈹€ compact overrides 鈹€鈹€ */
     .content { padding: 14px 16px; }
     .card { padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
     .form-row { margin-bottom: 14px; }
-    /* (.label compact-override removed — keep the upgraded label styles
+    /* (.label compact-override removed 鈥?keep the upgraded label styles
      *  defined above so all form-field labels get the section-title look) */
     .header { padding: 10px 18px; }
     .tab { padding: 9px 16px; }
     .btn { padding: 7px 14px; }
-    /* ── task started modal ── */
+    /* 鈹€鈹€ task started modal 鈹€鈹€ */
     .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: ak-fade-in .15s ease-out; padding: 20px; }
     .modal-card { background: var(--bg-card); border-radius: 12px; padding: 22px 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,.25); animation: ak-scale-in .15s ease-out; }
     .modal-icon { width: 42px; height: 42px; border-radius: 50%; background: rgba(34,197,94,.12); color: var(--success, #22c55e); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 22px; font-weight: 700; }
@@ -171,7 +171,7 @@
 <body>
 <div id="root"></div>
 <script>
-// ── Bridge SDK ──
+// 鈹€鈹€ Bridge SDK 鈹€鈹€
 const BRIDGE_VER = 1;
 let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
@@ -218,7 +218,7 @@ function pluginApi(method, path, body) {
 // Native download via host bridge. On Tauri the host invokes the native
 // `download_file` Rust command (reqwest -> disk) and resolves with the
 // REAL filesystem path the file was saved to. On web mode the host falls
-// back to <a download>, so the resolved `path` is just the filename — in
+// back to <a download>, so the resolved `path` is just the filename 鈥?in
 // that case the caller should fall through to the in-page <a download>
 // path so the browser handles the location.
 function bridgeDownload(url, fname) {
@@ -313,20 +313,20 @@ async function downloadImage(taskId, idx, promptHint) {
     // saves into the user's Downloads directory and returns the absolute
     // path so we can both (a) tell the user exactly where it landed and
     // (b) reveal it in the OS file manager. On plain web the host returns
-    // just the filename — we treat that as "no native path" and fall back.
+    // just the filename 鈥?we treat that as "no native path" and fall back.
     if (_inIframe && _bridgeConnected) {
       var native = await bridgeDownload(url, fname);
       // A return value with a path that looks absolute (contains a slash
       // or backslash) means the host actually wrote the file to disk.
       if (native && native.ok && native.path && /[\\/]/.test(String(native.path))) {
         showToast(_tr("toast.downloadedTo", { path: native.path }, "Saved to: {path}"));
-        // Reveal the file so the user immediately sees where it went —
+        // Reveal the file so the user immediately sees where it went 鈥?
         // this is the whole point of switching off <a download>.
         bridgeShowInFolder(native.path);
         return;
       }
       // If native failed for a real reason (not just web fallback), tell
-      // the user — then still try the in-page download as a last resort.
+      // the user 鈥?then still try the in-page download as a last resort.
       if (native && !native.ok && native.error && native.error !== "no-bridge") {
         console.warn("[downloadImage] bridge download failed, falling back:", native.error);
       }
@@ -348,7 +348,7 @@ async function downloadImage(taskId, idx, promptHint) {
     a.click();
     document.body.removeChild(a);
     setTimeout(function() { URL.revokeObjectURL(objUrl); }, 3000);
-    showToast(_tr("toast.downloadedBrowser", { name: fname }, "Downloaded {name} — check your browser's default Downloads folder."));
+    showToast(_tr("toast.downloadedBrowser", { name: fname }, "Downloaded {name} 鈥?check your browser's default Downloads folder."));
   } catch (e) {
     showToast(_tr("toast.downloadFailed", { msg: e.message }, "Download failed: {msg}"));
   }
@@ -361,14 +361,14 @@ function showToast(body, type) {
 }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 
 <script type="text/babel" data-type="module">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─── i18n dictionary ────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ i18n dictionary 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Single source of truth for every user-visible string in this plugin.
 // Adding a new locale is as simple as adding another top-level key here.
 //
@@ -380,177 +380,177 @@ const { useState, useEffect, useRef, useCallback } = React;
 const I18N_DICT = {
   zh: {
     // app shell
-    "app.title": "通义生图",
-    "app.subtitle": "DashScope · 文生图 / 图像编辑 / 电商套图",
-    "tabs.create": "创建",
-    "tabs.tasks": "任务列表",
-    "tabs.guide": "提示词指南",
-    "tabs.settings": "设置",
+    "app.title": "閫氫箟鐢熷浘",
+    "app.subtitle": "DashScope 路 鏂囩敓鍥?/ 鍥惧儚缂栬緫 / 鐢靛晢濂楀浘",
+    "tabs.create": "鍒涘缓",
+    "tabs.tasks": "浠诲姟鍒楄〃",
+    "tabs.guide": "鎻愮ず璇嶆寚鍗?,
+    "tabs.settings": "璁剧疆",
     // top banner (no API key)
-    "banner.noKey.title": "尚未配置 DashScope API Key",
-    "banner.noKey.desc": "所有创建任务都会失败。请前往设置页填入阿里云百炼 DashScope API Key。",
-    "banner.noKey.cta": "前往配置",
+    "banner.noKey.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "banner.noKey.desc": "鎵€鏈夊垱寤轰换鍔￠兘浼氬け璐ャ€傝鍓嶅線璁剧疆椤靛～鍏ラ樋閲屼簯鐧剧偧 DashScope API Key銆?,
+    "banner.noKey.cta": "鍓嶅線閰嶇疆",
     // task started modal
-    "modal.taskStarted.title": "任务已开始",
-    "modal.taskStarted.continue": "继续创建",
-    "modal.taskStarted.goTasks": "前往任务列表",
-    "modal.taskStarted.imageDesc": "图像正在云端生成,约需 15~60 秒。可前往任务列表查看进度与历史结果。",
-    "modal.taskStarted.suiteDesc": "已启动 {n} 个套图生成任务,可前往任务列表查看进度。",
+    "modal.taskStarted.title": "浠诲姟宸插紑濮?,
+    "modal.taskStarted.continue": "缁х画鍒涘缓",
+    "modal.taskStarted.goTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "modal.taskStarted.imageDesc": "鍥惧儚姝ｅ湪浜戠鐢熸垚,绾﹂渶 15~60 绉掋€傚彲鍓嶅線浠诲姟鍒楄〃鏌ョ湅杩涘害涓庡巻鍙茬粨鏋溿€?,
+    "modal.taskStarted.suiteDesc": "宸插惎鍔?{n} 涓鍥剧敓鎴愪换鍔?鍙墠寰€浠诲姟鍒楄〃鏌ョ湅杩涘害銆?,
     // generation modes
-    "modes.text2img": "文生图",
-    "modes.img_edit": "图像编辑",
-    "modes.ecommerce": "电商套图",
-    "modes.style_repaint": "风格重绘",
-    "modes.background": "背景生成",
-    "modes.outpaint": "画面扩展",
-    "modes.sketch": "涂鸦作画",
+    "modes.text2img": "鏂囩敓鍥?,
+    "modes.img_edit": "鍥惧儚缂栬緫",
+    "modes.ecommerce": "鐢靛晢濂楀浘",
+    "modes.style_repaint": "椋庢牸閲嶇粯",
+    "modes.background": "鑳屾櫙鐢熸垚",
+    "modes.outpaint": "鐢婚潰鎵╁睍",
+    "modes.sketch": "娑傞甫浣滅敾",
     // task status
-    "status.pending": "等待中",
-    "status.running": "生成中",
-    "status.succeeded": "已完成",
-    "status.failed": "失败",
-    // create tab — left panel
-    "create.modeLabel": "生成模式",
-    "create.productName.label": "商品名称",
-    "create.productName.placeholder": "例如:蓝牙降噪耳机、精致香水、手工皮包...",
-    "create.productDesc.label": "商品描述 (可选,补充风格/材质等)",
-    "create.productDesc.placeholder": "补充描述:银色金属质感蓝牙耳机,头戴式设计...",
-    "create.productImage.label": "商品图片 (可选,上传后自动用于换背景)",
-    "create.productImage.tip": "推荐上传透明背景(PNG)商品图,效果最佳",
-    "create.scene.label": "选择生成场景",
-    "create.prompt.editLabel": "编辑指令",
-    "create.prompt.sketchLabel": "文字描述",
-    "create.prompt.label": "提示词",
-    "create.aiOptimize": "AI 优化",
-    "create.aiOptimize.title": "使用 LLM 自动优化提示词,提升画面细节与一致性",
-    "create.prompt.text2imgPlaceholder": "描述你想生成的图像...",
-    "create.prompt.editPlaceholder": "描述编辑内容...",
-    "create.prompt.targetPlaceholder": "描述目标图像...",
-    "create.negPrompt.label": "反向提示词 (可选)",
-    "create.negPrompt.placeholder": "不希望出现的内容...",
-    "create.bg.label": "背景描述",
-    "create.bg.placeholder": "描述目标背景场景...",
-    "create.image.styleRepaint": "人物照片",
-    "create.image.background": "主体图片 (透明背景)",
-    "create.image.outpaint": "原始图片",
-    "create.image.sketch": "草图",
-    "create.image.imgEdit": "参考图片",
-    "create.image.optional": "参考图片 (可选)",
-    "create.model.label": "模型",
-    "create.size.label": "尺寸",
-    "create.size.default": "默认",
-    "create.count.label": "数量",
-    "create.count.unit": "{n} 张",
-    "create.style.label": "预置风格",
-    "create.sketch.styleLabel": "画风",
-    "create.outpaint.ratio": "目标比例",
-    "create.thinking.label": "深度思考模式",
-    "create.thinking.hint": "适合复杂构图",
-    "create.btn.start": "开始生成",
-    "create.btn.generating": "生成中...",
-    "create.btn.ecommerceSuite": "一键生成套图 ({n} 张)",
+    "status.pending": "绛夊緟涓?,
+    "status.running": "鐢熸垚涓?,
+    "status.succeeded": "宸插畬鎴?,
+    "status.failed": "澶辫触",
+    // create tab 鈥?left panel
+    "create.modeLabel": "鐢熸垚妯″紡",
+    "create.productName.label": "鍟嗗搧鍚嶇О",
+    "create.productName.placeholder": "渚嬪:钃濈墮闄嶅櫔鑰虫満銆佺簿鑷撮姘淬€佹墜宸ョ毊鍖?..",
+    "create.productDesc.label": "鍟嗗搧鎻忚堪 (鍙€?琛ュ厖椋庢牸/鏉愯川绛?",
+    "create.productDesc.placeholder": "琛ュ厖鎻忚堪:閾惰壊閲戝睘璐ㄦ劅钃濈墮鑰虫満,澶存埓寮忚璁?..",
+    "create.productImage.label": "鍟嗗搧鍥剧墖 (鍙€?涓婁紶鍚庤嚜鍔ㄧ敤浜庢崲鑳屾櫙)",
+    "create.productImage.tip": "鎺ㄨ崘涓婁紶閫忔槑鑳屾櫙(PNG)鍟嗗搧鍥?鏁堟灉鏈€浣?,
+    "create.scene.label": "閫夋嫨鐢熸垚鍦烘櫙",
+    "create.prompt.editLabel": "缂栬緫鎸囦护",
+    "create.prompt.sketchLabel": "鏂囧瓧鎻忚堪",
+    "create.prompt.label": "鎻愮ず璇?,
+    "create.aiOptimize": "AI 浼樺寲",
+    "create.aiOptimize.title": "浣跨敤 LLM 鑷姩浼樺寲鎻愮ず璇?鎻愬崌鐢婚潰缁嗚妭涓庝竴鑷存€?,
+    "create.prompt.text2imgPlaceholder": "鎻忚堪浣犳兂鐢熸垚鐨勫浘鍍?..",
+    "create.prompt.editPlaceholder": "鎻忚堪缂栬緫鍐呭...",
+    "create.prompt.targetPlaceholder": "鎻忚堪鐩爣鍥惧儚...",
+    "create.negPrompt.label": "鍙嶅悜鎻愮ず璇?(鍙€?",
+    "create.negPrompt.placeholder": "涓嶅笇鏈涘嚭鐜扮殑鍐呭...",
+    "create.bg.label": "鑳屾櫙鎻忚堪",
+    "create.bg.placeholder": "鎻忚堪鐩爣鑳屾櫙鍦烘櫙...",
+    "create.image.styleRepaint": "浜虹墿鐓х墖",
+    "create.image.background": "涓讳綋鍥剧墖 (閫忔槑鑳屾櫙)",
+    "create.image.outpaint": "鍘熷鍥剧墖",
+    "create.image.sketch": "鑽夊浘",
+    "create.image.imgEdit": "鍙傝€冨浘鐗?,
+    "create.image.optional": "鍙傝€冨浘鐗?(鍙€?",
+    "create.model.label": "妯″瀷",
+    "create.size.label": "灏哄",
+    "create.size.default": "榛樿",
+    "create.count.label": "鏁伴噺",
+    "create.count.unit": "{n} 寮?,
+    "create.style.label": "棰勭疆椋庢牸",
+    "create.sketch.styleLabel": "鐢婚",
+    "create.outpaint.ratio": "鐩爣姣斾緥",
+    "create.thinking.label": "娣卞害鎬濊€冩ā寮?,
+    "create.thinking.hint": "閫傚悎澶嶆潅鏋勫浘",
+    "create.btn.start": "寮€濮嬬敓鎴?,
+    "create.btn.generating": "鐢熸垚涓?..",
+    "create.btn.ecommerceSuite": "涓€閿敓鎴愬鍥?({n} 寮?",
     // preview / result
-    "preview.empty.text2img.title": "等待生成图片",
-    "preview.empty.text2img.hint": "选择模式,输入描述,开始创作",
-    "preview.empty.ecommerce.title": "等待生成电商套图",
-    "preview.empty.ecommerce.hint": "输入商品信息,一键生成电商套图",
-    "preview.ec.title": "电商套图结果",
-    "preview.ec.totalCount": "共 {n} 张",
-    "preview.ec.scene.fallback": "场景",
-    "preview.result.title": "生成结果",
-    "preview.result.runningHint": "图像生成中,请稍候...",
-    "preview.result.viewInTasks": "在任务列表中查看",
-    "preview.result.completedNoImages": "任务已完成,图片加载中...",
-    "preview.result.refreshResult": "刷新结果",
-    "preview.result.genFailed": "生成失败",
-    "preview.result.promptLabel": "提示词",
-    "preview.image.download": "下载",
+    "preview.empty.text2img.title": "绛夊緟鐢熸垚鍥剧墖",
+    "preview.empty.text2img.hint": "閫夋嫨妯″紡,杈撳叆鎻忚堪,寮€濮嬪垱浣?,
+    "preview.empty.ecommerce.title": "绛夊緟鐢熸垚鐢靛晢濂楀浘",
+    "preview.empty.ecommerce.hint": "杈撳叆鍟嗗搧淇℃伅,涓€閿敓鎴愮數鍟嗗鍥?,
+    "preview.ec.title": "鐢靛晢濂楀浘缁撴灉",
+    "preview.ec.totalCount": "鍏?{n} 寮?,
+    "preview.ec.scene.fallback": "鍦烘櫙",
+    "preview.result.title": "鐢熸垚缁撴灉",
+    "preview.result.runningHint": "鍥惧儚鐢熸垚涓?璇风◢鍊?..",
+    "preview.result.viewInTasks": "鍦ㄤ换鍔″垪琛ㄤ腑鏌ョ湅",
+    "preview.result.completedNoImages": "浠诲姟宸插畬鎴?鍥剧墖鍔犺浇涓?..",
+    "preview.result.refreshResult": "鍒锋柊缁撴灉",
+    "preview.result.genFailed": "鐢熸垚澶辫触",
+    "preview.result.promptLabel": "鎻愮ず璇?,
+    "preview.image.download": "涓嬭浇",
     // tasks tab
-    "tasks.filter.status": "状态",
-    "tasks.filter.mode": "模式",
-    "tasks.filter.all": "全部",
-    "tasks.filter.allModes": "全部模式",
-    "tasks.empty.title": "暂无任务",
-    "tasks.empty.hint": '在"创建"页发起一次生成后,任务会出现在这里',
-    "tasks.untitled": "无标题",
-    "tasks.totalCount": "共 {n} 个任务",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.retry": "重试",
-    "tasks.detail.delete": "删除",
-    "tasks.detail.confirmDelete": "确定删除?",
-    "tasks.detail.runningHint": "生成中...",
-    "tasks.detail.completedNoImages": "任务已完成,但未找到图片",
-    "tasks.detail.recheck": "重新获取图片",
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.mode": "妯″紡",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.allModes": "鍏ㄩ儴妯″紡",
+    "tasks.empty.title": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": '鍦?鍒涘缓"椤靛彂璧蜂竴娆＄敓鎴愬悗,浠诲姟浼氬嚭鐜板湪杩欓噷',
+    "tasks.untitled": "鏃犳爣棰?,
+    "tasks.totalCount": "鍏?{n} 涓换鍔?,
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.retry": "閲嶈瘯",
+    "tasks.detail.delete": "鍒犻櫎",
+    "tasks.detail.confirmDelete": "纭畾鍒犻櫎?",
+    "tasks.detail.runningHint": "鐢熸垚涓?..",
+    "tasks.detail.completedNoImages": "浠诲姟宸插畬鎴?浣嗘湭鎵惧埌鍥剧墖",
+    "tasks.detail.recheck": "閲嶆柊鑾峰彇鍥剧墖",
     "tasks.detail.id": "ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.model": "模型",
-    "tasks.detail.createdAt": "创建时间",
-    "tasks.detail.prompt": "提示词",
-    "tasks.empty.noSelection.title": "未选择任务",
-    "tasks.empty.noSelection.hint": "从左侧列表选择一个任务查看详情",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.model": "妯″瀷",
+    "tasks.detail.createdAt": "鍒涘缓鏃堕棿",
+    "tasks.detail.prompt": "鎻愮ず璇?,
+    "tasks.empty.noSelection.title": "鏈€夋嫨浠诲姟",
+    "tasks.empty.noSelection.hint": "浠庡乏渚у垪琛ㄩ€夋嫨涓€涓换鍔℃煡鐪嬭鎯?,
     // guide
-    "guide.intro": "点击下方任意章节标题展开。所有内容默认折叠,方便预览全部主题。",
-    "guide.section.formulas": "提示词公式",
-    "guide.section.templates": "提示词模板",
-    "guide.section.styleKeywords": "风格词典",
-    "guide.section.lightingKeywords": "光线词典",
-    "guide.section.compositionKeywords": "构图词典",
-    "guide.section.negativePresets": "反向提示词预设",
-    "guide.formula.basic": "基础",
-    "guide.formula.advanced": "进阶",
+    "guide.intro": "鐐瑰嚮涓嬫柟浠绘剰绔犺妭鏍囬灞曞紑銆傛墍鏈夊唴瀹归粯璁ゆ姌鍙?鏂逛究棰勮鍏ㄩ儴涓婚銆?,
+    "guide.section.formulas": "鎻愮ず璇嶅叕寮?,
+    "guide.section.templates": "鎻愮ず璇嶆ā鏉?,
+    "guide.section.styleKeywords": "椋庢牸璇嶅吀",
+    "guide.section.lightingKeywords": "鍏夌嚎璇嶅吀",
+    "guide.section.compositionKeywords": "鏋勫浘璇嶅吀",
+    "guide.section.negativePresets": "鍙嶅悜鎻愮ず璇嶉璁?,
+    "guide.formula.basic": "鍩虹",
+    "guide.formula.advanced": "杩涢樁",
     // settings
-    "settings.api.title": "API 配置",
-    "settings.api.callout": "必填项",
-    "settings.api.key.show": "显示",
-    "settings.api.key.hide": "隐藏",
-    "settings.api.key.save": "保存",
-    "settings.api.key.helpPrefix": "获取地址: ",
-    "settings.api.key.helpLink": "阿里云百炼控制台",
-    "settings.api.baseUrl.label": "Base URL（中转站地址，可选）",
-    "settings.api.baseUrl.placeholder": "默认: https://dashscope.aliyuncs.com/api/v1",
-    "settings.api.baseUrl.help": "填写兼容 DashScope API 的中转站根地址；留空则使用官方地址。",
-    "settings.defaults.title": "默认参数",
-    "settings.defaults.model": "默认模型",
-    "settings.defaults.size": "默认尺寸",
-    "settings.defaults.size4kHint": "(仅 wan2.7 Pro)",
-    "settings.autoDownload.title": "自动下载",
-    "settings.autoDownload.desc": "生成完成后自动下载到本地",
-    "settings.watermark.title": "水印",
-    "settings.watermark.desc": "添加水印",
-    "settings.storage.title": "存储",
-    "settings.storage.images": "生成图片",
-    "settings.storage.uploads": "上传文件",
-    "settings.storage.usage": "{size} MB / {count} 文件",
+    "settings.api.title": "API 閰嶇疆",
+    "settings.api.callout": "蹇呭～椤?,
+    "settings.api.key.show": "鏄剧ず",
+    "settings.api.key.hide": "闅愯棌",
+    "settings.api.key.save": "淇濆瓨",
+    "settings.api.key.helpPrefix": "鑾峰彇鍦板潃: ",
+    "settings.api.key.helpLink": "闃块噷浜戠櫨鐐兼帶鍒跺彴",
+    "settings.api.baseUrl.label": "Base URL锛堜腑杞珯鍦板潃锛屽彲閫夛級",
+    "settings.api.baseUrl.placeholder": "榛樿: https://dashscope.aliyuncs.com/api/v1",
+    "settings.api.baseUrl.help": "濉啓鍏煎 DashScope API 鐨勪腑杞珯鏍瑰湴鍧€锛涚暀绌哄垯浣跨敤瀹樻柟鍦板潃銆?,
+    "settings.defaults.title": "榛樿鍙傛暟",
+    "settings.defaults.model": "榛樿妯″瀷",
+    "settings.defaults.size": "榛樿灏哄",
+    "settings.defaults.size4kHint": "(浠?wan2.7 Pro)",
+    "settings.autoDownload.title": "鑷姩涓嬭浇",
+    "settings.autoDownload.desc": "鐢熸垚瀹屾垚鍚庤嚜鍔ㄤ笅杞藉埌鏈湴",
+    "settings.watermark.title": "姘村嵃",
+    "settings.watermark.desc": "娣诲姞姘村嵃",
+    "settings.storage.title": "瀛樺偍",
+    "settings.storage.images": "鐢熸垚鍥剧墖",
+    "settings.storage.uploads": "涓婁紶鏂囦欢",
+    "settings.storage.usage": "{size} MB / {count} 鏂囦欢",
     // error boundary
-    "err.title": "插件 UI 渲染出错",
-    "err.retry": "重试渲染",
-    "err.stackLabel": "错误堆栈 (复制给开发者)",
+    "err.title": "鎻掍欢 UI 娓叉煋鍑洪敊",
+    "err.retry": "閲嶈瘯娓叉煋",
+    "err.stackLabel": "閿欒鍫嗘爤 (澶嶅埗缁欏紑鍙戣€?",
     // toast
-    "toast.downloading": "正在下载...",
-    "toast.downloadFailed": "下载失败: {msg}",
-    "toast.downloaded": "已下载: {name}",
-    "toast.downloadedTo": "已保存到: {path}（已为你打开所在文件夹）",
-    "toast.downloadedBrowser": "已下载: {name}（请在浏览器默认下载文件夹中查看）",
-    "toast.serverReturned": "服务端返回 {status}",
-    "toast.optimizeOk": "提示词优化完成",
-    "toast.optimizeFail": "优化失败",
-    "toast.optimizeReqFail": "优化请求失败",
-    "toast.needKey": "请先在设置中配置 API Key",
-    "toast.createFail": "创建失败",
-    "toast.requestFail": "请求失败: {msg}",
-    "toast.taskCreated": "任务已创建",
-    "toast.genComplete": "生成完成!",
-    "toast.savedSettings": "设置已保存",
-    "toast.saveFailed": "保存失败",
-    "toast.retryCreated": "重试任务已创建",
-    "toast.recheckQuerying": "正在重新查询...",
-    "toast.recheckFound": "找到 {n} 张图片!",
-    "toast.recheckEmpty": "未找到图片,请稍后重试",
-    "toast.recheckFail": "查询失败",
+    "toast.downloading": "姝ｅ湪涓嬭浇...",
+    "toast.downloadFailed": "涓嬭浇澶辫触: {msg}",
+    "toast.downloaded": "宸蹭笅杞? {name}",
+    "toast.downloadedTo": "宸蹭繚瀛樺埌: {path}锛堝凡涓轰綘鎵撳紑鎵€鍦ㄦ枃浠跺す锛?,
+    "toast.downloadedBrowser": "宸蹭笅杞? {name}锛堣鍦ㄦ祻瑙堝櫒榛樿涓嬭浇鏂囦欢澶逛腑鏌ョ湅锛?,
+    "toast.serverReturned": "鏈嶅姟绔繑鍥?{status}",
+    "toast.optimizeOk": "鎻愮ず璇嶄紭鍖栧畬鎴?,
+    "toast.optimizeFail": "浼樺寲澶辫触",
+    "toast.optimizeReqFail": "浼樺寲璇锋眰澶辫触",
+    "toast.needKey": "璇峰厛鍦ㄨ缃腑閰嶇疆 API Key",
+    "toast.createFail": "鍒涘缓澶辫触",
+    "toast.requestFail": "璇锋眰澶辫触: {msg}",
+    "toast.taskCreated": "浠诲姟宸插垱寤?,
+    "toast.genComplete": "鐢熸垚瀹屾垚!",
+    "toast.savedSettings": "璁剧疆宸蹭繚瀛?,
+    "toast.saveFailed": "淇濆瓨澶辫触",
+    "toast.retryCreated": "閲嶈瘯浠诲姟宸插垱寤?,
+    "toast.recheckQuerying": "姝ｅ湪閲嶆柊鏌ヨ...",
+    "toast.recheckFound": "鎵惧埌 {n} 寮犲浘鐗?",
+    "toast.recheckEmpty": "鏈壘鍒板浘鐗?璇风◢鍚庨噸璇?,
+    "toast.recheckFail": "鏌ヨ澶辫触",
   },
   en: {
     "app.title": "Tongyi Image",
-    "app.subtitle": "DashScope · Text-to-image / Edit / E-commerce",
+    "app.subtitle": "DashScope 路 Text-to-image / Edit / E-commerce",
     "tabs.create": "Create",
     "tabs.tasks": "Tasks",
     "tabs.guide": "Prompt guide",
@@ -561,7 +561,7 @@ const I18N_DICT = {
     "modal.taskStarted.title": "Task started",
     "modal.taskStarted.continue": "Keep creating",
     "modal.taskStarted.goTasks": "Go to tasks",
-    "modal.taskStarted.imageDesc": "Your image is being generated in the cloud (about 15–60 seconds). Open Tasks to follow progress and history.",
+    "modal.taskStarted.imageDesc": "Your image is being generated in the cloud (about 15鈥?0 seconds). Open Tasks to follow progress and history.",
     "modal.taskStarted.suiteDesc": "Started {n} suite tasks. Open Tasks to follow progress.",
     "modes.text2img": "Text-to-image",
     "modes.img_edit": "Image edit",
@@ -576,10 +576,10 @@ const I18N_DICT = {
     "status.failed": "Failed",
     "create.modeLabel": "Generation mode",
     "create.productName.label": "Product name",
-    "create.productName.placeholder": "e.g. Bluetooth noise-cancelling headphones, luxury perfume, handcrafted leather bag…",
-    "create.productDesc.label": "Product description (optional — add style / material)",
-    "create.productDesc.placeholder": "Add details: silver metallic Bluetooth headphones, over-ear design…",
-    "create.productImage.label": "Product image (optional — used as the foreground for background swap)",
+    "create.productName.placeholder": "e.g. Bluetooth noise-cancelling headphones, luxury perfume, handcrafted leather bag鈥?,
+    "create.productDesc.label": "Product description (optional 鈥?add style / material)",
+    "create.productDesc.placeholder": "Add details: silver metallic Bluetooth headphones, over-ear design鈥?,
+    "create.productImage.label": "Product image (optional 鈥?used as the foreground for background swap)",
     "create.productImage.tip": "A transparent-background PNG works best.",
     "create.scene.label": "Pick scenes",
     "create.prompt.editLabel": "Edit instruction",
@@ -587,13 +587,13 @@ const I18N_DICT = {
     "create.prompt.label": "Prompt",
     "create.aiOptimize": "AI optimize",
     "create.aiOptimize.title": "Use an LLM to refine the prompt for better detail and consistency.",
-    "create.prompt.text2imgPlaceholder": "Describe the image you want to generate…",
-    "create.prompt.editPlaceholder": "Describe the edits…",
-    "create.prompt.targetPlaceholder": "Describe the target image…",
+    "create.prompt.text2imgPlaceholder": "Describe the image you want to generate鈥?,
+    "create.prompt.editPlaceholder": "Describe the edits鈥?,
+    "create.prompt.targetPlaceholder": "Describe the target image鈥?,
     "create.negPrompt.label": "Negative prompt (optional)",
-    "create.negPrompt.placeholder": "Things you don't want…",
+    "create.negPrompt.placeholder": "Things you don't want鈥?,
     "create.bg.label": "Background description",
-    "create.bg.placeholder": "Describe the target background scene…",
+    "create.bg.placeholder": "Describe the target background scene鈥?,
     "create.image.styleRepaint": "Portrait",
     "create.image.background": "Subject image (transparent BG)",
     "create.image.outpaint": "Original image",
@@ -611,7 +611,7 @@ const I18N_DICT = {
     "create.thinking.label": "Deep thinking mode",
     "create.thinking.hint": "Best for complex compositions",
     "create.btn.start": "Generate",
-    "create.btn.generating": "Generating…",
+    "create.btn.generating": "Generating鈥?,
     "create.btn.ecommerceSuite": "Generate suite ({n})",
     "preview.empty.text2img.title": "Nothing to show yet",
     "preview.empty.text2img.hint": "Pick a mode, write a prompt, and create.",
@@ -621,9 +621,9 @@ const I18N_DICT = {
     "preview.ec.totalCount": "{n} images",
     "preview.ec.scene.fallback": "Scene",
     "preview.result.title": "Result",
-    "preview.result.runningHint": "Generating, please wait…",
+    "preview.result.runningHint": "Generating, please wait鈥?,
     "preview.result.viewInTasks": "View in Tasks",
-    "preview.result.completedNoImages": "Task complete, loading images…",
+    "preview.result.completedNoImages": "Task complete, loading images鈥?,
     "preview.result.refreshResult": "Refresh",
     "preview.result.genFailed": "Generation failed",
     "preview.result.promptLabel": "Prompt",
@@ -640,7 +640,7 @@ const I18N_DICT = {
     "tasks.detail.retry": "Retry",
     "tasks.detail.delete": "Delete",
     "tasks.detail.confirmDelete": "Delete this task?",
-    "tasks.detail.runningHint": "Generating…",
+    "tasks.detail.runningHint": "Generating鈥?,
     "tasks.detail.completedNoImages": "Task complete but no images were found.",
     "tasks.detail.recheck": "Re-fetch images",
     "tasks.detail.id": "ID",
@@ -684,11 +684,11 @@ const I18N_DICT = {
     "err.title": "Plugin UI render error",
     "err.retry": "Retry render",
     "err.stackLabel": "Error stack (share with developers)",
-    "toast.downloading": "Downloading…",
+    "toast.downloading": "Downloading鈥?,
     "toast.downloadFailed": "Download failed: {msg}",
     "toast.downloaded": "Downloaded: {name}",
     "toast.downloadedTo": "Saved to: {path} (folder opened for you)",
-    "toast.downloadedBrowser": "Downloaded {name} — check your browser's default Downloads folder.",
+    "toast.downloadedBrowser": "Downloaded {name} 鈥?check your browser's default Downloads folder.",
     "toast.serverReturned": "Server returned {status}",
     "toast.optimizeOk": "Prompt optimized",
     "toast.optimizeFail": "Optimize failed",
@@ -701,7 +701,7 @@ const I18N_DICT = {
     "toast.savedSettings": "Settings saved",
     "toast.saveFailed": "Save failed",
     "toast.retryCreated": "Retry task created",
-    "toast.recheckQuerying": "Re-querying…",
+    "toast.recheckQuerying": "Re-querying鈥?,
     "toast.recheckFound": "Found {n} images!",
     "toast.recheckEmpty": "No images found yet, please retry later",
     "toast.recheckFail": "Query failed",
@@ -793,7 +793,7 @@ function statusCls(s) {
   return STATUS_CLS[s] || "tag-gray";
 }
 
-// ─── Task Started Modal ───
+// 鈹€鈹€鈹€ Task Started Modal 鈹€鈹€鈹€
 function TaskStartedModal({ open, onClose, onGoToTasks, title, desc }) {
   const t = useT();
   if (!open) return null;
@@ -816,7 +816,7 @@ function TaskStartedModal({ open, onClose, onGoToTasks, title, desc }) {
   );
 }
 
-// ─── App ───
+// 鈹€鈹€鈹€ App 鈹€鈹€鈹€
 function App() {
   const t = useT();
   const [tab, setTab] = useState("create");
@@ -913,7 +913,7 @@ function App() {
   );
 }
 
-// ─── Create Tab ───
+// 鈹€鈹€鈹€ Create Tab 鈹€鈹€鈹€
 function CreateTab({ apiReady, goToTasks }) {
   const t = useT();
   const locale = useLocale();
@@ -1132,7 +1132,7 @@ function CreateTab({ apiReady, goToTasks }) {
                   {imagePreview.map((p, i) => (
                     <div key={i} className="upload-zone has-image" style={{width:80,height:80,position:"relative"}}>
                       <img src={p} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:4}} />
-                      <button onClick={() => removeImage(i)} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11}}>×</button>
+                      <button onClick={() => removeImage(i)} style={{position:"absolute",top:2,right:2,background:"rgba(0,0,0,.5)",color:"#fff",border:"none",borderRadius:"50%",width:18,height:18,cursor:"pointer",fontSize:11}}>脳</button>
                     </div>
                   ))}
                   <label className="upload-zone" style={{width:80,height:80,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
@@ -1212,7 +1212,7 @@ function CreateTab({ apiReady, goToTasks }) {
                 {imagePreview.map((p, i) => (
                   <div key={i} className="upload-zone has-image" style={{width: 100, height: 100, position: "relative"}}>
                     <img src={p} className="upload-preview" style={{width: "100%", height: "100%", objectFit: "cover"}} />
-                    <button onClick={() => removeImage(i)} style={{position:"absolute", top:2, right:2, background:"rgba(0,0,0,.5)", color:"#fff", border:"none", borderRadius:"50%", width:20, height:20, cursor:"pointer", fontSize:12}}>×</button>
+                    <button onClick={() => removeImage(i)} style={{position:"absolute", top:2, right:2, background:"rgba(0,0,0,.5)", color:"#fff", border:"none", borderRadius:"50%", width:20, height:20, cursor:"pointer", fontSize:12}}>脳</button>
                   </div>
                 ))}
                 <label className="upload-zone" style={{width: 100, height: 100, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24}}>
@@ -1238,12 +1238,12 @@ function CreateTab({ apiReady, goToTasks }) {
                 <div className="label">{t("create.size.label")}</div>
                 <select className="input select" value={size} onChange={e => setSize(e.target.value)}>
                   <option value="">{t("create.size.default")}</option>
-                  <option value="1024*1024">1024×1024 (1:1)</option>
-                  <option value="2048*2048">2048×2048 (1:1)</option>
-                  <option value="1536*2688">1536×2688 (9:16)</option>
-                  <option value="2688*1536">2688×1536 (16:9)</option>
-                  <option value="1728*2368">1728×2368 (3:4)</option>
-                  <option value="2368*1728">2368×1728 (4:3)</option>
+                  <option value="1024*1024">1024脳1024 (1:1)</option>
+                  <option value="2048*2048">2048脳2048 (1:1)</option>
+                  <option value="1536*2688">1536脳2688 (9:16)</option>
+                  <option value="2688*1536">2688脳1536 (16:9)</option>
+                  <option value="1728*2368">1728脳2368 (3:4)</option>
+                  <option value="2368*1728">2368脳1728 (4:3)</option>
                 </select>
               </div>
               <div className="form-row">
@@ -1480,7 +1480,7 @@ function CreateTab({ apiReady, goToTasks }) {
   );
 }
 
-// ─── Tasks Tab ───
+// 鈹€鈹€鈹€ Tasks Tab 鈹€鈹€鈹€
 function TasksTab({ refreshSignal = 0 }) {
   const t = useT();
   const MODES = modeList(t);
@@ -1515,7 +1515,7 @@ function TasksTab({ refreshSignal = 0 }) {
   // navigated to the tasks tab after creating a job). We use a ref so we
   // always invoke the latest `load` (which closes over current filter
   // values) without making this effect re-run on every load identity
-  // change — that would cause a redundant fetch alongside the existing
+  // change 鈥?that would cause a redundant fetch alongside the existing
   // `useEffect(() => load(), [load])` above.
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; }, [load]);
@@ -1615,7 +1615,7 @@ function TasksTab({ refreshSignal = 0 }) {
                   ) : tk.status === "running" ? (
                     <div className="spinner-sm" />
                   ) : (
-                    <span className="text-dim text-xs">—</span>
+                    <span className="text-dim text-xs">鈥?/span>
                   )}
                 </div>
                 <div className="task-info">
@@ -1658,7 +1658,7 @@ function TasksTab({ refreshSignal = 0 }) {
                   // at 600px wide, object-fit: contain) instead of being
                   // squashed into a 320px square via the multi-image grid's
                   // aspect-ratio: 1 + object-fit: cover. Multi-image tasks
-                  // keep the grid layout — only the 1-image case differs.
+                  // keep the grid layout 鈥?only the 1-image case differs.
                   (() => {
                     const isSingle = selected.image_urls.length === 1;
                     const galleryClass = isSingle ? "image-gallery image-gallery--single" : "image-gallery";
@@ -1742,10 +1742,10 @@ function TasksTab({ refreshSignal = 0 }) {
   );
 }
 
-// ─── Guide Tab ───
+// 鈹€鈹€鈹€ Guide Tab 鈹€鈹€鈹€
 // Render a keyword chip whose source can be either a plain string (legacy
 // shape) or a {zh, en} bilingual object. The bilingual case is shown as
-// "中文 / English" so users see both forms regardless of UI locale — this is
+// "涓枃 / English" so users see both forms regardless of UI locale 鈥?this is
 // the "side-by-side short keyword" half of the hybrid i18n strategy.
 function renderKeywordLabel(w) {
   if (w == null) return "";
@@ -1880,7 +1880,7 @@ function Collapsible({ title, children, defaultOpen }) {
   );
 }
 
-// ─── Settings Tab ───
+// 鈹€鈹€鈹€ Settings Tab 鈹€鈹€鈹€
 function SettingsTab({ onApiKeyChange }) {
   const t = useT();
   const [config, setConfig] = useState({});
@@ -1958,23 +1958,23 @@ function SettingsTab({ onApiKeyChange }) {
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <div className="label">共享中转站名称（可选）</div>
+            <div className="label">鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</div>
             <input className="input" type="text"
                    value={config.dashscope_relay_endpoint || ""}
                    onChange={e => updateField("dashscope_relay_endpoint", e.target.value)}
                    onBlur={e => save({ dashscope_relay_endpoint: e.target.value.trim() })}
-                   placeholder="例如: yunwu-image" />
+                   placeholder="渚嬪: yunwu-image" />
             <div className="text-xs text-dim" style={{marginTop: 4}}>
-              来自 LLM 配置页 relay_endpoints；填写后优先使用共享中转站。
+              鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涘～鍐欏悗浼樺厛浣跨敤鍏变韩涓浆绔欍€?
             </div>
           </div>
           <div className="form-row">
-            <div className="label">中转站失败策略</div>
+            <div className="label">涓浆绔欏け璐ョ瓥鐣?/div>
             <select className="input select"
                     value={config.dashscope_relay_fallback_policy || "official"}
                     onChange={e => { updateField("dashscope_relay_fallback_policy", e.target.value); save({ dashscope_relay_fallback_policy: e.target.value }); }}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
@@ -1991,10 +1991,10 @@ function SettingsTab({ onApiKeyChange }) {
             <div className="label">{t("settings.defaults.model")}</div>
             <select className="input select" value={config.default_model || "wan27-pro"}
                     onChange={e => { updateField("default_model", e.target.value); save({ default_model: e.target.value }); }}>
-              <option value="wan27-pro">万相 2.7 Pro</option>
-              <option value="wan27">万相 2.7</option>
-              <option value="qwen-pro">千问 2.0 Pro</option>
-              <option value="qwen">千问 2.0</option>
+              <option value="wan27-pro">涓囩浉 2.7 Pro</option>
+              <option value="wan27">涓囩浉 2.7</option>
+              <option value="qwen-pro">鍗冮棶 2.0 Pro</option>
+              <option value="qwen">鍗冮棶 2.0</option>
             </select>
           </div>
           <div className="form-row">
@@ -2055,7 +2055,7 @@ function SettingsTab({ onApiKeyChange }) {
   );
 }
 
-// ─── Error Boundary ───
+// 鈹€鈹€鈹€ Error Boundary 鈹€鈹€鈹€
 // React 18 production build will UNMOUNT the entire root if any component
 // throws and there is no error boundary above it. That is why a single bad
 // render in TasksTab/GuideTab/SettingsTab used to wipe the whole plugin UI
@@ -2084,8 +2084,8 @@ class PluginErrorBoundary extends React.Component {
     const compStack = (this.state.info && this.state.info.componentStack) || "";
     // Error boundary is a class component (cannot use hooks), so we read
     // i18n directly from the shared helper. Re-render on locale change is
-    // not strictly necessary here — the error state is usually short-lived
-    // and the user will refresh — but text is still localized at the time
+    // not strictly necessary here 鈥?the error state is usually short-lived
+    // and the user will refresh 鈥?but text is still localized at the time
     // the error first appears.
     const tr = (k) => _i18n.t(k);
     return (
@@ -2115,7 +2115,7 @@ class PluginErrorBoundary extends React.Component {
   }
 }
 
-// ─── Mount ───
+// 鈹€鈹€鈹€ Mount 鈹€鈹€鈹€
 ReactDOM.createRoot(document.getElementById("root")).render(
   <PluginErrorBoundary>
     <App />

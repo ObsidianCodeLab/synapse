@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>电商素材小助理</title>
+<title>鐢靛晢绱犳潗灏忓姪鐞?/title>
 <!--
   Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
   bootstrap.js no-ops outside of an iframe, so direct-source dev mode falls
@@ -68,7 +68,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(249,115,22,.15); }
 .textarea { resize: vertical; min-height: 72px; max-height: 400px; font-family: inherit; }
 .select { appearance: none; padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
-/* Form-field label — upgraded to a "section label" look (small accent
+/* Form-field label 鈥?upgraded to a "section label" look (small accent
  * bar + slightly heavier weight) so each field gets a clear hierarchy.
  * Mirrors plugins/tongyi-image and plugins/seedance-video. */
 .label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 8px; line-height: 1.3; }
@@ -208,27 +208,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 * { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,.45) transparent; }
 .split-left, .split-right { scrollbar-gutter: stable; }
 
-/* ── compact overrides (align with seedance-video / tongyi-image rhythm) ── */
+/* 鈹€鈹€ compact overrides (align with seedance-video / tongyi-image rhythm) 鈹€鈹€ */
 .content { padding: 14px 16px; }
 .card { padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 .tab { padding: 9px 16px; }
 .btn { padding: 7px 14px; }
 
-/* ── full-width primary button (block) — used for major submit actions ── */
+/* 鈹€鈹€ full-width primary button (block) 鈥?used for major submit actions 鈹€鈹€ */
 .btn-block { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 16px; font-size: 14px; font-weight: 600; border-radius: 8px; }
 
-/* ── header: API key status pill (matches tongyi-image header pattern) ── */
+/* 鈹€鈹€ header: API key status pill (matches tongyi-image header pattern) 鈹€鈹€ */
 .api-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; background: rgba(34,197,94,.12); color: var(--success); cursor: default; }
 .api-pill--missing { background: rgba(245,158,11,.15); color: var(--warning); cursor: pointer; }
 
-/* ── prompt textarea wrapper with floating counter ── */
+/* 鈹€鈹€ prompt textarea wrapper with floating counter 鈹€鈹€ */
 .prompt-wrap { position: relative; }
 .prompt-wrap .prompt-counter { position: absolute; bottom: 8px; right: 12px; font-size: 11px; color: var(--text-dim); pointer-events: none; background: linear-gradient(to right, transparent, var(--bg) 30%); padding: 2px 4px 2px 16px; border-radius: 4px; }
 
-/* ── tip-bar (subtle inline hint, matches seedance-video) ── */
+/* 鈹€鈹€ tip-bar (subtle inline hint, matches seedance-video) 鈹€鈹€ */
 .tip-bar { background: rgba(249,115,22,.08); border: 1px solid rgba(249,115,22,.2); border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--primary); margin-bottom: 12px; }
 
-/* ── Guide (提示词教学) Styles ── */
+/* 鈹€鈹€ Guide (鎻愮ず璇嶆暀瀛? Styles 鈹€鈹€ */
 .guide-container { padding: 24px; max-width: 900px; margin: 0 auto; overflow-y: auto; height: 100%; }
 .guide-banner { background: linear-gradient(135deg, var(--primary), #fb923c); color: #fff; padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
 .guide-banner strong { font-weight: 600; }
@@ -311,7 +311,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <div id="root"></div>
 
 <script>
-// ── Bridge SDK ──
+// 鈹€鈹€ Bridge SDK 鈹€鈹€
 var BRIDGE_VER = 1;
 var _ctx = null, _caps = [], _pending = {}, _handlers = {};
 var _bridgeConnected = false;
@@ -407,11 +407,11 @@ function uploadFile(file) {
 
 async function downloadAsset(taskId, idx, isVideo) {
   try {
-    showToast("正在下载...");
+    showToast("姝ｅ湪涓嬭浇...");
     var base = _detectApiBase() + (_ctx ? "/api/plugins/" + _ctx.pluginId : "/api/plugins/ecommerce-image");
     var url = isVideo ? (base + "/videos/" + taskId) : (base + "/images/" + taskId + "?idx=" + (idx || 0));
     var resp = await fetch(url);
-    if (!resp.ok) throw new Error("服务端返回 " + resp.status);
+    if (!resp.ok) throw new Error("鏈嶅姟绔繑鍥?" + resp.status);
     var blob = await resp.blob();
     var objUrl = URL.createObjectURL(blob);
     var ext = isVideo ? ".mp4" : ".png";
@@ -420,8 +420,8 @@ async function downloadAsset(taskId, idx, isVideo) {
     a.href = objUrl; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function() { URL.revokeObjectURL(objUrl); }, 3000);
-    showToast("已下载: " + fname);
-  } catch (e) { showToast("下载失败: " + e.message, "error"); }
+    showToast("宸蹭笅杞? " + fname);
+  } catch (e) { showToast("涓嬭浇澶辫触: " + e.message, "error"); }
 }
 
 function showToast(body, type) {
@@ -438,22 +438,22 @@ function showToast(body, type) {
 }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 
 <script type="text/babel">
 const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
 const EMOJI_TO_ICON = {
-  "🔥": "flame", "🎬": "clapperboard", "📹": "camera", "🎭": "masks",
-  "📋": "copy", "✏️": "edit", "🔄": "refresh", "📦": "package",
-  "🖼️": "images", "🌐": "globe", "✨": "sparkles", "📑": "layers",
-  "📏": "ruler", "🚀": "rocket", "💬": "message", "📢": "megaphone",
-  "🎊": "party", "🎉": "confetti", "📁": "upload", "📄": "file",
-  "🛒": "cart", "⚙️": "settings", "🎨": "sparkles", "🎯": "rocket",
-  "🛍️": "cart", "🏷️": "package", "💎": "sparkles", "⭐": "sparkles",
-  "🎁": "package",
+  "馃敟": "flame", "馃幀": "clapperboard", "馃摴": "camera", "馃幁": "masks",
+  "馃搵": "copy", "鉁忥笍": "edit", "馃攧": "refresh", "馃摝": "package",
+  "馃柤锔?: "images", "馃寪": "globe", "鉁?: "sparkles", "馃搼": "layers",
+  "馃搹": "ruler", "馃殌": "rocket", "馃挰": "message", "馃摙": "megaphone",
+  "馃帄": "party", "馃帀": "confetti", "馃搧": "upload", "馃搫": "file",
+  "馃洅": "cart", "鈿欙笍": "settings", "馃帹": "sparkles", "馃幆": "rocket",
+  "馃泹锔?: "cart", "馃彿锔?: "package", "馃拵": "sparkles", "猸?: "sparkles",
+  "馃巵": "package",
 };
 const KNOWN_ICONS = new Set([
   "cart","settings","arrow-left","video","image","detail","poster",
@@ -501,27 +501,27 @@ const ICON_MAP = {
 };
 
 const TABS = [
-  { id: "create",   label: "创建" },
-  { id: "tasks",    label: "任务列表" },
-  { id: "guide",    label: "提示词教学" },
-  { id: "settings", label: "设置" },
+  { id: "create",   label: "鍒涘缓" },
+  { id: "tasks",    label: "浠诲姟鍒楄〃" },
+  { id: "guide",    label: "鎻愮ず璇嶆暀瀛? },
+  { id: "settings", label: "璁剧疆" },
 ];
 
 const MODULES = [
-  { id: "video",  label: "视频生成",   icon: "video" },
-  { id: "image",  label: "图像生成",   icon: "image" },
-  { id: "detail", label: "电商详情图", icon: "detail" },
-  { id: "poster", label: "活动海报",   icon: "poster" },
+  { id: "video",  label: "瑙嗛鐢熸垚",   icon: "video" },
+  { id: "image",  label: "鍥惧儚鐢熸垚",   icon: "image" },
+  { id: "detail", label: "鐢靛晢璇︽儏鍥?, icon: "detail" },
+  { id: "poster", label: "娲诲姩娴锋姤",   icon: "poster" },
 ];
 
 const STATUS_MAP = {
-  pending: { label: "等待中", cls: "tag-gray" },
-  running: { label: "生成中", cls: "tag-blue" },
-  succeeded: { label: "完成", cls: "tag-green" },
-  failed: { label: "失败", cls: "tag-red" },
-  cancelled: { label: "已取消", cls: "tag-gray" },
-  cancelling: { label: "取消中", cls: "tag-orange" },
-  partial_success: { label: "部分完成", cls: "tag-orange" },
+  pending: { label: "绛夊緟涓?, cls: "tag-gray" },
+  running: { label: "鐢熸垚涓?, cls: "tag-blue" },
+  succeeded: { label: "瀹屾垚", cls: "tag-green" },
+  failed: { label: "澶辫触", cls: "tag-red" },
+  cancelled: { label: "宸插彇娑?, cls: "tag-gray" },
+  cancelling: { label: "鍙栨秷涓?, cls: "tag-orange" },
+  partial_success: { label: "閮ㄥ垎瀹屾垚", cls: "tag-orange" },
 };
 
 function isRequiredParamEmpty(p, vals) {
@@ -537,21 +537,21 @@ function isRequiredParamEmpty(p, vals) {
   return false;
 }
 
-// ── Collapsible ──
+// 鈹€鈹€ Collapsible 鈹€鈹€
 function Collapsible({ title, defaultOpen, children }) {
   const [open, setOpen] = useState(defaultOpen !== false);
   return (
     <div className={"collapsible" + (open ? " open" : "")}>
       <div className="collapsible-header" onClick={() => setOpen(!open)}>
         <span>{title}</span>
-        <span className="arrow">▶</span>
+        <span className="arrow">鈻?/span>
       </div>
       <div className="collapsible-body">{children}</div>
     </div>
   );
 }
 
-// ── ImageUpload ──
+// 鈹€鈹€ ImageUpload 鈹€鈹€
 function ImageUpload({ value, onChange, label }) {
   const ref = useRef(null);
   const [preview, setPreview] = useState(null);
@@ -567,12 +567,12 @@ function ImageUpload({ value, onChange, label }) {
       const resp = await uploadFile(file);
       if (resp.ok && resp.asset) {
         onChange(resp.asset.id);
-        showToast("图片已上传");
+        showToast("鍥剧墖宸蹭笂浼?);
       } else {
-        showToast("上传失败", "error");
+        showToast("涓婁紶澶辫触", "error");
       }
     } catch (e) {
-      showToast("上传失败: " + e.message, "error");
+      showToast("涓婁紶澶辫触: " + e.message, "error");
     }
     setUploading(false);
   };
@@ -588,7 +588,7 @@ function ImageUpload({ value, onChange, label }) {
         onChange={(e) => handleFile(e.target.files[0])} />
       {uploading ? (
         <div className="flex items-center justify-between gap-2" style={{justifyContent:"center"}}>
-          <div className="spinner-sm"></div> <span className="text-sm">上传中...</span>
+          <div className="spinner-sm"></div> <span className="text-sm">涓婁紶涓?..</span>
         </div>
       ) : preview ? (
         <img src={preview} className="upload-preview" alt="" />
@@ -596,14 +596,14 @@ function ImageUpload({ value, onChange, label }) {
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
           <span className="oa-icon" style={{fontSize:24,opacity:.6}}
             dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.upload() : ""}} />
-          <div>{label || "点击或拖拽上传图片"}</div>
+          <div>{label || "鐐瑰嚮鎴栨嫋鎷戒笂浼犲浘鐗?}</div>
         </div>
       )}
     </div>
   );
 }
 
-// ── MultiImageUpload ──
+// 鈹€鈹€ MultiImageUpload 鈹€鈹€
 function MultiImageUpload({ value, onChange, label, max }) {
   const ref = useRef(null);
   const [items, setItems] = useState([]);
@@ -628,16 +628,16 @@ function MultiImageUpload({ value, onChange, label, max }) {
         if (resp.ok && resp.asset) {
           newItems.push({ assetId: resp.asset.id, preview: previewUrl, name: file.name });
         } else {
-          showToast("上传失败: " + (file.name), "error");
+          showToast("涓婁紶澶辫触: " + (file.name), "error");
         }
       } catch (e) {
-        showToast("上传失败: " + e.message, "error");
+        showToast("涓婁紶澶辫触: " + e.message, "error");
       }
     }
     setItems(newItems);
     onChange(newItems.map(it => it.assetId));
     setUploading(false);
-    if (newItems.length >= maxCount) showToast("最多上传 " + maxCount + " 张图片");
+    if (newItems.length >= maxCount) showToast("鏈€澶氫笂浼?" + maxCount + " 寮犲浘鐗?);
   };
 
   const removeItem = (idx) => {
@@ -658,28 +658,28 @@ function MultiImageUpload({ value, onChange, label, max }) {
           onChange={(e) => { handleFiles(Array.from(e.target.files || [])); e.target.value = ""; }} />
         {uploading ? (
           <div className="flex items-center justify-between gap-2" style={{justifyContent:"center"}}>
-            <div className="spinner-sm"></div> <span className="text-sm">上传中...</span>
+            <div className="spinner-sm"></div> <span className="text-sm">涓婁紶涓?..</span>
           </div>
         ) : (
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
             <span className="oa-icon" style={{fontSize:24,opacity:.6}}
               dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.upload() : ""}} />
-            <div>{label || "点击或拖拽上传多张图片"}</div>
+            <div>{label || "鐐瑰嚮鎴栨嫋鎷戒笂浼犲寮犲浘鐗?}</div>
           </div>
         )}
       </div>
       {items.length > 0 && (
         <div>
-          <div className="multi-upload-count">已上传 {items.length} 张{maxCount < 100 ? " / 最多 " + maxCount + " 张" : ""}</div>
+          <div className="multi-upload-count">宸蹭笂浼?{items.length} 寮爗maxCount < 100 ? " / 鏈€澶?" + maxCount + " 寮? : ""}</div>
           <div className="multi-upload-grid">
             {items.map((it, i) => (
               <div key={it.assetId} className="multi-upload-item">
                 <img src={it.preview} alt={it.name} />
-                <button className="remove-btn" onClick={(e) => { e.stopPropagation(); removeItem(i); }} title="移除">×</button>
+                <button className="remove-btn" onClick={(e) => { e.stopPropagation(); removeItem(i); }} title="绉婚櫎">脳</button>
               </div>
             ))}
             {items.length < maxCount && (
-              <div className="multi-upload-add" onClick={() => ref.current && ref.current.click()} title="继续添加">+</div>
+              <div className="multi-upload-add" onClick={() => ref.current && ref.current.click()} title="缁х画娣诲姞">+</div>
             )}
           </div>
         </div>
@@ -688,7 +688,7 @@ function MultiImageUpload({ value, onChange, label, max }) {
   );
 }
 
-// ── DynamicForm ──
+// 鈹€鈹€ DynamicForm 鈹€鈹€
 function DynamicForm({ feature, params, setParams, pluginApi }) {
   if (!feature) return null;
   const [optimizing, setOptimizing] = React.useState({});
@@ -726,12 +726,12 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
       const resp = await pluginApi("POST", "/prompt-optimize", body);
       if (resp.ok && resp.body && resp.body.optimized) {
         setParams((prev) => ({...prev, [fieldId]: resp.body.optimized}));
-        showToast("优化成功");
+        showToast("浼樺寲鎴愬姛");
       } else {
-        showToast((resp.body && resp.body.detail) || "优化失败", "error");
+        showToast((resp.body && resp.body.detail) || "浼樺寲澶辫触", "error");
       }
     } catch (e) {
-      showToast("优化失败: " + (e.message || e), "error");
+      showToast("浼樺寲澶辫触: " + (e.message || e), "error");
     } finally {
       setOptimizing((prev) => ({...prev, [fieldId]: false}));
     }
@@ -741,7 +741,7 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
   if (plist.length === 0) {
     return (
       <div className="form-empty-hint">
-        未收到该功能的参数字段（params 为空）。若刚热重载过插件，请<strong>重启后端</strong>或重新加载插件；并确认已更新到修复「配置被 pop 清空」的版本。
+        鏈敹鍒拌鍔熻兘鐨勫弬鏁板瓧娈碉紙params 涓虹┖锛夈€傝嫢鍒氱儹閲嶈浇杩囨彃浠讹紝璇?strong>閲嶅惎鍚庣</strong>鎴栭噸鏂板姞杞芥彃浠讹紱骞剁‘璁ゅ凡鏇存柊鍒颁慨澶嶃€岄厤缃 pop 娓呯┖銆嶇殑鐗堟湰銆?
       </div>
     );
   }
@@ -792,12 +792,12 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
               <span>{p.label}{p.required ? " *" : ""}</span>
               <button className="oa-ai-btn" type="button" disabled={optimizing[p.id] || !val}
                 onClick={() => handleOptimize(p.id)}
-                title="使用 AI 自动优化提示词">
+                title="浣跨敤 AI 鑷姩浼樺寲鎻愮ず璇?>
                 {optimizing[p.id]
                   ? <span className="spinner-sm" style={{width:11,height:11,borderWidth:1.5}} />
                   : <span className="oa-ai-btn__icon"
                       dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.sparkles() : ""}} />}
-                AI 优化
+                AI 浼樺寲
               </button>
             </div>
           ) : (
@@ -853,7 +853,7 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
       return (
         <div className="form-row" key={p.id}>
           <label className="label">{p.label}{p.required ? " *" : ""}</label>
-          <MultiImageUpload value={val} label={p.placeholder || "点击或拖拽上传多张图片"}
+          <MultiImageUpload value={val} label={p.placeholder || "鐐瑰嚮鎴栨嫋鎷戒笂浼犲寮犲浘鐗?}
             max={p.max || 20}
             onChange={(assetIds) => setParams({...params, [p.id]: assetIds})} />
         </div>
@@ -883,7 +883,7 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
   if (totalVisible === 0) {
     return (
       <div className="form-empty-hint">
-        当前筛选条件下没有可见参数。请检查依赖字段或联系开发者配置 <code>visible_when</code>。
+        褰撳墠绛涢€夋潯浠朵笅娌℃湁鍙鍙傛暟銆傝妫€鏌ヤ緷璧栧瓧娈垫垨鑱旂郴寮€鍙戣€呴厤缃?<code>visible_when</code>銆?
       </div>
     );
   }
@@ -892,12 +892,12 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
     <div>
       {grouped.basic.length > 0 && grouped.basic.map(renderParam)}
       {grouped.advanced.length > 0 && (
-        <Collapsible title="高级设置" defaultOpen={false}>
+        <Collapsible title="楂樼骇璁剧疆" defaultOpen={false}>
           {grouped.advanced.map(renderParam)}
         </Collapsible>
       )}
       {grouped.style.length > 0 && (
-        <Collapsible title="风格设置" defaultOpen={false}>
+        <Collapsible title="椋庢牸璁剧疆" defaultOpen={false}>
           {grouped.style.map(renderParam)}
         </Collapsible>
       )}
@@ -905,11 +905,11 @@ function DynamicForm({ feature, params, setParams, pluginApi }) {
   );
 }
 
-// ── ExampleGallery ──
+// 鈹€鈹€ ExampleGallery 鈹€鈹€
 function ExampleGallery({ examples, onSelect }) {
   if (!examples || examples.length === 0) return null;
   return (
-    <Collapsible title={`示例画廊 (${examples.length})`} defaultOpen={false}>
+    <Collapsible title={`绀轰緥鐢诲粖 (${examples.length})`} defaultOpen={false}>
       <div className="example-grid">
         {examples.map((ex) => (
           <div key={ex.id} className="example-card" onClick={() => onSelect(ex)}>
@@ -923,20 +923,20 @@ function ExampleGallery({ examples, onSelect }) {
   );
 }
 
-// ── TaskList ──
+// 鈹€鈹€ TaskList 鈹€鈹€
 function TaskList({ tasks, selectedId, onSelect, onRefresh, loading }) {
   return (
     <div>
       <div className="flex items-center justify-between" style={{marginBottom:12}}>
-        <span className="text-sm text-muted">生成记录</span>
+        <span className="text-sm text-muted">鐢熸垚璁板綍</span>
         <button className="btn btn-sm" onClick={onRefresh} disabled={loading}>
-          {loading ? <span className="spinner-sm"></span> : "刷新"}
+          {loading ? <span className="spinner-sm"></span> : "鍒锋柊"}
         </button>
       </div>
       {tasks.length === 0 ? (
         <div className="empty-state" style={{padding:"30px 10px"}}>
           <div style={{fontSize:28,marginBottom:8,opacity:.5}}><Ic name="clipboard" size="xl" /></div>
-          <div className="text-sm text-dim">暂无记录</div>
+          <div className="text-sm text-dim">鏆傛棤璁板綍</div>
         </div>
       ) : tasks.map((t) => {
         const st = STATUS_MAP[t.status] || STATUS_MAP.pending;
@@ -949,7 +949,7 @@ function TaskList({ tasks, selectedId, onSelect, onRefresh, loading }) {
             <div className="task-thumb">
               {t.task_type === "video" ? <Ic name="video" size="lg" /> :
                 imgs.length > 0 ? <img src={imgs[0]} alt="" /> :
-                hasProgress ? <span className="text-xs" style={{fontWeight:600,color:"var(--primary)"}}>{t.progress_total}张</span> :
+                hasProgress ? <span className="text-xs" style={{fontWeight:600,color:"var(--primary)"}}>{t.progress_total}寮?/span> :
                 <Ic name="image" size="lg" />}
             </div>
             <div className="task-info">
@@ -957,7 +957,7 @@ function TaskList({ tasks, selectedId, onSelect, onRefresh, loading }) {
               <div className="task-meta">
                 <span className={"tag " + st.cls}>{st.label}</span>
                 {(t.api_task_id && String(t.api_task_id).indexOf("mock-") === 0) && (
-                  <span className="tag tag-orange">演示</span>
+                  <span className="tag tag-orange">婕旂ず</span>
                 )}
                 <span>{new Date(t.created_at * 1000).toLocaleString()}</span>
               </div>
@@ -974,7 +974,7 @@ function TaskList({ tasks, selectedId, onSelect, onRefresh, loading }) {
   );
 }
 
-// ── ChildTaskCard ──
+// 鈹€鈹€ ChildTaskCard 鈹€鈹€
 function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
   const cst = STATUS_MAP[child.status] || STATUS_MAP.pending;
   const cimgs = child.image_urls ? (typeof child.image_urls === "string" ? JSON.parse(child.image_urls || "[]") : child.image_urls) : [];
@@ -990,9 +990,9 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
     setSaving(true);
     try {
       await pluginApi("PUT", "/tasks/" + child.id, { prompt: editPrompt });
-      showToast("已保存");
+      showToast("宸蹭繚瀛?);
       setEditing(false);
-    } catch(e) { showToast("保存失败", "error"); }
+    } catch(e) { showToast("淇濆瓨澶辫触", "error"); }
     setSaving(false);
   };
 
@@ -1001,12 +1001,12 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
     try {
       const resp = await pluginApi("POST", "/tasks/" + child.id + "/retry-child");
       if (resp.body && resp.body.ok) {
-        showToast("已重新提交");
+        showToast("宸查噸鏂版彁浜?);
         if (onRetried) onRetried();
       } else {
-        showToast(resp.body?.detail || "重跑失败", "error");
+        showToast(resp.body?.detail || "閲嶈窇澶辫触", "error");
       }
-    } catch(e) { showToast("重跑失败: " + e.message, "error"); }
+    } catch(e) { showToast("閲嶈窇澶辫触: " + e.message, "error"); }
     setRetrying(false);
   };
 
@@ -1015,12 +1015,12 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
       <div className="flex items-center justify-between" style={{marginBottom:8}}>
         <div className="flex items-center gap-2">
           <span className={"tag " + cst.cls} style={{fontSize:11}}>{cst.label}</span>
-          <span className="text-xs" style={{fontWeight:600}}>子任务 {index+1}/{total}</span>
+          <span className="text-xs" style={{fontWeight:600}}>瀛愪换鍔?{index+1}/{total}</span>
         </div>
         <div className="flex gap-2">
           {(child.status === "failed" || child.status === "succeeded" || child.status === "cancelled") && (
             <button className="btn btn-sm" onClick={handleRetryChild} disabled={retrying}>
-              {retrying ? <span className="spinner-sm"></span> : "重跑"}
+              {retrying ? <span className="spinner-sm"></span> : "閲嶈窇"}
             </button>
           )}
         </div>
@@ -1034,10 +1034,10 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
           <div className="flex gap-2" style={{marginTop:4}}>
             {child.prompt.length > 80 && (
               <button className="btn-link text-xs" onClick={() => setExpanded(!expanded)}>
-                {expanded ? "收起" : "展开全部"}
+                {expanded ? "鏀惰捣" : "灞曞紑鍏ㄩ儴"}
               </button>
             )}
-            <button className="btn-link text-xs" onClick={() => { setExpanded(true); setEditing(true); }}>编辑</button>
+            <button className="btn-link text-xs" onClick={() => { setExpanded(true); setEditing(true); }}>缂栬緫</button>
           </div>
         </div>
       )}
@@ -1048,9 +1048,9 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
             value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} />
           <div className="flex gap-2" style={{marginTop:4}}>
             <button className="btn btn-sm btn-primary" onClick={handleSavePrompt} disabled={saving}>
-              {saving ? "保存中..." : "保存"}
+              {saving ? "淇濆瓨涓?.." : "淇濆瓨"}
             </button>
-            <button className="btn btn-sm" onClick={() => { setEditing(false); setEditPrompt(child.prompt || ""); }}>取消</button>
+            <button className="btn btn-sm" onClick={() => { setEditing(false); setEditPrompt(child.prompt || ""); }}>鍙栨秷</button>
           </div>
         </div>
       )}
@@ -1062,7 +1062,7 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
             <div key={i} className="image-card" onClick={() => onLightbox(url)}>
               <img src={url} alt="" loading="lazy" />
               <div className="image-card-actions">
-                <button onClick={(e) => { e.stopPropagation(); downloadAsset(child.id, i); }}>下载</button>
+                <button onClick={(e) => { e.stopPropagation(); downloadAsset(child.id, i); }}>涓嬭浇</button>
               </div>
             </div>
           ))}
@@ -1071,19 +1071,19 @@ function ChildTaskCard({ child, index, total, onLightbox, onRetried }) {
       {child.status === "running" && (
         <div style={{textAlign:"center",padding:"12px 0"}}>
           <div className="spinner-sm" style={{margin:"0 auto 4px"}}></div>
-          <div className="text-xs text-muted">生成中...</div>
+          <div className="text-xs text-muted">鐢熸垚涓?..</div>
         </div>
       )}
     </div>
   );
 }
 
-// ── TaskDetail ──
+// 鈹€鈹€ TaskDetail 鈹€鈹€
 function TaskDetail({ task }) {
   if (!task) return (
     <div className="empty-state">
       <div className="empty-state-icon"><Ic name="sparkles" size="xl" /></div>
-      <div className="text-sm text-dim">选择一个功能开始创作，或查看历史记录</div>
+      <div className="text-sm text-dim">閫夋嫨涓€涓姛鑳藉紑濮嬪垱浣滐紝鎴栨煡鐪嬪巻鍙茶褰?/div>
     </div>
   );
 
@@ -1119,37 +1119,37 @@ function TaskDetail({ task }) {
           <div className="flex items-center gap-2">
             <span className={"tag " + st.cls}>{st.label}</span>
             <span className="text-xs text-dim">{task.id}</span>
-            {isParent && <span className="text-xs text-dim">（{task.progress_total}张套图）</span>}
+            {isParent && <span className="text-xs text-dim">锛坽task.progress_total}寮犲鍥撅級</span>}
           </div>
           <div className="flex gap-2">
             {task.status === "running" && (
               <button className="btn btn-sm btn-danger" onClick={async () => {
                 await pluginApi("POST", "/tasks/" + task.id + "/cancel");
-                showToast("任务已取消");
-              }}>取消</button>
+                showToast("浠诲姟宸插彇娑?);
+              }}>鍙栨秷</button>
             )}
             {(task.status === "failed" || task.status === "cancelled" || task.status === "partial_success") && (
               <button className="btn btn-sm" onClick={async () => {
                 await pluginApi("POST", "/tasks/" + task.id + "/retry");
-                showToast("已重新提交");
-              }}>重试</button>
+                showToast("宸查噸鏂版彁浜?);
+              }}>閲嶈瘯</button>
             )}
           </div>
         </div>
         {(task.api_task_id && String(task.api_task_id).indexOf("mock-") === 0) && (
-          <div className="text-sm text-warning" style={{marginBottom:8}}>此为本地演示数据（无真实 API 调用），可在设置中一键清除。</div>
+          <div className="text-sm text-warning" style={{marginBottom:8}}>姝や负鏈湴婕旂ず鏁版嵁锛堟棤鐪熷疄 API 璋冪敤锛夛紝鍙湪璁剧疆涓竴閿竻闄ゃ€?/div>
         )}
-        {task.prompt && <div className="text-sm" style={{marginBottom:8}}><strong>提示词: </strong>{task.prompt}</div>}
+        {task.prompt && <div className="text-sm" style={{marginBottom:8}}><strong>鎻愮ず璇? </strong>{task.prompt}</div>}
         {(() => {
           const p = task.params || {};
           const tags = [];
-          if (task.model) tags.push(["模型", task.model]);
-          if (p.ratio && p.ratio !== "auto") tags.push(["比例", p.ratio]);
-          if (p.size) tags.push(["清晰度", p.size]);
-          if (p.quantity) tags.push(["数量", p.quantity]);
-          if (p.style) tags.push(["风格", p.style]);
-          if (p.resolution) tags.push(["分辨率", p.resolution]);
-          if (p.duration) tags.push(["时长", p.duration + "s"]);
+          if (task.model) tags.push(["妯″瀷", task.model]);
+          if (p.ratio && p.ratio !== "auto") tags.push(["姣斾緥", p.ratio]);
+          if (p.size) tags.push(["娓呮櫚搴?, p.size]);
+          if (p.quantity) tags.push(["鏁伴噺", p.quantity]);
+          if (p.style) tags.push(["椋庢牸", p.style]);
+          if (p.resolution) tags.push(["鍒嗚鲸鐜?, p.resolution]);
+          if (p.duration) tags.push(["鏃堕暱", p.duration + "s"]);
           if (tags.length === 0) return null;
           return (
             <div className="text-xs text-dim" style={{marginBottom:8,display:"flex",flexWrap:"wrap",gap:"6px 12px"}}>
@@ -1160,7 +1160,7 @@ function TaskDetail({ task }) {
         {task.error_message && <div className="text-sm text-danger" style={{marginBottom:8}}>{task.error_message}</div>}
         {isParent && (
           <div style={{marginBottom:8}}>
-            <div className="text-xs text-dim">进度: {task.progress_current}/{task.progress_total}</div>
+            <div className="text-xs text-dim">杩涘害: {task.progress_current}/{task.progress_total}</div>
             <div className="progress-bar">
               <div className="progress-fill" style={{width: (task.progress_current / task.progress_total * 100) + "%"}}></div>
             </div>
@@ -1181,7 +1181,7 @@ function TaskDetail({ task }) {
       {isParent && loadingChildren && children.length === 0 && (
         <div className="card" style={{textAlign:"center",marginTop:8}}>
           <div className="spinner-sm" style={{margin:"8px auto"}}></div>
-          <div className="text-xs text-muted">加载子任务...</div>
+          <div className="text-xs text-muted">鍔犺浇瀛愪换鍔?..</div>
         </div>
       )}
 
@@ -1190,7 +1190,7 @@ function TaskDetail({ task }) {
         <div className="card">
           <video className="video-player" src={task.video_url} controls autoPlay loop />
           <div style={{marginTop:8}}>
-            <button className="btn btn-sm" onClick={() => downloadAsset(task.id, 0, true)}>下载视频</button>
+            <button className="btn btn-sm" onClick={() => downloadAsset(task.id, 0, true)}>涓嬭浇瑙嗛</button>
           </div>
         </div>
       )}
@@ -1213,7 +1213,7 @@ function TaskDetail({ task }) {
                 <div key={i} className="image-card" onClick={() => setLightbox(displayUrl)} style={cardStyle}>
                   <img src={displayUrl} alt="" loading="lazy" />
                   <div className="image-card-actions">
-                    <button onClick={(e) => { e.stopPropagation(); downloadAsset(task.id, i); }}>下载</button>
+                    <button onClick={(e) => { e.stopPropagation(); downloadAsset(task.id, i); }}>涓嬭浇</button>
                   </div>
                 </div>
               ))}
@@ -1231,14 +1231,14 @@ function TaskDetail({ task }) {
       {!isParent && task.status === "running" && (
         <div className="card" style={{textAlign:"center"}}>
           <div className="spinner" style={{margin:"12px auto"}}></div>
-          <div className="text-sm text-muted">生成中，请稍候...</div>
+          <div className="text-sm text-muted">鐢熸垚涓紝璇风◢鍊?..</div>
         </div>
       )}
     </div>
   );
 }
 
-// ── FolderPickerModal (ported from seedance-video) ──
+// 鈹€鈹€ FolderPickerModal (ported from seedance-video) 鈹€鈹€
 function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
   const [path, setPath] = useState("");
   const [items, setItems] = useState([]);
@@ -1298,15 +1298,15 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
     try {
       const r = await pluginApi("POST", "/storage/mkdir", { parent: path, name });
       if (r.ok && r.body?.ok) {
-        showToast("文件夹已创建: " + name);
+        showToast("鏂囦欢澶瑰凡鍒涘缓: " + name);
         setNewFolderMode(false);
         setNewFolderName("");
         await load(path);
       } else {
-        showToast("创建失败: " + (r.body?.detail || ""), "error");
+        showToast("鍒涘缓澶辫触: " + (r.body?.detail || ""), "error");
       }
     } catch (e) {
-      showToast("创建失败: " + String(e && e.message || e), "error");
+      showToast("鍒涘缓澶辫触: " + String(e && e.message || e), "error");
     }
   };
 
@@ -1338,7 +1338,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
     <div className="modal-mask" onClick={onCancel}>
       <div className="modal-card folder-picker" onClick={e => e.stopPropagation()}>
         <div className="folder-picker__head">
-          <div className="folder-picker__title">{title || "选择文件夹"}</div>
+          <div className="folder-picker__title">{title || "閫夋嫨鏂囦欢澶?}</div>
           <div className="folder-picker__crumbs">
             <span className="folder-picker__crumb" onClick={() => handleNavigate("")}>
               <Ic name="folder" />
@@ -1352,7 +1352,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
           </div>
         </div>
 
-        {error && <div className="folder-picker__error">加载出错: {error}</div>}
+        {error && <div className="folder-picker__error">鍔犺浇鍑洪敊: {error}</div>}
 
         <div className="folder-picker__body">
           {isAnchor && anchors.length > 0 && (
@@ -1366,9 +1366,9 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
           )}
           <div className="folder-picker__list">
             {loading ? (
-              <div className="folder-picker__empty"><div className="spinner" style={{margin:"0 auto 8px"}}></div>加载中...</div>
+              <div className="folder-picker__empty"><div className="spinner" style={{margin:"0 auto 8px"}}></div>鍔犺浇涓?..</div>
             ) : folders.length === 0 ? (
-              <div className="folder-picker__empty">（空目录）</div>
+              <div className="folder-picker__empty">锛堢┖鐩綍锛?/div>
             ) : folders.map((it, i) => (
               <div key={i} className="folder-picker__item" onClick={() => handleNavigate(it.path)}>
                 <Ic name="folder" style={{width:16,height:16,color:"var(--primary)"}} /> {it.name}
@@ -1383,16 +1383,16 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
               <input ref={newFolderInputRef} className="folder-picker__newinput" value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") { setNewFolderMode(false); setNewFolderName(""); } }}
-                placeholder="新建文件夹名" />
-              <button className="btn btn-sm" onClick={() => { setNewFolderMode(false); setNewFolderName(""); }}>取消</button>
-              <button className="btn btn-sm btn-primary" disabled={!newFolderName.trim()} onClick={handleCreate}>创建</button>
+                placeholder="鏂板缓鏂囦欢澶瑰悕" />
+              <button className="btn btn-sm" onClick={() => { setNewFolderMode(false); setNewFolderName(""); }}>鍙栨秷</button>
+              <button className="btn btn-sm btn-primary" disabled={!newFolderName.trim()} onClick={handleCreate}>鍒涘缓</button>
             </>
           ) : (
             <>
               <span className="folder-picker__current" title={path}>{path || ""}</span>
-              <button className="btn btn-sm" disabled={!path || isAnchor} onClick={() => setNewFolderMode(true)}>新建文件夹</button>
-              <button className="btn btn-sm" onClick={onCancel}>取消</button>
-              <button className="btn btn-sm btn-primary" disabled={!path || isAnchor} onClick={() => onSelect(path)}>选择此目录</button>
+              <button className="btn btn-sm" disabled={!path || isAnchor} onClick={() => setNewFolderMode(true)}>鏂板缓鏂囦欢澶?/button>
+              <button className="btn btn-sm" onClick={onCancel}>鍙栨秷</button>
+              <button className="btn btn-sm btn-primary" disabled={!path || isAnchor} onClick={() => onSelect(path)}>閫夋嫨姝ょ洰褰?/button>
             </>
           )}
         </div>
@@ -1401,7 +1401,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
   );
 }
 
-// ── SettingsPage (aligned with seedance-video) ──
+// 鈹€鈹€ SettingsPage (aligned with seedance-video) 鈹€鈹€
 function SettingsPage({ onPurge }) {
   const [config, setConfig] = useState({});
   const [meta, setMeta] = useState(null);
@@ -1445,10 +1445,10 @@ function SettingsPage({ onPurge }) {
     setSaving(true);
     try {
       await pluginApi("PUT", "/config", { updates });
-      showToast("配置已保存");
+      showToast("閰嶇疆宸蹭繚瀛?);
       reload();
     } catch (e) {
-      showToast("保存失败: " + (e.message || ""), "error");
+      showToast("淇濆瓨澶辫触: " + (e.message || ""), "error");
     }
     setSaving(false);
   };
@@ -1456,9 +1456,9 @@ function SettingsPage({ onPurge }) {
   const openFolderByKey = async (key) => {
     try {
       const r = await pluginApi("POST", "/storage/open-folder", { key });
-      if (!r.body?.ok) showToast("打开文件夹失败: " + (r.body?.detail || ""), "error");
+      if (!r.body?.ok) showToast("鎵撳紑鏂囦欢澶瑰け璐? " + (r.body?.detail || ""), "error");
     } catch (e) {
-      showToast("打开文件夹失败: " + (e.message || ""), "error");
+      showToast("鎵撳紑鏂囦欢澶瑰け璐? " + (e.message || ""), "error");
     }
   };
 
@@ -1472,146 +1472,146 @@ function SettingsPage({ onPurge }) {
     if (path) {
       setConfig({...config, [k]: path});
       save({[k]: path});
-      showToast("已设置路径: " + path);
+      showToast("宸茶缃矾寰? " + path);
     }
   };
 
   const purgeMock = async () => {
-    if (!window.confirm("确定删除所有演示任务？（api_task_id 以 mock- 开头）")) return;
+    if (!window.confirm("纭畾鍒犻櫎鎵€鏈夋紨绀轰换鍔★紵锛坅pi_task_id 浠?mock- 寮€澶达級")) return;
     const r = await pluginApi("DELETE", "/tasks/purge-mock");
     if (r.body && r.body.ok) {
-      showToast("已清除演示任务 " + (r.body.deleted_roots || 0) + " 条");
+      showToast("宸叉竻闄ゆ紨绀轰换鍔?" + (r.body.deleted_roots || 0) + " 鏉?);
       if (onPurge) onPurge();
     } else {
-      showToast("清除失败", "error");
+      showToast("娓呴櫎澶辫触", "error");
     }
   };
 
   if (loading) return <div className="empty-state"><div className="spinner"></div></div>;
 
   const mockMode = (config.mock_mode != null && config.mock_mode !== "") ? config.mock_mode : (meta && meta.mock_mode) || "auto";
-  const statKeyMap = {image_output_dir: "图片输出", video_output_dir: "视频输出", assets: "素材资源"};
+  const statKeyMap = {image_output_dir: "鍥剧墖杈撳嚭", video_output_dir: "瑙嗛杈撳嚭", assets: "绱犳潗璧勬簮"};
 
   return (
     <div style={{maxWidth:640}}>
-      {/* ── API 配置 ── */}
+      {/* 鈹€鈹€ API 閰嶇疆 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
-        <h3 className="oa-settings-section__title"><Ic name="key"/> API 配置</h3>
+        <h3 className="oa-settings-section__title"><Ic name="key"/> API 閰嶇疆</h3>
         <div className={"form-row" + (config.dashscope_api_key ? "" : " oa-config-field-callout")}
-             data-callout={config.dashscope_api_key ? undefined : "需要配置才能使用通义万相"}>
-          <label className="label">DashScope API Key (通义万相)</label>
+             data-callout={config.dashscope_api_key ? undefined : "闇€瑕侀厤缃墠鑳戒娇鐢ㄩ€氫箟涓囩浉"}>
+          <label className="label">DashScope API Key (閫氫箟涓囩浉)</label>
           <div className="flex gap-2">
             <input className="input flex-1" type={showDk?"text":"password"}
               value={dk !== "" ? dk : (config.dashscope_api_key || "")}
               onChange={e => setDk(e.target.value)}
-              placeholder="输入 API Key" />
-            <button className="btn btn-sm" onClick={() => setShowDk(!showDk)}>{showDk ? "隐藏" : "显示"}</button>
+              placeholder="杈撳叆 API Key" />
+            <button className="btn btn-sm" onClick={() => setShowDk(!showDk)}>{showDk ? "闅愯棌" : "鏄剧ず"}</button>
             <button className="btn btn-sm btn-primary" disabled={!dk || saving}
-              onClick={() => { save({ dashscope_api_key: dk }); setDk(""); }}>保存</button>
+              onClick={() => { save({ dashscope_api_key: dk }); setDk(""); }}>淇濆瓨</button>
           </div>
           <p className="text-xs text-dim" style={{marginTop:4}}>
-            获取地址：<a href="https://bailian.console.aliyun.com/?tab=model#/api-key" target="_blank" rel="noopener noreferrer" style={{color:"var(--primary)"}}>阿里云百炼控制台</a>
+            鑾峰彇鍦板潃锛?a href="https://bailian.console.aliyun.com/?tab=model#/api-key" target="_blank" rel="noopener noreferrer" style={{color:"var(--primary)"}}>闃块噷浜戠櫨鐐兼帶鍒跺彴</a>
           </p>
         </div>
         <div className={"form-row" + (config.ark_api_key ? "" : " oa-config-field-callout")}
-             data-callout={config.ark_api_key ? undefined : "需要配置才能使用火山视频"}>
-          <label className="label">Ark API Key (火山引擎视频)</label>
+             data-callout={config.ark_api_key ? undefined : "闇€瑕侀厤缃墠鑳戒娇鐢ㄧ伀灞辫棰?}>
+          <label className="label">Ark API Key (鐏北寮曟搸瑙嗛)</label>
           <div className="flex gap-2">
             <input className="input flex-1" type={showAk?"text":"password"}
               value={ak !== "" ? ak : (config.ark_api_key || "")}
               onChange={e => setAk(e.target.value)}
-              placeholder="输入 API Key" />
-            <button className="btn btn-sm" onClick={() => setShowAk(!showAk)}>{showAk ? "隐藏" : "显示"}</button>
+              placeholder="杈撳叆 API Key" />
+            <button className="btn btn-sm" onClick={() => setShowAk(!showAk)}>{showAk ? "闅愯棌" : "鏄剧ず"}</button>
             <button className="btn btn-sm btn-primary" disabled={!ak || saving}
-              onClick={() => { save({ ark_api_key: ak }); setAk(""); }}>保存</button>
+              onClick={() => { save({ ark_api_key: ak }); setAk(""); }}>淇濆瓨</button>
           </div>
           <p className="text-xs text-dim" style={{marginTop:4}}>
-            获取地址：<a href="https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey" target="_blank" rel="noopener noreferrer" style={{color:"var(--primary)"}}>火山方舟控制台</a>
+            鑾峰彇鍦板潃锛?a href="https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey" target="_blank" rel="noopener noreferrer" style={{color:"var(--primary)"}}>鐏北鏂硅垷鎺у埗鍙?/a>
           </p>
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <label className="label">DashScope 共享中转站（可选）</label>
+            <label className="label">DashScope 鍏变韩涓浆绔欙紙鍙€夛級</label>
             <input className="input" type="text"
               value={config.dashscope_relay_endpoint || ""}
               onChange={e => setConfig({...config, dashscope_relay_endpoint: e.target.value})}
               onBlur={e => save({ dashscope_relay_endpoint: e.target.value.trim() })}
-              placeholder="例如: yunwu-image" />
-            <p className="text-xs text-dim" style={{marginTop:4}}>用于通义万相图片能力，来自 LLM 配置页 relay_endpoints。</p>
+              placeholder="渚嬪: yunwu-image" />
+            <p className="text-xs text-dim" style={{marginTop:4}}>鐢ㄤ簬閫氫箟涓囩浉鍥剧墖鑳藉姏锛屾潵鑷?LLM 閰嶇疆椤?relay_endpoints銆?/p>
           </div>
           <div className="form-row">
-            <label className="label">DashScope 失败策略</label>
+            <label className="label">DashScope 澶辫触绛栫暐</label>
             <select className="input select" value={config.dashscope_relay_fallback_policy || "official"}
               onChange={e => save({ dashscope_relay_fallback_policy: e.target.value })}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
           <div className="form-row">
-            <label className="label">Ark 共享中转站（可选）</label>
+            <label className="label">Ark 鍏变韩涓浆绔欙紙鍙€夛級</label>
             <input className="input" type="text"
               value={config.ark_relay_endpoint || ""}
               onChange={e => setConfig({...config, ark_relay_endpoint: e.target.value})}
               onBlur={e => save({ ark_relay_endpoint: e.target.value.trim() })}
-              placeholder="例如: yunwu-video" />
-            <p className="text-xs text-dim" style={{marginTop:4}}>用于火山 Ark 视频能力，来自 LLM 配置页 relay_endpoints。</p>
+              placeholder="渚嬪: yunwu-video" />
+            <p className="text-xs text-dim" style={{marginTop:4}}>鐢ㄤ簬鐏北 Ark 瑙嗛鑳藉姏锛屾潵鑷?LLM 閰嶇疆椤?relay_endpoints銆?/p>
           </div>
           <div className="form-row">
-            <label className="label">Ark 失败策略</label>
+            <label className="label">Ark 澶辫触绛栫暐</label>
             <select className="input select" value={config.ark_relay_fallback_policy || "official"}
               onChange={e => save({ ark_relay_fallback_policy: e.target.value })}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* ── 默认参数 ── */}
+      {/* 鈹€鈹€ 榛樿鍙傛暟 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
-        <h3 className="oa-settings-section__title"><Ic name="settings"/> 默认参数</h3>
+        <h3 className="oa-settings-section__title"><Ic name="settings"/> 榛樿鍙傛暟</h3>
         <div className="grid-2">
           <div className="form-row">
-            <label className="label">默认图像模型</label>
+            <label className="label">榛樿鍥惧儚妯″瀷</label>
             <select className="input select"
               value={config.default_image_model || ""}
               onChange={e => { const v = e.target.value; setConfig({...config, default_image_model: v}); save({ default_image_model: v }); }}>
-              <option value="">（使用功能预设）</option>
+              <option value="">锛堜娇鐢ㄥ姛鑳介璁撅級</option>
               {(meta && meta.image_models || []).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div className="form-row">
-            <label className="label">默认视频模型</label>
+            <label className="label">榛樿瑙嗛妯″瀷</label>
             <select className="input select"
               value={config.default_video_model || ""}
               onChange={e => { const v = e.target.value; setConfig({...config, default_video_model: v}); save({ default_video_model: v }); }}>
-              <option value="">（使用功能预设）</option>
+              <option value="">锛堜娇鐢ㄥ姛鑳介璁撅級</option>
               {(meta && meta.video_models || []).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
           <div className="form-row">
-            <label className="label">默认图像尺寸</label>
+            <label className="label">榛樿鍥惧儚灏哄</label>
             <select className="input select"
               value={config.default_image_size || ""}
               onChange={e => { const v = e.target.value; setConfig({...config, default_image_size: v}); save({ default_image_size: v }); }}>
-              <option value="">（使用功能预设）</option>
+              <option value="">锛堜娇鐢ㄥ姛鑳介璁撅級</option>
               {(meta && meta.image_sizes || ["1024*1024","1280*720","720*1280"]).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="form-row">
-            <label className="label">轮询间隔</label>
+            <label className="label">杞闂撮殧</label>
             <select className="input select"
               value={config.poll_interval_image || "10"}
               onChange={e => save({poll_interval_image: e.target.value})}>
-              <option value="5">5秒</option>
-              <option value="10">10秒</option>
-              <option value="15">15秒</option>
-              <option value="30">30秒</option>
+              <option value="5">5绉?/option>
+              <option value="10">10绉?/option>
+              <option value="15">15绉?/option>
+              <option value="30">30绉?/option>
             </select>
           </div>
         </div>
         <div className="flex items-center justify-between" style={{marginTop:8}}>
-          <span className="text-sm">水印</span>
+          <span className="text-sm">姘村嵃</span>
           {(() => {
             const on = String(config.watermark ?? (meta && meta.watermark) ?? "false").toLowerCase() === "true";
             return <div className={`switch ${on?"on":""}`} onClick={() => save({watermark: on?"false":"true"})} />;
@@ -1619,33 +1619,33 @@ function SettingsPage({ onPurge }) {
         </div>
       </div>
 
-      {/* ── 输出目录 ── */}
+      {/* 鈹€鈹€ 杈撳嚭鐩綍 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
-        <h3 className="oa-settings-section__title"><Ic name="folder"/> 输出目录</h3>
+        <h3 className="oa-settings-section__title"><Ic name="folder"/> 杈撳嚭鐩綍</h3>
         <div className="form-row">
-          <label className="label">图片输出目录</label>
+          <label className="label">鍥剧墖杈撳嚭鐩綍</label>
           <div className="folder-row">
             <input className="input" value={imgDir}
-              placeholder={(meta && meta.default_image_dir) || "默认: ~/ecommerce-images/"}
+              placeholder={(meta && meta.default_image_dir) || "榛樿: ~/ecommerce-images/"}
               onChange={e => setImgDir(e.target.value)}
               onBlur={e => save({image_output_dir: e.target.value.trim()})} />
-            <button className="btn btn-sm" onClick={() => openFolderPicker("image_output_dir", "选择图片输出目录")}>浏览</button>
-            <button className="btn btn-sm" onClick={() => openFolderByKey("image_output_dir")}>打开</button>
+            <button className="btn btn-sm" onClick={() => openFolderPicker("image_output_dir", "閫夋嫨鍥剧墖杈撳嚭鐩綍")}>娴忚</button>
+            <button className="btn btn-sm" onClick={() => openFolderByKey("image_output_dir")}>鎵撳紑</button>
           </div>
         </div>
         <div className="form-row">
-          <label className="label">视频输出目录</label>
+          <label className="label">瑙嗛杈撳嚭鐩綍</label>
           <div className="folder-row">
             <input className="input" value={vidDir}
-              placeholder={(meta && meta.default_video_dir) || "默认: ~/ecommerce-videos/"}
+              placeholder={(meta && meta.default_video_dir) || "榛樿: ~/ecommerce-videos/"}
               onChange={e => setVidDir(e.target.value)}
               onBlur={e => save({video_output_dir: e.target.value.trim()})} />
-            <button className="btn btn-sm" onClick={() => openFolderPicker("video_output_dir", "选择视频输出目录")}>浏览</button>
-            <button className="btn btn-sm" onClick={() => openFolderByKey("video_output_dir")}>打开</button>
+            <button className="btn btn-sm" onClick={() => openFolderPicker("video_output_dir", "閫夋嫨瑙嗛杈撳嚭鐩綍")}>娴忚</button>
+            <button className="btn btn-sm" onClick={() => openFolderByKey("video_output_dir")}>鎵撳紑</button>
           </div>
         </div>
         <div className="flex items-center justify-between" style={{marginTop:8}}>
-          <span className="text-sm">自动下载</span>
+          <span className="text-sm">鑷姩涓嬭浇</span>
           {(() => {
             const on = String(config.auto_download ?? (meta && meta.auto_download) ?? "true").toLowerCase() !== "false";
             return <div className={`switch ${on?"on":""}`} onClick={() => save({auto_download: on?"false":"true"})} />;
@@ -1658,32 +1658,32 @@ function SettingsPage({ onPurge }) {
               <div key={k} className="card" style={{padding:10,textAlign:"center"}}>
                 <div className="text-xs text-dim">{statKeyMap[k] || k}</div>
                 <div style={{fontSize:18,fontWeight:600,color:"var(--primary)",margin:"4px 0"}}>{s.size_mb} MB</div>
-                <div className="text-xs text-dim">{s.file_count} 个文件</div>
+                <div className="text-xs text-dim">{s.file_count} 涓枃浠?/div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* ── 演示 / 模拟数据 ── */}
+      {/* 鈹€鈹€ 婕旂ず / 妯℃嫙鏁版嵁 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
-        <h3 className="oa-settings-section__title"><Ic name="refresh"/> 演示模式</h3>
+        <h3 className="oa-settings-section__title"><Ic name="refresh"/> 婕旂ず妯″紡</h3>
         <p className="text-sm text-muted" style={{marginBottom:12}}>
-          未配置对应 API Key 时，默认会用占位图（picsum）与示例视频（W3C）走完整流程，便于验收表单与任务列表。
-          配置真实 Key 后可将此项设为「关闭演示」；「始终演示」即使有 Key 也不会调用外网 API。
+          鏈厤缃搴?API Key 鏃讹紝榛樿浼氱敤鍗犱綅鍥撅紙picsum锛変笌绀轰緥瑙嗛锛圵3C锛夎蛋瀹屾暣娴佺▼锛屼究浜庨獙鏀惰〃鍗曚笌浠诲姟鍒楄〃銆?
+          閰嶇疆鐪熷疄 Key 鍚庡彲灏嗘椤硅涓恒€屽叧闂紨绀恒€嶏紱銆屽缁堟紨绀恒€嶅嵆浣挎湁 Key 涔熶笉浼氳皟鐢ㄥ缃?API銆?
         </p>
         <div className="form-row">
-          <label className="label">演示模式</label>
+          <label className="label">婕旂ず妯″紡</label>
           <select className="input select" value={mockMode}
             onChange={e => { const v = e.target.value; setConfig({...config, mock_mode: v}); save({ mock_mode: v }); }}>
-            <option value="auto">自动（未配 Key 时用演示数据）</option>
-            <option value="0">关闭（必须配置真实 Key）</option>
-            <option value="1">始终演示（不调用外网 API）</option>
+            <option value="auto">鑷姩锛堟湭閰?Key 鏃剁敤婕旂ず鏁版嵁锛?/option>
+            <option value="0">鍏抽棴锛堝繀椤婚厤缃湡瀹?Key锛?/option>
+            <option value="1">濮嬬粓婕旂ず锛堜笉璋冪敤澶栫綉 API锛?/option>
           </select>
         </div>
         <div className="form-row">
-          <button type="button" className="btn btn-danger btn-sm" onClick={purgeMock}>清除全部演示任务</button>
-          <p className="text-xs text-dim" style={{marginTop:4}}>仅删除 api_task_id 为 mock- 开头的记录，可随时再生成</p>
+          <button type="button" className="btn btn-danger btn-sm" onClick={purgeMock}>娓呴櫎鍏ㄩ儴婕旂ず浠诲姟</button>
+          <p className="text-xs text-dim" style={{marginTop:4}}>浠呭垹闄?api_task_id 涓?mock- 寮€澶寸殑璁板綍锛屽彲闅忔椂鍐嶇敓鎴?/p>
         </div>
       </div>
 
@@ -1698,7 +1698,7 @@ function SettingsPage({ onPurge }) {
   );
 }
 
-// ── PromptGuide (提示词教学页) ──
+// 鈹€鈹€ PromptGuide (鎻愮ず璇嶆暀瀛﹂〉) 鈹€鈹€
 function PromptGuide() {
   const Tag = ({ children }) => <span className="guide-tag">{children}</span>;
   const Code = ({ children }) => <pre className="guide-code">{children}</pre>;
@@ -1706,205 +1706,205 @@ function PromptGuide() {
   return (
     <div className="guide-container">
       <div className="guide-banner">
-        <Ic name="sparkles" /> <strong>不想自己写提示词？</strong> 在任意功能页点击输入框下方的「AI 优化」按钮，即可一键生成专业提示词。
+        <Ic name="sparkles" /> <strong>涓嶆兂鑷繁鍐欐彁绀鸿瘝锛?/strong> 鍦ㄤ换鎰忓姛鑳介〉鐐瑰嚮杈撳叆妗嗕笅鏂圭殑銆孉I 浼樺寲銆嶆寜閽紝鍗冲彲涓€閿敓鎴愪笓涓氭彁绀鸿瘝銆?
       </div>
 
-      {/* ── 通用原则 ── */}
-      <Collapsible title={<><Ic name="book" /> 通用原则</>} defaultOpen={false}>
+      {/* 鈹€鈹€ 閫氱敤鍘熷垯 鈹€鈹€ */}
+      <Collapsible title={<><Ic name="book" /> 閫氱敤鍘熷垯</>} defaultOpen={false}>
         <div className="guide-section">
-          <h4>提示词 ≠ 文字说明，而是「画面描述」</h4>
-          <p>AI 需要的是你想看到的<strong>视觉元素</strong>，不是产品介绍文案。把自己想象成摄影师或导演，描述你脑海中的画面。</p>
-          <h4>万能结构公式</h4>
-          <Code>{"主体（产品/人物） + 场景/背景 + 风格/光影 + 细节约束（构图/比例/颜色）"}</Code>
-          <h4>示例对比</h4>
+          <h4>鎻愮ず璇?鈮?鏂囧瓧璇存槑锛岃€屾槸銆岀敾闈㈡弿杩般€?/h4>
+          <p>AI 闇€瑕佺殑鏄綘鎯崇湅鍒扮殑<strong>瑙嗚鍏冪礌</strong>锛屼笉鏄骇鍝佷粙缁嶆枃妗堛€傛妸鑷繁鎯宠薄鎴愭憚褰卞笀鎴栧婕旓紝鎻忚堪浣犺剳娴蜂腑鐨勭敾闈€?/p>
+          <h4>涓囪兘缁撴瀯鍏紡</h4>
+          <Code>{"涓讳綋锛堜骇鍝?浜虹墿锛?+ 鍦烘櫙/鑳屾櫙 + 椋庢牸/鍏夊奖 + 缁嗚妭绾︽潫锛堟瀯鍥?姣斾緥/棰滆壊锛?}</Code>
+          <h4>绀轰緥瀵规瘮</h4>
           <table className="guide-table">
-            <thead><tr><th><Ic name="close" /> 差的提示词</th><th><Ic name="check" /> 好的提示词</th></tr></thead>
+            <thead><tr><th><Ic name="close" /> 宸殑鎻愮ず璇?/th><th><Ic name="check" /> 濂界殑鎻愮ず璇?/th></tr></thead>
             <tbody>
               <tr>
-                <td>帮我做一张耳机主图</td>
-                <td>白色无线耳机，纯白渐变背景，影棚柔光，产品居中占85%画面，45度侧面角度，金属质感高光，无文字水印</td>
+                <td>甯垜鍋氫竴寮犺€虫満涓诲浘</td>
+                <td>鐧借壊鏃犵嚎鑰虫満锛岀函鐧芥笎鍙樿儗鏅紝褰辨鏌斿厜锛屼骇鍝佸眳涓崰85%鐢婚潰锛?5搴︿晶闈㈣搴︼紝閲戝睘璐ㄦ劅楂樺厜锛屾棤鏂囧瓧姘村嵃</td>
               </tr>
               <tr>
-                <td>做一个促销海报</td>
-                <td>618 大促海报，上1/3红底白字标题「年中狂欢」，中间产品悬浮展示，下方CTA按钮「立即抢购」，高饱和霓虹配色</td>
+                <td>鍋氫竴涓績閿€娴锋姤</td>
+                <td>618 澶т績娴锋姤锛屼笂1/3绾㈠簳鐧藉瓧鏍囬銆屽勾涓媯娆€嶏紝涓棿浜у搧鎮诞灞曠ず锛屼笅鏂笴TA鎸夐挳銆岀珛鍗虫姠璐€嶏紝楂橀ケ鍜岄湏铏归厤鑹?/td>
               </tr>
             </tbody>
           </table>
-          <h4>关键提醒</h4>
+          <h4>鍏抽敭鎻愰啋</h4>
           <ul>
-            <li><Ic name="target" /> <strong>越具体越好</strong>：「45度侧面」比「好看的角度」好</li>
-            <li><Ic name="close" /> <strong>避免否定词</strong>：说「纯白背景」而不是「不要杂乱背景」</li>
-            <li><Ic name="ruler" /> <strong>注意比例</strong>：主图方形(1:1)、详情图竖版(3:4)、海报竖版(9:16)</li>
-            <li><Ic name="palette" /> <strong>指定风格</strong>：「极简」「赛博朋克」「日系清新」远比「好看」有用</li>
+            <li><Ic name="target" /> <strong>瓒婂叿浣撹秺濂?/strong>锛氥€?5搴︿晶闈€嶆瘮銆屽ソ鐪嬬殑瑙掑害銆嶅ソ</li>
+            <li><Ic name="close" /> <strong>閬垮厤鍚﹀畾璇?/strong>锛氳銆岀函鐧借儗鏅€嶈€屼笉鏄€屼笉瑕佹潅涔辫儗鏅€?/li>
+            <li><Ic name="ruler" /> <strong>娉ㄦ剰姣斾緥</strong>锛氫富鍥炬柟褰?1:1)銆佽鎯呭浘绔栫増(3:4)銆佹捣鎶ョ珫鐗?9:16)</li>
+            <li><Ic name="palette" /> <strong>鎸囧畾椋庢牸</strong>锛氥€屾瀬绠€銆嶃€岃禌鍗氭湅鍏嬨€嶃€屾棩绯绘竻鏂般€嶈繙姣斻€屽ソ鐪嬨€嶆湁鐢?/li>
           </ul>
         </div>
       </Collapsible>
 
-      {/* ── 图像类功能教学 ── */}
-      <Collapsible title={<><Ic name="image" /> 图像功能提示词教学</>} defaultOpen={false}>
+      {/* 鈹€鈹€ 鍥惧儚绫诲姛鑳芥暀瀛?鈹€鈹€ */}
+      <Collapsible title={<><Ic name="image" /> 鍥惧儚鍔熻兘鎻愮ず璇嶆暀瀛?/>} defaultOpen={false}>
         <div className="guide-section">
 
-          <h4><Ic name="cart" /> 商品主图</h4>
-          <p>电商主图 = 买家第一眼看到的图。核心要求：产品清晰、背景干净、无文字水印。</p>
-          <Code>{"电商商品主图，产品：{你的产品名}。\n场景与构图：{你的描述}。\n风格：{风格}专业商业摄影。\n【强制约束】产品居中占画面 85% 以上，纯色/简洁渐变背景，\n影棚级布光（主光+补光+轮廓光），锐利对焦，无文字无水印。"}</Code>
-          <p className="text-sm text-muted">关键词：产品居中 85%+、影棚布光、无文字水印、纯色背景</p>
+          <h4><Ic name="cart" /> 鍟嗗搧涓诲浘</h4>
+          <p>鐢靛晢涓诲浘 = 涔板绗竴鐪肩湅鍒扮殑鍥俱€傛牳蹇冭姹傦細浜у搧娓呮櫚銆佽儗鏅共鍑€銆佹棤鏂囧瓧姘村嵃銆?/p>
+          <Code>{"鐢靛晢鍟嗗搧涓诲浘锛屼骇鍝侊細{浣犵殑浜у搧鍚峿銆俓n鍦烘櫙涓庢瀯鍥撅細{浣犵殑鎻忚堪}銆俓n椋庢牸锛歿椋庢牸}涓撲笟鍟嗕笟鎽勫奖銆俓n銆愬己鍒剁害鏉熴€戜骇鍝佸眳涓崰鐢婚潰 85% 浠ヤ笂锛岀函鑹?绠€娲佹笎鍙樿儗鏅紝\n褰辨绾у竷鍏夛紙涓诲厜+琛ュ厜+杞粨鍏夛級锛岄攼鍒╁鐒︼紝鏃犳枃瀛楁棤姘村嵃銆?}</Code>
+          <p className="text-sm text-muted">鍏抽敭璇嶏細浜у搧灞呬腑 85%+銆佸奖妫氬竷鍏夈€佹棤鏂囧瓧姘村嵃銆佺函鑹茶儗鏅?/p>
 
-          <h4><Ic name="images" /> 主图套图 / 详情图套图</h4>
-          <p>一组风格统一的图片。关键是<strong>风格锚定</strong>——所有图共享相同色调、光影、排版风格。</p>
-          <Code>{"[统一风格] 产品：{产品名}，风格：{风格}商业摄影，色调统一，光影一致。\n电商主图套图第{N}张。\n卖点：{卖点列表}。{详细描述}。\n【强制约束】产品占画面 70%+，保持系列一致性。"}</Code>
-          <p className="text-sm text-muted">提示：写清卖点列表，AI 会为每张图分配不同的卖点角度</p>
+          <h4><Ic name="images" /> 涓诲浘濂楀浘 / 璇︽儏鍥惧鍥?/h4>
+          <p>涓€缁勯鏍肩粺涓€鐨勫浘鐗囥€傚叧閿槸<strong>椋庢牸閿氬畾</strong>鈥斺€旀墍鏈夊浘鍏变韩鐩稿悓鑹茶皟銆佸厜褰便€佹帓鐗堥鏍笺€?/p>
+          <Code>{"[缁熶竴椋庢牸] 浜у搧锛歿浜у搧鍚峿锛岄鏍硷細{椋庢牸}鍟嗕笟鎽勫奖锛岃壊璋冪粺涓€锛屽厜褰变竴鑷淬€俓n鐢靛晢涓诲浘濂楀浘绗瑊N}寮犮€俓n鍗栫偣锛歿鍗栫偣鍒楄〃}銆倇璇︾粏鎻忚堪}銆俓n銆愬己鍒剁害鏉熴€戜骇鍝佸崰鐢婚潰 70%+锛屼繚鎸佺郴鍒椾竴鑷存€с€?}</Code>
+          <p className="text-sm text-muted">鎻愮ず锛氬啓娓呭崠鐐瑰垪琛紝AI 浼氫负姣忓紶鍥惧垎閰嶄笉鍚岀殑鍗栫偣瑙掑害</p>
 
-          <h4><Ic name="ruler" /> 详情长图</h4>
-          <p>竖版分段内容图（3:4 比例），最终拼接为商品详情页长图。</p>
-          <Code>{"电商详情页竖版分段内容图，产品：{产品名}，\n卖点：{卖点}。{你的描述}。\n【强制约束】竖版构图 3:4 比例，分段清晰：\n首屏产品全貌+品牌，中间每段一个卖点，尾屏售后/规格信息。"}</Code>
+          <h4><Ic name="ruler" /> 璇︽儏闀垮浘</h4>
+          <p>绔栫増鍒嗘鍐呭鍥撅紙3:4 姣斾緥锛夛紝鏈€缁堟嫾鎺ヤ负鍟嗗搧璇︽儏椤甸暱鍥俱€?/p>
+          <Code>{"鐢靛晢璇︽儏椤电珫鐗堝垎娈靛唴瀹瑰浘锛屼骇鍝侊細{浜у搧鍚峿锛孿n鍗栫偣锛歿鍗栫偣}銆倇浣犵殑鎻忚堪}銆俓n銆愬己鍒剁害鏉熴€戠珫鐗堟瀯鍥?3:4 姣斾緥锛屽垎娈垫竻鏅帮細\n棣栧睆浜у搧鍏ㄨ矊+鍝佺墝锛屼腑闂存瘡娈典竴涓崠鐐癸紝灏惧睆鍞悗/瑙勬牸淇℃伅銆?}</Code>
 
-          <h4><Ic name="sparkles" /> 新品发布</h4>
-          <p>生成一套新品发布素材（多张子任务），适合上新时一次性出图。</p>
-          <Code>{"[统一风格] 产品：{产品名}，视觉风格：{风格}品牌感科技感，色调统一。\n新品发布素材第{N}张。\n卖点：{卖点}。{描述}。"}</Code>
+          <h4><Ic name="sparkles" /> 鏂板搧鍙戝竷</h4>
+          <p>鐢熸垚涓€濂楁柊鍝佸彂甯冪礌鏉愶紙澶氬紶瀛愪换鍔★級锛岄€傚悎涓婃柊鏃朵竴娆℃€у嚭鍥俱€?/p>
+          <Code>{"[缁熶竴椋庢牸] 浜у搧锛歿浜у搧鍚峿锛岃瑙夐鏍硷細{椋庢牸}鍝佺墝鎰熺鎶€鎰燂紝鑹茶皟缁熶竴銆俓n鏂板搧鍙戝竷绱犳潗绗瑊N}寮犮€俓n鍗栫偣锛歿鍗栫偣}銆倇鎻忚堪}銆?}</Code>
 
-          <h4><Ic name="edit" /> 批量改图 / 批量替换</h4>
-          <p>上传多张图进行统一编辑。核心约束：<strong>仅改指定部分，其余严格保持不变</strong>。</p>
-          <Code>{"图片编辑：{要修改的内容}，编辑风格：{风格}。\n【强制约束】仅按描述修改指定的视觉属性，\n严格保持原图中产品主体的形状、位置、大小完全不变。"}</Code>
+          <h4><Ic name="edit" /> 鎵归噺鏀瑰浘 / 鎵归噺鏇挎崲</h4>
+          <p>涓婁紶澶氬紶鍥捐繘琛岀粺涓€缂栬緫銆傛牳蹇冪害鏉燂細<strong>浠呮敼鎸囧畾閮ㄥ垎锛屽叾浣欎弗鏍间繚鎸佷笉鍙?/strong>銆?/p>
+          <Code>{"鍥剧墖缂栬緫锛歿瑕佷慨鏀圭殑鍐呭}锛岀紪杈戦鏍硷細{椋庢牸}銆俓n銆愬己鍒剁害鏉熴€戜粎鎸夋弿杩颁慨鏀规寚瀹氱殑瑙嗚灞炴€э紝\n涓ユ牸淇濇寔鍘熷浘涓骇鍝佷富浣撶殑褰㈢姸銆佷綅缃€佸ぇ灏忓畬鍏ㄤ笉鍙樸€?}</Code>
 
-          <h4><Ic name="globe" /> 图片翻译</h4>
-          <p>将图中文字翻译为目标语言，保持原设计风格。只需选择源图和目标语言即可。</p>
+          <h4><Ic name="globe" /> 鍥剧墖缈昏瘧</h4>
+          <p>灏嗗浘涓枃瀛楃炕璇戜负鐩爣璇█锛屼繚鎸佸師璁捐椋庢牸銆傚彧闇€閫夋嫨婧愬浘鍜岀洰鏍囪瑷€鍗冲彲銆?/p>
 
-          <h4><Ic name="megaphone" /> 活动海报</h4>
-          <p>海报结构：上 1/3 标题区 → 中间产品主视觉 → 下方行动引导（CTA）。</p>
-          <Code>{"海报设计，产品：{产品名}。\n活动主题：{你的主题}。\n风格：{风格}设计。\n【结构】上1/3大字标题+活动信息，中间产品主视觉聚焦，\n下1/4行动引导（按钮/二维码/倒计时）。"}</Code>
-          <p className="text-sm text-muted">子类型差异：私域海报适合朋友圈竖版(9:16)，节日海报注重节日视觉元素，活动宣传突出利益点</p>
+          <h4><Ic name="megaphone" /> 娲诲姩娴锋姤</h4>
+          <p>娴锋姤缁撴瀯锛氫笂 1/3 鏍囬鍖?鈫?涓棿浜у搧涓昏瑙?鈫?涓嬫柟琛屽姩寮曞锛圕TA锛夈€?/p>
+          <Code>{"娴锋姤璁捐锛屼骇鍝侊細{浜у搧鍚峿銆俓n娲诲姩涓婚锛歿浣犵殑涓婚}銆俓n椋庢牸锛歿椋庢牸}璁捐銆俓n銆愮粨鏋勩€戜笂1/3澶у瓧鏍囬+娲诲姩淇℃伅锛屼腑闂翠骇鍝佷富瑙嗚鑱氱劍锛孿n涓?/4琛屽姩寮曞锛堟寜閽?浜岀淮鐮?鍊掕鏃讹級銆?}</Code>
+          <p className="text-sm text-muted">瀛愮被鍨嬪樊寮傦細绉佸煙娴锋姤閫傚悎鏈嬪弸鍦堢珫鐗?9:16)锛岃妭鏃ユ捣鎶ユ敞閲嶈妭鏃ヨ瑙夊厓绱狅紝娲诲姩瀹ｄ紶绐佸嚭鍒╃泭鐐?/p>
         </div>
       </Collapsible>
 
-      {/* ── 视频类功能教学 ── */}
-      <Collapsible title={<><Ic name="video" /> 视频功能提示词教学</>} defaultOpen={false}>
+      {/* 鈹€鈹€ 瑙嗛绫诲姛鑳芥暀瀛?鈹€鈹€ */}
+      <Collapsible title={<><Ic name="video" /> 瑙嗛鍔熻兘鎻愮ず璇嶆暀瀛?/>} defaultOpen={false}>
         <div className="guide-section">
 
-          <h4><Ic name="film" /> 视频提示词的核心结构：时间轴</h4>
-          <p>视频提示词和图片最大的区别：需要按<strong>时间段</strong>描述画面。</p>
-          <Code>{"风格，{时长}秒，{画幅}，氛围\n0-{t1}秒：[开场] 镜头运动 + 画面内容\n{t1}-{t2}秒：[中段] 镜头运动 + 画面内容\n{t2}-{duration}秒：[收尾] 镜头运动 + 画面内容\n【声音】配乐 + 音效（可选）"}</Code>
+          <h4><Ic name="film" /> 瑙嗛鎻愮ず璇嶇殑鏍稿績缁撴瀯锛氭椂闂磋酱</h4>
+          <p>瑙嗛鎻愮ず璇嶅拰鍥剧墖鏈€澶х殑鍖哄埆锛氶渶瑕佹寜<strong>鏃堕棿娈?/strong>鎻忚堪鐢婚潰銆?/p>
+          <Code>{"椋庢牸锛寋鏃堕暱}绉掞紝{鐢诲箙}锛屾皼鍥碶n0-{t1}绉掞細[寮€鍦篯 闀滃ご杩愬姩 + 鐢婚潰鍐呭\n{t1}-{t2}绉掞細[涓] 闀滃ご杩愬姩 + 鐢婚潰鍐呭\n{t2}-{duration}绉掞細[鏀跺熬] 闀滃ご杩愬姩 + 鐢婚潰鍐呭\n銆愬０闊炽€戦厤涔?+ 闊虫晥锛堝彲閫夛級"}</Code>
 
-          <h4><Ic name="clapperboard" /> 镜头语言速查</h4>
+          <h4><Ic name="clapperboard" /> 闀滃ご璇█閫熸煡</h4>
           <div className="guide-tags">
-            <Tag>推镜头 Push in — 向前靠近主体</Tag>
-            <Tag>拉镜头 Pull out — 向后远离主体</Tag>
-            <Tag>摇镜头 Pan — 水平旋转拍摄</Tag>
-            <Tag>移镜头 Dolly — 平移跟随</Tag>
-            <Tag>跟镜头 Follow — 追踪主体运动</Tag>
-            <Tag>环绕镜头 Orbit — 绕产品旋转，电商最常用</Tag>
-            <Tag>升降镜头 Crane — 垂直升降</Tag>
-            <Tag>希区柯克变焦 Dolly Zoom — 推拉+变焦同时进行</Tag>
-            <Tag>一镜到底 One-take — 长镜头无剪辑</Tag>
-            <Tag>手持晃动 Handheld — Vlog 质感</Tag>
+            <Tag>鎺ㄩ暅澶?Push in 鈥?鍚戝墠闈犺繎涓讳綋</Tag>
+            <Tag>鎷夐暅澶?Pull out 鈥?鍚戝悗杩滅涓讳綋</Tag>
+            <Tag>鎽囬暅澶?Pan 鈥?姘村钩鏃嬭浆鎷嶆憚</Tag>
+            <Tag>绉婚暅澶?Dolly 鈥?骞崇Щ璺熼殢</Tag>
+            <Tag>璺熼暅澶?Follow 鈥?杩借釜涓讳綋杩愬姩</Tag>
+            <Tag>鐜粫闀滃ご Orbit 鈥?缁曚骇鍝佹棆杞紝鐢靛晢鏈€甯哥敤</Tag>
+            <Tag>鍗囬檷闀滃ご Crane 鈥?鍨傜洿鍗囬檷</Tag>
+            <Tag>甯屽尯鏌厠鍙樼劍 Dolly Zoom 鈥?鎺ㄦ媺+鍙樼劍鍚屾椂杩涜</Tag>
+            <Tag>涓€闀滃埌搴?One-take 鈥?闀块暅澶存棤鍓緫</Tag>
+            <Tag>鎵嬫寔鏅冨姩 Handheld 鈥?Vlog 璐ㄦ劅</Tag>
           </div>
 
-          <h4><Ic name="palette" /> 氛围关键词库</h4>
+          <h4><Ic name="palette" /> 姘涘洿鍏抽敭璇嶅簱</h4>
           <div className="guide-atmo-grid">
             <div>
-              <h5><Ic name="sparkles" /> 光影</h5>
+              <h5><Ic name="sparkles" /> 鍏夊奖</h5>
               <div className="guide-tags">
-                {["逆光","侧光","丁达尔效应","伦勃朗光","体积光","柔光","硬光","影棚灯"].map((w) => <Tag key={w}>{w}</Tag>)}
+                {["閫嗗厜","渚у厜","涓佽揪灏旀晥搴?,"浼﹀媰鏈楀厜","浣撶Н鍏?,"鏌斿厜","纭厜","褰辨鐏?].map((w) => <Tag key={w}>{w}</Tag>)}
               </div>
             </div>
             <div>
-              <h5><Ic name="brush" /> 色调</h5>
+              <h5><Ic name="brush" /> 鑹茶皟</h5>
               <div className="guide-tags">
-                {["暖色调","冷色调","高饱和","莫兰迪色","黑金质感","莫奈油画","霓虹"].map((w) => <Tag key={w}>{w}</Tag>)}
+                {["鏆栬壊璋?,"鍐疯壊璋?,"楂橀ケ鍜?,"鑾叞杩壊","榛戦噾璐ㄦ劅","鑾娌圭敾","闇撹櫣"].map((w) => <Tag key={w}>{w}</Tag>)}
               </div>
             </div>
             <div>
-              <h5><Ic name="film" /> 质感</h5>
+              <h5><Ic name="film" /> 璐ㄦ劅</h5>
               <div className="guide-tags">
-                {["商业广告级","电影级","纪录片","iPhone 实拍感","CG 渲染","胶片颗粒"].map((w) => <Tag key={w}>{w}</Tag>)}
+                {["鍟嗕笟骞垮憡绾?,"鐢靛奖绾?,"绾綍鐗?,"iPhone 瀹炴媿鎰?,"CG 娓叉煋","鑳剁墖棰楃矑"].map((w) => <Tag key={w}>{w}</Tag>)}
               </div>
             </div>
             <div>
-              <h5><Ic name="sparkles" /> 情绪</h5>
+              <h5><Ic name="sparkles" /> 鎯呯华</h5>
               <div className="guide-tags">
-                {["治愈","热血","紧凑","高级感","促销热闹","极简清爽","轻奢","未来感"].map((w) => <Tag key={w}>{w}</Tag>)}
+                {["娌绘剤","鐑","绱у噾","楂樼骇鎰?,"淇冮攢鐑椆","鏋佺畝娓呯埥","杞诲ア","鏈潵鎰?].map((w) => <Tag key={w}>{w}</Tag>)}
               </div>
             </div>
           </div>
 
-          <h4><Ic name="edit" /> 视频模式公式</h4>
+          <h4><Ic name="edit" /> 瑙嗛妯″紡鍏紡</h4>
           <table className="guide-table">
-            <thead><tr><th>模式</th><th>公式</th></tr></thead>
+            <thead><tr><th>妯″紡</th><th>鍏紡</th></tr></thead>
             <tbody>
-              <tr><td>文生视频 (t2v)</td><td>主体+动作 / 场景+氛围 / 镜头+运动 / 转化点</td></tr>
-              <tr><td>图生视频 (i2v)</td><td>首图特征延续 + 镜头运动 + 画面变化 + 转化点</td></tr>
-              <tr><td>首尾帧 (i2v_end)</td><td>首尾帧之间的过渡 + 中间画面变化 + 镜头运动</td></tr>
-              <tr><td>多模态</td><td>参考「图片N」中的特征 + 参考「视频N」的运镜 + 旁白/台词</td></tr>
-              <tr><td>视频编辑</td><td>保留不变的部分 + 替换/增加/删除元素 + 时机和位置</td></tr>
-              <tr><td>视频延长</td><td>延续描述 + 新内容方向 + 过渡方式</td></tr>
+              <tr><td>鏂囩敓瑙嗛 (t2v)</td><td>涓讳綋+鍔ㄤ綔 / 鍦烘櫙+姘涘洿 / 闀滃ご+杩愬姩 / 杞寲鐐?/td></tr>
+              <tr><td>鍥剧敓瑙嗛 (i2v)</td><td>棣栧浘鐗瑰緛寤剁画 + 闀滃ご杩愬姩 + 鐢婚潰鍙樺寲 + 杞寲鐐?/td></tr>
+              <tr><td>棣栧熬甯?(i2v_end)</td><td>棣栧熬甯т箣闂寸殑杩囨浮 + 涓棿鐢婚潰鍙樺寲 + 闀滃ご杩愬姩</td></tr>
+              <tr><td>澶氭ā鎬?/td><td>鍙傝€冦€屽浘鐗嘚銆嶄腑鐨勭壒寰?+ 鍙傝€冦€岃棰慛銆嶇殑杩愰暅 + 鏃佺櫧/鍙拌瘝</td></tr>
+              <tr><td>瑙嗛缂栬緫</td><td>淇濈暀涓嶅彉鐨勯儴鍒?+ 鏇挎崲/澧炲姞/鍒犻櫎鍏冪礌 + 鏃舵満鍜屼綅缃?/td></tr>
+              <tr><td>瑙嗛寤堕暱</td><td>寤剁画鎻忚堪 + 鏂板唴瀹规柟鍚?+ 杩囨浮鏂瑰紡</td></tr>
             </tbody>
           </table>
 
-          <h4><Ic name="clipboard" /> 7 个视频模板速查</h4>
+          <h4><Ic name="clipboard" /> 7 涓棰戞ā鏉块€熸煡</h4>
           <div className="guide-template-list">
             <div className="guide-template-item">
-              <strong><Ic name="refresh" /> 产品 360° 旋转</strong> <span className="text-sm text-muted">干净背景 + 环绕镜头 + 卖点叠加</span>
-              <Code>{"商业广告风格，{duration}秒，{ratio}，简洁干净背景\n0-{t1}秒：环绕镜头，产品全景缓慢旋转\n{t1}-{t2}秒：推镜头特写，强调材质和细节\n{t2}-{duration}秒：拉镜头，产品落定，文字卖点出现"}</Code>
+              <strong><Ic name="refresh" /> 浜у搧 360掳 鏃嬭浆</strong> <span className="text-sm text-muted">骞插噣鑳屾櫙 + 鐜粫闀滃ご + 鍗栫偣鍙犲姞</span>
+              <Code>{"鍟嗕笟骞垮憡椋庢牸锛寋duration}绉掞紝{ratio}锛岀畝娲佸共鍑€鑳屾櫙\n0-{t1}绉掞細鐜粫闀滃ご锛屼骇鍝佸叏鏅紦鎱㈡棆杞琝n{t1}-{t2}绉掞細鎺ㄩ暅澶寸壒鍐欙紝寮鸿皟鏉愯川鍜岀粏鑺俓n{t2}-{duration}绉掞細鎷夐暅澶达紝浜у搧钀藉畾锛屾枃瀛楀崠鐐瑰嚭鐜?}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="package" /> 开箱测评</strong> <span className="text-sm text-muted">美妆/数码/食品适用</span>
-              <Code>{"Vlog 实拍风格，{duration}秒，{ratio}，温馨真实\n0-{t1}秒：手持晃动，拆开包装，产品露出\n{t1}-{t2}秒：俯拍特写，展示质感和包装细节\n{t2}-{duration}秒：使用过程，呈现真实体验"}</Code>
+              <strong><Ic name="package" /> 寮€绠辨祴璇?/strong> <span className="text-sm text-muted">缇庡/鏁扮爜/椋熷搧閫傜敤</span>
+              <Code>{"Vlog 瀹炴媿椋庢牸锛寋duration}绉掞紝{ratio}锛屾俯棣ㄧ湡瀹瀄n0-{t1}绉掞細鎵嬫寔鏅冨姩锛屾媶寮€鍖呰锛屼骇鍝侀湶鍑篭n{t1}-{t2}绉掞細淇媿鐗瑰啓锛屽睍绀鸿川鎰熷拰鍖呰缁嗚妭\n{t2}-{duration}绉掞細浣跨敤杩囩▼锛屽憟鐜扮湡瀹炰綋楠?}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="sparkles" /> 卖点演示</strong> <span className="text-sm text-muted">突出 1-2 个核心功能</span>
-              <Code>{"商业 CG 风格，{duration}秒，{ratio}，干净影棚灯光\n0-{t1}秒：产品出现，旁白点出主卖点\n{t1}-{t2}秒：动效演示功能\n{t2}-{duration}秒：场景使用画面，强调结果"}</Code>
+              <strong><Ic name="sparkles" /> 鍗栫偣婕旂ず</strong> <span className="text-sm text-muted">绐佸嚭 1-2 涓牳蹇冨姛鑳?/span>
+              <Code>{"鍟嗕笟 CG 椋庢牸锛寋duration}绉掞紝{ratio}锛屽共鍑€褰辨鐏厜\n0-{t1}绉掞細浜у搧鍑虹幇锛屾梺鐧界偣鍑轰富鍗栫偣\n{t1}-{t2}绉掞細鍔ㄦ晥婕旂ず鍔熻兘\n{t2}-{duration}绉掞細鍦烘櫙浣跨敤鐢婚潰锛屽己璋冪粨鏋?}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="image" /> 场景代入</strong> <span className="text-sm text-muted">把产品放进真实生活场景</span>
-              <Code>{"生活实拍风格，{duration}秒，{ratio}，温暖治愈\n0-{t1}秒：场景全景（客厅/厨房/户外）\n{t1}-{t2}秒：人物使用产品，自然光下细节\n{t2}-{duration}秒：人物满意表情 + 产品定格"}</Code>
+              <strong><Ic name="image" /> 鍦烘櫙浠ｅ叆</strong> <span className="text-sm text-muted">鎶婁骇鍝佹斁杩涚湡瀹炵敓娲诲満鏅?/span>
+              <Code>{"鐢熸椿瀹炴媿椋庢牸锛寋duration}绉掞紝{ratio}锛屾俯鏆栨不鎰圽n0-{t1}绉掞細鍦烘櫙鍏ㄦ櫙锛堝鍘?鍘ㄦ埧/鎴峰锛塡n{t1}-{t2}绉掞細浜虹墿浣跨敤浜у搧锛岃嚜鐒跺厜涓嬬粏鑺俓n{t2}-{duration}绉掞細浜虹墿婊℃剰琛ㄦ儏 + 浜у搧瀹氭牸"}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="layers" /> 对比测试</strong> <span className="text-sm text-muted">Before / After 强转化</span>
-              <Code>{"测评风格，{duration}秒，{ratio}，干净背景\n0-{t1}秒：左侧 Before 状态，痛点呈现\n{t1}-{t2}秒：使用产品过程，分屏对比\n{t2}-{duration}秒：右侧 After 效果，差异强调"}</Code>
+              <strong><Ic name="layers" /> 瀵规瘮娴嬭瘯</strong> <span className="text-sm text-muted">Before / After 寮鸿浆鍖?/span>
+              <Code>{"娴嬭瘎椋庢牸锛寋duration}绉掞紝{ratio}锛屽共鍑€鑳屾櫙\n0-{t1}绉掞細宸︿晶 Before 鐘舵€侊紝鐥涚偣鍛堢幇\n{t1}-{t2}绉掞細浣跨敤浜у搧杩囩▼锛屽垎灞忓姣擻n{t2}-{duration}绉掞細鍙充晶 After 鏁堟灉锛屽樊寮傚己璋?}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="flame" /> 促销爆点</strong> <span className="text-sm text-muted">618 / 双11 / 活动倒计时</span>
-              <Code>{"促销广告风格，{duration}秒，{ratio}，霓虹高饱和\n0-{t1}秒：标题动效砸入画面\n{t1}-{t2}秒：产品阵列展示 + 折扣价格闪烁\n{t2}-{duration}秒：行动指令 + 倒计时"}</Code>
+              <strong><Ic name="flame" /> 淇冮攢鐖嗙偣</strong> <span className="text-sm text-muted">618 / 鍙?1 / 娲诲姩鍊掕鏃?/span>
+              <Code>{"淇冮攢骞垮憡椋庢牸锛寋duration}绉掞紝{ratio}锛岄湏铏归珮楗卞拰\n0-{t1}绉掞細鏍囬鍔ㄦ晥鐮稿叆鐢婚潰\n{t1}-{t2}绉掞細浜у搧闃靛垪灞曠ず + 鎶樻墸浠锋牸闂儊\n{t2}-{duration}绉掞細琛屽姩鎸囦护 + 鍊掕鏃?}</Code>
             </div>
             <div className="guide-template-item">
-              <strong><Ic name="camera" /> 用户视角 POV</strong> <span className="text-sm text-muted">第一视角拍摄使用过程</span>
-              <Code>{"POV 第一视角，{duration}秒，{ratio}，真实自然\n0-{t1}秒：手部入画，拿起产品\n{t1}-{t2}秒：操作产品，细节特写\n{t2}-{duration}秒：成果展示，POV 看向使用结果"}</Code>
+              <strong><Ic name="camera" /> 鐢ㄦ埛瑙嗚 POV</strong> <span className="text-sm text-muted">绗竴瑙嗚鎷嶆憚浣跨敤杩囩▼</span>
+              <Code>{"POV 绗竴瑙嗚锛寋duration}绉掞紝{ratio}锛岀湡瀹炶嚜鐒禱n0-{t1}绉掞細鎵嬮儴鍏ョ敾锛屾嬁璧蜂骇鍝乗n{t1}-{t2}绉掞細鎿嶄綔浜у搧锛岀粏鑺傜壒鍐橽n{t2}-{duration}绉掞細鎴愭灉灞曠ず锛孭OV 鐪嬪悜浣跨敤缁撴灉"}</Code>
             </div>
           </div>
         </div>
       </Collapsible>
 
-      {/* ── AI 优化说明 ── */}
-      <Collapsible title={<><Ic name="sparkles" /> AI 优化功能说明</>} defaultOpen={false}>
+      {/* 鈹€鈹€ AI 浼樺寲璇存槑 鈹€鈹€ */}
+      <Collapsible title={<><Ic name="sparkles" /> AI 浼樺寲鍔熻兘璇存槑</>} defaultOpen={false}>
         <div className="guide-section">
-          <h4>工作原理</h4>
+          <h4>宸ヤ綔鍘熺悊</h4>
           <ol>
-            <li>你在任意功能页的提示词输入框中写一段<strong>简单描述</strong>（哪怕一句话）</li>
-            <li>点击输入框下方的 <strong>「AI 优化」</strong> 按钮</li>
-            <li>AI 会根据当前功能类型（主图/套图/海报/视频等）自动补充专业约束</li>
-            <li>优化后的提示词会回填到输入框，你可以再微调</li>
-            <li>点击「开始生成」，使用最终提示词直接生成，<strong>不再二次优化</strong></li>
+            <li>浣犲湪浠绘剰鍔熻兘椤电殑鎻愮ず璇嶈緭鍏ユ涓啓涓€娈?strong>绠€鍗曟弿杩?/strong>锛堝摢鎬曚竴鍙ヨ瘽锛?/li>
+            <li>鐐瑰嚮杈撳叆妗嗕笅鏂圭殑 <strong>銆孉I 浼樺寲銆?/strong> 鎸夐挳</li>
+            <li>AI 浼氭牴鎹綋鍓嶅姛鑳界被鍨嬶紙涓诲浘/濂楀浘/娴锋姤/瑙嗛绛夛級鑷姩琛ュ厖涓撲笟绾︽潫</li>
+            <li>浼樺寲鍚庣殑鎻愮ず璇嶄細鍥炲～鍒拌緭鍏ユ锛屼綘鍙互鍐嶅井璋?/li>
+            <li>鐐瑰嚮銆屽紑濮嬬敓鎴愩€嶏紝浣跨敤鏈€缁堟彁绀鸿瘝鐩存帴鐢熸垚锛?strong>涓嶅啀浜屾浼樺寲</strong></li>
           </ol>
 
-          <h4>不同功能的优化差异</h4>
+          <h4>涓嶅悓鍔熻兘鐨勪紭鍖栧樊寮?/h4>
           <table className="guide-table">
-            <thead><tr><th>功能类型</th><th>AI 优化会补充什么</th></tr></thead>
+            <thead><tr><th>鍔熻兘绫诲瀷</th><th>AI 浼樺寲浼氳ˉ鍏呬粈涔?/th></tr></thead>
             <tbody>
-              <tr><td>商品主图</td><td>产品居中比例、影棚布光参数、背景约束、无水印</td></tr>
-              <tr><td>套图类</td><td>[统一风格] 前缀、风格锚定段、卖点分配</td></tr>
-              <tr><td>详情长图</td><td>竖版构图约束、分段结构、3:4 比例</td></tr>
-              <tr><td>海报类</td><td>版式结构（标题区/主视觉/CTA）、配色方案</td></tr>
-              <tr><td>视频类</td><td>时间轴分段、镜头语言、氛围词汇、声音设计</td></tr>
+              <tr><td>鍟嗗搧涓诲浘</td><td>浜у搧灞呬腑姣斾緥銆佸奖妫氬竷鍏夊弬鏁般€佽儗鏅害鏉熴€佹棤姘村嵃</td></tr>
+              <tr><td>濂楀浘绫?/td><td>[缁熶竴椋庢牸] 鍓嶇紑銆侀鏍奸敋瀹氭銆佸崠鐐瑰垎閰?/td></tr>
+              <tr><td>璇︽儏闀垮浘</td><td>绔栫増鏋勫浘绾︽潫銆佸垎娈电粨鏋勩€?:4 姣斾緥</td></tr>
+              <tr><td>娴锋姤绫?/td><td>鐗堝紡缁撴瀯锛堟爣棰樺尯/涓昏瑙?CTA锛夈€侀厤鑹叉柟妗?/td></tr>
+              <tr><td>瑙嗛绫?/td><td>鏃堕棿杞村垎娈点€侀暅澶磋瑷€銆佹皼鍥磋瘝姹囥€佸０闊宠璁?/td></tr>
             </tbody>
           </table>
 
-          <h4>什么时候该自己写？什么时候用 AI？</h4>
+          <h4>浠€涔堟椂鍊欒鑷繁鍐欙紵浠€涔堟椂鍊欑敤 AI锛?/h4>
           <table className="guide-table">
-            <thead><tr><th>场景</th><th>建议</th></tr></thead>
+            <thead><tr><th>鍦烘櫙</th><th>寤鸿</th></tr></thead>
             <tbody>
-              <tr><td>赶时间、不知道怎么写</td><td>直接用 AI 优化，改改就提交</td></tr>
-              <tr><td>有明确的画面想法</td><td>自己写具体描述，参考上面的模板</td></tr>
-              <tr><td>想要独特风格</td><td>自己写核心创意 + AI 优化补充技术参数</td></tr>
-              <tr><td>批量出图/套图</td><td>写清卖点列表，让 AI 优化为每张分配角度</td></tr>
+              <tr><td>璧舵椂闂淬€佷笉鐭ラ亾鎬庝箞鍐?/td><td>鐩存帴鐢?AI 浼樺寲锛屾敼鏀瑰氨鎻愪氦</td></tr>
+              <tr><td>鏈夋槑纭殑鐢婚潰鎯虫硶</td><td>鑷繁鍐欏叿浣撴弿杩帮紝鍙傝€冧笂闈㈢殑妯℃澘</td></tr>
+              <tr><td>鎯宠鐙壒椋庢牸</td><td>鑷繁鍐欐牳蹇冨垱鎰?+ AI 浼樺寲琛ュ厖鎶€鏈弬鏁?/td></tr>
+              <tr><td>鎵归噺鍑哄浘/濂楀浘</td><td>鍐欐竻鍗栫偣鍒楄〃锛岃 AI 浼樺寲涓烘瘡寮犲垎閰嶈搴?/td></tr>
             </tbody>
           </table>
         </div>
@@ -1913,7 +1913,7 @@ function PromptGuide() {
   );
 }
 
-// ── CreateTab ──
+// 鈹€鈹€ CreateTab 鈹€鈹€
 function CreateTab({ features, activeModule, setActiveModule, selectedFeature, setSelectedFeature, featureDetail, params, setParams, generating, onGenerate, selectedTask, setSelectedTask, pluginApi }) {
   const currentFeatures = features[activeModule] || [];
 
@@ -1924,7 +1924,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
 
   const handleExampleSelect = (ex) => {
     setParams((prev) => ({ ...prev, ...ex.preset_params }));
-    showToast("已加载示例参数");
+    showToast("宸插姞杞界ず渚嬪弬鏁?);
   };
 
   return (
@@ -1932,7 +1932,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
       <div className="split-left">
         <div className="card">
           <div className="form-row">
-            <div className="label">生成模块</div>
+            <div className="label">鐢熸垚妯″潡</div>
             <div className="flex gap-2 flex-wrap">
               {MODULES.map(m => (
                 <button key={m.id} className={"mode-btn" + (activeModule === m.id ? " active" : "")}
@@ -1947,7 +1947,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
 
           {currentFeatures.length > 1 && (
             <div className="form-row">
-              <div className="label">功能</div>
+              <div className="label">鍔熻兘</div>
               <div className="flex gap-2 flex-wrap">
                 {currentFeatures.map(f => (
                   <button key={f.id} className={"mode-btn" + (selectedFeature === f.id ? " active" : "")}
@@ -1969,13 +1969,13 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
               <div style={{marginTop:16}}>
                 <button className="btn btn-primary btn-block"
                   onClick={onGenerate} disabled={generating || blockedByRequired.length > 0}
-                  title={blockedByRequired.length ? "请先填写必填项" : ""}>
-                  {generating ? <><span className="spinner-sm"></span> 生成中...</>
-                    : <><Ic name={featureDetail.output_type === "video" ? "video" : "sparkles"} /> 开始生成</>}
+                  title={blockedByRequired.length ? "璇峰厛濉啓蹇呭～椤? : ""}>
+                  {generating ? <><span className="spinner-sm"></span> 鐢熸垚涓?..</>
+                    : <><Ic name={featureDetail.output_type === "video" ? "video" : "sparkles"} /> 寮€濮嬬敓鎴?/>}
                 </button>
                 {blockedByRequired.length > 0 && (
                   <p className="text-xs text-warning" style={{marginTop:8}}>
-                    请先完成必填项：{blockedByRequired.map(p => p.label).join("、")}
+                    璇峰厛瀹屾垚蹇呭～椤癸細{blockedByRequired.map(p => p.label).join("銆?)}
                   </p>
                 )}
               </div>
@@ -1984,7 +1984,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
           {!featureDetail && (
             <div className="empty-state" style={{padding:"30px 0"}}>
               <div className="spinner"></div>
-              <div className="text-sm text-dim" style={{marginTop:8}}>加载中...</div>
+              <div className="text-sm text-dim" style={{marginTop:8}}>鍔犺浇涓?..</div>
             </div>
           )}
         </div>
@@ -1999,8 +1999,8 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
               dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.sparkles() : ""}} />
-            <div className="oa-preview-empty__title">选择一个功能开始创作</div>
-            <div className="oa-preview-empty__hint">或查看历史记录</div>
+            <div className="oa-preview-empty__title">閫夋嫨涓€涓姛鑳藉紑濮嬪垱浣?/div>
+            <div className="oa-preview-empty__hint">鎴栨煡鐪嬪巻鍙茶褰?/div>
           </div>
         )}
       </div>
@@ -2008,7 +2008,7 @@ function CreateTab({ features, activeModule, setActiveModule, selectedFeature, s
   );
 }
 
-// ── TasksTab ──
+// 鈹€鈹€ TasksTab 鈹€鈹€
 function TasksTab({ pluginApi }) {
   const [tasks, setTasks] = useState([]);
   const [total, setTotal] = useState(0);
@@ -2042,19 +2042,19 @@ function TasksTab({ pluginApi }) {
     <div className="split-layout">
       <div className="split-left" style={{width:"38%",minWidth:320}}>
         <div className="filter-group">
-          <div className="filter-group__label">状态</div>
+          <div className="filter-group__label">鐘舵€?/div>
           <div className="filter-group__buttons">
-            {[{v:"",l:"全部"},{v:"running",l:"生成中"},{v:"succeeded",l:"完成"},{v:"failed",l:"失败"}].map(f => (
+            {[{v:"",l:"鍏ㄩ儴"},{v:"running",l:"鐢熸垚涓?},{v:"succeeded",l:"瀹屾垚"},{v:"failed",l:"澶辫触"}].map(f => (
               <button key={f.v} className={"mode-btn" + (statusFilter===f.v?" active":"")}
                 onClick={() => setStatusFilter(f.v)}>{f.l}</button>
             ))}
           </div>
         </div>
         <div className="filter-group">
-          <div className="filter-group__label">模块</div>
+          <div className="filter-group__label">妯″潡</div>
           <div className="filter-group__buttons">
             <button className={"mode-btn" + (moduleFilter===""?" active":"")}
-              onClick={() => setModuleFilter("")}>全部</button>
+              onClick={() => setModuleFilter("")}>鍏ㄩ儴</button>
             {MODULES.map(m => (
               <button key={m.id} className={"mode-btn" + (moduleFilter===m.id?" active":"")}
                 onClick={() => setModuleFilter(m.id)}>
@@ -2070,7 +2070,7 @@ function TasksTab({ pluginApi }) {
             <div className="empty-state"><div className="spinner" /></div>
           ) : tasks.length === 0 ? (
             <div className="empty-state" style={{padding:"30px 0"}}>
-              <div className="text-sm text-dim">暂无任务</div>
+              <div className="text-sm text-dim">鏆傛棤浠诲姟</div>
             </div>
           ) : tasks.map(tk => (
             <div key={tk.id} className={"task-card" + (selected && selected.id === tk.id ? " selected" : "")}
@@ -2084,7 +2084,7 @@ function TasksTab({ pluginApi }) {
                 })()}
               </div>
               <div className="task-info">
-                <h4>{tk.prompt || tk.feature_id || "任务"}</h4>
+                <h4>{tk.prompt || tk.feature_id || "浠诲姟"}</h4>
                 <div className="task-meta">
                   <span className={"tag " + ((STATUS_MAP[tk.status] || {}).cls || "tag-gray")}>{(STATUS_MAP[tk.status] || {}).label || tk.status}</span>
                   <span>{tk.module}</span>
@@ -2095,7 +2095,7 @@ function TasksTab({ pluginApi }) {
             </div>
           ))}
         </div>
-        <div className="text-xs text-dim" style={{padding:"8px 0",textAlign:"center"}}>共 {total} 条</div>
+        <div className="text-xs text-dim" style={{padding:"8px 0",textAlign:"center"}}>鍏?{total} 鏉?/div>
       </div>
 
       <div className={"split-right oa-preview-area" + (!selected ? " oa-preview-area--centered" : "")}>
@@ -2107,8 +2107,8 @@ function TasksTab({ pluginApi }) {
           <div className="oa-preview-empty">
             <span className="oa-preview-empty__icon"
               dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.listTask ? window.SynapseIcons.listTask() : (window.SynapseIcons.layers ? window.SynapseIcons.layers() : "") : ""}} />
-            <div className="oa-preview-empty__title">未选择任务</div>
-            <div className="oa-preview-empty__hint">从左侧列表选择一个任务查看详情</div>
+            <div className="oa-preview-empty__title">鏈€夋嫨浠诲姟</div>
+            <div className="oa-preview-empty__hint">浠庡乏渚у垪琛ㄩ€夋嫨涓€涓换鍔℃煡鐪嬭鎯?/div>
           </div>
         )}
       </div>
@@ -2116,7 +2116,7 @@ function TasksTab({ pluginApi }) {
   );
 }
 
-// ── App ──
+// 鈹€鈹€ App 鈹€鈹€
 function App() {
   const [tab, setTab] = useState("create");
   const [activeModule, setActiveModule] = useState("video");
@@ -2175,9 +2175,9 @@ function App() {
             const updated = resp.body.task;
             setTasks((prev) => prev.map((pt) => pt.id === updated.id ? updated : pt));
             if (selectedTask && selectedTask.id === updated.id) setSelectedTask(updated);
-            if (updated.status === "succeeded") showToast("任务完成!");
-            if (updated.status === "partial_success") showToast("任务部分完成");
-            if (updated.status === "failed") showToast("任务失败: " + (updated.error_message || ""), "error");
+            if (updated.status === "succeeded") showToast("浠诲姟瀹屾垚!");
+            if (updated.status === "partial_success") showToast("浠诲姟閮ㄥ垎瀹屾垚");
+            if (updated.status === "failed") showToast("浠诲姟澶辫触: " + (updated.error_message || ""), "error");
           }
         });
       });
@@ -2223,7 +2223,7 @@ function App() {
   const handleGenerate = async () => {
     if (!selectedFeature || generating || generateLock.current) return;
     if (blockedByRequired.length) {
-      showToast("请先填写：" + blockedByRequired.map((p) => p.label).join("、"), "error");
+      showToast("璇峰厛濉啓锛? + blockedByRequired.map((p) => p.label).join("銆?), "error");
       return;
     }
     generateLock.current = true;
@@ -2234,12 +2234,12 @@ function App() {
         const task = resp.body.task;
         setTasks((prev) => [task, ...prev]);
         setSelectedTask(task);
-        showToast("任务已提交!");
+        showToast("浠诲姟宸叉彁浜?");
       } else {
-        showToast(resp.body?.detail || "提交失败", "error");
+        showToast(resp.body?.detail || "鎻愪氦澶辫触", "error");
       }
     } catch (e) {
-      showToast("提交失败: " + e.message, "error");
+      showToast("鎻愪氦澶辫触: " + e.message, "error");
     }
     setGenerating(false);
     generateLock.current = false;
@@ -2263,8 +2263,8 @@ function App() {
             <img src="icon.svg" alt="" aria-hidden="true" />
           </span>
           <span className="oa-hero-title__text">
-            电商素材小助理
-            <span className="oa-hero-title__sub">DASHSCOPE + ARK · 主图 / 详情页 / 海报 / 视频</span>
+            鐢靛晢绱犳潗灏忓姪鐞?
+            <span className="oa-hero-title__sub">DASHSCOPE + ARK 路 涓诲浘 / 璇︽儏椤?/ 娴锋姤 / 瑙嗛</span>
           </span>
         </h1>
         <div className="header-right" />
@@ -2275,13 +2275,13 @@ function App() {
           <span className="oa-icon oa-config-banner__icon"
                 dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.warning() : ""}} />
           <div className="oa-config-banner__text">
-            <strong>未配置 API Key</strong>
+            <strong>鏈厤缃?API Key</strong>
             <div style={{fontSize:12,color:"var(--text-muted)",marginTop:2}}>
-              配置 DashScope Key 可使用图像功能，配置 Ark Key 可使用视频功能。至少配置一个即可开始使用。
+              閰嶇疆 DashScope Key 鍙娇鐢ㄥ浘鍍忓姛鑳斤紝閰嶇疆 Ark Key 鍙娇鐢ㄨ棰戝姛鑳姐€傝嚦灏戦厤缃竴涓嵆鍙紑濮嬩娇鐢ㄣ€?
             </div>
           </div>
           <button className="oa-config-banner__action" type="button" onClick={() => setTab("settings")}>
-            前往设置
+            鍓嶅線璁剧疆
             <span className="oa-icon"
                   dangerouslySetInnerHTML={{__html: window.SynapseIcons ? window.SynapseIcons.arrowRight() : ""}} />
           </button>
@@ -2326,18 +2326,18 @@ class PluginErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.error) {
-      const msg = (this.state.error && (this.state.error.message || String(this.state.error))) || "未知渲染错误";
+      const msg = (this.state.error && (this.state.error.message || String(this.state.error))) || "鏈煡娓叉煋閿欒";
       return (
         <div style={{padding:24,maxWidth:720,margin:"40px auto"}}>
           <div className="oa-config-banner" role="alert">
             <span className="oa-config-banner__icon"><Ic name="warning" /></span>
             <div className="oa-config-banner__text">
-              <strong>插件 UI 渲染失败。</strong>
+              <strong>鎻掍欢 UI 娓叉煋澶辫触銆?/strong>
               <div style={{marginTop:6,fontSize:12,color:"var(--text-muted)",wordBreak:"break-word"}}>{msg}</div>
-              <div style={{marginTop:6,fontSize:12,color:"var(--text-muted)"}}>请尝试刷新页面，或在主程序「插件管理」中重新加载本插件。</div>
+              <div style={{marginTop:6,fontSize:12,color:"var(--text-muted)"}}>璇峰皾璇曞埛鏂伴〉闈紝鎴栧湪涓荤▼搴忋€屾彃浠剁鐞嗐€嶄腑閲嶆柊鍔犺浇鏈彃浠躲€?/div>
             </div>
             <button className="oa-config-banner__action" onClick={() => { try { window.location.reload(); } catch (_) {} }}>
-              <Ic name="refresh" /> 刷新
+              <Ic name="refresh" /> 鍒锋柊
             </button>
           </div>
         </div>

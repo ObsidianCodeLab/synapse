@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fin Pulse · 财经脉动</title>
+  <title>Fin Pulse 路 璐㈢粡鑴夊姩</title>
   <!--
     Self-contained plugin UI: bootstrap + shared UI Kit inlined under _assets/.
-    fin-pulse shares the same UI Kit as avatar-studio / subtitle-craft — the
+    fin-pulse shares the same UI Kit as avatar-studio / subtitle-craft 鈥?the
     five files below are the canonical 5-asset bundle, vendored from
     plugins-archive/_shared/web-uikit/ at build time. React / ReactDOM / Babel
     are loaded from unpkg; everything else is local.
@@ -16,11 +16,11 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/i18n.js"></script>
   <script src="_assets/markdown-mini.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
-    /* ── Theme tokens ──
+    /* 鈹€鈹€ Theme tokens 鈹€鈹€
        Clean white/black base; stock-market red accent (#D32F2F)
        for borders, tab underlines, icons, and button outlines. */
     :root {
@@ -44,14 +44,14 @@
         --border: #475569; --border-strong: #EF5350;
       }
     }
-    /* ── Reset + typography ── */
+    /* 鈹€鈹€ Reset + typography 鈹€鈹€ */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg); color: var(--text); line-height: 1.5;
       -webkit-font-smoothing: antialiased;
     }
-    /* ── Layout shell ── */
+    /* 鈹€鈹€ Layout shell 鈹€鈹€ */
     .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     .header {
       display: flex; align-items: center; justify-content: space-between;
@@ -73,14 +73,14 @@
     .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
     .content { flex: 1; overflow: auto; padding: 18px 20px; background: var(--bg); display: flex; flex-direction: column; }
     .empty { color: var(--text-muted); font-size: 13px; padding: 32px 12px; text-align: center; }
-    /* ── Split layout (left filter + right list) ── */
+    /* 鈹€鈹€ Split layout (left filter + right list) 鈹€鈹€ */
     .split-layout { display: flex; gap: 16px; height: 100%; }
-    /* ── Stack layout (top filter bar + bottom content) ── */
+    /* 鈹€鈹€ Stack layout (top filter bar + bottom content) 鈹€鈹€ */
     .stack-layout { display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0; }
     .stack-layout > .card.grow { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
     .stack-layout > .card.grow > .card-body { flex: 1; overflow: auto; }
     .stack-layout > .card--compact { flex: 0 0 auto; }
-    /* ── Hero title (oa-hero-title) — big gradient brand mark ──
+    /* 鈹€鈹€ Hero title (oa-hero-title) 鈥?big gradient brand mark 鈹€鈹€
        Matches the avatar-studio hard contract: always explicit --text
        colour, weight 700, size 20px so the Chinese headline stays
        legible on the blush background (previous 18/600 inherited to
@@ -102,7 +102,7 @@
     .oa-hero-title__icon svg { width: 100%; height: 100%; display: block; }
     .oa-hero-title__text { display: inline-flex; flex-direction: column; line-height: 1.15; color: var(--text); }
     .oa-hero-title__sub { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 4px; letter-spacing: .3px; }
-    /* ── Section title with leading accent bar ── */
+    /* 鈹€鈹€ Section title with leading accent bar 鈹€鈹€ */
     .oa-section-title {
       display: flex; align-items: center; gap: 10px;
       font-size: 16px; font-weight: 600; color: var(--text);
@@ -118,7 +118,7 @@
       padding: 2px 8px; border-radius: 999px; background: var(--bg-hover);
     }
     .oa-section-title__actions { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
-    /* ── Hint text (beginner-friendly description under a title) ── */
+    /* 鈹€鈹€ Hint text (beginner-friendly description under a title) 鈹€鈹€ */
     .oa-hint {
       font-size: 12px; color: var(--text); line-height: 1.6;
       background: var(--bg-hover); padding: 8px 12px; border-radius: 6px;
@@ -129,7 +129,7 @@
       background: var(--bg-card); padding: 1px 6px; border-radius: 4px;
       font-size: 11px; color: var(--primary); border: 1px solid var(--border);
     }
-    /* ── Segmented button group (active-state aware) ── */
+    /* 鈹€鈹€ Segmented button group (active-state aware) 鈹€鈹€ */
     .seg-group { display: inline-flex; gap: 4px; padding: 3px;
                  background: var(--bg-hover); border-radius: 8px; }
     .seg-btn {
@@ -145,7 +145,7 @@
       border-color: var(--border);
       box-shadow: 0 1px 3px rgba(211,47,47,.18);
     }
-    /* ── Filter bar (horizontal sticky strip for Today tab) ── */
+    /* 鈹€鈹€ Filter bar (horizontal sticky strip for Today tab) 鈹€鈹€ */
     .filter-bar {
       display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px;
       padding: 12px 14px; background: var(--bg-card);
@@ -237,7 +237,7 @@
       100% { box-shadow: 0 0 0 0 rgba(56,189,248,0), 0 0 10px rgba(37,99,235,.12), 0 5px 14px rgba(30,64,175,.10); }
     }
     .sort-pill { display: inline-flex; align-items: center; gap: 5px; }
-    /* ── Ingest split-button (main action + dropdown for single-source) ── */
+    /* 鈹€鈹€ Ingest split-button (main action + dropdown for single-source) 鈹€鈹€ */
     .ingest-split { display: inline-flex; align-items: stretch; position: relative; filter: drop-shadow(0 4px 10px rgba(211,47,47,.12)); }
     .ingest-split .btn { border-radius: 0; }
     .ingest-split .btn:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; padding-left: 14px; }
@@ -260,10 +260,10 @@
     }
     .ingest-split__menu button:hover { background: rgba(211,47,47,.10); color: var(--primary); }
     .ingest-split__menu button[disabled] { opacity: .5; cursor: not-allowed; }
-    /* ── Spinner icon ── */
+    /* 鈹€鈹€ Spinner icon 鈹€鈹€ */
     @keyframes fp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .fp-spin { animation: fp-spin 1s linear infinite; transform-origin: 50% 50%; display: inline-block; }
-    /* ── Indeterminate progress bar ── */
+    /* 鈹€鈹€ Indeterminate progress bar 鈹€鈹€ */
     @keyframes fp-shimmer {
       0%   { transform: translateX(-55%); }
       100% { transform: translateX(155%); }
@@ -297,7 +297,7 @@
     .ingest-split.is-busy .btn-primary {
       animation: fp-ingest-pulse 1.2s ease-in-out infinite;
     }
-    /* ── Ingest result drawer ── */
+    /* 鈹€鈹€ Ingest result drawer 鈹€鈹€ */
     .fp-drawer {
       display: flex; flex-direction: column; gap: 10px;
       padding: 12px 14px; border-radius: var(--radius);
@@ -342,7 +342,7 @@
       background: rgba(239,68,68,.06); border: 1px dashed rgba(239,68,68,.28);
       border-radius: 6px; padding: 6px 10px; word-break: break-word;
     }
-    /* ── Config banner (oa-config-banner) ── */
+    /* 鈹€鈹€ Config banner (oa-config-banner) 鈹€鈹€ */
     .oa-config-banner {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 14px; border-radius: var(--radius);
@@ -359,7 +359,7 @@
     }
     .oa-config-banner__action:hover { background: var(--primary-hover); }
     .oa-icon { display: inline-flex; align-items: center; }
-    /* ── Code block (terminal-style, with copy button) ── */
+    /* 鈹€鈹€ Code block (terminal-style, with copy button) 鈹€鈹€ */
     .fp-codeblock { position: relative; border-radius: 6px;
                     background: #1F0F14; color: #FDEEF1;
                     border: 1px solid var(--border);
@@ -476,14 +476,14 @@
       padding: 8px 10px; border-radius: 6px; font-size: 11px; overflow: auto; margin: 0;
     }
     .agent-tool-actions { display: flex; gap: 6px; margin-top: 10px; align-items: center; }
-    /* ── Label bar ── */
+    /* 鈹€鈹€ Label bar 鈹€鈹€ */
     .label { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px;
              display: flex; align-items: center; gap: 6px; }
     .label::before {
       content: ""; width: 3px; height: 14px; background: var(--primary);
       border-radius: 1px; display: inline-block;
     }
-    /* ── Form inputs (input + invalid tooltip) ── */
+    /* 鈹€鈹€ Form inputs (input + invalid tooltip) 鈹€鈹€ */
     .field-wrap { position: relative; display: block; }
     .input {
       width: 100%; padding: 8px 10px; font-size: 13px;
@@ -507,13 +507,13 @@
     }
     .field-warn-icon:hover + .field-warn-tip,
     .field-warn-tip:hover { opacity: .95; }
-    /* ── Cards ── */
+    /* 鈹€鈹€ Cards 鈹€鈹€ */
     .card {
       background: var(--bg-card); border: 1.5px solid var(--border);
       border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
     }
     .card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
-    /* ── Buttons ── */
+    /* 鈹€鈹€ Buttons 鈹€鈹€ */
     .btn {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 7px 14px; font-size: 13px; font-weight: 500;
@@ -526,7 +526,7 @@
     .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
     .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
-    /* Create-CTA — used by the "新增/创建 xxx 计划" buttons in the
+    /* Create-CTA 鈥?used by the "鏂板/鍒涘缓 xxx 璁″垝" buttons in the
        Digest workbench. The default ghost/.btn-primary look read as
        a regular row-action and confused users; this style is a wide,
        dashed, centred affordance that telegraphs "tap to create a
@@ -557,7 +557,7 @@
       background: transparent; color: var(--text-secondary);
       border-color: var(--border);
     }
-    /* ── API pill (source status) ── */
+    /* 鈹€鈹€ API pill (source status) 鈹€鈹€ */
     .api-pill {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 3px 10px; border-radius: 999px;
@@ -569,11 +569,11 @@
       background: rgba(245,158,11,.15); color: var(--warning); cursor: pointer;
     }
     .api-pill--missing:hover { filter: brightness(0.95); }
-    /* ── Error panel (used by PluginErrorBoundary) ── */
+    /* 鈹€鈹€ Error panel (used by PluginErrorBoundary) 鈹€鈹€ */
     .err-panel { border: 1px solid var(--danger); border-radius: var(--radius); padding: 14px; background: rgba(220,38,38,0.08); }
     .err-panel__title { font-weight: 600; color: var(--danger); display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
     .err-panel__msg { font-size: 12px; color: var(--text); margin-bottom: 8px; word-break: break-word; }
-    /* ── Confirm dialog (ConfirmHost / oaConfirm) ── */
+    /* 鈹€鈹€ Confirm dialog (ConfirmHost / oaConfirm) 鈹€鈹€ */
     .confirm-mask {
       position: fixed; inset: 0; background: rgba(0,0,0,.35);
       display: flex; align-items: center; justify-content: center; z-index: 999;
@@ -587,7 +587,7 @@
     .confirm-dialog .card-title { font-size: 16px; margin-bottom: 10px; }
     .confirm-message { font-size: 13px; color: var(--text); line-height: 1.7; word-break: break-word; }
     .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
-    /* ── News card ── */
+    /* 鈹€鈹€ News card 鈹€鈹€ */
     .news-card {
       padding: 12px 0; border-bottom: 1px solid var(--border);
       transition: background .12s;
@@ -640,7 +640,7 @@
     }
     .news-source-group__title { font-size: 13px; font-weight: 600; color: var(--text); }
     .news-source-group__meta { margin-left: auto; font-size: 11px; color: var(--text-muted); }
-    /* Source pill — colored by source */
+    /* Source pill 鈥?colored by source */
     .source-pill {
       display: inline-flex; align-items: center; gap: 3px;
       padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500;
@@ -795,7 +795,7 @@
       background: #eff6ff; color: #2563eb;
     }
     [data-theme="dark"] .kw-tag { background: rgba(59,130,246,.15); color: #60a5fa; }
-    /* AI score badge — color scales with score */
+    /* AI score badge 鈥?color scales with score */
     .ai-badge {
       display: inline-flex; align-items: center; gap: 3px;
       padding: 1px 8px; border-radius: 999px;
@@ -848,7 +848,7 @@
       flex: 1; width: 100%; border: 1px solid var(--border);
       border-radius: 10px; background: #fff;
     }
-    /* ── Collapsible ── */
+    /* 鈹€鈹€ Collapsible 鈹€鈹€ */
     .coll { border: 1.5px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; background: var(--bg-card); }
     .coll-head {
       display: flex; align-items: center; gap: 8px;
@@ -866,7 +866,7 @@
       padding: 1px 8px; border-radius: 999px;
     }
     .coll-body { padding: 0 14px 12px; }
-    /* ── Source row ── */
+    /* 鈹€鈹€ Source row 鈹€鈹€ */
     .source-row {
       display: flex; align-items: center; gap: 8px;
       padding: 7px 0; border-bottom: 1px solid var(--border);
@@ -875,7 +875,7 @@
     .source-row--disabled { opacity: .5; }
     .source-row__name { font-size: 13px; font-weight: 500; color: var(--text); min-width: 0; }
     .source-row__spacer { flex: 1; min-width: 8px; }
-    /* ── Toggle switch ── */
+    /* 鈹€鈹€ Toggle switch 鈹€鈹€ */
     .switch {
       position: relative; width: 34px; height: 18px; flex-shrink: 0;
       background: var(--border); border-radius: 999px;
@@ -888,7 +888,7 @@
       background: #fff; transition: left .2s;
     }
     .switch--on .switch__knob { left: 18px; }
-    /* ── Content-type pill ── */
+    /* 鈹€鈹€ Content-type pill 鈹€鈹€ */
     .ct-pill {
       display: inline-flex; align-items: center;
       padding: 1px 8px; border-radius: 999px;
@@ -901,12 +901,12 @@
     .ct-pill--filing { background: rgba(107,114,128,.12); color: #4b5563; }
     .ct-pill--data { background: rgba(16,185,129,.12); color: #059669; }
     .ct-pill--custom { background: rgba(99,102,241,.12); color: #4f46e5; }
-    /* ── Source status dot ── */
+    /* 鈹€鈹€ Source status dot 鈹€鈹€ */
     .source-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .source-dot--ok { background: var(--success); }
     .source-dot--err { background: var(--danger); }
     .source-dot--unknown { background: var(--border); }
-    /* ── Bing RSS builder ── */
+    /* 鈹€鈹€ Bing RSS builder 鈹€鈹€ */
     .bing-builder { padding: 10px 0; }
     .bing-builder__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .bing-builder__preview {
@@ -914,10 +914,10 @@
       margin-top: 6px; padding: 6px 10px;
       background: var(--bg-hover); border-radius: 6px;
     }
-    /* ── Custom source add form ── */
+    /* 鈹€鈹€ Custom source add form 鈹€鈹€ */
     .custom-add-form { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; }
     .custom-add-form__row { display: flex; gap: 8px; align-items: center; }
-    /* ── Section wrapper (vertical-line title) ── */
+    /* 鈹€鈹€ Section wrapper (vertical-line title) 鈹€鈹€ */
     .oa-settings-section { margin-bottom: 16px; }
     .oa-settings-section__title {
       font-size: 14px; font-weight: 600; color: var(--text);
@@ -927,7 +927,7 @@
       content: ""; width: 3px; height: 16px; background: var(--primary);
       border-radius: 1px; display: inline-block;
     }
-    /* ── NewsNow status bar ── */
+    /* 鈹€鈹€ NewsNow status bar 鈹€鈹€ */
     .nn-status-bar {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       padding: 8px 12px; margin-bottom: 10px;
@@ -954,335 +954,335 @@
 </head>
 <body>
   <div id="root"></div>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
   <script type="text/babel">
 const { useState, useEffect, useCallback, useRef } = React;
 
-/* ── i18n dictionary (zh / en) ── */
+/* 鈹€鈹€ i18n dictionary (zh / en) 鈹€鈹€ */
 const I18N_DICT = {
   zh: {
-    "app.title": "财经脉动",
-    "app.subtitle": "Fin Pulse · 早午晚报 · 热点雷达",
-    "tabs.today": "资讯",
-    "tabs.digests": "早午晚报",
-    "tabs.radar": "雷达预警",
-    "tabs.settings": "设置",
-    "banner.noChannel.title": "尚未配置 IM 推送通道",
-    "banner.noChannel.desc": "请先在 Synapse 主程序配置至少一个 IM 通道（飞书/企微/钉钉）并授予 channel.send 权限。",
-    "banner.noChannel.cta": "前往设置",
-    "err.title": "界面渲染异常",
-    "err.retry": "重试",
-    "err.stackLabel": "错误堆栈",
-    "confirm.ok": "确认",
-    "confirm.cancel": "取消",
-    "empty.phase1": "暂无数据，点击刷新或先在设置页配置数据源",
-    "today.filters.title": "筛选",
-    "today.filters.source": "数据源",
-    "today.filters.source.all": "全部",
-    "today.sources.cat.all": "全部",
-    "today.sources.cat.realtime": "实时",
-    "today.sources.cat.news": "资讯",
-    "today.sources.cat.rank": "榜单",
-    "today.sources.cat.policy_data": "政策/数据",
-    "today.sources.cat.other": "其他",
-    "today.filters.window": "时间范围",
-    "today.filters.window.6h": "近 6 小时",
-    "today.filters.window.24h": "近 24 小时",
-    "today.filters.window.72h": "近 3 天",
-    "today.filters.window.custom": "自定义",
-    "today.filters.window.from": "开始",
-    "today.filters.window.to": "结束",
-    "today.filters.sortLabel": "排序",
-    "today.filters.sort.time": "按时间",
-    "today.filters.sort.time_desc": "时间降序",
-    "today.filters.sort.time_asc": "时间升序",
-    "today.filters.search.submit": "搜索",
-    "today.filters.view": "视图",
-    "today.filters.view.grouped": "聚合",
-    "today.filters.view.timeline": "时间线",
-    "today.filters.reset": "重置",
-    "today.list.title": "资讯",
-    "today.list.empty": "没有命中当前筛选条件的新闻",
-    "today.list.loading": "加载中…",
-    "today.sources.loadFail": "数据源列表加载失败，已保留现有资讯；请稍后刷新或到设置页检查数据源。",
-    "today.sources.disabledHint": "该源当前关闭；仍可查看已抓取内容，抓取前请在设置页启用。",
-    "today.group.matches": "命中结果",
-    "today.group.others": "其他资讯",
-    "today.group.focused": "当前关注源",
-    "today.group.collapse": "折叠/展开",
-    "today.list.refresh": "刷新",
-    "today.list.ingest": "抓取全部",
-    "today.list.copy": "复制",
-    "today.list.copied": "已复制到剪贴板",
+    "app.title": "璐㈢粡鑴夊姩",
+    "app.subtitle": "Fin Pulse 路 鏃╁崍鏅氭姤 路 鐑偣闆疯揪",
+    "tabs.today": "璧勮",
+    "tabs.digests": "鏃╁崍鏅氭姤",
+    "tabs.radar": "闆疯揪棰勮",
+    "tabs.settings": "璁剧疆",
+    "banner.noChannel.title": "灏氭湭閰嶇疆 IM 鎺ㄩ€侀€氶亾",
+    "banner.noChannel.desc": "璇峰厛鍦?Synapse 涓荤▼搴忛厤缃嚦灏戜竴涓?IM 閫氶亾锛堥涔?浼佸井/閽夐拤锛夊苟鎺堜簣 channel.send 鏉冮檺銆?,
+    "banner.noChannel.cta": "鍓嶅線璁剧疆",
+    "err.title": "鐣岄潰娓叉煋寮傚父",
+    "err.retry": "閲嶈瘯",
+    "err.stackLabel": "閿欒鍫嗘爤",
+    "confirm.ok": "纭",
+    "confirm.cancel": "鍙栨秷",
+    "empty.phase1": "鏆傛棤鏁版嵁锛岀偣鍑诲埛鏂版垨鍏堝湪璁剧疆椤甸厤缃暟鎹簮",
+    "today.filters.title": "绛涢€?,
+    "today.filters.source": "鏁版嵁婧?,
+    "today.filters.source.all": "鍏ㄩ儴",
+    "today.sources.cat.all": "鍏ㄩ儴",
+    "today.sources.cat.realtime": "瀹炴椂",
+    "today.sources.cat.news": "璧勮",
+    "today.sources.cat.rank": "姒滃崟",
+    "today.sources.cat.policy_data": "鏀跨瓥/鏁版嵁",
+    "today.sources.cat.other": "鍏朵粬",
+    "today.filters.window": "鏃堕棿鑼冨洿",
+    "today.filters.window.6h": "杩?6 灏忔椂",
+    "today.filters.window.24h": "杩?24 灏忔椂",
+    "today.filters.window.72h": "杩?3 澶?,
+    "today.filters.window.custom": "鑷畾涔?,
+    "today.filters.window.from": "寮€濮?,
+    "today.filters.window.to": "缁撴潫",
+    "today.filters.sortLabel": "鎺掑簭",
+    "today.filters.sort.time": "鎸夋椂闂?,
+    "today.filters.sort.time_desc": "鏃堕棿闄嶅簭",
+    "today.filters.sort.time_asc": "鏃堕棿鍗囧簭",
+    "today.filters.search.submit": "鎼滅储",
+    "today.filters.view": "瑙嗗浘",
+    "today.filters.view.grouped": "鑱氬悎",
+    "today.filters.view.timeline": "鏃堕棿绾?,
+    "today.filters.reset": "閲嶇疆",
+    "today.list.title": "璧勮",
+    "today.list.empty": "娌℃湁鍛戒腑褰撳墠绛涢€夋潯浠剁殑鏂伴椈",
+    "today.list.loading": "鍔犺浇涓€?,
+    "today.sources.loadFail": "鏁版嵁婧愬垪琛ㄥ姞杞藉け璐ワ紝宸蹭繚鐣欑幇鏈夎祫璁紱璇风◢鍚庡埛鏂版垨鍒拌缃〉妫€鏌ユ暟鎹簮銆?,
+    "today.sources.disabledHint": "璇ユ簮褰撳墠鍏抽棴锛涗粛鍙煡鐪嬪凡鎶撳彇鍐呭锛屾姄鍙栧墠璇峰湪璁剧疆椤靛惎鐢ㄣ€?,
+    "today.group.matches": "鍛戒腑缁撴灉",
+    "today.group.others": "鍏朵粬璧勮",
+    "today.group.focused": "褰撳墠鍏虫敞婧?,
+    "today.group.collapse": "鎶樺彔/灞曞紑",
+    "today.list.refresh": "鍒锋柊",
+    "today.list.ingest": "鎶撳彇鍏ㄩ儴",
+    "today.list.copy": "澶嶅埗",
+    "today.list.copied": "宸插鍒跺埌鍓创鏉?,
     "today.list.score": "AI {score}",
-    "today.list.ingest.current": "只抓取当前源",
-    "today.list.ingest.more": "更多抓取操作",
-    "today.ingest.busy": "抓取中…",
-    "today.ingest.done.green": "本次抓取：新增 {inserted} · 更新 {updated}（{sourcesOk}/{sourcesTotal} 源成功）",
-    "today.ingest.done.amber": "本次抓取未产生新文章：{sourcesOk} 源成功 · {failed} 源失败 · {empty} 源暂无结果",
-    "today.ingest.done.none_enabled": "未启用任何数据源，请前往「设置 → 数据源健康」开启至少一个",
-    "today.ingest.view": "查看详情",
-    "today.drawer.title": "本次抓取结果",
-    "today.drawer.empty": "尚未触发抓取",
-    "today.drawer.dismiss": "收起",
+    "today.list.ingest.current": "鍙姄鍙栧綋鍓嶆簮",
+    "today.list.ingest.more": "鏇村鎶撳彇鎿嶄綔",
+    "today.ingest.busy": "鎶撳彇涓€?,
+    "today.ingest.done.green": "鏈鎶撳彇锛氭柊澧?{inserted} 路 鏇存柊 {updated}锛坽sourcesOk}/{sourcesTotal} 婧愭垚鍔燂級",
+    "today.ingest.done.amber": "鏈鎶撳彇鏈骇鐢熸柊鏂囩珷锛歿sourcesOk} 婧愭垚鍔?路 {failed} 婧愬け璐?路 {empty} 婧愭殏鏃犵粨鏋?,
+    "today.ingest.done.none_enabled": "鏈惎鐢ㄤ换浣曟暟鎹簮锛岃鍓嶅線銆岃缃?鈫?鏁版嵁婧愬仴搴枫€嶅紑鍚嚦灏戜竴涓?,
+    "today.ingest.view": "鏌ョ湅璇︽儏",
+    "today.drawer.title": "鏈鎶撳彇缁撴灉",
+    "today.drawer.empty": "灏氭湭瑙﹀彂鎶撳彇",
+    "today.drawer.dismiss": "鏀惰捣",
     "today.drawer.via.newsnow": "NewsNow",
-    "today.drawer.via.direct": "直连",
-    "today.drawer.via.cooldown": "冷却",
-    "today.drawer.via.none": "无结果",
-    "today.drawer.status.ok": "抓取 {fetched} · 新增 {inserted} · 更新 {updated}",
-    "today.drawer.status.fetchedOnly": "抓取 {fetched} · 无新增",
-    "today.drawer.status.empty": "本次未返回",
-    "today.drawer.status.cooldown": "冷却中 · {s}s 后可重试",
-    "today.drawer.status.error": "失败",
-    "today.drawer.source_single": "只抓取：{source}",
-    "today.drawer.show_error": "错误详情",
-    "today.drawer.via_reason.prefix": "备注：",
-    "today.drawer.via_reason.newsnow_cloudflare_blocked": "NewsNow 被 Cloudflare 拦截，已回退到直连",
-    "today.drawer.via_reason.newsnow_invalid_source_id": "NewsNow 不支持此来源，已回退到直连",
-    "today.drawer.via_reason.newsnow_http": "NewsNow 返回异常状态，已回退到直连",
-    "today.drawer.via_reason.newsnow_error": "NewsNow 请求失败，已回退到直连",
-    "today.drawer.via_reason.newsnow_empty_payload": "NewsNow 本次返回空列表",
-    "today.drawer.via_reason.rss_not_configured": "自定义 RSS 未配置",
-    "today.drawer.via_reason.rss_no_items": "RSS 未解析到条目",
-    "today.filters.keyword": "关键词",
-    "today.filters.keyword.placeholder": "搜索标题或摘要…",
-    "today.filters.ai": "AI 筛选",
-    "today.filters.ai.title": "AI 筛选 / 兴趣命中置顶",
-    "today.filters.ai.desc": "先用自然语言描述关注方向，再用 +必须、!排除、普通关键词做快速命中；情感倾向会参与智能评分和排序，不再依赖文章预置字段。",
-    "today.filters.ai.interests": "关注方向",
-    "today.filters.ai.interests.placeholder": "例如：关注美联储利率、人民币汇率、A股流动性、AI 算力和中美关税变化",
-    "today.filters.ai.keywords": "辅助规则（+必须 !排除 普通关键词）",
-    "today.filters.ai.keywords.placeholder": "+美联储\n+降息\n!谣言\n特朗普 关税",
-    "today.filters.ai.sentiment": "情感倾向",
-    "today.filters.ai.sentiment.all": "全部",
-    "today.filters.ai.sentiment.positive": "积极",
-    "today.filters.ai.sentiment.negative": "消极",
-    "today.filters.ai.sentiment.neutral": "中性",
-    "today.filters.ai.apply": "应用 AI 筛选",
-    "today.filters.ai.clear": "清除 AI 筛选",
-    "today.filters.ai.active": "AI 筛选已激活：智能评分命中",
-    "today.filters.ai.score": "AI 命中 {score}",
-    "today.translate": "翻译",
-    "today.translate.original": "原文",
-    "today.translate.loading": "翻译中…",
-    "today.translate.fail": "翻译失败：{err}",
-    "today.export": "导出",
-    "today.export.title": "导出 HTML 报表",
-    "today.export.done": "报表已生成，可预览或下载",
-    "today.export.fail": "导出失败：{err}",
-    "today.export.dialog.title": "导出 HTML 报告",
-    "today.export.dialog.desc": "选择要写入独立 HTML 页面里的内容，导出的文件可直接在浏览器打开。",
-    "today.export.scope": "导出范围",
-    "today.export.scope.current": "当前筛选结果",
-    "today.export.scope.current.hint": "使用页面当前来源、时间、AI 与关键词筛选",
-    "today.export.scope.loaded": "当前时间窗口全部加载内容",
-    "today.export.scope.loaded.hint": "忽略来源/关键词/AI，只使用当前时间窗口",
-    "today.export.fields": "内容字段",
-    "today.export.include.summary": "摘要",
-    "today.export.include.tags": "AI 标签/指标",
-    "today.export.include.meta": "来源与时间",
-    "today.export.include.group": "按来源分组",
-    "today.export.limit": "最多导出",
-    "today.export.limit.all": "全部",
-    "today.export.create": "生成 HTML",
-    "today.export.preview.title": "HTML 报表预览",
-    "today.export.preview.download": "下载 HTML",
-    "today.export.preview.open": "新窗口打开",
-    "today.export.include.brief": "AI 要点摘要",
-    "today.export.include.insights": "来源统计与重点提示",
-    "today.export.include.links": "原文链接",
-    "today.ingest.cooldown": "冷却中（{s}s）",
-    "today.list.ingest.all": "抓取全部",
-    "digests.title": "早午晚报",
-    "digests.hint": "点击右上方「早报 / 午报 / 晚报」即可生成对应时段的财经速报；已生成的会出现在下方卡片，可预览或一键再推送到 IM 通道。",
-    "digests.run": "立即生成",
-    "digests.runGroup": "生成早午晚报",
-    "digests.session.morning": "早报",
-    "digests.session.noon": "午报",
-    "digests.session.evening": "晚报",
-    "digests.items": "条",
-    "digests.empty": "尚未生成任何早午晚报",
-    "digests.preview": "预览",
-    "digests.resend": "再推一次",
-    "digests.resend.target": "发送至",
-    "digests.resend.confirm": "确定要将该份早午晚报推送到 {channel}？",
-    "digests.resend.success": "已发送",
-    "digests.resend.fail": "发送失败：{err}",
-    "radar.editor.title": "关键词规则",
-    "radar.editor.hintHtml": "规则：<code>+必须</code><code>!排除</code><code>@alias</code><code>[GLOBAL_FILTER]</code>；空行分组。可点「示例填写」或「AI 优化」。",
-    "radar.editor.hint": "每行一个关键词；`+` 必须、`!` 排除、`@alias` 别名、空行分组、`[GLOBAL_FILTER]` 全局排除",
-    "radar.window": "时间窗口",
-    "radar.evaluate": "试运行",
-    "radar.evaluate.loading": "正在评估…",
-    "radar.template": "示例填写",
-    "radar.template.tooltip": "点击后会把一段可读的示例规则追加到文本框",
-    "radar.template.filled": "已填入示例规则，可按需编辑",
-    "radar.ai": "AI 优化",
-    "radar.ai.tooltip": "用自然语言描述你的关注点，由大脑生成规则",
-    "radar.ai.title": "让 AI 帮你写规则",
-    "radar.ai.hint": "直接写你想追踪的内容即可，例如：「美联储政策动向 + 特朗普关税表态，但不要小道消息和论坛贴文」。AI 会输出可直接试运行的规则文本，你还可以继续手工微调。",
-    "radar.ai.placeholder": "我想追踪美联储的政策动向，以及特朗普对中国关税的任何最新表态；不要小道消息和论坛贴文…",
-    "radar.ai.go": "生成规则",
-    "radar.ai.loading": "AI 思考中…",
-    "radar.ai.ok": "已由 {source} 生成规则，已填入编辑器",
-    "radar.ai.fail": "AI 生成失败：{err}",
-    "radar.ai.source.brain": "大脑",
-    "radar.ai.source.fallback": "本地兜底",
-    "radar.hits.title": "命中预览",
-    "radar.hits.empty": "未命中任何新闻",
-    "radar.hits.count": "共 {count} 条命中（{since_hours} 小时内）",
-    "radar.hits.subtitle": "{since_hours} 小时内",
-    "radar.save": "保存规则",
-    "radar.save.short": "保存",
-    "radar.save.title": "命名并保存规则",
-    "radar.save.desc": "给这组规则取个名字，下次可以直接从「历史」一键调用。同时会把规则写入「当前启用的规则」。",
-    "radar.save.placeholder": "例如：美联储政策 + 关税风向",
-    "radar.save.confirm": "保存",
-    "radar.save.empty": "规则为空，请先填写再保存",
-    "radar.save.ok": "已保存为「{name}」",
-    "radar.save.fail": "保存失败：{err}",
-    "radar.history": "历史",
-    "radar.history.tooltip": "点击查看已保存的规则，选中即可一键填入编辑器",
-    "radar.history.empty": "暂无已保存的规则",
-    "radar.history.loaded": "已载入「{name}」",
-    "radar.history.delete": "删除",
-    "radar.saved": "规则已保存到配置",
-    "ask.title": "Agent 工具",
-    "ask.intro": "这些工具会被 Synapse 的大脑在对话中自动调用。你也可以在左侧复制自然语言 Prompt，粘贴到主对话窗口直接使用。",
-    "ask.copy.prompt": "复制自然语言 Prompt",
-    "ask.copy.schema": "复制 JSON 样例",
-    "ask.copied": "已复制",
-    "settings.sources.title": "数据源管理",
-    "settings.sources.ingest": "手动抓取",
-    "settings.sources.cat.direct": "直连与 RSS 源",
-    "settings.sources.cat.custom": "自定义来源",
-    "settings.sources.cat.newsnow": "NewsNow 聚合源",
-    "settings.sources.count": "{n} 个源",
-    "settings.sources.probe": "检测",
-    "settings.sources.probing": "检测中…",
-    "settings.sources.probe.ok": "可用 · {n} 条",
-    "settings.sources.probe.fail": "不可用",
-    "settings.sources.probeAll": "全部检测",
-    "settings.sources.probe.direct": "检测直连与 RSS",
-    "settings.sources.probe.newsnow": "检测 NewsNow",
-    "settings.sources.probe.custom": "检测自定义 RSS",
-    "settings.sources.probe.summary": "抓取 {fetched} · 新增 {inserted} · 更新 {updated}",
-    "settings.sources.rss.master": "自定义 RSS 总开关",
-    "settings.sources.disabled.hint": "未启用，点击可开启",
-    "settings.sources.ct.flash": "快讯",
-    "settings.sources.ct.news": "新闻",
-    "settings.sources.ct.hot_stock": "热股",
-    "settings.sources.ct.policy": "政策",
-    "settings.sources.ct.filing": "备案",
-    "settings.sources.ct.data": "数据",
-    "settings.sources.ct.custom": "自定义",
-    "settings.sources.custom.bing.title": "Bing 新闻 RSS",
-    "settings.sources.custom.bing.placeholder": "输入搜索关键词，如：科技 编程",
-    "settings.sources.custom.bing.add": "添加此 Bing RSS",
-    "settings.sources.custom.add": "+ 添加 RSS 来源",
-    "settings.sources.custom.dialog.title": "添加 RSS 来源",
-    "settings.sources.custom.dialog.mode.custom": "自填 RSS 链接",
-    "settings.sources.custom.dialog.mode.bing": "Bing 新闻 RSS",
-    "settings.sources.custom.name": "来源名称",
-    "settings.sources.custom.url": "RSS 地址",
-    "settings.sources.custom.name.placeholder": "自定义来源名称",
+    "today.drawer.via.direct": "鐩磋繛",
+    "today.drawer.via.cooldown": "鍐峰嵈",
+    "today.drawer.via.none": "鏃犵粨鏋?,
+    "today.drawer.status.ok": "鎶撳彇 {fetched} 路 鏂板 {inserted} 路 鏇存柊 {updated}",
+    "today.drawer.status.fetchedOnly": "鎶撳彇 {fetched} 路 鏃犳柊澧?,
+    "today.drawer.status.empty": "鏈鏈繑鍥?,
+    "today.drawer.status.cooldown": "鍐峰嵈涓?路 {s}s 鍚庡彲閲嶈瘯",
+    "today.drawer.status.error": "澶辫触",
+    "today.drawer.source_single": "鍙姄鍙栵細{source}",
+    "today.drawer.show_error": "閿欒璇︽儏",
+    "today.drawer.via_reason.prefix": "澶囨敞锛?,
+    "today.drawer.via_reason.newsnow_cloudflare_blocked": "NewsNow 琚?Cloudflare 鎷︽埅锛屽凡鍥為€€鍒扮洿杩?,
+    "today.drawer.via_reason.newsnow_invalid_source_id": "NewsNow 涓嶆敮鎸佹鏉ユ簮锛屽凡鍥為€€鍒扮洿杩?,
+    "today.drawer.via_reason.newsnow_http": "NewsNow 杩斿洖寮傚父鐘舵€侊紝宸插洖閫€鍒扮洿杩?,
+    "today.drawer.via_reason.newsnow_error": "NewsNow 璇锋眰澶辫触锛屽凡鍥為€€鍒扮洿杩?,
+    "today.drawer.via_reason.newsnow_empty_payload": "NewsNow 鏈杩斿洖绌哄垪琛?,
+    "today.drawer.via_reason.rss_not_configured": "鑷畾涔?RSS 鏈厤缃?,
+    "today.drawer.via_reason.rss_no_items": "RSS 鏈В鏋愬埌鏉＄洰",
+    "today.filters.keyword": "鍏抽敭璇?,
+    "today.filters.keyword.placeholder": "鎼滅储鏍囬鎴栨憳瑕佲€?,
+    "today.filters.ai": "AI 绛涢€?,
+    "today.filters.ai.title": "AI 绛涢€?/ 鍏磋叮鍛戒腑缃《",
+    "today.filters.ai.desc": "鍏堢敤鑷劧璇█鎻忚堪鍏虫敞鏂瑰悜锛屽啀鐢?+蹇呴』銆?鎺掗櫎銆佹櫘閫氬叧閿瘝鍋氬揩閫熷懡涓紱鎯呮劅鍊惧悜浼氬弬涓庢櫤鑳借瘎鍒嗗拰鎺掑簭锛屼笉鍐嶄緷璧栨枃绔犻缃瓧娈点€?,
+    "today.filters.ai.interests": "鍏虫敞鏂瑰悜",
+    "today.filters.ai.interests.placeholder": "渚嬪锛氬叧娉ㄧ編鑱斿偍鍒╃巼銆佷汉姘戝竵姹囩巼銆丄鑲℃祦鍔ㄦ€с€丄I 绠楀姏鍜屼腑缇庡叧绋庡彉鍖?,
+    "today.filters.ai.keywords": "杈呭姪瑙勫垯锛?蹇呴』 !鎺掗櫎 鏅€氬叧閿瘝锛?,
+    "today.filters.ai.keywords.placeholder": "+缇庤仈鍌╘n+闄嶆伅\n!璋ｈ█\n鐗规湕鏅?鍏崇◣",
+    "today.filters.ai.sentiment": "鎯呮劅鍊惧悜",
+    "today.filters.ai.sentiment.all": "鍏ㄩ儴",
+    "today.filters.ai.sentiment.positive": "绉瀬",
+    "today.filters.ai.sentiment.negative": "娑堟瀬",
+    "today.filters.ai.sentiment.neutral": "涓€?,
+    "today.filters.ai.apply": "搴旂敤 AI 绛涢€?,
+    "today.filters.ai.clear": "娓呴櫎 AI 绛涢€?,
+    "today.filters.ai.active": "AI 绛涢€夊凡婵€娲伙細鏅鸿兘璇勫垎鍛戒腑",
+    "today.filters.ai.score": "AI 鍛戒腑 {score}",
+    "today.translate": "缈昏瘧",
+    "today.translate.original": "鍘熸枃",
+    "today.translate.loading": "缈昏瘧涓€?,
+    "today.translate.fail": "缈昏瘧澶辫触锛歿err}",
+    "today.export": "瀵煎嚭",
+    "today.export.title": "瀵煎嚭 HTML 鎶ヨ〃",
+    "today.export.done": "鎶ヨ〃宸茬敓鎴愶紝鍙瑙堟垨涓嬭浇",
+    "today.export.fail": "瀵煎嚭澶辫触锛歿err}",
+    "today.export.dialog.title": "瀵煎嚭 HTML 鎶ュ憡",
+    "today.export.dialog.desc": "閫夋嫨瑕佸啓鍏ョ嫭绔?HTML 椤甸潰閲岀殑鍐呭锛屽鍑虹殑鏂囦欢鍙洿鎺ュ湪娴忚鍣ㄦ墦寮€銆?,
+    "today.export.scope": "瀵煎嚭鑼冨洿",
+    "today.export.scope.current": "褰撳墠绛涢€夌粨鏋?,
+    "today.export.scope.current.hint": "浣跨敤椤甸潰褰撳墠鏉ユ簮銆佹椂闂淬€丄I 涓庡叧閿瘝绛涢€?,
+    "today.export.scope.loaded": "褰撳墠鏃堕棿绐楀彛鍏ㄩ儴鍔犺浇鍐呭",
+    "today.export.scope.loaded.hint": "蹇界暐鏉ユ簮/鍏抽敭璇?AI锛屽彧浣跨敤褰撳墠鏃堕棿绐楀彛",
+    "today.export.fields": "鍐呭瀛楁",
+    "today.export.include.summary": "鎽樿",
+    "today.export.include.tags": "AI 鏍囩/鎸囨爣",
+    "today.export.include.meta": "鏉ユ簮涓庢椂闂?,
+    "today.export.include.group": "鎸夋潵婧愬垎缁?,
+    "today.export.limit": "鏈€澶氬鍑?,
+    "today.export.limit.all": "鍏ㄩ儴",
+    "today.export.create": "鐢熸垚 HTML",
+    "today.export.preview.title": "HTML 鎶ヨ〃棰勮",
+    "today.export.preview.download": "涓嬭浇 HTML",
+    "today.export.preview.open": "鏂扮獥鍙ｆ墦寮€",
+    "today.export.include.brief": "AI 瑕佺偣鎽樿",
+    "today.export.include.insights": "鏉ユ簮缁熻涓庨噸鐐规彁绀?,
+    "today.export.include.links": "鍘熸枃閾炬帴",
+    "today.ingest.cooldown": "鍐峰嵈涓紙{s}s锛?,
+    "today.list.ingest.all": "鎶撳彇鍏ㄩ儴",
+    "digests.title": "鏃╁崍鏅氭姤",
+    "digests.hint": "鐐瑰嚮鍙充笂鏂广€屾棭鎶?/ 鍗堟姤 / 鏅氭姤銆嶅嵆鍙敓鎴愬搴旀椂娈电殑璐㈢粡閫熸姤锛涘凡鐢熸垚鐨勪細鍑虹幇鍦ㄤ笅鏂瑰崱鐗囷紝鍙瑙堟垨涓€閿啀鎺ㄩ€佸埌 IM 閫氶亾銆?,
+    "digests.run": "绔嬪嵆鐢熸垚",
+    "digests.runGroup": "鐢熸垚鏃╁崍鏅氭姤",
+    "digests.session.morning": "鏃╂姤",
+    "digests.session.noon": "鍗堟姤",
+    "digests.session.evening": "鏅氭姤",
+    "digests.items": "鏉?,
+    "digests.empty": "灏氭湭鐢熸垚浠讳綍鏃╁崍鏅氭姤",
+    "digests.preview": "棰勮",
+    "digests.resend": "鍐嶆帹涓€娆?,
+    "digests.resend.target": "鍙戦€佽嚦",
+    "digests.resend.confirm": "纭畾瑕佸皢璇ヤ唤鏃╁崍鏅氭姤鎺ㄩ€佸埌 {channel}锛?,
+    "digests.resend.success": "宸插彂閫?,
+    "digests.resend.fail": "鍙戦€佸け璐ワ細{err}",
+    "radar.editor.title": "鍏抽敭璇嶈鍒?,
+    "radar.editor.hintHtml": "瑙勫垯锛?code>+蹇呴』</code><code>!鎺掗櫎</code><code>@alias</code><code>[GLOBAL_FILTER]</code>锛涚┖琛屽垎缁勩€傚彲鐐广€岀ず渚嬪～鍐欍€嶆垨銆孉I 浼樺寲銆嶃€?,
+    "radar.editor.hint": "姣忚涓€涓叧閿瘝锛沗+` 蹇呴』銆乣!` 鎺掗櫎銆乣@alias` 鍒悕銆佺┖琛屽垎缁勩€乣[GLOBAL_FILTER]` 鍏ㄥ眬鎺掗櫎",
+    "radar.window": "鏃堕棿绐楀彛",
+    "radar.evaluate": "璇曡繍琛?,
+    "radar.evaluate.loading": "姝ｅ湪璇勪及鈥?,
+    "radar.template": "绀轰緥濉啓",
+    "radar.template.tooltip": "鐐瑰嚮鍚庝細鎶婁竴娈靛彲璇荤殑绀轰緥瑙勫垯杩藉姞鍒版枃鏈",
+    "radar.template.filled": "宸插～鍏ョず渚嬭鍒欙紝鍙寜闇€缂栬緫",
+    "radar.ai": "AI 浼樺寲",
+    "radar.ai.tooltip": "鐢ㄨ嚜鐒惰瑷€鎻忚堪浣犵殑鍏虫敞鐐癸紝鐢卞ぇ鑴戠敓鎴愯鍒?,
+    "radar.ai.title": "璁?AI 甯綘鍐欒鍒?,
+    "radar.ai.hint": "鐩存帴鍐欎綘鎯宠拷韪殑鍐呭鍗冲彲锛屼緥濡傦細銆岀編鑱斿偍鏀跨瓥鍔ㄥ悜 + 鐗规湕鏅叧绋庤〃鎬侊紝浣嗕笉瑕佸皬閬撴秷鎭拰璁哄潧璐存枃銆嶃€侫I 浼氳緭鍑哄彲鐩存帴璇曡繍琛岀殑瑙勫垯鏂囨湰锛屼綘杩樺彲浠ョ户缁墜宸ュ井璋冦€?,
+    "radar.ai.placeholder": "鎴戞兂杩借釜缇庤仈鍌ㄧ殑鏀跨瓥鍔ㄥ悜锛屼互鍙婄壒鏈楁櫘瀵逛腑鍥藉叧绋庣殑浠讳綍鏈€鏂拌〃鎬侊紱涓嶈灏忛亾娑堟伅鍜岃鍧涜创鏂団€?,
+    "radar.ai.go": "鐢熸垚瑙勫垯",
+    "radar.ai.loading": "AI 鎬濊€冧腑鈥?,
+    "radar.ai.ok": "宸茬敱 {source} 鐢熸垚瑙勫垯锛屽凡濉叆缂栬緫鍣?,
+    "radar.ai.fail": "AI 鐢熸垚澶辫触锛歿err}",
+    "radar.ai.source.brain": "澶ц剳",
+    "radar.ai.source.fallback": "鏈湴鍏滃簳",
+    "radar.hits.title": "鍛戒腑棰勮",
+    "radar.hits.empty": "鏈懡涓换浣曟柊闂?,
+    "radar.hits.count": "鍏?{count} 鏉″懡涓紙{since_hours} 灏忔椂鍐咃級",
+    "radar.hits.subtitle": "{since_hours} 灏忔椂鍐?,
+    "radar.save": "淇濆瓨瑙勫垯",
+    "radar.save.short": "淇濆瓨",
+    "radar.save.title": "鍛藉悕骞朵繚瀛樿鍒?,
+    "radar.save.desc": "缁欒繖缁勮鍒欏彇涓悕瀛楋紝涓嬫鍙互鐩存帴浠庛€屽巻鍙层€嶄竴閿皟鐢ㄣ€傚悓鏃朵細鎶婅鍒欏啓鍏ャ€屽綋鍓嶅惎鐢ㄧ殑瑙勫垯銆嶃€?,
+    "radar.save.placeholder": "渚嬪锛氱編鑱斿偍鏀跨瓥 + 鍏崇◣椋庡悜",
+    "radar.save.confirm": "淇濆瓨",
+    "radar.save.empty": "瑙勫垯涓虹┖锛岃鍏堝～鍐欏啀淇濆瓨",
+    "radar.save.ok": "宸蹭繚瀛樹负銆寋name}銆?,
+    "radar.save.fail": "淇濆瓨澶辫触锛歿err}",
+    "radar.history": "鍘嗗彶",
+    "radar.history.tooltip": "鐐瑰嚮鏌ョ湅宸蹭繚瀛樼殑瑙勫垯锛岄€変腑鍗冲彲涓€閿～鍏ョ紪杈戝櫒",
+    "radar.history.empty": "鏆傛棤宸蹭繚瀛樼殑瑙勫垯",
+    "radar.history.loaded": "宸茶浇鍏ャ€寋name}銆?,
+    "radar.history.delete": "鍒犻櫎",
+    "radar.saved": "瑙勫垯宸蹭繚瀛樺埌閰嶇疆",
+    "ask.title": "Agent 宸ュ叿",
+    "ask.intro": "杩欎簺宸ュ叿浼氳 Synapse 鐨勫ぇ鑴戝湪瀵硅瘽涓嚜鍔ㄨ皟鐢ㄣ€備綘涔熷彲浠ュ湪宸︿晶澶嶅埗鑷劧璇█ Prompt锛岀矘璐村埌涓诲璇濈獥鍙ｇ洿鎺ヤ娇鐢ㄣ€?,
+    "ask.copy.prompt": "澶嶅埗鑷劧璇█ Prompt",
+    "ask.copy.schema": "澶嶅埗 JSON 鏍蜂緥",
+    "ask.copied": "宸插鍒?,
+    "settings.sources.title": "鏁版嵁婧愮鐞?,
+    "settings.sources.ingest": "鎵嬪姩鎶撳彇",
+    "settings.sources.cat.direct": "鐩磋繛涓?RSS 婧?,
+    "settings.sources.cat.custom": "鑷畾涔夋潵婧?,
+    "settings.sources.cat.newsnow": "NewsNow 鑱氬悎婧?,
+    "settings.sources.count": "{n} 涓簮",
+    "settings.sources.probe": "妫€娴?,
+    "settings.sources.probing": "妫€娴嬩腑鈥?,
+    "settings.sources.probe.ok": "鍙敤 路 {n} 鏉?,
+    "settings.sources.probe.fail": "涓嶅彲鐢?,
+    "settings.sources.probeAll": "鍏ㄩ儴妫€娴?,
+    "settings.sources.probe.direct": "妫€娴嬬洿杩炰笌 RSS",
+    "settings.sources.probe.newsnow": "妫€娴?NewsNow",
+    "settings.sources.probe.custom": "妫€娴嬭嚜瀹氫箟 RSS",
+    "settings.sources.probe.summary": "鎶撳彇 {fetched} 路 鏂板 {inserted} 路 鏇存柊 {updated}",
+    "settings.sources.rss.master": "鑷畾涔?RSS 鎬诲紑鍏?,
+    "settings.sources.disabled.hint": "鏈惎鐢紝鐐瑰嚮鍙紑鍚?,
+    "settings.sources.ct.flash": "蹇",
+    "settings.sources.ct.news": "鏂伴椈",
+    "settings.sources.ct.hot_stock": "鐑偂",
+    "settings.sources.ct.policy": "鏀跨瓥",
+    "settings.sources.ct.filing": "澶囨",
+    "settings.sources.ct.data": "鏁版嵁",
+    "settings.sources.ct.custom": "鑷畾涔?,
+    "settings.sources.custom.bing.title": "Bing 鏂伴椈 RSS",
+    "settings.sources.custom.bing.placeholder": "杈撳叆鎼滅储鍏抽敭璇嶏紝濡傦細绉戞妧 缂栫▼",
+    "settings.sources.custom.bing.add": "娣诲姞姝?Bing RSS",
+    "settings.sources.custom.add": "+ 娣诲姞 RSS 鏉ユ簮",
+    "settings.sources.custom.dialog.title": "娣诲姞 RSS 鏉ユ簮",
+    "settings.sources.custom.dialog.mode.custom": "鑷～ RSS 閾炬帴",
+    "settings.sources.custom.dialog.mode.bing": "Bing 鏂伴椈 RSS",
+    "settings.sources.custom.name": "鏉ユ簮鍚嶇О",
+    "settings.sources.custom.url": "RSS 鍦板潃",
+    "settings.sources.custom.name.placeholder": "鑷畾涔夋潵婧愬悕绉?,
     "settings.sources.custom.url.placeholder": "https://example.com/feed.xml",
-    "settings.sources.custom.bing.name.placeholder": "来源名称，例如：Bing 白酒",
-    "settings.sources.custom.save": "保存",
-    "settings.sources.custom.cancel": "取消",
-    "settings.sources.custom.delete": "删除",
-    "settings.sources.custom.delete.confirm": "确认删除此自定义来源？",
-    "settings.sources.custom.empty": "暂无自定义来源",
-    "settings.sources.custom.listTitle": "自定义 RSS",
-    "settings.sources.nn.warn": "公共服务由开源作者自费维护（v0.0.39），已默认开启；最小抓取间隔 {floor} 秒，避免过载。",
-    "settings.sources.nn.mode": "模式",
-    "settings.sources.nn.floor": "最小间隔",
-    "settings.sources.nn.floor.unit": "秒",
-    "settings.sources.nn.publicHint": "公共服务：https://newsnow.busiyi.world/api/s · 开源作者自费维护（v0.0.39），建议最小间隔不低于 {floor} 秒，避免过载。",
-    "settings.translation.title": "AI 翻译",
-    "settings.translation.desc": "资讯卡片的翻译按钮会调用 Synapse 大脑，将标题和摘要翻译为目标语言。",
-    "settings.translation.enabled": "启用卡片翻译",
-    "settings.translation.target": "目标语言",
-    "settings.translation.scope": "翻译范围",
-    "settings.translation.scope.title_summary": "标题 + 摘要",
-    "settings.channels.title": "IM 推送渠道",
-    "settings.channels.none": "未在宿主中注册任何 IM 适配器，推送将不可用。",
-    "settings.channels.send": "发送测试消息",
-    "settings.schedules.title": "定时任务",
-    "settings.schedules.desc": "从下方 4 个模板里挑一个，即可直接写入主程序的定时任务（底层仍是 Agent Scheduler），不用再跳转「计划任务」面板。",
-    "settings.schedules.none": "尚未创建任何定时任务",
-    "settings.schedules.create": "新建",
-    "settings.schedules.delete": "删除",
-    "settings.schedules.daily": "早午晚报",
-    "settings.schedules.radar": "热点雷达",
-    "settings.schedules.tpl.morning": "每日早报",
-    "settings.schedules.tpl.morning.desc": "每天 08:00 生成并推送早报",
-    "settings.schedules.tpl.noon": "每日午报",
-    "settings.schedules.tpl.noon.desc": "每天 12:30 生成并推送午报",
-    "settings.schedules.tpl.evening": "每日晚报",
-    "settings.schedules.tpl.evening.desc": "每天 19:00 生成并推送晚报",
-    "settings.schedules.tpl.radar": "雷达预警",
-    "settings.schedules.tpl.radar.desc": "每 15 分钟扫描一次关键词规则",
-    "settings.schedules.dialog.title": "新建 {template}",
-    "settings.schedules.dialog.name": "任务名称",
-    "settings.schedules.dialog.type": "任务类型",
-    "settings.schedules.dialog.type.digest": "财经日报推送",
-    "settings.schedules.dialog.type.radar": "热点雷达预警",
-    "settings.schedules.dialog.trigger": "触发方式",
-    "settings.schedules.dialog.trigger.cron": "Cron 定时",
-    "settings.schedules.dialog.time": "执行时间",
-    "settings.schedules.dialog.cron": "Cron 表达式",
-    "settings.schedules.dialog.cron.hint": "不会写？打开 crontab.guru 在线构造",
-    "settings.schedules.dialog.channel": "通知通道",
+    "settings.sources.custom.bing.name.placeholder": "鏉ユ簮鍚嶇О锛屼緥濡傦細Bing 鐧介厭",
+    "settings.sources.custom.save": "淇濆瓨",
+    "settings.sources.custom.cancel": "鍙栨秷",
+    "settings.sources.custom.delete": "鍒犻櫎",
+    "settings.sources.custom.delete.confirm": "纭鍒犻櫎姝よ嚜瀹氫箟鏉ユ簮锛?,
+    "settings.sources.custom.empty": "鏆傛棤鑷畾涔夋潵婧?,
+    "settings.sources.custom.listTitle": "鑷畾涔?RSS",
+    "settings.sources.nn.warn": "鍏叡鏈嶅姟鐢卞紑婧愪綔鑰呰嚜璐圭淮鎶わ紙v0.0.39锛夛紝宸查粯璁ゅ紑鍚紱鏈€灏忔姄鍙栭棿闅?{floor} 绉掞紝閬垮厤杩囪浇銆?,
+    "settings.sources.nn.mode": "妯″紡",
+    "settings.sources.nn.floor": "鏈€灏忛棿闅?,
+    "settings.sources.nn.floor.unit": "绉?,
+    "settings.sources.nn.publicHint": "鍏叡鏈嶅姟锛歨ttps://newsnow.busiyi.world/api/s 路 寮€婧愪綔鑰呰嚜璐圭淮鎶わ紙v0.0.39锛夛紝寤鸿鏈€灏忛棿闅斾笉浣庝簬 {floor} 绉掞紝閬垮厤杩囪浇銆?,
+    "settings.translation.title": "AI 缈昏瘧",
+    "settings.translation.desc": "璧勮鍗＄墖鐨勭炕璇戞寜閽細璋冪敤 Synapse 澶ц剳锛屽皢鏍囬鍜屾憳瑕佺炕璇戜负鐩爣璇█銆?,
+    "settings.translation.enabled": "鍚敤鍗＄墖缈昏瘧",
+    "settings.translation.target": "鐩爣璇█",
+    "settings.translation.scope": "缈昏瘧鑼冨洿",
+    "settings.translation.scope.title_summary": "鏍囬 + 鎽樿",
+    "settings.channels.title": "IM 鎺ㄩ€佹笭閬?,
+    "settings.channels.none": "鏈湪瀹夸富涓敞鍐屼换浣?IM 閫傞厤鍣紝鎺ㄩ€佸皢涓嶅彲鐢ㄣ€?,
+    "settings.channels.send": "鍙戦€佹祴璇曟秷鎭?,
+    "settings.schedules.title": "瀹氭椂浠诲姟",
+    "settings.schedules.desc": "浠庝笅鏂?4 涓ā鏉块噷鎸戜竴涓紝鍗冲彲鐩存帴鍐欏叆涓荤▼搴忕殑瀹氭椂浠诲姟锛堝簳灞備粛鏄?Agent Scheduler锛夛紝涓嶇敤鍐嶈烦杞€岃鍒掍换鍔°€嶉潰鏉裤€?,
+    "settings.schedules.none": "灏氭湭鍒涘缓浠讳綍瀹氭椂浠诲姟",
+    "settings.schedules.create": "鏂板缓",
+    "settings.schedules.delete": "鍒犻櫎",
+    "settings.schedules.daily": "鏃╁崍鏅氭姤",
+    "settings.schedules.radar": "鐑偣闆疯揪",
+    "settings.schedules.tpl.morning": "姣忔棩鏃╂姤",
+    "settings.schedules.tpl.morning.desc": "姣忓ぉ 08:00 鐢熸垚骞舵帹閫佹棭鎶?,
+    "settings.schedules.tpl.noon": "姣忔棩鍗堟姤",
+    "settings.schedules.tpl.noon.desc": "姣忓ぉ 12:30 鐢熸垚骞舵帹閫佸崍鎶?,
+    "settings.schedules.tpl.evening": "姣忔棩鏅氭姤",
+    "settings.schedules.tpl.evening.desc": "姣忓ぉ 19:00 鐢熸垚骞舵帹閫佹櫄鎶?,
+    "settings.schedules.tpl.radar": "闆疯揪棰勮",
+    "settings.schedules.tpl.radar.desc": "姣?15 鍒嗛挓鎵弿涓€娆″叧閿瘝瑙勫垯",
+    "settings.schedules.dialog.title": "鏂板缓 {template}",
+    "settings.schedules.dialog.name": "浠诲姟鍚嶇О",
+    "settings.schedules.dialog.type": "浠诲姟绫诲瀷",
+    "settings.schedules.dialog.type.digest": "璐㈢粡鏃ユ姤鎺ㄩ€?,
+    "settings.schedules.dialog.type.radar": "鐑偣闆疯揪棰勮",
+    "settings.schedules.dialog.trigger": "瑙﹀彂鏂瑰紡",
+    "settings.schedules.dialog.trigger.cron": "Cron 瀹氭椂",
+    "settings.schedules.dialog.time": "鎵ц鏃堕棿",
+    "settings.schedules.dialog.cron": "Cron 琛ㄨ揪寮?,
+    "settings.schedules.dialog.cron.hint": "涓嶄細鍐欙紵鎵撳紑 crontab.guru 鍦ㄧ嚎鏋勯€?,
+    "settings.schedules.dialog.channel": "閫氱煡閫氶亾",
     "settings.schedules.dialog.chat_id": "chat_id",
-    "settings.schedules.dialog.timezone": "时区",
-    "settings.schedules.dialog.session": "早午晚",
-    "settings.schedules.dialog.rules": "关键词规则",
-    "settings.schedules.dialog.content": "提醒内容",
-    "settings.schedules.dialog.preview.morning": "每天 {cron} 触发 · 汇总过去 12 小时的 20 条头条推送到 {channel}",
-    "settings.schedules.dialog.preview.noon": "每天 {cron} 触发 · 汇总过去 12 小时的 15 条头条推送到 {channel}",
-    "settings.schedules.dialog.preview.evening": "每天 {cron} 触发 · 汇总过去 12 小时的 20 条头条推送到 {channel}",
-    "settings.schedules.dialog.preview.radar": "每 {cron} 触发 · 匹配关键词规则后推送快讯到 {channel}",
-    "settings.schedules.dialog.enabled": "启用",
-    "settings.schedules.dialog.create": "新建任务",
-    "settings.schedules.dialog.cancel": "取消",
-    "settings.schedules.dialog.no_channel": "请先在上方 IM 推送通道配置一个通道",
-    "settings.schedules.row.enabled": "运行中",
-    "settings.schedules.row.disabled": "已暂停",
-    "settings.schedules.row.run": "立即运行",
-    "settings.schedules.row.pause": "暂停",
-    "settings.schedules.row.resume": "启用",
-    "settings.schedules.row.delete": "删除",
-    "settings.schedules.row.deleted": "已删除",
-    "settings.schedules.row.triggered": "已触发一次执行",
-    "settings.schedules.row.confirm_delete": "确认删除该计划任务？",
-    "settings.channels.refresh": "刷新",
-    "settings.channels.refreshed": "已刷新 IM 通道列表",
-    "settings.newsnow.title": "NewsNow 热榜聚合",
-    "settings.newsnow.mode.off": "关闭",
-    "settings.newsnow.mode.public": "公共服务",
-    "settings.newsnow.mode.self_host": "自建",
-    "settings.newsnow.step1": "① 选择模式",
-    "settings.newsnow.step2": "② API 地址",
-    "settings.newsnow.step3": "③ 测试连接",
-    "settings.newsnow.probe": "测试连接",
-    "settings.newsnow.probe.ok": "连接成功：{n} 条热榜",
-    "settings.newsnow.probe.fail": "连接失败：{err}",
-    "settings.newsnow.warn.public": "公共服务由开源作者自费维护，当前版本 v0.0.39；已默认开启并限制为每 {floor} 秒最多抓取一次，避免压垮上游。",
-    "settings.newsnow.help.self_host": "> 自建命令示例：\\n> ```bash\\n> docker run -d --name newsnow -p 4444:4444 ourongxing/newsnow:latest\\n> ```\\n> 完成后 API URL 填 `http://127.0.0.1:4444/api/s`。",
-    "settings.newsnow.url.readonly": "已内置官方公共节点地址（{url}），无需修改。",
-    "settings.newsnow.floor.label": "最小抓取间隔（秒，公共服务下限 300）",
-    "settings.newsnow.rate_limited": "公共服务冷却中，{s} 秒后可再次抓取。",
-    "settings.llm.title": "AI 大脑（继承宿主 LLM 工厂）",
-    "settings.llm.hint": "fin-pulse 直接复用 Synapse 的大脑调用；如需调整 provider / model / 温度，请前往宿主「设置 → 模型」页面修改。",
-    "settings.save": "保存",
-    "settings.saved": "已保存",
+    "settings.schedules.dialog.timezone": "鏃跺尯",
+    "settings.schedules.dialog.session": "鏃╁崍鏅?,
+    "settings.schedules.dialog.rules": "鍏抽敭璇嶈鍒?,
+    "settings.schedules.dialog.content": "鎻愰啋鍐呭",
+    "settings.schedules.dialog.preview.morning": "姣忓ぉ {cron} 瑙﹀彂 路 姹囨€昏繃鍘?12 灏忔椂鐨?20 鏉″ご鏉℃帹閫佸埌 {channel}",
+    "settings.schedules.dialog.preview.noon": "姣忓ぉ {cron} 瑙﹀彂 路 姹囨€昏繃鍘?12 灏忔椂鐨?15 鏉″ご鏉℃帹閫佸埌 {channel}",
+    "settings.schedules.dialog.preview.evening": "姣忓ぉ {cron} 瑙﹀彂 路 姹囨€昏繃鍘?12 灏忔椂鐨?20 鏉″ご鏉℃帹閫佸埌 {channel}",
+    "settings.schedules.dialog.preview.radar": "姣?{cron} 瑙﹀彂 路 鍖归厤鍏抽敭璇嶈鍒欏悗鎺ㄩ€佸揩璁埌 {channel}",
+    "settings.schedules.dialog.enabled": "鍚敤",
+    "settings.schedules.dialog.create": "鏂板缓浠诲姟",
+    "settings.schedules.dialog.cancel": "鍙栨秷",
+    "settings.schedules.dialog.no_channel": "璇峰厛鍦ㄤ笂鏂?IM 鎺ㄩ€侀€氶亾閰嶇疆涓€涓€氶亾",
+    "settings.schedules.row.enabled": "杩愯涓?,
+    "settings.schedules.row.disabled": "宸叉殏鍋?,
+    "settings.schedules.row.run": "绔嬪嵆杩愯",
+    "settings.schedules.row.pause": "鏆傚仠",
+    "settings.schedules.row.resume": "鍚敤",
+    "settings.schedules.row.delete": "鍒犻櫎",
+    "settings.schedules.row.deleted": "宸插垹闄?,
+    "settings.schedules.row.triggered": "宸茶Е鍙戜竴娆℃墽琛?,
+    "settings.schedules.row.confirm_delete": "纭鍒犻櫎璇ヨ鍒掍换鍔★紵",
+    "settings.channels.refresh": "鍒锋柊",
+    "settings.channels.refreshed": "宸插埛鏂?IM 閫氶亾鍒楄〃",
+    "settings.newsnow.title": "NewsNow 鐑鑱氬悎",
+    "settings.newsnow.mode.off": "鍏抽棴",
+    "settings.newsnow.mode.public": "鍏叡鏈嶅姟",
+    "settings.newsnow.mode.self_host": "鑷缓",
+    "settings.newsnow.step1": "鈶?閫夋嫨妯″紡",
+    "settings.newsnow.step2": "鈶?API 鍦板潃",
+    "settings.newsnow.step3": "鈶?娴嬭瘯杩炴帴",
+    "settings.newsnow.probe": "娴嬭瘯杩炴帴",
+    "settings.newsnow.probe.ok": "杩炴帴鎴愬姛锛歿n} 鏉＄儹姒?,
+    "settings.newsnow.probe.fail": "杩炴帴澶辫触锛歿err}",
+    "settings.newsnow.warn.public": "鍏叡鏈嶅姟鐢卞紑婧愪綔鑰呰嚜璐圭淮鎶わ紝褰撳墠鐗堟湰 v0.0.39锛涘凡榛樿寮€鍚苟闄愬埗涓烘瘡 {floor} 绉掓渶澶氭姄鍙栦竴娆★紝閬垮厤鍘嬪灝涓婃父銆?,
+    "settings.newsnow.help.self_host": "> 鑷缓鍛戒护绀轰緥锛歕\n> ```bash\\n> docker run -d --name newsnow -p 4444:4444 ourongxing/newsnow:latest\\n> ```\\n> 瀹屾垚鍚?API URL 濉?`http://127.0.0.1:4444/api/s`銆?,
+    "settings.newsnow.url.readonly": "宸插唴缃畼鏂瑰叕鍏辫妭鐐瑰湴鍧€锛坽url}锛夛紝鏃犻渶淇敼銆?,
+    "settings.newsnow.floor.label": "鏈€灏忔姄鍙栭棿闅旓紙绉掞紝鍏叡鏈嶅姟涓嬮檺 300锛?,
+    "settings.newsnow.rate_limited": "鍏叡鏈嶅姟鍐峰嵈涓紝{s} 绉掑悗鍙啀娆℃姄鍙栥€?,
+    "settings.llm.title": "AI 澶ц剳锛堢户鎵垮涓?LLM 宸ュ巶锛?,
+    "settings.llm.hint": "fin-pulse 鐩存帴澶嶇敤 Synapse 鐨勫ぇ鑴戣皟鐢紱濡傞渶璋冩暣 provider / model / 娓╁害锛岃鍓嶅線瀹夸富銆岃缃?鈫?妯″瀷銆嶉〉闈慨鏀广€?,
+    "settings.save": "淇濆瓨",
+    "settings.saved": "宸蹭繚瀛?,
   },
   en: {
     "app.title": "Fin Pulse",
-    "app.subtitle": "Daily Brief · Hot Radar",
+    "app.subtitle": "Daily Brief 路 Hot Radar",
     "tabs.today": "News",
     "tabs.digests": "Digests",
     "tabs.radar": "Radar",
@@ -1295,7 +1295,7 @@ const I18N_DICT = {
     "err.stackLabel": "Stack trace",
     "confirm.ok": "Confirm",
     "confirm.cancel": "Cancel",
-    "empty.phase1": "No data yet — click Refresh or configure a data source in Settings",
+    "empty.phase1": "No data yet 鈥?click Refresh or configure a data source in Settings",
     "today.filters.title": "Filters",
     "today.filters.source": "Source",
     "today.filters.source.all": "All",
@@ -1323,7 +1323,7 @@ const I18N_DICT = {
     "today.filters.reset": "Reset",
     "today.list.title": "News",
     "today.list.empty": "No articles match the current filters",
-    "today.list.loading": "Loading…",
+    "today.list.loading": "Loading鈥?,
     "today.sources.loadFail": "Source list failed to load. Existing articles are still shown; refresh later or check sources in Settings.",
     "today.sources.disabledHint": "This source is disabled. Existing articles can still be focused; enable it in Settings before fetching.",
     "today.group.matches": "Matched articles",
@@ -1337,10 +1337,10 @@ const I18N_DICT = {
     "today.list.score": "AI {score}",
     "today.list.ingest.current": "Only current source",
     "today.list.ingest.more": "More ingest actions",
-    "today.ingest.busy": "Fetching…",
-    "today.ingest.done.green": "Ingest done: +{inserted} new · {updated} updated ({sourcesOk}/{sourcesTotal} sources OK)",
-    "today.ingest.done.amber": "No new articles this round: {sourcesOk} OK · {failed} failed · {empty} empty",
-    "today.ingest.done.none_enabled": "No source enabled. Turn at least one on in Settings → Source health.",
+    "today.ingest.busy": "Fetching鈥?,
+    "today.ingest.done.green": "Ingest done: +{inserted} new 路 {updated} updated ({sourcesOk}/{sourcesTotal} sources OK)",
+    "today.ingest.done.amber": "No new articles this round: {sourcesOk} OK 路 {failed} failed 路 {empty} empty",
+    "today.ingest.done.none_enabled": "No source enabled. Turn at least one on in Settings 鈫?Source health.",
     "today.ingest.view": "View details",
     "today.drawer.title": "Last ingest result",
     "today.drawer.empty": "No ingest run yet",
@@ -1349,23 +1349,23 @@ const I18N_DICT = {
     "today.drawer.via.direct": "Direct",
     "today.drawer.via.cooldown": "Cooldown",
     "today.drawer.via.none": "No data",
-    "today.drawer.status.ok": "fetched {fetched} · +{inserted} new · {updated} updated",
-    "today.drawer.status.fetchedOnly": "fetched {fetched} · no new items",
+    "today.drawer.status.ok": "fetched {fetched} 路 +{inserted} new 路 {updated} updated",
+    "today.drawer.status.fetchedOnly": "fetched {fetched} 路 no new items",
     "today.drawer.status.empty": "no items returned",
-    "today.drawer.status.cooldown": "cooling down · retry in {s}s",
+    "today.drawer.status.cooldown": "cooling down 路 retry in {s}s",
     "today.drawer.status.error": "failed",
     "today.drawer.source_single": "Single source: {source}",
     "today.drawer.show_error": "Error detail",
     "today.drawer.via_reason.prefix": "Note: ",
-    "today.drawer.via_reason.newsnow_cloudflare_blocked": "NewsNow blocked by Cloudflare — fell back to direct",
-    "today.drawer.via_reason.newsnow_invalid_source_id": "NewsNow does not host this source — fell back to direct",
-    "today.drawer.via_reason.newsnow_http": "NewsNow returned an unexpected HTTP status — fell back to direct",
-    "today.drawer.via_reason.newsnow_error": "NewsNow request failed — fell back to direct",
+    "today.drawer.via_reason.newsnow_cloudflare_blocked": "NewsNow blocked by Cloudflare 鈥?fell back to direct",
+    "today.drawer.via_reason.newsnow_invalid_source_id": "NewsNow does not host this source 鈥?fell back to direct",
+    "today.drawer.via_reason.newsnow_http": "NewsNow returned an unexpected HTTP status 鈥?fell back to direct",
+    "today.drawer.via_reason.newsnow_error": "NewsNow request failed 鈥?fell back to direct",
     "today.drawer.via_reason.newsnow_empty_payload": "NewsNow returned an empty list",
     "today.drawer.via_reason.rss_not_configured": "custom RSS is not configured",
     "today.drawer.via_reason.rss_no_items": "RSS returned no parsed entries",
     "today.filters.keyword": "Keyword",
-    "today.filters.keyword.placeholder": "Search title or summary…",
+    "today.filters.keyword.placeholder": "Search title or summary鈥?,
     "today.filters.ai": "AI Filter",
     "today.filters.ai.title": "AI Filter / Interest Matches",
     "today.filters.ai.desc": "Describe interests in natural language, then use +required, !exclude and plain keywords. Sentiment is scored locally instead of relying on pre-filled article fields.",
@@ -1384,7 +1384,7 @@ const I18N_DICT = {
     "today.filters.ai.score": "AI hit {score}",
     "today.translate": "Translate",
     "today.translate.original": "Original",
-    "today.translate.loading": "Translating…",
+    "today.translate.loading": "Translating鈥?,
     "today.translate.fail": "Translation failed: {err}",
     "today.export": "Export",
     "today.export.title": "Export HTML report",
@@ -1414,7 +1414,7 @@ const I18N_DICT = {
     "today.ingest.cooldown": "Cooling down ({s}s)",
     "today.list.ingest.all": "Fetch all",
     "digests.title": "Daily Briefs",
-    "digests.hint": "Click Morning / Noon / Evening above to generate a brief for that slot. Generated briefs show up below — preview them or resend to any IM channel with one click.",
+    "digests.hint": "Click Morning / Noon / Evening above to generate a brief for that slot. Generated briefs show up below 鈥?preview them or resend to any IM channel with one click.",
     "digests.run": "Generate now",
     "digests.runGroup": "Run daily brief",
     "digests.session.morning": "Morning",
@@ -1433,17 +1433,17 @@ const I18N_DICT = {
     "radar.editor.hint": "One keyword per line; `+` must, `!` exclude, `@alias` alias, blank line = group, `[GLOBAL_FILTER]` = global exclude.",
     "radar.window": "Window",
     "radar.evaluate": "Dry run",
-    "radar.evaluate.loading": "Evaluating…",
+    "radar.evaluate.loading": "Evaluating鈥?,
     "radar.template": "Template",
     "radar.template.tooltip": "Appends a readable sample ruleset to the editor",
-    "radar.template.filled": "Template inserted — edit freely",
+    "radar.template.filled": "Template inserted 鈥?edit freely",
     "radar.ai": "AI optimise",
     "radar.ai.tooltip": "Describe what you want to track in plain English; the brain will produce rules",
     "radar.ai.title": "Let AI draft the rules",
-    "radar.ai.hint": "Describe what you want to track — e.g. \"Fed policy moves, Trump tariff remarks, but exclude rumours and forum posts\". The brain returns rules you can dry-run or hand-edit.",
-    "radar.ai.placeholder": "Track Fed policy moves and Trump tariff remarks; exclude rumours and forum posts…",
+    "radar.ai.hint": "Describe what you want to track 鈥?e.g. \"Fed policy moves, Trump tariff remarks, but exclude rumours and forum posts\". The brain returns rules you can dry-run or hand-edit.",
+    "radar.ai.placeholder": "Track Fed policy moves and Trump tariff remarks; exclude rumours and forum posts鈥?,
     "radar.ai.go": "Generate",
-    "radar.ai.loading": "Thinking…",
+    "radar.ai.loading": "Thinking鈥?,
     "radar.ai.ok": "Rules drafted by {source}",
     "radar.ai.fail": "AI draft failed: {err}",
     "radar.ai.source.brain": "Brain",
@@ -1458,7 +1458,7 @@ const I18N_DICT = {
     "radar.save.desc": "Give this ruleset a name so you can pull it back from History later. It also becomes the active rule used by scheduled runs.",
     "radar.save.placeholder": "e.g. Fed-policy-and-tariffs",
     "radar.save.confirm": "Save",
-    "radar.save.empty": "Rules are empty — please write something first",
+    "radar.save.empty": "Rules are empty 鈥?please write something first",
     "radar.save.ok": "Saved as \"{name}\"",
     "radar.save.fail": "Save failed: {err}",
     "radar.history": "History",
@@ -1479,14 +1479,14 @@ const I18N_DICT = {
     "settings.sources.cat.newsnow": "NewsNow Aggregated",
     "settings.sources.count": "{n} sources",
     "settings.sources.probe": "Probe",
-    "settings.sources.probing": "Probing…",
-    "settings.sources.probe.ok": "OK · {n} items",
+    "settings.sources.probing": "Probing鈥?,
+    "settings.sources.probe.ok": "OK 路 {n} items",
     "settings.sources.probe.fail": "Unavailable",
     "settings.sources.probeAll": "Probe all",
     "settings.sources.probe.direct": "Probe Direct & RSS",
     "settings.sources.probe.newsnow": "Probe NewsNow",
     "settings.sources.probe.custom": "Probe custom RSS",
-    "settings.sources.probe.summary": "Fetched {fetched} · New {inserted} · Updated {updated}",
+    "settings.sources.probe.summary": "Fetched {fetched} 路 New {inserted} 路 Updated {updated}",
     "settings.sources.rss.master": "Custom RSS master switch",
     "settings.sources.disabled.hint": "Disabled. Click to enable.",
     "settings.sources.ct.flash": "Flash",
@@ -1518,7 +1518,7 @@ const I18N_DICT = {
     "settings.sources.nn.mode": "Mode",
     "settings.sources.nn.floor": "Min interval",
     "settings.sources.nn.floor.unit": "sec",
-    "settings.sources.nn.publicHint": "Public service: https://newsnow.busiyi.world/api/s · maintained at the author's cost (v0.0.39). Keep the interval at least {floor}s to avoid overload.",
+    "settings.sources.nn.publicHint": "Public service: https://newsnow.busiyi.world/api/s 路 maintained at the author's cost (v0.0.39). Keep the interval at least {floor}s to avoid overload.",
     "settings.translation.title": "AI Translation",
     "settings.translation.desc": "The translate button on news cards calls the Synapse Brain to translate titles and summaries.",
     "settings.translation.enabled": "Enable card translation",
@@ -1529,7 +1529,7 @@ const I18N_DICT = {
     "settings.channels.none": "No IM adapter registered in the host. Dispatch will be unavailable.",
     "settings.channels.send": "Send test message",
     "settings.schedules.title": "Scheduled tasks",
-    "settings.schedules.desc": "Pick a template below — the schedule is written straight into the host Agent Scheduler, no separate panel needed. Run, pause or delete rows right here.",
+    "settings.schedules.desc": "Pick a template below 鈥?the schedule is written straight into the host Agent Scheduler, no separate panel needed. Run, pause or delete rows right here.",
     "settings.schedules.none": "No scheduled tasks",
     "settings.schedules.create": "Create",
     "settings.schedules.delete": "Delete",
@@ -1543,7 +1543,7 @@ const I18N_DICT = {
     "settings.schedules.tpl.evening.desc": "Runs every day at 19:00",
     "settings.schedules.tpl.radar": "Hot radar",
     "settings.schedules.tpl.radar.desc": "Scans keyword rules every 15 minutes",
-    "settings.schedules.dialog.title": "New · {template}",
+    "settings.schedules.dialog.title": "New 路 {template}",
     "settings.schedules.dialog.name": "Task name",
     "settings.schedules.dialog.type": "Task type",
     "settings.schedules.dialog.type.digest": "Fin-pulse digest push",
@@ -1559,10 +1559,10 @@ const I18N_DICT = {
     "settings.schedules.dialog.session": "Session",
     "settings.schedules.dialog.rules": "Keyword rules",
     "settings.schedules.dialog.content": "Reminder content",
-    "settings.schedules.dialog.preview.morning": "Fires at {cron} · summarises the last 12h with 20 headlines and pushes to {channel}",
-    "settings.schedules.dialog.preview.noon": "Fires at {cron} · summarises the last 12h with 15 headlines and pushes to {channel}",
-    "settings.schedules.dialog.preview.evening": "Fires at {cron} · summarises the last 12h with 20 headlines and pushes to {channel}",
-    "settings.schedules.dialog.preview.radar": "Fires every {cron} · pushes matching alerts to {channel}",
+    "settings.schedules.dialog.preview.morning": "Fires at {cron} 路 summarises the last 12h with 20 headlines and pushes to {channel}",
+    "settings.schedules.dialog.preview.noon": "Fires at {cron} 路 summarises the last 12h with 15 headlines and pushes to {channel}",
+    "settings.schedules.dialog.preview.evening": "Fires at {cron} 路 summarises the last 12h with 20 headlines and pushes to {channel}",
+    "settings.schedules.dialog.preview.radar": "Fires every {cron} 路 pushes matching alerts to {channel}",
     "settings.schedules.dialog.enabled": "Enable on create",
     "settings.schedules.dialog.create": "Create task",
     "settings.schedules.dialog.cancel": "Cancel",
@@ -1582,19 +1582,19 @@ const I18N_DICT = {
     "settings.newsnow.mode.off": "Off",
     "settings.newsnow.mode.public": "Public",
     "settings.newsnow.mode.self_host": "Self-host",
-    "settings.newsnow.step1": "Step 1 — Mode",
-    "settings.newsnow.step2": "Step 2 — API URL",
-    "settings.newsnow.step3": "Step 3 — Test",
+    "settings.newsnow.step1": "Step 1 鈥?Mode",
+    "settings.newsnow.step2": "Step 2 鈥?API URL",
+    "settings.newsnow.step3": "Step 3 鈥?Test",
     "settings.newsnow.probe": "Probe connection",
-    "settings.newsnow.probe.ok": "OK — {n} items",
+    "settings.newsnow.probe.ok": "OK 鈥?{n} items",
     "settings.newsnow.probe.fail": "Failed: {err}",
     "settings.newsnow.warn.public": "The public service is run by the open-source author at their own cost (current version v0.0.39). Enabled by default with a {floor}s hard cooldown between fetches to protect the upstream.",
     "settings.newsnow.help.self_host": "> Self-host command:\\n> ```bash\\n> docker run -d --name newsnow -p 4444:4444 ourongxing/newsnow:latest\\n> ```\\n> Then set API URL to `http://127.0.0.1:4444/api/s`.",
-    "settings.newsnow.url.readonly": "Official public node is pre-filled ({url}) — no edit needed.",
-    "settings.newsnow.floor.label": "Minimum fetch interval (seconds — public floor is 300)",
+    "settings.newsnow.url.readonly": "Official public node is pre-filled ({url}) 鈥?no edit needed.",
+    "settings.newsnow.floor.label": "Minimum fetch interval (seconds 鈥?public floor is 300)",
     "settings.newsnow.rate_limited": "Public service cooling down, try again in {s}s.",
     "settings.llm.title": "AI Brain (inherits host factory)",
-    "settings.llm.hint": "fin-pulse reuses the Synapse brain directly; change provider / model / temperature in the host Settings → Models page.",
+    "settings.llm.hint": "fin-pulse reuses the Synapse brain directly; change provider / model / temperature in the host Settings 鈫?Models page.",
     "settings.save": "Save",
     "settings.saved": "Saved",
   },
@@ -1609,32 +1609,32 @@ const _i18n = (window.SynapseI18n && window.SynapseI18n.api) || {
 };
 
 const SOURCE_FALLBACK = [
-  {id:"wallstreetcn", display_zh:"华尔街见闻", display_en:"WallStreet CN", kind:"newsnow", content_type:"flash", newsnow_id:"wallstreetcn", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"wallstreetcn-news", display_zh:"华尔街见闻·新闻", display_en:"WallStreet CN News", kind:"newsnow", content_type:"news", newsnow_id:"wallstreetcn-news", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"cls", display_zh:"财联社电报", display_en:"CLS Telegraph", kind:"newsnow", content_type:"flash", newsnow_id:"cls", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"cls-depth", display_zh:"财联社·深度", display_en:"CLS In-depth", kind:"newsnow", content_type:"news", newsnow_id:"cls-depth", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"jin10", display_zh:"金十数据", display_en:"Jin10", kind:"newsnow", content_type:"flash", newsnow_id:"jin10", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"gelonghui", display_zh:"格隆汇", display_en:"Gelonghui", kind:"newsnow", content_type:"news", newsnow_id:"gelonghui", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"xueqiu-hotstock", display_zh:"雪球·热门股票", display_en:"Xueqiu Hot Stocks", kind:"newsnow", content_type:"hot_stock", newsnow_id:"xueqiu-hotstock", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"fastbull", display_zh:"快牛快讯", display_en:"Fastbull Express", kind:"newsnow", content_type:"flash", newsnow_id:"fastbull", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"mktnews", display_zh:"市场新闻", display_en:"MktNews", kind:"newsnow", content_type:"flash", newsnow_id:"mktnews", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"baidu-hot", display_zh:"百度热搜", display_en:"Baidu Hot Search", kind:"newsnow", content_type:"news", newsnow_id:"baidu", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"weibo-hot", display_zh:"微博热搜", display_en:"Weibo Hot Search", kind:"newsnow", content_type:"news", newsnow_id:"weibo", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"zhihu-hot", display_zh:"知乎热榜", display_en:"Zhihu Hot List", kind:"newsnow", content_type:"news", newsnow_id:"zhihu", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"toutiao-hot", display_zh:"今日头条热榜", display_en:"Toutiao Trending", kind:"newsnow", content_type:"news", newsnow_id:"toutiao", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"thepaper", display_zh:"澎湃新闻", display_en:"The Paper", kind:"newsnow", content_type:"news", newsnow_id:"thepaper", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"ithome", display_zh:"IT之家", display_en:"ITHome", kind:"newsnow", content_type:"news", newsnow_id:"ithome", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"bilibili-hot", display_zh:"B站热榜", display_en:"Bilibili Trending", kind:"newsnow", content_type:"news", newsnow_id:"bilibili", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"36kr", display_zh:"36氪快讯", display_en:"36Kr Newsflash", kind:"newsnow", content_type:"news", newsnow_id:"36kr", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
-  {id:"eastmoney", display_zh:"东方财富", display_en:"EastMoney", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"eastmoney", probe_target:"eastmoney"},
-  {id:"pbc_omo", display_zh:"央行公开市场", display_en:"PBC OMO", kind:"direct", content_type:"policy", default_enabled:true, group:"direct", fetcher_id:"pbc_omo", probe_target:"pbc_omo"},
-  {id:"yicai", display_zh:"第一财经", display_en:"Yicai", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"yicai", probe_target:"yicai"},
-  {id:"nbd", display_zh:"每日经济新闻", display_en:"National Business Daily", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"nbd", probe_target:"nbd"},
-  {id:"stcn", display_zh:"证券时报", display_en:"Securities Times", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"stcn", probe_target:"stcn"},
-  {id:"nbs", display_zh:"国家统计局", display_en:"NBS of China", kind:"rss", content_type:"data", default_enabled:true, group:"builtin_rss", fetcher_id:"nbs", probe_target:"nbs"},
-  {id:"fed_fomc", display_zh:"美联储 FOMC", display_en:"Fed FOMC", kind:"rss", content_type:"policy", default_enabled:true, group:"builtin_rss", fetcher_id:"fed_fomc", probe_target:"fed_fomc"},
-  {id:"sec_edgar", display_zh:"美国 SEC EDGAR", display_en:"SEC EDGAR", kind:"rss", content_type:"filing", default_enabled:true, group:"builtin_rss", fetcher_id:"sec_edgar", probe_target:"sec_edgar"},
-  {id:"rss_generic", display_zh:"自定义 RSS", display_en:"Custom RSS", kind:"rss", content_type:"custom", default_enabled:true, group:"custom_rss", fetcher_id:"rss_generic", probe_target:"rss_generic"}
+  {id:"wallstreetcn", display_zh:"鍗庡皵琛楄闂?, display_en:"WallStreet CN", kind:"newsnow", content_type:"flash", newsnow_id:"wallstreetcn", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"wallstreetcn-news", display_zh:"鍗庡皵琛楄闂宦锋柊闂?, display_en:"WallStreet CN News", kind:"newsnow", content_type:"news", newsnow_id:"wallstreetcn-news", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"cls", display_zh:"璐㈣仈绀剧數鎶?, display_en:"CLS Telegraph", kind:"newsnow", content_type:"flash", newsnow_id:"cls", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"cls-depth", display_zh:"璐㈣仈绀韭锋繁搴?, display_en:"CLS In-depth", kind:"newsnow", content_type:"news", newsnow_id:"cls-depth", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"jin10", display_zh:"閲戝崄鏁版嵁", display_en:"Jin10", kind:"newsnow", content_type:"flash", newsnow_id:"jin10", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"gelonghui", display_zh:"鏍奸殕姹?, display_en:"Gelonghui", kind:"newsnow", content_type:"news", newsnow_id:"gelonghui", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"xueqiu-hotstock", display_zh:"闆悆路鐑棬鑲＄エ", display_en:"Xueqiu Hot Stocks", kind:"newsnow", content_type:"hot_stock", newsnow_id:"xueqiu-hotstock", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"fastbull", display_zh:"蹇墰蹇", display_en:"Fastbull Express", kind:"newsnow", content_type:"flash", newsnow_id:"fastbull", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"mktnews", display_zh:"甯傚満鏂伴椈", display_en:"MktNews", kind:"newsnow", content_type:"flash", newsnow_id:"mktnews", default_enabled:true, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"baidu-hot", display_zh:"鐧惧害鐑悳", display_en:"Baidu Hot Search", kind:"newsnow", content_type:"news", newsnow_id:"baidu", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"weibo-hot", display_zh:"寰崥鐑悳", display_en:"Weibo Hot Search", kind:"newsnow", content_type:"news", newsnow_id:"weibo", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"zhihu-hot", display_zh:"鐭ヤ箮鐑", display_en:"Zhihu Hot List", kind:"newsnow", content_type:"news", newsnow_id:"zhihu", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"toutiao-hot", display_zh:"浠婃棩澶存潯鐑", display_en:"Toutiao Trending", kind:"newsnow", content_type:"news", newsnow_id:"toutiao", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"thepaper", display_zh:"婢庢箖鏂伴椈", display_en:"The Paper", kind:"newsnow", content_type:"news", newsnow_id:"thepaper", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"ithome", display_zh:"IT涔嬪", display_en:"ITHome", kind:"newsnow", content_type:"news", newsnow_id:"ithome", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"bilibili-hot", display_zh:"B绔欑儹姒?, display_en:"Bilibili Trending", kind:"newsnow", content_type:"news", newsnow_id:"bilibili", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"36kr", display_zh:"36姘揩璁?, display_en:"36Kr Newsflash", kind:"newsnow", content_type:"news", newsnow_id:"36kr", default_enabled:false, group:"newsnow", fetcher_id:"newsnow", probe_target:"newsnow"},
+  {id:"eastmoney", display_zh:"涓滄柟璐㈠瘜", display_en:"EastMoney", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"eastmoney", probe_target:"eastmoney"},
+  {id:"pbc_omo", display_zh:"澶鍏紑甯傚満", display_en:"PBC OMO", kind:"direct", content_type:"policy", default_enabled:true, group:"direct", fetcher_id:"pbc_omo", probe_target:"pbc_omo"},
+  {id:"yicai", display_zh:"绗竴璐㈢粡", display_en:"Yicai", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"yicai", probe_target:"yicai"},
+  {id:"nbd", display_zh:"姣忔棩缁忔祹鏂伴椈", display_en:"National Business Daily", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"nbd", probe_target:"nbd"},
+  {id:"stcn", display_zh:"璇佸埜鏃舵姤", display_en:"Securities Times", kind:"direct", content_type:"news", default_enabled:true, group:"direct", fetcher_id:"stcn", probe_target:"stcn"},
+  {id:"nbs", display_zh:"鍥藉缁熻灞€", display_en:"NBS of China", kind:"rss", content_type:"data", default_enabled:true, group:"builtin_rss", fetcher_id:"nbs", probe_target:"nbs"},
+  {id:"fed_fomc", display_zh:"缇庤仈鍌?FOMC", display_en:"Fed FOMC", kind:"rss", content_type:"policy", default_enabled:true, group:"builtin_rss", fetcher_id:"fed_fomc", probe_target:"fed_fomc"},
+  {id:"sec_edgar", display_zh:"缇庡浗 SEC EDGAR", display_en:"SEC EDGAR", kind:"rss", content_type:"filing", default_enabled:true, group:"builtin_rss", fetcher_id:"sec_edgar", probe_target:"sec_edgar"},
+  {id:"rss_generic", display_zh:"鑷畾涔?RSS", display_en:"Custom RSS", kind:"rss", content_type:"custom", default_enabled:true, group:"custom_rss", fetcher_id:"rss_generic", probe_target:"rss_generic"}
 ];
 
 function useT() {
@@ -1647,11 +1647,11 @@ function useT() {
   return function (k) { return _i18n.t(k); };
 }
 
-/* ── Tab registry ── */
+/* 鈹€鈹€ Tab registry 鈹€鈹€ */
 const TAB_IDS = ["today", "digests", "radar", "settings"];
 const TAB_ICONS = { today: "news", digests: "doc", radar: "radar", settings: "cog" };
 
-/* ── Icon shim — binds to window.SynapseIcons (from icons.js).
+/* 鈹€鈹€ Icon shim 鈥?binds to window.SynapseIcons (from icons.js).
    Short aliases keep call-sites terse while the bundle stays ~3KB. */
 const ICON_ALIAS = {
   /* tabs */
@@ -1661,7 +1661,7 @@ const ICON_ALIAS = {
   warn: "warning", eye: "info", send: "upload", copy: "listTask",
   trash: "close", edit: "edit", history: "listTask", lib: "folder",
   ai: "sparkles", template: "book",
-  /* schedule-row actions — host icon lib exposes pause/bell/target but we
+  /* schedule-row actions 鈥?host icon lib exposes pause/bell/target but we
      keep fallbacks to keep first-render safe. */
   pause: "close", bell: "warning", refresh: "refresh",
 };
@@ -1678,8 +1678,8 @@ const ICONIFY_SVG = {
   filter: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" opacity=".35" d="M3 5.5C3 4.67 3.67 4 4.5 4h15c.83 0 1.5.67 1.5 1.5 0 .38-.14.74-.4 1.02L15 12.68V18a1.5 1.5 0 0 1-.66 1.24l-3 2A1.5 1.5 0 0 1 9 20V12.68L3.4 6.52A1.5 1.5 0 0 1 3 5.5Z"/><path fill="currentColor" d="M7 4h10l-5 5.55L7 4Z"/></svg>',
   download: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" opacity=".35" d="M3 7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7Z"/><path fill="currentColor" d="M11 6.75a1 1 0 1 1 2 0v6.08l2.04-2.04a1 1 0 1 1 1.42 1.42l-3.75 3.75a1 1 0 0 1-1.42 0l-3.75-3.75a1 1 0 1 1 1.42-1.42L11 12.83V6.75Z"/></svg>',
   magic: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" opacity=".35" d="m14.2 4.3 5.5 5.5a2 2 0 0 1 0 2.83L9.63 22.7a2 2 0 0 1-2.83 0L1.3 17.2a2 2 0 0 1 0-2.83L11.37 4.3a2 2 0 0 1 2.83 0Z"/><path fill="currentColor" d="m12.8 5.7 5.5 5.5-2.12 2.12-5.5-5.5L12.8 5.7ZM19 2l.58 1.42L21 4l-1.42.58L19 6l-.58-1.42L17 4l1.42-.58L19 2ZM5 3l.8 1.95L7.75 5.75 5.8 6.55 5 8.5l-.8-1.95-1.95-.8 1.95-.8L5 3Z"/></svg>',
-  /* Real "+" glyph — overrides the historical alias to arrowRight which
-     made every "添加 / 新增" CTA misleadingly read as a navigation arrow. */
+  /* Real "+" glyph 鈥?overrides the historical alias to arrowRight which
+     made every "娣诲姞 / 鏂板" CTA misleadingly read as a navigation arrow. */
   plusIcon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>'
 };
 function Ico(props) {
@@ -1695,24 +1695,24 @@ function Ico(props) {
       return <span className="oa-icon" dangerouslySetInnerHTML={{__html: lib[key]()}} />;
     }
   }
-  return <span className="oa-icon" aria-hidden="true">·</span>;
+  return <span className="oa-icon" aria-hidden="true">路</span>;
 }
 
-/* ── Brand mark — Iconify-based hero mark ── */
+/* 鈹€鈹€ Brand mark 鈥?Iconify-based hero mark 鈹€鈹€ */
 /* The header uses mdi:finance wrapped in the fin-pulse brand palette. */
 const BRAND_SVG = ICONIFY_SVG.brand;
 function BrandMark() {
   return <span className="oa-hero-title__icon" dangerouslySetInnerHTML={{__html: BRAND_SVG}} />;
 }
 
-/* ── Host event subscription helper ── */
+/* 鈹€鈹€ Host event subscription helper 鈹€鈹€ */
 function onEvent(type, fn) {
   function handler(e) { try { fn((e && e.detail) || {}); } catch (_) {} }
   window.addEventListener(type, handler);
   return function () { window.removeEventListener(type, handler); };
 }
 
-/* ── Plugin API wrapper ──
+/* 鈹€鈹€ Plugin API wrapper 鈹€鈹€
    The host bridge (plugin-bridge-host.ts::handleApiRequest) does NOT
    auto-prefix `/api/plugins/<id>/`; it fetches `${apiBase}${path}`
    verbatim. Other plugins (ecommerce-image etc.) prepend the plugin
@@ -1730,7 +1730,7 @@ function _finPulsePath(path) {
   return API_BASE_PATH + (path.startsWith("/") ? path : "/" + path);
 }
 /* FastAPI and some proxies return ``detail`` as a string, an object, or
-   a Pydantic ``[{loc,msg,...}]`` array — the toast and ingest error line
+   a Pydantic ``[{loc,msg,...}]`` array 鈥?the toast and ingest error line
    must never degrade to the useless plain word ``unknown``. */
 function _stringifyApiDetail(d) {
   if (d == null || d === "") return "";
@@ -1750,10 +1750,10 @@ function _stringifyApiDetail(d) {
 
    1) Full transport (preferred): ``{ok, status, body}`` from the
       desktop host's fetch proxy.
-   2) Bootstrap timeout: ``{ok:false, error:"timeout"}`` — *no* ``body``
+   2) Bootstrap timeout: ``{ok:false, error:"timeout"}`` 鈥?*no* ``body``
       key, so the old code fell through and ``ingest`` showed
       ``ingest failed: unknown`` (reported 2025-04).
-   3) Lean hosts that forward JSON without wrapping — return as-is
+   3) Lean hosts that forward JSON without wrapping 鈥?return as-is
       after normalising a top-level ``detail`` string. */
 function _normalizeBridgeApiResult(res) {
   if (!res || typeof res !== "object") {
@@ -1828,7 +1828,7 @@ async function api(method, path, body) {
   return json;
 }
 
-/* ── Async ingest helper ──
+/* 鈹€鈹€ Async ingest helper 鈹€鈹€
    `/ingest` and `/ingest/source/{id}` return immediately with a
    `task_id` and run in the background so the host iframe bridge's
    30s hard timeout never trips on first-run fan-outs. We poll
@@ -1839,7 +1839,7 @@ async function api(method, path, body) {
    `kind` controls the polling cadence: full-fan-out runs ("all"
    mode) start at 800ms and back off to 2s; a single-source probe
    ("single") starts at 300ms and tops out at 1s so the Settings
-   button feels snappy. The hard wall is 5 minutes — anything past
+   button feels snappy. The hard wall is 5 minutes 鈥?anything past
    that almost certainly means a stuck upstream and we surface it
    as `error_kind="timeout"`. */
 const INGEST_TERMINAL_STATUS = { succeeded: 1, skipped: 1, failed: 1, canceled: 1 };
@@ -1902,7 +1902,7 @@ async function ingestAndWait(path, body, opts) {
   return await _waitForIngestTask(resp.task_id, opts || {});
 }
 
-/* ── Settings hook (Phase 1 placeholder — Phase 6 hydrates from /config) ── */
+/* 鈹€鈹€ Settings hook (Phase 1 placeholder 鈥?Phase 6 hydrates from /config) 鈹€鈹€ */
 function useSettings() {
   /* `available_channels` here holds the host's rich channel entries
      ({channel_id, chat_id, chat_name, ...}) so the Settings / Schedule
@@ -1946,14 +1946,14 @@ function channelKey(ch) {
 function channelPlatform(ch) {
   const cid = String((ch && ch.channel_id) || "");
   const raw = cid.split(":")[0] || cid || "IM";
-  const map = {feishu: "飞书", qqbot: "QQ", wework_ws: "企微", wework: "企微", dingtalk: "钉钉", wechat: "微信", telegram: "TG"};
+  const map = {feishu: "椋炰功", qqbot: "QQ", wework_ws: "浼佸井", wework: "浼佸井", dingtalk: "閽夐拤", wechat: "寰俊", telegram: "TG"};
   return map[raw] || raw;
 }
 function channelSubtitle(ch) {
   if (!ch || typeof ch !== "object") return "";
   const cid = String(ch.channel_id || "");
   const chat = String(ch.chat_id || "");
-  if (chat) return cid + " · " + chat;
+  if (chat) return cid + " 路 " + chat;
   return cid;
 }
 function normalizeChannels(list) {
@@ -1971,7 +1971,7 @@ function ChannelPicker(props) {
   const [open, setOpen] = useState(false);
   const channels = normalizeChannels(props.channels || []);
   const selected = channels.find(function (c) { return channelKey(c) === props.value; }) || null;
-  const placeholder = props.placeholder || "选择一个 IM 通道";
+  const placeholder = props.placeholder || "閫夋嫨涓€涓?IM 閫氶亾";
   const disabled = !!props.disabled;
   return (
     <div className="channel-picker">
@@ -1983,12 +1983,12 @@ function ChannelPicker(props) {
           <span className="channel-picker__title">{selected ? formatChannelLabel(selected) : placeholder}</span>
           {selected ? <span className="channel-picker__sub">{channelSubtitle(selected)}</span> : null}
         </span>
-        <span style={{color: "var(--text-muted)"}}>⌄</span>
+        <span style={{color: "var(--text-muted)"}}>鈱?/span>
       </button>
       {open && !disabled && (
         <div className="channel-picker__menu">
           {channels.length === 0 ? (
-            <div className="empty" style={{padding: 12}}>暂无可用 IM 通道</div>
+            <div className="empty" style={{padding: 12}}>鏆傛棤鍙敤 IM 閫氶亾</div>
           ) : channels.map(function (c) {
             const key = channelKey(c);
             const active = key === props.value;
@@ -2022,11 +2022,11 @@ function SourcePicker(props) {
   return (
     <div>
       <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 6}}>
-        <span className="filter-bar__label">{props.label || "数据源"}</span>
-        <span style={{fontSize: 11, color: "var(--text-muted)"}}>{picked.length ? ("已选 " + picked.length) : "全部来源"}</span>
+        <span className="filter-bar__label">{props.label || "鏁版嵁婧?}</span>
+        <span style={{fontSize: 11, color: "var(--text-muted)"}}>{picked.length ? ("宸查€?" + picked.length) : "鍏ㄩ儴鏉ユ簮"}</span>
         <span style={{flex: 1}}/>
-        <button className="btn btn-sm" type="button" disabled={disabled} onClick={function (e) { e.stopPropagation(); onChange(sources.map(function (s) { return s.id; })); }}>全选</button>
-        <button className="btn btn-sm" type="button" disabled={disabled} onClick={function (e) { e.stopPropagation(); onChange([]); }}>全部</button>
+        <button className="btn btn-sm" type="button" disabled={disabled} onClick={function (e) { e.stopPropagation(); onChange(sources.map(function (s) { return s.id; })); }}>鍏ㄩ€?/button>
+        <button className="btn btn-sm" type="button" disabled={disabled} onClick={function (e) { e.stopPropagation(); onChange([]); }}>鍏ㄩ儴</button>
       </div>
       <div className="source-chip-grid source-chip-grid--rail" style={{maxHeight: props.maxHeight || 76}}>
         {sources.map(function (src) {
@@ -2046,7 +2046,7 @@ function SourcePicker(props) {
   );
 }
 
-/* ── Global confirm (ConfirmHost / oaConfirm / oaToast) ── */
+/* 鈹€鈹€ Global confirm (ConfirmHost / oaConfirm / oaToast) 鈹€鈹€ */
 let _confirmHostRef = null;
 window.oaConfirm = function (opts) {
   if (!_confirmHostRef) return Promise.resolve(false);
@@ -2109,7 +2109,7 @@ function ConfirmHost() {
   );
 }
 
-/* ── Shared helpers ── */
+/* 鈹€鈹€ Shared helpers 鈹€鈹€ */
 function tfmt(template, vars) {
   return String(template || "").replace(/\{(\w+)\}/g, function (_, k) { return (vars && k in vars) ? vars[k] : "{" + k + "}"; });
 }
@@ -2186,13 +2186,13 @@ function copyText(text) {
 /* Source definitions are loaded dynamically from GET /sources.
    Content-type labels use i18n keys: settings.sources.ct.{type}. */
 
-/* ── Ingest drawer helpers + component ───────────────────────────
+/* 鈹€鈹€ Ingest drawer helpers + component 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
    The drawer renders the per-source breakdown returned by
    POST /ingest (or POST /ingest/source/{id}). Each pill shows:
-   · source display name
-   · NewsNow / 直连 / 冷却 / 无结果 badge (the "via" transport)
-   · result summary (+{inserted} new · {updated} updated, empty, failed)
-   · an expandable error row when the fetcher reported an error.
+   路 source display name
+   路 NewsNow / 鐩磋繛 / 鍐峰嵈 / 鏃犵粨鏋?badge (the "via" transport)
+   路 result summary (+{inserted} new 路 {updated} updated, empty, failed)
+   路 an expandable error row when the fetcher reported an error.
 */
 function _sourceName(sources, id) {
   for (let i = 0; i < sources.length; i++) {
@@ -2269,7 +2269,7 @@ function IngestDrawer(props) {
         <span className="fp-drawer__spacer"/>
         <span className="fp-drawer__summary">
           <strong>{"+" + inserted}</strong>
-          <span className="fp-pill__sep" style={{margin: "0 4px"}}>·</span>
+          <span className="fp-pill__sep" style={{margin: "0 4px"}}>路</span>
           <strong>{updated}</strong>
           <span style={{opacity: .75, marginLeft: 4}}>
             ({totals.sources_ok || 0}/{totals.sources_total || sourceIds.length})
@@ -2316,24 +2316,24 @@ function IngestDrawer(props) {
             <span key={id} className={cls} title={label}>
               <span className="fp-pill__via">{t("today.drawer.via." + viaKey)}</span>
               <span>{label}</span>
-              <span className="fp-pill__sep">·</span>
+              <span className="fp-pill__sep">路</span>
               <span>{statusText}</span>
               {viaReason && (
                 <span className="fp-pill__reason" title={row.via_reason || ""}>
-                  <span className="fp-pill__sep">·</span>
+                  <span className="fp-pill__sep">路</span>
                   <span>{viaReason}</span>
                 </span>
               )}
               {hasError && (
                 <button className="fp-pill__btn" type="button"
                         onClick={function () { setExpandedId(expanded ? "" : id); }}>
-                  {expanded ? "−" : "+"} {t("today.drawer.show_error")}
+                  {expanded ? "鈭? : "+"} {t("today.drawer.show_error")}
                 </button>
               )}
               {expanded && hasError && (
                 <div className="fp-drawer__error">
                   <strong>{row.error_kind || "error"}</strong>
-                  {row.error ? " · " + String(row.error).slice(0, 240) : ""}
+                  {row.error ? " 路 " + String(row.error).slice(0, 240) : ""}
                 </div>
               )}
             </span>
@@ -2344,7 +2344,7 @@ function IngestDrawer(props) {
   );
 }
 
-/* ── Keyword highlight helper ── */
+/* 鈹€鈹€ Keyword highlight helper 鈹€鈹€ */
 function highlightText(text, keyword) {
   if (!keyword || !text) return text;
   var lower = String(text).toLowerCase();
@@ -2363,7 +2363,7 @@ function highlightText(text, keyword) {
   return parts;
 }
 
-/* ── Source pill class helper ── */
+/* 鈹€鈹€ Source pill class helper 鈹€鈹€ */
 function _sourcePillClass(source) {
   if (!source) return "source-pill";
   var kind = source.kind || "";
@@ -2381,8 +2381,8 @@ function _itemSubSourceLabel(it, source) {
   if (raw.channel) return raw.channel;
   if (raw.platform && raw.platform !== it.source_id) return raw.platform;
   if (raw.via === "newsnow") {
-    if (ct === "hot_stock") return "榜单";
-    if (ct === "flash") return "实时";
+    if (ct === "hot_stock") return "姒滃崟";
+    if (ct === "flash") return "瀹炴椂";
   }
   if (raw.via) return raw.via;
   return "";
@@ -2394,14 +2394,14 @@ function _itemMetricPills(it) {
   var rank = raw.rank || raw.order || raw.index;
   if (rank !== undefined && rank !== null && rank !== "") pills.push("No." + rank);
   var heat = raw.hot || raw.heat || raw.hot_value || raw.hotValue || raw.score;
-  if (heat !== undefined && heat !== null && heat !== "") pills.push("热度 " + heat);
+  if (heat !== undefined && heat !== null && heat !== "") pills.push("鐑害 " + heat);
   return pills;
 }
 
 function _tokenizeInterestText(text) {
-  var stop = {"关注": 1, "重点": 1, "新闻": 1, "资讯": 1, "变化": 1, "相关": 1, "以及": 1, "例如": 1, "一个": 1, "这个": 1};
+  var stop = {"鍏虫敞": 1, "閲嶇偣": 1, "鏂伴椈": 1, "璧勮": 1, "鍙樺寲": 1, "鐩稿叧": 1, "浠ュ強": 1, "渚嬪": 1, "涓€涓?: 1, "杩欎釜": 1};
   var out = [];
-  String(text || "").split(/[\n，,、；;。.!！?？：:\s]+/).forEach(function (word) {
+  String(text || "").split(/[\n锛?銆侊紱;銆?!锛?锛燂細:\s]+/).forEach(function (word) {
     word = word.trim();
     if (word.length >= 2 && !stop[word]) out.push(word.toLowerCase());
   });
@@ -2410,8 +2410,8 @@ function _tokenizeInterestText(text) {
 
 function _inferSentimentFromText(text) {
   text = String(text || "").toLowerCase();
-  var positive = ["上涨", "涨停", "走强", "反弹", "回暖", "利好", "增长", "增持", "突破", "创新高", "上调", "扩张", "乐观", "positive", "bullish", "surge", "gain", "beat", "upgrade"];
-  var negative = ["下跌", "跌停", "走弱", "回落", "承压", "利空", "下降", "减持", "亏损", "暴跌", "下调", "收缩", "担忧", "风险", "negative", "bearish", "slump", "loss", "miss", "downgrade"];
+  var positive = ["涓婃定", "娑ㄥ仠", "璧板己", "鍙嶅脊", "鍥炴殩", "鍒╁ソ", "澧為暱", "澧炴寔", "绐佺牬", "鍒涙柊楂?, "涓婅皟", "鎵╁紶", "涔愯", "positive", "bullish", "surge", "gain", "beat", "upgrade"];
+  var negative = ["涓嬭穼", "璺屽仠", "璧板急", "鍥炶惤", "鎵垮帇", "鍒╃┖", "涓嬮檷", "鍑忔寔", "浜忔崯", "鏆磋穼", "涓嬭皟", "鏀剁缉", "鎷呭咖", "椋庨櫓", "negative", "bearish", "slump", "loss", "miss", "downgrade"];
   var pos = 0, neg = 0;
   positive.forEach(function (w) { if (text.indexOf(w) >= 0) pos += 1; });
   negative.forEach(function (w) { if (text.indexOf(w) >= 0) neg += 1; });
@@ -2433,7 +2433,7 @@ function _aiScoreArticle(it, ctx) {
   return {excluded: false, score: score, sentiment: inferred};
 }
 
-/* ── HTML report export ── */
+/* 鈹€鈹€ HTML report export 鈹€鈹€ */
 async function exportHtmlReport(items, sourcesMap, filters, t, options) {
   options = Object.assign({includeSummary: true, includeTags: true, includeMeta: true, includeLinks: true, includeBrief: true, includeInsights: true, groupBySource: false, limit: "1000"}, options || {});
   var now = new Date();
@@ -2444,7 +2444,7 @@ async function exportHtmlReport(items, sourcesMap, filters, t, options) {
   var sourceCounts = {};
   exportItems.forEach(function (it) {
     var srcDef = sourcesMap[it.source_id] || _legacySourceDefinition(it.source_id || "");
-    var name = _sourceDisplayName(srcDef) || it.source_id || "未知来源";
+    var name = _sourceDisplayName(srcDef) || it.source_id || "鏈煡鏉ユ簮";
     sourceCounts[name] = (sourceCounts[name] || 0) + 1;
   });
   var topSources = Object.keys(sourceCounts).sort(function (a, b) { return sourceCounts[b] - sourceCounts[a]; }).slice(0, 6);
@@ -2469,22 +2469,22 @@ async function exportHtmlReport(items, sourcesMap, filters, t, options) {
     var groups = {};
     exportItems.forEach(function (it) {
       var srcDef = sourcesMap[it.source_id] || _legacySourceDefinition(it.source_id || "");
-      var name = _sourceDisplayName(srcDef) || it.source_id || "未知来源";
+      var name = _sourceDisplayName(srcDef) || it.source_id || "鏈煡鏉ユ簮";
       if (!groups[name]) groups[name] = [];
       groups[name].push(it);
     });
     Object.keys(groups).sort().forEach(function (name) {
-      rows += '<tr class="group-row"><td colspan="' + (options.includeMeta ? 3 : 1) + '">' + _escHtml(name) + ' · ' + groups[name].length + '</td></tr>';
+      rows += '<tr class="group-row"><td colspan="' + (options.includeMeta ? 3 : 1) + '">' + _escHtml(name) + ' 路 ' + groups[name].length + '</td></tr>';
       rows += groups[name].map(rowFor).join("\n");
     });
   } else {
     rows = exportItems.map(rowFor).join("\n");
   }
-  var filterDesc = (filters.source ? "Source: " + filters.source + " · " : "") +
+  var filterDesc = (filters.source ? "Source: " + filters.source + " 路 " : "") +
     "Window: " + filters.window + "h" +
-    (filters.keyword ? " · Keyword: " + filters.keyword : "");
+    (filters.keyword ? " 路 Keyword: " + filters.keyword : "");
   var html = '<!DOCTYPE html>\n<html lang="zh"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
-    _escHtml("财经脉动资讯报表 · " + dateStr) +
+    _escHtml("璐㈢粡鑴夊姩璧勮鎶ヨ〃 路 " + dateStr) +
     '</title><style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;margin:0;padding:20px;background:#f5f5f5;color:#1a1a1a;line-height:1.55}' +
     '.container{max-width:1040px;margin:0 auto;background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,0,0,.08);overflow:hidden}' +
     '.header{background:linear-gradient(135deg,#D32F2F 0%,#80151F 100%);color:#fff;padding:26px 30px}.header h1{margin:0;font-size:24px;font-weight:750}.header p{margin:8px 0 0;font-size:13px;opacity:.86}' +
@@ -2492,12 +2492,12 @@ async function exportHtmlReport(items, sourcesMap, filters, t, options) {
     'table{width:100%;border-collapse:collapse}th{background:#fff7f7;padding:11px 14px;font-size:12px;font-weight:700;color:#7a2a32;text-align:left;border-bottom:1px solid #f1d8dc}td{padding:10px 14px;border-bottom:1px solid #f0f0f0;vertical-align:top}a{color:#1a1a1a;text-decoration:none;font-weight:650}.meta{font-size:12px;color:#777;white-space:nowrap}.summary{font-size:12px;color:#666;margin-top:5px}.tags{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}.tags span{display:inline-block;padding:2px 7px;border-radius:999px;font-size:11px;background:#fff0f1;color:#b91c1c}.group-row td{background:#fafafa;color:#b91c1c;font-weight:700;font-size:12px}' +
     '.empty{padding:36px;text-align:center;color:#777}.footer{padding:16px 28px;font-size:11px;color:#aaa;text-align:center;border-top:1px solid #eee}' +
     '</style></head><body><div class="container">' +
-    '<div class="header"><h1>财经脉动 · 资讯报表</h1><p>' + _escHtml(dateStr + " · " + filterDesc) + '</p><div class="stats"><span>导出 ' + exportItems.length + ' 条</span><span>总加载 ' + items.length + ' 条</span><span>Generated by Fin Pulse</span></div></div>' +
-    (options.includeBrief && briefItems.length ? '<section class="brief"><h2>AI 要点摘要</h2><ul>' + briefItems.map(function (it) { return '<li>' + _escHtml(it.title || "") + '</li>'; }).join("") + '</ul>' + (options.includeInsights ? '<div class="insights">' + topSources.map(function (name) { return '<div><strong>' + _escHtml(name) + '</strong><br>' + sourceCounts[name] + ' 条资讯</div>'; }).join("") + '</div>' : '') + '</section>' : '') +
-    (exportItems.length ? '<table><thead><tr>' + (options.includeMeta ? '<th>来源</th>' : '') + '<th>标题</th>' + (options.includeMeta ? '<th>时间</th>' : '') + '</tr></thead><tbody>' : '<div class="empty">当前配置下没有可导出的资讯</div>') +
+    '<div class="header"><h1>璐㈢粡鑴夊姩 路 璧勮鎶ヨ〃</h1><p>' + _escHtml(dateStr + " 路 " + filterDesc) + '</p><div class="stats"><span>瀵煎嚭 ' + exportItems.length + ' 鏉?/span><span>鎬诲姞杞?' + items.length + ' 鏉?/span><span>Generated by Fin Pulse</span></div></div>' +
+    (options.includeBrief && briefItems.length ? '<section class="brief"><h2>AI 瑕佺偣鎽樿</h2><ul>' + briefItems.map(function (it) { return '<li>' + _escHtml(it.title || "") + '</li>'; }).join("") + '</ul>' + (options.includeInsights ? '<div class="insights">' + topSources.map(function (name) { return '<div><strong>' + _escHtml(name) + '</strong><br>' + sourceCounts[name] + ' 鏉¤祫璁?/div>'; }).join("") + '</div>' : '') + '</section>' : '') +
+    (exportItems.length ? '<table><thead><tr>' + (options.includeMeta ? '<th>鏉ユ簮</th>' : '') + '<th>鏍囬</th>' + (options.includeMeta ? '<th>鏃堕棿</th>' : '') + '</tr></thead><tbody>' : '<div class="empty">褰撳墠閰嶇疆涓嬫病鏈夊彲瀵煎嚭鐨勮祫璁?/div>') +
     rows +
     (exportItems.length ? '</tbody></table>' : '') +
-    '<div class="footer">Generated by Fin Pulse · ' + _escHtml(now.toISOString()) + '</div>' +
+    '<div class="footer">Generated by Fin Pulse 路 ' + _escHtml(now.toISOString()) + '</div>' +
     '</div></body></html>';
   var filename = "finpulse-report-" + dateStr + ".html";
   return {html: html, filename: filename, dataUrl: "data:text/html;charset=utf-8," + encodeURIComponent(html)};
@@ -2506,7 +2506,7 @@ function _escHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/* ── AI Filter Dialog ── */
+/* 鈹€鈹€ AI Filter Dialog 鈹€鈹€ */
 function AIFilterDialog(props) {
   var t = useT();
   var [interests, setInterests] = useState(props.initialInterests || "");
@@ -2584,11 +2584,11 @@ function ExportDialog(props) {
           <div className="ai-dialog__grid">
             <label className="choice-row">
               <input type="radio" name="exportScope" checked={scope === "current"} onChange={function () { setScope("current"); }}/>
-              <span className="choice-row__text"><span>{t("today.export.scope.current")}</span><span className="choice-row__hint">{t("today.export.scope.current.hint")} · {props.currentCount}</span></span>
+              <span className="choice-row__text"><span>{t("today.export.scope.current")}</span><span className="choice-row__hint">{t("today.export.scope.current.hint")} 路 {props.currentCount}</span></span>
             </label>
             <label className="choice-row">
               <input type="radio" name="exportScope" checked={scope === "loaded"} onChange={function () { setScope("loaded"); }}/>
-              <span className="choice-row__text"><span>{t("today.export.scope.loaded")}</span><span className="choice-row__hint">{t("today.export.scope.loaded.hint")} · {props.loadedCount}</span></span>
+              <span className="choice-row__text"><span>{t("today.export.scope.loaded")}</span><span className="choice-row__hint">{t("today.export.scope.loaded.hint")} 路 {props.loadedCount}</span></span>
             </label>
           </div>
         </div>
@@ -2722,7 +2722,7 @@ function NewsCardCompact(props) {
   );
 }
 
-/* ── Today Tab — live article feed ─────────────────────────────── */
+/* 鈹€鈹€ Today Tab 鈥?live article feed 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function TodayTab() {
   const t = useT();
   const [items, setItems] = useState([]);
@@ -2748,7 +2748,7 @@ function TodayTab() {
   const [exportPreview, setExportPreview] = useState(null);
   const [viewMode, setViewMode] = useState("grouped");
   const [collapsedGroups, setCollapsedGroups] = useState({});
-  const [translationConfig, setTranslationConfig] = useState({enabled: true, target_language: "中文", scope: "title_summary"});
+  const [translationConfig, setTranslationConfig] = useState({enabled: true, target_language: "涓枃", scope: "title_summary"});
   const [translatedMap, setTranslatedMap] = useState({});
   const [translatingIds, setTranslatingIds] = useState({});
 
@@ -2781,7 +2781,7 @@ function TodayTab() {
         setSourceConfig(cfgResp.config);
         setTranslationConfig({
           enabled: cfgResp.config["translation.enabled"] === undefined ? true : cfgResp.config["translation.enabled"] !== false && cfgResp.config["translation.enabled"] !== "false",
-          target_language: String(cfgResp.config["translation.target_language"] || "中文"),
+          target_language: String(cfgResp.config["translation.target_language"] || "涓枃"),
           scope: String(cfgResp.config["translation.scope"] || "title_summary"),
         });
       }
@@ -2919,7 +2919,7 @@ function TodayTab() {
       line = line.trim();
       if (!line) return;
       if (line.startsWith("!")) return;
-      line.replace(/^[+]/, "").split(/[，,、；;\s]+/).forEach(function (word) {
+      line.replace(/^[+]/, "").split(/[锛?銆侊紱;\s]+/).forEach(function (word) {
         word = word.trim();
         if (word) aiKeywordTokens.push(word.toLowerCase());
       });
@@ -2930,7 +2930,7 @@ function TodayTab() {
     String(aiFilter.keywords).split("\n").forEach(function (line) {
       line = line.trim();
       if (line.startsWith("!")) {
-        line.substring(1).split(/[，,、；;\s]+/).forEach(function (w) {
+        line.substring(1).split(/[锛?銆侊紱;\s]+/).forEach(function (w) {
           w = w.trim();
           if (w) aiExcludeTokens.push(w.toLowerCase());
         });
@@ -3121,7 +3121,7 @@ function TodayTab() {
     setTranslatingIds(function (prev) { return Object.assign({}, prev, {[it.id]: true}); });
     try {
       var resp = await api("POST", "/translate", {
-        target_language: translationConfig.target_language || "中文",
+        target_language: translationConfig.target_language || "涓枃",
         items: [{id: it.id, title: it.title || "", summary: it.summary || ""}],
       });
       if (resp && resp.ok && Array.isArray(resp.items) && resp.items[0]) {
@@ -3163,7 +3163,7 @@ function TodayTab() {
                    return copy;
                  });
                }}>
-            <span style={{fontSize: 10, color: "var(--text-muted)"}}>{collapsed ? "▶" : "▼"}</span>
+            <span style={{fontSize: 10, color: "var(--text-muted)"}}>{collapsed ? "鈻? : "鈻?}</span>
             <span className={_sourcePillClass(srcDef)}>{_sourceDisplayName(srcDef) || sid}</span>
             {srcDef.content_type && <ContentTypePill type={srcDef.content_type}/>}
             {focusedSourceSet[sid] && <span className="api-pill" style={{background: "rgba(211,47,47,.10)", color: "var(--primary)"}}>{t("today.group.focused")}</span>}
@@ -3206,7 +3206,7 @@ function TodayTab() {
             <div key={key} className="timeline-slot">
               <div className="timeline-slot__time">
                 {key}
-                <span className="timeline-slot__meta">{groupItems.length} 条</span>
+                <span className="timeline-slot__meta">{groupItems.length} 鏉?/span>
               </div>
               <div className="timeline-slot__items">
                 {groupItems.map(function (it) {
@@ -3335,7 +3335,7 @@ function TodayTab() {
           <div className="filter-bar__item">
             <span className="filter-bar__label">{t("today.filters.sortLabel")}</span>
             <div className="seg-group">
-              {[{k:"time_desc", icon:"↓"},{k:"time_asc", icon:"↑"}].map(function (s) {
+              {[{k:"time_desc", icon:"鈫?},{k:"time_asc", icon:"鈫?}].map(function (s) {
                 const active = filters.sort === s.k;
                 return <button key={s.k} type="button"
                                className={"seg-btn " + (active ? "active" : "")}
@@ -3483,7 +3483,7 @@ function TodayTab() {
   );
 }
 
-/* ── Digests Tab — daily briefs + preview + resend ─────────────── */
+/* 鈹€鈹€ Digests Tab 鈥?daily briefs + preview + resend 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function DigestsTab() {
   const t = useT();
   const [items, setItems] = useState([]);
@@ -3496,12 +3496,12 @@ function DigestsTab() {
   const [sources, setSources] = useState([]);
   const [customOpen, setCustomOpen] = useState(true);
   const [reportConfigs, setReportConfigs] = useState({
-    morning: {id: "morning", kind: "builtin", label: "早报", session: "morning", time: "08:00", repeat: "daily", since_hours: 12, top_k: 20, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
-    noon: {id: "noon", kind: "builtin", label: "午报", session: "noon", time: "12:30", repeat: "daily", since_hours: 6, top_k: 15, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
-    evening: {id: "evening", kind: "builtin", label: "晚报", session: "evening", time: "19:00", repeat: "daily", since_hours: 12, top_k: 20, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
+    morning: {id: "morning", kind: "builtin", label: "鏃╂姤", session: "morning", time: "08:00", repeat: "daily", since_hours: 12, top_k: 20, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
+    noon: {id: "noon", kind: "builtin", label: "鍗堟姤", session: "noon", time: "12:30", repeat: "daily", since_hours: 6, top_k: 15, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
+    evening: {id: "evening", kind: "builtin", label: "鏅氭姤", session: "evening", time: "19:00", repeat: "daily", since_hours: 12, top_k: 20, source_ids: [], channel: "", chat_id: "", locked: false, preIngest: true},
   });
   const [customReports, setCustomReports] = useState([]);
-  const [customDraft, setCustomDraft] = useState({title: "自定义财经报表", time: "09:30", repeat: "daily", since_hours: 24, top_k: 20, source_ids: [], channel: "", chat_id: "", preIngest: true});
+  const [customDraft, setCustomDraft] = useState({title: "鑷畾涔夎储缁忔姤琛?, time: "09:30", repeat: "daily", since_hours: 24, top_k: 20, source_ids: [], channel: "", chat_id: "", preIngest: true});
 
   const load = useCallback(async function () {
     setLoading(true);
@@ -3553,11 +3553,11 @@ function DigestsTab() {
 
   const sessionMeta = {
     morning: {icon: "morning", label: t("digests.session.morning"), time: "08:00",
-      desc: "开盘/上班前速览：隔夜海外、政策线索、今日市场关注。"},
+      desc: "寮€鐩?涓婄彮鍓嶉€熻锛氶殧澶滄捣澶栥€佹斂绛栫嚎绱€佷粖鏃ュ競鍦哄叧娉ㄣ€?},
     noon: {icon: "noonIcon", label: t("digests.session.noon"), time: "12:30",
-      desc: "盘中热点更新：新增热点、快讯密度、行业和个股异动。"},
+      desc: "鐩樹腑鐑偣鏇存柊锛氭柊澧炵儹鐐广€佸揩璁瘑搴︺€佽涓氬拰涓偂寮傚姩銆?},
     evening: {icon: "eveningIcon", label: t("digests.session.evening"), time: "19:00",
-      desc: "收盘/下班复盘：全天汇总、重点复盘、明日关注方向。"},
+      desc: "鏀剁洏/涓嬬彮澶嶇洏锛氬叏澶╂眹鎬汇€侀噸鐐瑰鐩樸€佹槑鏃ュ叧娉ㄦ柟鍚戙€?},
   };
   const sourceNameMap = {};
   sources.forEach(function (s) { sourceNameMap[s.id] = s.name; });
@@ -3602,11 +3602,11 @@ function DigestsTab() {
     return (
       <div style={{gridColumn: "1 / -1"}}>
         <div style={{display: "flex", alignItems: "center", gap: 8, marginBottom: 6}}>
-          <span className="filter-bar__label">新闻来源</span>
-          <span style={{fontSize: 11, color: "var(--text-muted)"}}>{picked.length ? ("已选 " + picked.length) : "全部来源"}</span>
+          <span className="filter-bar__label">鏂伴椈鏉ユ簮</span>
+          <span style={{fontSize: 11, color: "var(--text-muted)"}}>{picked.length ? ("宸查€?" + picked.length) : "鍏ㄩ儴鏉ユ簮"}</span>
           <span style={{flex: 1}}/>
-          <button className="btn btn-sm" type="button" onClick={function (e) { e.stopPropagation(); selectAllSources(onChange); }}>全选</button>
-          <button className="btn btn-sm" type="button" onClick={function (e) { e.stopPropagation(); onChange({source_ids: []}); }}>全部来源</button>
+          <button className="btn btn-sm" type="button" onClick={function (e) { e.stopPropagation(); selectAllSources(onChange); }}>鍏ㄩ€?/button>
+          <button className="btn btn-sm" type="button" onClick={function (e) { e.stopPropagation(); onChange({source_ids: []}); }}>鍏ㄩ儴鏉ユ簮</button>
         </div>
         <div className="source-chip-grid source-chip-grid--rail" style={{maxHeight: 86}}>
           {sources.map(function (src) {
@@ -3628,7 +3628,7 @@ function DigestsTab() {
     });
     const currentValue = current ? channelKey(current) : "";
     return (
-      <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">通知通道</span>
+      <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">閫氱煡閫氶亾</span>
         <ChannelPicker
           channels={channels}
           value={currentValue}
@@ -3661,7 +3661,7 @@ function DigestsTab() {
         lang: "zh"
       });
       window.oaToast({level: resp && resp.ok ? "success" : "error",
-        message: resp && resp.ok ? ("HTML 简报已生成" + (resp.auto_ingested ? "，已自动抓取最新资讯" : "")) : ("failed: " + (resp && resp.detail || ""))});
+        message: resp && resp.ok ? ("HTML 绠€鎶ュ凡鐢熸垚" + (resp.auto_ingested ? "锛屽凡鑷姩鎶撳彇鏈€鏂拌祫璁? : "")) : ("failed: " + (resp && resp.detail || ""))});
       await load();
       if (resp && resp.ok && resp.digest && resp.digest.digest_id) {
         selectDigest({
@@ -3678,22 +3678,22 @@ function DigestsTab() {
   const savePlan = useCallback(async function (session, cfg) {
     const planId = planIdFor(session, cfg);
     if (!cfg.channel || !cfg.chat_id) {
-      window.oaToast({level: "warning", message: "请选择通知通道"});
+      window.oaToast({level: "warning", message: "璇烽€夋嫨閫氱煡閫氶亾"});
       return;
     }
     const resp = await api("PUT", "/report-plans/" + encodeURIComponent(planId), Object.assign({}, cfg, {
       id: planId,
       session: session,
-      label: cfg.label || (sessionMeta[session] && sessionMeta[session].label) || cfg.title || "自定义报表",
+      label: cfg.label || (sessionMeta[session] && sessionMeta[session].label) || cfg.title || "鑷畾涔夋姤琛?,
       title: cfg.title || (sessionMeta[session] && sessionMeta[session].label) || cfg.label || "",
     }));
     if (resp && resp.ok && resp.plan) {
       if (["morning", "noon", "evening"].indexOf(session) >= 0) updateReportConfig(session, resp.plan);
       else updateCustomReport(session, resp.plan);
-      window.oaToast({level: "success", message: "报表推送配置已保存并生效"});
+      window.oaToast({level: "success", message: "鎶ヨ〃鎺ㄩ€侀厤缃凡淇濆瓨骞剁敓鏁?});
       await loadPlans();
     } else {
-      window.oaToast({level: "error", message: "保存失败"});
+      window.oaToast({level: "error", message: "淇濆瓨澶辫触"});
     }
   }, [loadPlans]);
   const unlockPlan = useCallback(async function (session, cfg) {
@@ -3709,26 +3709,26 @@ function DigestsTab() {
     setRunning(planId);
     try {
       const resp = await api("POST", "/report-plans/" + encodeURIComponent(planId) + "/run");
-      window.oaToast({level: resp && resp.ok ? "success" : "error", message: resp && resp.ok ? "已生成 HTML 报表并推送" : "推送失败"});
+      window.oaToast({level: resp && resp.ok ? "success" : "error", message: resp && resp.ok ? "宸茬敓鎴?HTML 鎶ヨ〃骞舵帹閫? : "鎺ㄩ€佸け璐?});
       await load();
       await loadPlans();
     } finally { setRunning(""); }
   }, [load, loadPlans]);
   const deleteCustomPlan = useCallback(async function (cfg) {
     const planId = cfg.id || cfg.session;
-    const ok = await window.oaConfirm({title: "删除自定义报表计划", message: cfg.label || cfg.title || planId, danger: true, okText: "删除"});
+    const ok = await window.oaConfirm({title: "鍒犻櫎鑷畾涔夋姤琛ㄨ鍒?, message: cfg.label || cfg.title || planId, danger: true, okText: "鍒犻櫎"});
     if (!ok) return;
     const resp = await api("DELETE", "/report-plans/" + encodeURIComponent(planId));
     if (resp && resp.ok) {
       await loadPlans();
-      window.oaToast({level: "success", message: "自定义报表计划已删除"});
+      window.oaToast({level: "success", message: "鑷畾涔夋姤琛ㄨ鍒掑凡鍒犻櫎"});
     }
   }, [loadPlans]);
   const onResend = useCallback(async function (digest) {
     if (!digest || !digest.session) return;
     const cfg = reportConfigs[digest.session] || customReports.find(function (r) { return r.session === digest.session; });
     if (!cfg || !cfg.locked) {
-      window.oaToast({level: "warning", message: "该报表还没有保存推送配置"});
+      window.oaToast({level: "warning", message: "璇ユ姤琛ㄨ繕娌℃湁淇濆瓨鎺ㄩ€侀厤缃?});
       return;
     }
     runPlan(digest.session, cfg);
@@ -3740,7 +3740,7 @@ function DigestsTab() {
   const addCustomReport = function () {
     const title = String(customDraft.title || "").trim();
     if (!title) {
-      window.oaToast({level: "warning", message: "请先填写自定义报表名称"});
+      window.oaToast({level: "warning", message: "璇峰厛濉啓鑷畾涔夋姤琛ㄥ悕绉?});
       return;
     }
     const session = "custom_" + Date.now();
@@ -3757,16 +3757,16 @@ function DigestsTab() {
       })]);
     });
     setActiveSession(session);
-    window.oaToast({level: "success", message: "已添加自定义报表"});
+    window.oaToast({level: "success", message: "宸叉坊鍔犺嚜瀹氫箟鎶ヨ〃"});
   };
   const previewUrl = selected && selected.id ? "/api/plugins/fin-pulse/digests/" + selected.id + "/html" : "";
   const onDeleteDigest = useCallback(async function (digest) {
     if (!digest || !digest.id) return;
     const ok = await window.oaConfirm({
-      title: "删除历史简报",
+      title: "鍒犻櫎鍘嗗彶绠€鎶?,
       message: digest.title || (sessionMeta[digest.session] ? sessionMeta[digest.session].label : digest.session),
       danger: true,
-      okText: "删除",
+      okText: "鍒犻櫎",
     });
     if (!ok) return;
     const resp = await api("DELETE", "/digests/" + encodeURIComponent(digest.id));
@@ -3776,9 +3776,9 @@ function DigestsTab() {
         setPreviewHtml("");
       }
       await load();
-      window.oaToast({level: "success", message: "历史简报已删除"});
+      window.oaToast({level: "success", message: "鍘嗗彶绠€鎶ュ凡鍒犻櫎"});
     } else {
-      window.oaToast({level: "error", message: "删除失败"});
+      window.oaToast({level: "error", message: "鍒犻櫎澶辫触"});
     }
   }, [load, selected]);
   const downloadPreview = function () {
@@ -3792,13 +3792,13 @@ function DigestsTab() {
     document.body.removeChild(a);
   };
   const renderReportCard = function (session, cfg, custom) {
-    var meta = custom ? {icon: cfg.icon || "customReport", label: cfg.label || cfg.title || "自定义报表", time: cfg.time || "09:30", desc: "自定义报表计划：保存后按设定时间自动生成 HTML 报表并推送。"} : sessionMeta[session];
+    var meta = custom ? {icon: cfg.icon || "customReport", label: cfg.label || cfg.title || "鑷畾涔夋姤琛?, time: cfg.time || "09:30", desc: "鑷畾涔夋姤琛ㄨ鍒掞細淇濆瓨鍚庢寜璁惧畾鏃堕棿鑷姩鐢熸垚 HTML 鎶ヨ〃骞舵帹閫併€?} : sessionMeta[session];
     var latest = latestBySession[session];
     var active = activeSession === session;
     var onCfgChange = custom ? function (patch) { updateCustomReport(session, patch); } : function (patch) { updateReportConfig(session, patch); };
-    var sourceSummary = (cfg.source_ids && cfg.source_ids.length) ? cfg.source_ids.slice(0, 3).map(function (id) { return sourceNameMap[id] || id; }).join("、") + (cfg.source_ids.length > 3 ? " 等" : "") : "全部来源";
+    var sourceSummary = (cfg.source_ids && cfg.source_ids.length) ? cfg.source_ids.slice(0, 3).map(function (id) { return sourceNameMap[id] || id; }).join("銆?) + (cfg.source_ids.length > 3 ? " 绛? : "") : "鍏ㄩ儴鏉ユ簮";
     var locked = !!cfg.locked;
-    var channelLabel = cfg.channel ? formatChannelLabel({channel_id: cfg.channel, chat_id: cfg.chat_id, chat_name: cfg.chat_name}) : "未配置通道";
+    var channelLabel = cfg.channel ? formatChannelLabel({channel_id: cfg.channel, chat_id: cfg.chat_id, chat_name: cfg.chat_name}) : "鏈厤缃€氶亾";
     var lastResult = cfg.last_result || {};
     var dispatch = lastResult.dispatch || {};
     var dispatchErrors = (dispatch.errors && dispatch.errors.length) ? dispatch.errors : [];
@@ -3806,7 +3806,7 @@ function DigestsTab() {
     if (primaryError.indexOf("hint:") === 0 && dispatchErrors.length > 1) {
       primaryError = String(dispatchErrors[1]);
     }
-    var dispatchText = dispatch.ok ? ("推送成功 · " + (dispatch.content_kind || lastResult.content_kind || "text")) : (primaryError ? ("推送失败 · " + primaryError) : "");
+    var dispatchText = dispatch.ok ? ("鎺ㄩ€佹垚鍔?路 " + (dispatch.content_kind || lastResult.content_kind || "text")) : (primaryError ? ("鎺ㄩ€佸け璐?路 " + primaryError) : "");
     var permanentFailure = dispatchErrors.some(function (e) { var s = String(e || ""); return s.indexOf("ret=-2") >= 0 || s.indexOf("ret=-14") >= 0 || s.indexOf("hint:") === 0; });
     var dispatchTooltip = dispatchErrors.length ? dispatchErrors.map(function (e) { return String(e); }).join("\n") : "";
     return (
@@ -3816,16 +3816,16 @@ function DigestsTab() {
         <div style={{display: "flex", alignItems: "center", gap: 8}}>
           <span className="api-pill" style={{background: "rgba(211,47,47,.10)", color: "var(--primary)"}}><Ico name={meta.icon}/> {meta.label}</span>
           <span style={{marginLeft: "auto", fontSize: 12, color: "var(--text-muted)"}}>{cfg.time || meta.time}</span>
-          {locked ? <span className="kw-tag">已锁定生效</span> : <span className="kw-tag">可编辑</span>}
+          {locked ? <span className="kw-tag">宸查攣瀹氱敓鏁?/span> : <span className="kw-tag">鍙紪杈?/span>}
           {custom && <button className="btn btn-sm btn-danger" type="button" onClick={function (e) { e.stopPropagation(); deleteCustomPlan(cfg); }}><Ico name="trash"/></button>}
         </div>
         <div style={{fontSize: 13, color: "var(--text)", lineHeight: 1.5, marginTop: 10}}>{meta.desc}</div>
         <div style={{display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10}}>
-          <span className="kw-tag">{cfg.since_hours}h 窗口</span>
+          <span className="kw-tag">{cfg.since_hours}h 绐楀彛</span>
           <span className="kw-tag">Top {cfg.top_k}</span>
           <span className="kw-tag">{sourceSummary}</span>
           <span className="kw-tag">{channelLabel}</span>
-          {latest ? <span className="kw-tag">最新 {fmtDate(latest.generated_at)}</span> : <span className="kw-tag">待生成</span>}
+          {latest ? <span className="kw-tag">鏈€鏂?{fmtDate(latest.generated_at)}</span> : <span className="kw-tag">寰呯敓鎴?/span>}
           {dispatchText ? (
             <span
               className="kw-tag"
@@ -3836,34 +3836,34 @@ function DigestsTab() {
         </div>
         <div className="card-body" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "10px 0 0"}}>
           {custom && (
-            <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">报表名称</span>
+            <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">鎶ヨ〃鍚嶇О</span>
               <input className="input" value={cfg.title || cfg.label || ""}
                      disabled={locked}
                      onChange={function (e) { onCfgChange({title: e.target.value, label: e.target.value}); }}/>
             </label>
           )}
-          <label><span className="filter-bar__label">推送时间</span>
+          <label><span className="filter-bar__label">鎺ㄩ€佹椂闂?/span>
             <input className="input" type="time" value={cfg.time || meta.time}
                    disabled={locked}
                    onClick={function (e) { e.stopPropagation(); }}
                    onChange={function (e) { onCfgChange({time: e.target.value}); }}/>
           </label>
-          <label><span className="filter-bar__label">重复方式</span>
+          <label><span className="filter-bar__label">閲嶅鏂瑰紡</span>
             <select className="input" value={cfg.repeat || "daily"} disabled={locked}
                     onClick={function (e) { e.stopPropagation(); }}
                     onChange={function (e) { onCfgChange({repeat: e.target.value}); }}>
-              <option value="daily">每天</option>
-              <option value="weekdays">工作日</option>
-              <option value="weekly">每周一</option>
+              <option value="daily">姣忓ぉ</option>
+              <option value="weekdays">宸ヤ綔鏃?/option>
+              <option value="weekly">姣忓懆涓€</option>
             </select>
           </label>
-          <label><span className="filter-bar__label">覆盖时长（小时）</span>
+          <label><span className="filter-bar__label">瑕嗙洊鏃堕暱锛堝皬鏃讹級</span>
             <input className="input" type="number" min="1" max="72" value={cfg.since_hours}
                    disabled={locked}
                    onClick={function (e) { e.stopPropagation(); }}
                    onChange={function (e) { onCfgChange({since_hours: e.target.value}); }}/>
           </label>
-          <label><span className="filter-bar__label">条目数</span>
+          <label><span className="filter-bar__label">鏉＄洰鏁?/span>
             <input className="input" type="number" min="1" max="60" value={cfg.top_k}
                    disabled={locked}
                    onClick={function (e) { e.stopPropagation(); }}
@@ -3876,29 +3876,29 @@ function DigestsTab() {
                    disabled={locked}
                    onClick={function (e) { e.stopPropagation(); }}
                    onChange={function (e) { onCfgChange({preIngest: e.target.checked}); }}/>
-            <span style={{fontSize: 13, color: "var(--text)"}}>强制先抓取最新资讯</span>
+            <span style={{fontSize: 13, color: "var(--text)"}}>寮哄埗鍏堟姄鍙栨渶鏂拌祫璁?/span>
           </label>
         </div>
         <div style={{display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap"}}>
           <button className="btn btn-sm btn-primary" disabled={!!running}
                   onClick={function (e) { e.stopPropagation(); applySessionDefaults(session); onRun(session, cfg); }}>
-            <Ico name="download"/> {running === session ? t("today.list.loading") : "生成并预览"}
+            <Ico name="download"/> {running === session ? t("today.list.loading") : "鐢熸垚骞堕瑙?}
           </button>
           {locked ? (
             <>
               <button className="btn btn-sm" disabled={!!running} onClick={function (e) { e.stopPropagation(); runPlan(session, cfg); }}>
-                <Ico name="send"/> 立即推送
+                <Ico name="send"/> 绔嬪嵆鎺ㄩ€?
               </button>
               <button className="btn btn-sm" onClick={function (e) { e.stopPropagation(); unlockPlan(session, cfg); }}>
-                <Ico name="edit"/> 解锁编辑
+                <Ico name="edit"/> 瑙ｉ攣缂栬緫
               </button>
             </>
           ) : (
             <button className="btn btn-sm btn-primary" onClick={function (e) { e.stopPropagation(); savePlan(session, cfg); }}>
-              <Ico name="download"/> 保存并生效
+              <Ico name="download"/> 淇濆瓨骞剁敓鏁?
             </button>
           )}
-          {latest && <button className="btn btn-sm" onClick={function (e) { e.stopPropagation(); selectDigest(latest); }}><Ico name="eye"/> 预览</button>}
+          {latest && <button className="btn btn-sm" onClick={function (e) { e.stopPropagation(); selectDigest(latest); }}><Ico name="eye"/> 棰勮</button>}
         </div>
       </div>
     );
@@ -3909,10 +3909,10 @@ function DigestsTab() {
       <div className="digest-left">
         <div className="card">
           <div className="oa-section-title">
-            {t("digests.title")}工作台
+            {t("digests.title")}宸ヤ綔鍙?
             <span className="oa-section-title__count">{items.length}</span>
           </div>
-          <div className="oa-hint">左侧配置时段和任务，右侧实时预览 HTML 报表。生成时如果数据为空或不够新，会自动先抓取一次。</div>
+          <div className="oa-hint">宸︿晶閰嶇疆鏃舵鍜屼换鍔★紝鍙充晶瀹炴椂棰勮 HTML 鎶ヨ〃銆傜敓鎴愭椂濡傛灉鏁版嵁涓虹┖鎴栦笉澶熸柊锛屼細鑷姩鍏堟姄鍙栦竴娆°€?/div>
           <div className="card-body" style={{display: "grid", gridTemplateColumns: "1fr", gap: 10}}>
             {["morning", "noon", "evening"].map(function (s) {
               return renderReportCard(s, reportConfigs[s], false);
@@ -3922,31 +3922,31 @@ function DigestsTab() {
 
         <div className="card">
           <div className="oa-section-title">
-            自定义报表工作台
+            鑷畾涔夋姤琛ㄥ伐浣滃彴
             <span className="oa-section-title__count">{customReports.length}</span>
           </div>
-          <div className="oa-hint" style={{marginBottom: 10}}>把早午晚报的参数全部自定义：名称、覆盖时长、条目数、新闻来源；添加后会成为可生成、可预览、可定时的报表卡片。</div>
+          <div className="oa-hint" style={{marginBottom: 10}}>鎶婃棭鍗堟櫄鎶ョ殑鍙傛暟鍏ㄩ儴鑷畾涔夛細鍚嶇О銆佽鐩栨椂闀裤€佹潯鐩暟銆佹柊闂绘潵婧愶紱娣诲姞鍚庝細鎴愪负鍙敓鎴愩€佸彲棰勮銆佸彲瀹氭椂鐨勬姤琛ㄥ崱鐗囥€?/div>
           <div className="card-body" style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingTop: 0}}>
-            <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">报表名称</span>
+            <label style={{gridColumn: "1 / -1"}}><span className="filter-bar__label">鎶ヨ〃鍚嶇О</span>
               <input className="input" value={customDraft.title} onChange={function (e) { setCustomDraft(Object.assign({}, customDraft, {title: e.target.value})); }}/>
             </label>
-            <label><span className="filter-bar__label">默认执行时间</span>
+            <label><span className="filter-bar__label">榛樿鎵ц鏃堕棿</span>
               <input className="input" type="time" value={customDraft.time}
                      onChange={function (e) { setCustomDraft(Object.assign({}, customDraft, {time: e.target.value})); }}/>
             </label>
-            <label><span className="filter-bar__label">重复方式</span>
+            <label><span className="filter-bar__label">閲嶅鏂瑰紡</span>
               <select className="input" value={customDraft.repeat || "daily"}
                       onChange={function (e) { setCustomDraft(Object.assign({}, customDraft, {repeat: e.target.value})); }}>
-                <option value="daily">每天</option>
-                <option value="weekdays">工作日</option>
-                <option value="weekly">每周一</option>
+                <option value="daily">姣忓ぉ</option>
+                <option value="weekdays">宸ヤ綔鏃?/option>
+                <option value="weekly">姣忓懆涓€</option>
               </select>
             </label>
-            <label><span className="filter-bar__label">覆盖时长（小时）</span>
+            <label><span className="filter-bar__label">瑕嗙洊鏃堕暱锛堝皬鏃讹級</span>
               <input className="input" type="number" min="1" max="72" value={customDraft.since_hours}
                      onChange={function (e) { setCustomDraft(Object.assign({}, customDraft, {since_hours: e.target.value})); }}/>
             </label>
-            <label><span className="filter-bar__label">条目数</span>
+            <label><span className="filter-bar__label">鏉＄洰鏁?/span>
               <input className="input" type="number" min="1" max="60" value={customDraft.top_k}
                      onChange={function (e) { setCustomDraft(Object.assign({}, customDraft, {top_k: e.target.value})); }}/>
             </label>
@@ -3957,20 +3957,20 @@ function DigestsTab() {
               type="button"
               style={{gridColumn: "1 / -1", marginTop: 4}}
               disabled={!String(customDraft.title || "").trim()}
-              title={!String(customDraft.title || "").trim() ? "请先填写报表名称" : "添加一个自定义报表计划"}
+              title={!String(customDraft.title || "").trim() ? "璇峰厛濉啓鎶ヨ〃鍚嶇О" : "娣诲姞涓€涓嚜瀹氫箟鎶ヨ〃璁″垝"}
               onClick={addCustomReport}>
-              <Ico name="plusIcon"/> 创建自定义报表计划
+              <Ico name="plusIcon"/> 鍒涘缓鑷畾涔夋姤琛ㄨ鍒?
             </button>
           </div>
           <div className={"coll" + (customOpen ? " coll--open" : "")} style={{marginTop: 10}}>
             <div className="coll-head" onClick={function () { setCustomOpen(!customOpen); }}>
-              <span className="coll-head__arrow">▶</span>
-              <span className="coll-head__title">自定义报表计划</span>
+              <span className="coll-head__arrow">鈻?/span>
+              <span className="coll-head__title">鑷畾涔夋姤琛ㄨ鍒?/span>
               <span className="coll-head__badge">{customReports.length}</span>
             </div>
             {customOpen && (
               <div className="coll-body">
-                {!customReports.length ? <div className="empty" style={{padding: 12}}>暂无自定义报表计划</div> : (
+                {!customReports.length ? <div className="empty" style={{padding: 12}}>鏆傛棤鑷畾涔夋姤琛ㄨ鍒?/div> : (
                   <div style={{display: "grid", gridTemplateColumns: "1fr", gap: 10}}>
                     {customReports.map(function (r) { return renderReportCard(r.session, r, true); })}
                   </div>
@@ -3981,7 +3981,7 @@ function DigestsTab() {
         </div>
 
         <div className="card">
-          <div className="oa-section-title">历史简报 <span className="oa-section-title__count">{items.length}</span></div>
+          <div className="oa-section-title">鍘嗗彶绠€鎶?<span className="oa-section-title__count">{items.length}</span></div>
           {loading && items.length === 0 && <div className="empty">{t("today.list.loading")}</div>}
           {!loading && items.length === 0 && <div className="empty">{t("digests.empty")}</div>}
           <div className="digest-history-list">
@@ -4012,19 +4012,19 @@ function DigestsTab() {
       <div className="digest-preview-pane">
         <div className="card grow">
           <div className="oa-section-title">
-            HTML 报表即时预览
+            HTML 鎶ヨ〃鍗虫椂棰勮
             {selected && <span className="oa-section-title__count">{sessionMeta[selected.session] ? sessionMeta[selected.session].label : selected.session}</span>}
             <span className="oa-section-title__actions">
-              <button className="btn btn-sm" disabled={!selected} onClick={downloadPreview}><Ico name="download"/> 下载 HTML</button>
-              <button className="btn btn-sm" disabled={!selected} onClick={function () { selected && copyText(selected.markdown_blob || selected.title || ""); window.oaToast({level: "success", message: t("today.list.copied")}); }}><Ico name="copy"/> 复制摘要</button>
-              <button className="btn btn-sm btn-primary" disabled={!selected} onClick={function () { selected && onResend(selected); }}><Ico name="send"/> 再推送</button>
+              <button className="btn btn-sm" disabled={!selected} onClick={downloadPreview}><Ico name="download"/> 涓嬭浇 HTML</button>
+              <button className="btn btn-sm" disabled={!selected} onClick={function () { selected && copyText(selected.markdown_blob || selected.title || ""); window.oaToast({level: "success", message: t("today.list.copied")}); }}><Ico name="copy"/> 澶嶅埗鎽樿</button>
+              <button className="btn btn-sm btn-primary" disabled={!selected} onClick={function () { selected && onResend(selected); }}><Ico name="send"/> 鍐嶆帹閫?/button>
             </span>
           </div>
           {selected ? (
             <iframe className="digest-preview-frame" srcDoc={previewHtml || selected.html_blob || ""} title="digest-preview"/>
           ) : (
             <div className="empty" style={{minHeight: 360, display: "flex", alignItems: "center", justifyContent: "center"}}>
-              请选择历史简报，或点击左侧“生成并预览”。
+              璇烽€夋嫨鍘嗗彶绠€鎶ワ紝鎴栫偣鍑诲乏渚р€滅敓鎴愬苟棰勮鈥濄€?
             </div>
           )}
         </div>
@@ -4034,18 +4034,18 @@ function DigestsTab() {
   );
 }
 
-/* ── Radar Tab — rule editor + AI suggest + history ──────────── */
+/* 鈹€鈹€ Radar Tab 鈥?rule editor + AI suggest + history 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 const RADAR_TEMPLATE = (
-  "+美联储\n" +
-  "+降息\n" +
-  "!传闻\n" +
+  "+缇庤仈鍌╘n" +
+  "+闄嶆伅\n" +
+  "!浼犻椈\n" +
   "\n" +
-  "+特朗普\n" +
-  "+关税\n" +
+  "+鐗规湕鏅甛n" +
+  "+鍏崇◣\n" +
   "\n" +
   "[GLOBAL_FILTER]\n" +
-  "!小道消息\n" +
-  "!论坛\n"
+  "!灏忛亾娑堟伅\n" +
+  "!璁哄潧\n"
 );
 
 function RadarTab() {
@@ -4272,7 +4272,7 @@ function RadarTab() {
       return;
     }
     if (!selectedTarget) {
-      window.oaToast({level: "warning", message: "请选择通知通道"});
+      window.oaToast({level: "warning", message: "璇烽€夋嫨閫氱煡閫氶亾"});
       return;
     }
     const channel = selectedTarget.channel_id || "";
@@ -4289,10 +4289,10 @@ function RadarTab() {
         source_ids: selectedSourceIds,
         force_refresh: forceRefresh,
         cooldown_s: 600,
-        title: "财经脉动雷达预警"
+        title: "璐㈢粡鑴夊姩闆疯揪棰勮"
       });
       setRadarResult(resp || {});
-      window.oaToast({level: resp && resp.ok ? "success" : "error", message: resp && resp.ok ? "雷达预警已推送" : "预警失败"});
+      window.oaToast({level: resp && resp.ok ? "success" : "error", message: resp && resp.ok ? "闆疯揪棰勮宸叉帹閫? : "棰勮澶辫触"});
     } finally { setPushing(false); }
   }, [rulesText, selectedTarget, sinceHours, selectedSourceIds, forceRefresh, t, hits.length, onEvaluate]);
 
@@ -4302,7 +4302,7 @@ function RadarTab() {
       return;
     }
     if (!selectedTarget) {
-      window.oaToast({level: "warning", message: "请选择通知通道"});
+      window.oaToast({level: "warning", message: "璇烽€夋嫨閫氱煡閫氶亾"});
       return;
     }
     setSavingRadarPlan(true);
@@ -4321,9 +4321,9 @@ function RadarTab() {
       });
       if (resp && resp.ok) {
         setRadarLocked(true);
-        window.oaToast({level: "success", message: "雷达定时扫描已保存并生效"});
+        window.oaToast({level: "success", message: "闆疯揪瀹氭椂鎵弿宸蹭繚瀛樺苟鐢熸晥"});
       } else {
-        window.oaToast({level: "error", message: "保存失败：" + ((resp && (resp.detail || resp.error)) || "unknown")});
+        window.oaToast({level: "error", message: "淇濆瓨澶辫触锛? + ((resp && (resp.detail || resp.error)) || "unknown")});
       }
     } finally { setSavingRadarPlan(false); }
   }, [rulesText, selectedTarget, sinceHours, selectedSourceIds, forceRefresh, radarRepeat, radarTime, t]);
@@ -4337,13 +4337,13 @@ function RadarTab() {
     <div className="radar-workbench">
       <div className="radar-left">
       <div className="card">
-        <div className="oa-section-title">雷达预警工作台</div>
-        <div className="oa-hint radar-intro">填写规则、选择窗口和通道后即可试运行或推送；右侧预览独立滚动。</div>
+        <div className="oa-section-title">闆疯揪棰勮宸ヤ綔鍙?/div>
+        <div className="oa-hint radar-intro">濉啓瑙勫垯銆侀€夋嫨绐楀彛鍜岄€氶亾鍚庡嵆鍙瘯杩愯鎴栨帹閫侊紱鍙充晶棰勮鐙珛婊氬姩銆?/div>
       </div>
       <div className={"card card--compact" + (radarLocked ? " radar-card--locked" : "")}>
         <div className="oa-section-title">
           <span className="radar-title-text">{t("radar.editor.title")}</span>
-          {radarLocked ? <span className="radar-locked-badge">已锁定生效</span> : null}
+          {radarLocked ? <span className="radar-locked-badge">宸查攣瀹氱敓鏁?/span> : null}
           <span className="oa-section-title__actions">
             <button className="btn btn-sm" type="button" onClick={onFillTemplate} title={t("radar.template.tooltip")}>
               <Ico name="book"/> {t("radar.template")}
@@ -4355,7 +4355,7 @@ function RadarTab() {
               <button className="btn btn-sm" type="button"
                       onClick={function () { setLibOpen(function (v) { return !v; }); }}
                       title={t("radar.history.tooltip")}>
-                <Ico name="folder"/> {t("radar.history")} · {library.length}
+                <Ico name="folder"/> {t("radar.history")} 路 {library.length}
               </button>
               {libOpen && (
                 <div style={{position: "absolute", top: "calc(100% + 4px)", right: 0, minWidth: 260, maxHeight: 320, overflow: "auto",
@@ -4421,43 +4421,43 @@ function RadarTab() {
 
       <div className={"card radar-exec-card" + (radarLocked ? " radar-card--locked" : "")}>
         <div className="oa-section-title">
-          <span className="radar-title-text">预警执行</span>
-          {radarLocked ? <span className="radar-locked-badge">定时扫描生效中</span> : null}
+          <span className="radar-title-text">棰勮鎵ц</span>
+          {radarLocked ? <span className="radar-locked-badge">瀹氭椂鎵弿鐢熸晥涓?/span> : null}
           <span className="oa-section-title__actions">
             {radarLocked ? (
-              <button className="btn btn-sm" onClick={onUnlockRadarPlan}><Ico name="edit"/> 解锁编辑</button>
+              <button className="btn btn-sm" onClick={onUnlockRadarPlan}><Ico name="edit"/> 瑙ｉ攣缂栬緫</button>
             ) : null}
             <button className="btn btn-sm btn-primary" disabled={pushing} onClick={onRunHotRadar}>
-              <Ico name="send"/> {pushing ? "推送中…" : "立即预警"}
+              <Ico name="send"/> {pushing ? "鎺ㄩ€佷腑鈥? : "绔嬪嵆棰勮"}
             </button>
             <button className="btn btn-sm" disabled={savingRadarPlan || radarLocked} onClick={onSaveRadarPlan}>
-              <Ico name="bell"/> {savingRadarPlan ? "保存中…" : "保存定时扫描"}
+              <Ico name="bell"/> {savingRadarPlan ? "淇濆瓨涓€? : "淇濆瓨瀹氭椂鎵弿"}
             </button>
           </span>
         </div>
         <div style={{display: "grid", gridTemplateColumns: "1fr", gap: 10}}>
           <label>
-            <span className="filter-bar__label">通知通道</span>
+            <span className="filter-bar__label">閫氱煡閫氶亾</span>
             <ChannelPicker
               channels={channels}
               value={radarTargetKey}
               disabled={radarLocked}
-              placeholder={channels.length ? "选择 IM 通道" : "暂无可用 IM 通道"}
+              placeholder={channels.length ? "閫夋嫨 IM 閫氶亾" : "鏆傛棤鍙敤 IM 閫氶亾"}
               onChange={function (_pick, key) { setRadarTargetKey(key); }}/>
           </label>
-          <SourcePicker sources={sources} value={selectedSourceIds} onChange={setSelectedSourceIds} maxHeight={58} disabled={radarLocked} label="匹配数据源"/>
+          <SourcePicker sources={sources} value={selectedSourceIds} onChange={setSelectedSourceIds} maxHeight={58} disabled={radarLocked} label="鍖归厤鏁版嵁婧?/>
           <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8}}>
             <label>
-              <span className="filter-bar__label">扫描频率</span>
+              <span className="filter-bar__label">鎵弿棰戠巼</span>
               <select className="input" value={radarRepeat} disabled={radarLocked}
                       onChange={function (e) { setRadarRepeat(e.target.value); }}>
-                <option value="every15">每 15 分钟</option>
-                <option value="hourly">每小时</option>
-                <option value="daily">每天固定时间</option>
+                <option value="every15">姣?15 鍒嗛挓</option>
+                <option value="hourly">姣忓皬鏃?/option>
+                <option value="daily">姣忓ぉ鍥哄畾鏃堕棿</option>
               </select>
             </label>
             <label>
-              <span className="filter-bar__label">固定时间</span>
+              <span className="filter-bar__label">鍥哄畾鏃堕棿</span>
               <input className="input" type="time" value={radarTime} disabled={radarLocked || radarRepeat !== "daily"}
                      onChange={function (e) { setRadarTime(e.target.value); }}/>
             </label>
@@ -4465,13 +4465,13 @@ function RadarTab() {
           <label className="source-master-switch" style={{justifyContent: "flex-start"}}>
             <input type="checkbox" checked={forceRefresh} disabled={radarLocked}
                    onChange={function (e) { setForceRefresh(e.target.checked); }}/>
-            <span>强制拉取最新新闻</span>
-            <span style={{color: "var(--text-muted)"}}>最短间隔 5 分钟</span>
+            <span>寮哄埗鎷夊彇鏈€鏂版柊闂?/span>
+            <span style={{color: "var(--text-muted)"}}>鏈€鐭棿闅?5 鍒嗛挓</span>
           </label>
-          <div className="oa-hint radar-intro">立即预警会按所选数据源先验证命中，再直推 IM；定时扫描由 fin-pulse 自己执行，不再创建主程序计划。</div>
+          <div className="oa-hint radar-intro">绔嬪嵆棰勮浼氭寜鎵€閫夋暟鎹簮鍏堥獙璇佸懡涓紝鍐嶇洿鎺?IM锛涘畾鏃舵壂鎻忕敱 fin-pulse 鑷繁鎵ц锛屼笉鍐嶅垱寤轰富绋嬪簭璁″垝銆?/div>
           {radarResult && (
             <div className="oa-hint" style={{padding: "8px 10px", background: "var(--bg-hover)", borderRadius: 8}}>
-              最近执行：{radarResult.ok ? "成功" : "失败"} · 命中 {((radarResult.result && radarResult.result.hits) || []).length || meta.total || 0} 条
+              鏈€杩戞墽琛岋細{radarResult.ok ? "鎴愬姛" : "澶辫触"} 路 鍛戒腑 {((radarResult.result && radarResult.result.hits) || []).length || meta.total || 0} 鏉?
             </div>
           )}
         </div>
@@ -4495,23 +4495,23 @@ function RadarTab() {
               <div className="radar-report-hero">
                 <div style={{display: "flex", alignItems: "center", gap: 8}}>
                   <span className="api-pill" style={{background: "rgba(211,47,47,.10)", color: "var(--primary)"}}>
-                    <Ico name="radar"/> 雷达命中报表
+                    <Ico name="radar"/> 闆疯揪鍛戒腑鎶ヨ〃
                   </span>
-                  <span style={{marginLeft: "auto", fontSize: 12, color: "var(--text-muted)"}}>按匹配度优先 · 按资讯类型分组</span>
+                  <span style={{marginLeft: "auto", fontSize: 12, color: "var(--text-muted)"}}>鎸夊尮閰嶅害浼樺厛 路 鎸夎祫璁被鍨嬪垎缁?/span>
                 </div>
                 <div className="radar-report-grid">
-                  <div className="radar-report-metric"><b>{hits.length}</b><span>命中资讯</span></div>
-                  <div className="radar-report-metric"><b>{radarGroups.length}</b><span>资讯类型</span></div>
-                  <div className="radar-report-metric"><b>{meta.since_hours}h</b><span>扫描窗口</span></div>
+                  <div className="radar-report-metric"><b>{hits.length}</b><span>鍛戒腑璧勮</span></div>
+                  <div className="radar-report-metric"><b>{radarGroups.length}</b><span>璧勮绫诲瀷</span></div>
+                  <div className="radar-report-metric"><b>{meta.since_hours}h</b><span>鎵弿绐楀彛</span></div>
                 </div>
                 {!!topRadarHits.length && (
                   <div style={{marginTop: 12}}>
-                    <div style={{fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 6}}>最高匹配度 Top 3</div>
+                    <div style={{fontSize: 12, fontWeight: 700, color: "var(--text)", marginBottom: 6}}>鏈€楂樺尮閰嶅害 Top 3</div>
                     {topRadarHits.map(function (h, idx) {
                       const src = radarSourceMap[h.source_id] || {};
                       return (
                         <div key={"top-" + (h.id || h.url || idx)} style={{fontSize: 12, color: "var(--text)", lineHeight: 1.6}}>
-                          {idx + 1}. {h.title} <span style={{color: "var(--text-muted)"}}>· {src.name || h.source_id} · 匹配 {hitMatchScore(h).toFixed(1)}</span>
+                          {idx + 1}. {h.title} <span style={{color: "var(--text-muted)"}}>路 {src.name || h.source_id} 路 鍖归厤 {hitMatchScore(h).toFixed(1)}</span>
                         </div>
                       );
                     })}
@@ -4533,7 +4533,7 @@ function RadarTab() {
                           <a href={h.url} target="_blank" rel="noopener noreferrer" className="radar-hit-card__title">{h.title}</a>
                           <div className="radar-hit-card__meta">
                             <span className="api-pill" style={{fontSize: 11, padding: "1px 8px"}}>{src.name || h.source_id}</span>
-                            <span>匹配度 {hitMatchScore(h).toFixed(1)}</span>
+                            <span>鍖归厤搴?{hitMatchScore(h).toFixed(1)}</span>
                             <span>{fmtDate(h.published_at || h.fetched_at)}</span>
                             {terms.slice(0, 4).map(function (term) { return <span key={term} className="kw-tag">{term}</span>; })}
                           </div>
@@ -4605,49 +4605,49 @@ function RadarTab() {
   );
 }
 
-/* ── Ask Tab — 7 agent tools reference ─────────────────────────── */
+/* 鈹€鈹€ Ask Tab 鈥?7 agent tools reference 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 const ASK_TOOLS = [
   {
     name: "fin_pulse_create",
-    desc_zh: "创建新任务（ingest / daily_brief / hot_radar）",
+    desc_zh: "鍒涘缓鏂颁换鍔★紙ingest / daily_brief / hot_radar锛?,
     sample: {mode: "daily_brief", session: "morning", since_hours: 12, top_k: 20},
-    prompt_zh: "帮我用 fin-pulse 生成今早的财经早报（session=morning, top_k=20, lang=zh）",
+    prompt_zh: "甯垜鐢?fin-pulse 鐢熸垚浠婃棭鐨勮储缁忔棭鎶ワ紙session=morning, top_k=20, lang=zh锛?,
   },
   {
     name: "fin_pulse_status",
-    desc_zh: "查询任务状态",
+    desc_zh: "鏌ヨ浠诲姟鐘舵€?,
     sample: {task_id: "fp-xxxx"},
-    prompt_zh: "查询 fin-pulse 任务 fp-xxxx 当前状态",
+    prompt_zh: "鏌ヨ fin-pulse 浠诲姟 fp-xxxx 褰撳墠鐘舵€?,
   },
   {
     name: "fin_pulse_list",
-    desc_zh: "列出最近任务",
+    desc_zh: "鍒楀嚭鏈€杩戜换鍔?,
     sample: {mode: "daily_brief", status: "succeeded", limit: 10},
-    prompt_zh: "列出最近 10 条 fin-pulse 成功的早午晚报任务",
+    prompt_zh: "鍒楀嚭鏈€杩?10 鏉?fin-pulse 鎴愬姛鐨勬棭鍗堟櫄鎶ヤ换鍔?,
   },
   {
     name: "fin_pulse_cancel",
-    desc_zh: "取消运行中的任务",
+    desc_zh: "鍙栨秷杩愯涓殑浠诲姟",
     sample: {task_id: "fp-xxxx"},
-    prompt_zh: "取消 fin-pulse 任务 fp-xxxx",
+    prompt_zh: "鍙栨秷 fin-pulse 浠诲姟 fp-xxxx",
   },
   {
     name: "fin_pulse_settings_get",
-    desc_zh: "读取配置（webhook/api_key 自动脱敏）",
+    desc_zh: "璇诲彇閰嶇疆锛坵ebhook/api_key 鑷姩鑴辨晱锛?,
     sample: {},
-    prompt_zh: "读取 fin-pulse 当前配置",
+    prompt_zh: "璇诲彇 fin-pulse 褰撳墠閰嶇疆",
   },
   {
     name: "fin_pulse_settings_set",
-    desc_zh: "写入配置",
-    sample: {updates: {radar_rules: "+美联储\n+降息"}},
-    prompt_zh: "将 fin-pulse 的雷达规则设置为「+美联储 +降息」",
+    desc_zh: "鍐欏叆閰嶇疆",
+    sample: {updates: {radar_rules: "+缇庤仈鍌╘n+闄嶆伅"}},
+    prompt_zh: "灏?fin-pulse 鐨勯浄杈捐鍒欒缃负銆?缇庤仈鍌?+闄嶆伅銆?,
   },
   {
     name: "fin_pulse_search_news",
-    desc_zh: "按关键词/源/时间检索新闻",
-    sample: {q: "美联储", days: 1, min_score: 6, limit: 20},
-    prompt_zh: "找今天和美联储相关、AI 评分 ≥ 6 的财经新闻",
+    desc_zh: "鎸夊叧閿瘝/婧?鏃堕棿妫€绱㈡柊闂?,
+    sample: {q: "缇庤仈鍌?, days: 1, min_score: 6, limit: 20},
+    prompt_zh: "鎵句粖澶╁拰缇庤仈鍌ㄧ浉鍏炽€丄I 璇勫垎 鈮?6 鐨勮储缁忔柊闂?,
   },
 ];
 
@@ -4676,7 +4676,7 @@ function AgentToolsHint() {
           );
         })}
       </div>
-      <Collapsible title="完整工具 JSON" badge={ASK_TOOLS.length}>
+      <Collapsible title="瀹屾暣宸ュ叿 JSON" badge={ASK_TOOLS.length}>
         <div className="agent-tool-grid">
         {ASK_TOOLS.map(function (tool) {
           return (
@@ -4717,7 +4717,7 @@ function SettingsTab(props) {
   return <SettingsForm goToTab={props && props.goToTab}/>;
 }
 
-/* ── CodeBlock — render preformatted command snippets with a copy
+/* 鈹€鈹€ CodeBlock 鈥?render preformatted command snippets with a copy
    button. Strips markdown code fences (``` ... ```) and unescapes
    ``\n`` so the NewsNow docker snippet renders as real lines.  */
 function CodeBlock(props) {
@@ -4751,11 +4751,11 @@ function CodeBlock(props) {
   );
 }
 
-/* ── ScheduleDialog — modal form mirroring the host "新建任务" layout
+/* 鈹€鈹€ ScheduleDialog 鈥?modal form mirroring the host "鏂板缓浠诲姟" layout
    (see Image-3 spec) so users can create a fin-pulse scheduled task
    entirely in-plugin. Every submission goes through the fin-pulse
    /schedules route which delegates to the host Agent Scheduler, so the
-   underlying rows still live alongside other host-managed schedules —
+   underlying rows still live alongside other host-managed schedules 鈥?
    we just skip the redirect hand-off. */
 const SCHEDULE_TEMPLATES = {
   morning:  {mode: "daily_brief", session: "morning", time: "08:00", repeat: "daily",    since_hours: 12, top_k: 20, name: "fin-pulse morning brief"},
@@ -4778,11 +4778,11 @@ function scheduleCronFromForm(timeValue, repeatValue) {
 
 function scheduleRepeatLabel(value) {
   return ({
-    daily: "每天",
-    weekdays: "工作日",
-    weekly: "每周一",
-    hourly: "每小时",
-    every15: "每 15 分钟",
+    daily: "姣忓ぉ",
+    weekdays: "宸ヤ綔鏃?,
+    weekly: "姣忓懆涓€",
+    hourly: "姣忓皬鏃?,
+    every15: "姣?15 鍒嗛挓",
   })[value] || value;
 }
 
@@ -4798,7 +4798,7 @@ function ScheduleDialog(props) {
     repeat: preset.repeat || "daily",
     channel: firstChannel.channel_id || "",
     chat_id: firstChannel.chat_id || "",
-    rules_text: tpl === "radar" ? (props.defaultRulesText || "+美联储") : "",
+    rules_text: tpl === "radar" ? (props.defaultRulesText || "+缇庤仈鍌?) : "",
     enabled: true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -4861,7 +4861,7 @@ function ScheduleDialog(props) {
   })();
   const channelLabel = (function () {
     const pick = channels.find(function (c) { return c.channel_id === form.channel && (c.chat_id || "") === (form.chat_id || ""); });
-    if (!pick) return "—";
+    if (!pick) return "鈥?;
     return formatChannelLabel(pick);
   })();
   const cronPreview = scheduleCronFromForm(form.time, form.repeat);
@@ -4886,7 +4886,7 @@ function ScheduleDialog(props) {
               <div className="input" style={{background: "var(--bg-subtle, rgba(0,0,0,.03))", cursor: "not-allowed"}}>{typeLabel}</div>
             </div>
             <label style={{display: "flex", flexDirection: "column", gap: 4}}>
-              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>执行时间点</span>
+              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>鎵ц鏃堕棿鐐?/span>
               <input className="input" type="time" value={form.time}
                      disabled={form.repeat === "every15"}
                      onChange={function (e) { update("time", e.target.value); }}/>
@@ -4894,30 +4894,30 @@ function ScheduleDialog(props) {
           </div>
           <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10}}>
             <label style={{display: "flex", flexDirection: "column", gap: 4}}>
-              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>重复方式</span>
+              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>閲嶅鏂瑰紡</span>
               <select className="input" value={form.repeat} onChange={function (e) { update("repeat", e.target.value); }}>
                 {preset.mode === "hot_radar" ? (
                   <>
-                    <option value="every15">每 15 分钟</option>
-                    <option value="hourly">每小时</option>
-                    <option value="daily">每天固定时间</option>
+                    <option value="every15">姣?15 鍒嗛挓</option>
+                    <option value="hourly">姣忓皬鏃?/option>
+                    <option value="daily">姣忓ぉ鍥哄畾鏃堕棿</option>
                   </>
                 ) : (
                   <>
-                    <option value="daily">每天</option>
-                    <option value="weekdays">工作日</option>
-                    <option value="weekly">每周一</option>
+                    <option value="daily">姣忓ぉ</option>
+                    <option value="weekdays">宸ヤ綔鏃?/option>
+                    <option value="weekly">姣忓懆涓€</option>
                   </>
                 )}
               </select>
             </label>
             <label style={{display: "flex", flexDirection: "column", gap: 4}}>
-              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>通知通道</span>
+              <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>閫氱煡閫氶亾</span>
               <ChannelPicker
                 channels={channels}
                 value={selectedChannelValue}
                 disabled={!hasChannels}
-                placeholder={hasChannels ? "选择一个 IM 通道" : t("settings.schedules.dialog.no_channel")}
+                placeholder={hasChannels ? "閫夋嫨涓€涓?IM 閫氶亾" : t("settings.schedules.dialog.no_channel")}
                 onChange={function (pick) {
                   setForm(function (prev) {
                     return Object.assign({}, prev, {channel: pick.channel_id || "", chat_id: pick.chat_id || ""});
@@ -4933,9 +4933,9 @@ function ScheduleDialog(props) {
             </label>
           )}
           <div style={{display: "flex", flexDirection: "column", gap: 4}}>
-            <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>计划预览</span>
+            <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>璁″垝棰勮</span>
             <div className="oa-hint" style={{fontSize: 12, padding: "8px 10px", background: "var(--bg-subtle, rgba(0,0,0,.03))", borderRadius: 6, color: "var(--text)"}}>
-              {form.name || preset.name} · {scheduleRepeatLabel(form.repeat)} · {form.repeat === "every15" ? "自动滚动扫描" : form.time} · {preset.since_hours || 24}h · Top {preset.top_k || preset.limit || 20} · {(preset.source_ids || []).length ? (preset.source_ids.length + " 个来源") : "全部来源"} · 写入主程序计划接口 · {channelLabel} · cron: {cronPreview}
+              {form.name || preset.name} 路 {scheduleRepeatLabel(form.repeat)} 路 {form.repeat === "every15" ? "鑷姩婊氬姩鎵弿" : form.time} 路 {preset.since_hours || 24}h 路 Top {preset.top_k || preset.limit || 20} 路 {(preset.source_ids || []).length ? (preset.source_ids.length + " 涓潵婧?) : "鍏ㄩ儴鏉ユ簮"} 路 鍐欏叆涓荤▼搴忚鍒掓帴鍙?路 {channelLabel} 路 cron: {cronPreview}
             </div>
           </div>
           <label style={{display: "flex", alignItems: "center", gap: 8, userSelect: "none"}}>
@@ -4957,7 +4957,7 @@ function ScheduleDialog(props) {
   );
 }
 
-/* ── Reusable sub-components for the Settings data-source area ──── */
+/* 鈹€鈹€ Reusable sub-components for the Settings data-source area 鈹€鈹€鈹€鈹€ */
 
 const NEWSNOW_PUBLIC_URL = "https://newsnow.busiyi.world/api/s";
 const NEWSNOW_PUBLIC_MIN_INTERVAL_S = 300;
@@ -4967,7 +4967,7 @@ function Collapsible(props) {
   return (
     <div className={"coll" + (open ? " coll--open" : "")}>
       <div className="coll-head" onClick={function () { setOpen(!open); }}>
-        <span className="coll-head__arrow">▶</span>
+        <span className="coll-head__arrow">鈻?/span>
         <span className="coll-head__title">{props.title}</span>
         {props.badge != null && <span className="coll-head__badge">{props.badge}</span>}
         {props.extra || null}
@@ -4997,8 +4997,8 @@ function ContentTypePill(props) {
 const SOURCE_CATEGORY_KEYS = ["all", "realtime", "news", "rank", "policy_data", "other"];
 
 const LEGACY_SOURCE_DEFS = {
-  xueqiu: {id: "xueqiu", display_zh: "雪球", display_en: "Xueqiu", kind: "newsnow", content_type: "hot_stock", group: "newsnow", fetcher_id: "newsnow", probe_target: "newsnow", default_enabled: true},
-  newsnow: {id: "newsnow", display_zh: "NewsNow 聚合", display_en: "NewsNow", kind: "newsnow", content_type: "news", group: "newsnow", fetcher_id: "newsnow", probe_target: "newsnow", default_enabled: true}
+  xueqiu: {id: "xueqiu", display_zh: "闆悆", display_en: "Xueqiu", kind: "newsnow", content_type: "hot_stock", group: "newsnow", fetcher_id: "newsnow", probe_target: "newsnow", default_enabled: true},
+  newsnow: {id: "newsnow", display_zh: "NewsNow 鑱氬悎", display_en: "NewsNow", kind: "newsnow", content_type: "news", group: "newsnow", fetcher_id: "newsnow", probe_target: "newsnow", default_enabled: true}
 };
 
 function _sourceDisplayName(s) {
@@ -5073,7 +5073,7 @@ function _parseCustomFeedsFromConfig(cfg) {
   }
   var feedsRaw = String((cfg && cfg["rss_generic.feeds"]) || "");
   return feedsRaw.split("\n").map(function (l) { return l.trim(); }).filter(Boolean).map(function (url, i) {
-    return {id: "cf_" + i, url: url, name: url.length > 50 ? url.substring(0, 47) + "…" : url, enabled: true};
+    return {id: "cf_" + i, url: url, name: url.length > 50 ? url.substring(0, 47) + "鈥? : url, enabled: true};
   });
 }
 
@@ -5199,7 +5199,7 @@ function SourceRow(props) {
   );
 }
 
-/* ── Settings Form ── */
+/* 鈹€鈹€ Settings Form 鈹€鈹€ */
 
 function SettingsForm(props) {
   const t = useT();
@@ -5256,7 +5256,7 @@ function SettingsForm(props) {
   }, [t]);
 
 
-  /* ── Source toggle ── */
+  /* 鈹€鈹€ Source toggle 鈹€鈹€ */
   const onToggleSource = useCallback(async function (sid) {
     var key = "source." + sid + ".enabled";
     var cur = config[key];
@@ -5265,7 +5265,7 @@ function SettingsForm(props) {
     await persist({[key]: String(next)});
   }, [config, persist]);
 
-  /* ── Source probe ── */
+  /* 鈹€鈹€ Source probe 鈹€鈹€ */
   const onProbeSource = useCallback(async function (sid) {
     var srcDef = allSources.find(function (s) { return s.id === sid; });
     var isNewsNow = srcDef && srcDef.kind === "newsnow";
@@ -5312,7 +5312,7 @@ function SettingsForm(props) {
     }
   }, [t]);
 
-  /* ── Custom feed helpers ── */
+  /* 鈹€鈹€ Custom feed helpers 鈹€鈹€ */
   const persistCustomFeeds = useCallback(async function (feeds) {
     var urls = feeds.map(function (f) { return f.url; });
     await persist({
@@ -5410,7 +5410,7 @@ function SettingsForm(props) {
 
   return (
     <div>
-      {/* ════════ Data Source Management ════════ */}
+      {/* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 Data Source Management 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 */}
       <div className="card" style={{padding: "16px 14px"}}>
         <div className="oa-settings-section">
           <div className="oa-settings-section__title">{t("settings.sources.title")}</div>
@@ -5485,15 +5485,15 @@ function SettingsForm(props) {
                       <span className="source-chip__dot"/>
                       <span>{_customFeedDisplayName(f, idx)}</span>
                       <span className="source-chip__type">RSS</span>
-                      <span className="source-chip__type" title={f.url}>链接</span>
+                      <span className="source-chip__type" title={f.url}>閾炬帴</span>
                       {customProbeLabels[idx] && (
-                        <span style={{fontSize: 11, color: customProbeLabels[idx].indexOf("OK") >= 0 || customProbeLabels[idx].indexOf("可用") >= 0 ? "var(--success)" : "var(--danger)"}}>
+                        <span style={{fontSize: 11, color: customProbeLabels[idx].indexOf("OK") >= 0 || customProbeLabels[idx].indexOf("鍙敤") >= 0 ? "var(--success)" : "var(--danger)"}}>
                           {customProbeLabels[idx]}
                         </span>
                       )}
                       <button className="btn btn-sm" title={t("settings.sources.custom.delete")}
                               onClick={function (e) { e.stopPropagation(); onDeleteCustom(idx); }}>
-                        ×
+                        脳
                       </button>
                     </div>
                   );
@@ -5588,7 +5588,7 @@ function SettingsForm(props) {
         </div>
       </div>
 
-      {/* ════════ AI Translation ════════ */}
+      {/* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 AI Translation 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 */}
       <div className="card" style={{padding: "16px 14px"}}>
         <div className="oa-settings-section">
           <div className="oa-settings-section__title">{t("settings.translation.title")}</div>
@@ -5608,9 +5608,9 @@ function SettingsForm(props) {
             </label>
             <label style={{display: "flex", flexDirection: "column", gap: 4}}>
               <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>{t("settings.translation.target")}</span>
-              <input className="input" value={String(config["translation.target_language"] || "中文")}
+              <input className="input" value={String(config["translation.target_language"] || "涓枃")}
                      onChange={function (e) { setCfgField("translation.target_language", e.target.value); }}
-                     onBlur={function () { persist({"translation.target_language": String(config["translation.target_language"] || "中文")}); }}/>
+                     onBlur={function () { persist({"translation.target_language": String(config["translation.target_language"] || "涓枃")}); }}/>
             </label>
             <label style={{display: "flex", flexDirection: "column", gap: 4}}>
               <span style={{fontSize: 12, color: "var(--text)", fontWeight: 600}}>{t("settings.translation.scope")}</span>
@@ -5623,7 +5623,7 @@ function SettingsForm(props) {
         </div>
       </div>
 
-      {/* ════════ LLM ════════ */}
+      {/* 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 LLM 鈺愨晲鈺愨晲鈺愨晲鈺愨晲 */}
       <div className="card">
         <div className="card-title">{t("settings.llm.title")}</div>
         <div className="oa-hint">{t("settings.llm.hint")}</div>
@@ -5637,7 +5637,7 @@ function SettingsForm(props) {
   );
 }
 
-/* ── App shell ── */
+/* 鈹€鈹€ App shell 鈹€鈹€ */
 function App() {
   const t = useT();
   const [activeTab, setActiveTab] = useState(0);
@@ -5651,7 +5651,7 @@ function App() {
     });
   }, []);
 
-  /* shortcut keys (d → theme toggle, Esc → close modal) */
+  /* shortcut keys (d 鈫?theme toggle, Esc 鈫?close modal) */
   useEffect(function () {
     function onKey(e) {
       const tag = (e.target && e.target.tagName) || "";
@@ -5668,7 +5668,7 @@ function App() {
   }, []);
 
   /* The "no IM channel" banner was previously mounted globally on
-     every tab. We now scope it strictly to the Settings → IM channels
+     every tab. We now scope it strictly to the Settings 鈫?IM channels
      card (rendered inside SettingsForm), so the Today / Digests /
      Radar / Ask tabs stay visually clean. */
 

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
@@ -9,9 +9,9 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/markdown-mini.js"></script>
   <script src="_assets/i18n.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -134,7 +134,7 @@
     .library-card { display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); margin-bottom: 8px; }
     @media (max-width: 860px) { .split-layout { flex-direction: column; } .split-left { width: 100%; min-width: unset; } }
 
-    /* ── Settings page extras (mirror seedance-video) ─────────────── */
+    /* 鈹€鈹€ Settings page extras (mirror seedance-video) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
     .folder-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .folder-row .input { flex: 1; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -148,7 +148,7 @@
     .deps-help strong { color: var(--text); font-weight: 600; }
     .deps-help ul { margin: 6px 0 0 18px; padding: 0; }
     .deps-help li { margin: 2px 0; }
-    /* ── In-plugin system-dep installer ──────────────────────────── */
+    /* 鈹€鈹€ In-plugin system-dep installer 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
     .sysdep-card {
       border: 1px solid var(--border); border-radius: 8px;
       padding: 12px; margin-top: 8px; background: var(--bg-card);
@@ -208,7 +208,7 @@
       vertical-align: middle;
     }
     @keyframes sysdep-spin { to { transform: rotate(360deg); } }
-    /* ── Permissions table ───────────────────────────────────────── */
+    /* 鈹€鈹€ Permissions table 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
     .perms-table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 12px; }
     .perms-table th, .perms-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
     .perms-table th { font-weight: 600; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
@@ -225,7 +225,7 @@
     }
     .perms-tag--ok { color: var(--success); background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.35); }
     .perms-tag--missing { color: var(--danger); background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.35); }
-    /* ── In-plugin folder picker modal ──────────────────────────── */
+    /* 鈹€鈹€ In-plugin folder picker modal 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
     .folder-picker { width: min(820px, 96vw); max-width: min(820px, 96vw); max-height: 82vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
     .folder-picker__head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
     .folder-picker__title { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
@@ -253,7 +253,7 @@
   </style>
 </head>
 <body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__cs_loading">正在加载插件...</div></div>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__cs_loading">姝ｅ湪鍔犺浇鎻掍欢...</div></div>
 <script>
 window.onerror = function(msg, src, line, col, err) {
   if (String(msg).indexOf("ResizeObserver") !== -1) return true;
@@ -269,11 +269,11 @@ setTimeout(function() {
   el.style.flexDirection = "column";
   el.style.textAlign = "center";
   el.style.lineHeight = "1.8";
-  el.innerHTML = '<b>插件初始化超时</b><br/>可能原因：<br/>1. CDN 脚本加载失败 (unpkg.com)<br/>2. Babel 编译错误<br/>3. React 渲染失败<br/><br/><span style="font-size:11px;color:#94a3b8">请按 F12 打开开发者工具查看控制台错误</span>';
+  el.innerHTML = '<b>鎻掍欢鍒濆鍖栬秴鏃?/b><br/>鍙兘鍘熷洜锛?br/>1. CDN 鑴氭湰鍔犺浇澶辫触 (unpkg.com)<br/>2. Babel 缂栬瘧閿欒<br/>3. React 娓叉煋澶辫触<br/><br/><span style="font-size:11px;color:#94a3b8">璇锋寜 F12 鎵撳紑寮€鍙戣€呭伐鍏锋煡鐪嬫帶鍒跺彴閿欒</span>';
 }, 10000);
 </script>
 <script>
-// ── Bridge SDK ──
+// 鈹€鈹€ Bridge SDK 鈹€鈹€
 console.log("[clip-sense] Bridge SDK loading...");
 const BRIDGE_VER = 1;
 let _ctx = null, _caps = [], _pending = {}, _handlers = {};
@@ -386,13 +386,13 @@ function _tr(key, vars, fallback) {
 
 async function downloadOutput(taskId, fname, query) {
   try {
-    showToast(_tr("toast.downloading", null, "下载中..."));
+    showToast(_tr("toast.downloading", null, "涓嬭浇涓?.."));
     const base = _detectApiBase() + (_ctx ? "/api/plugins/" + _ctx.pluginId : "/api/plugins/clip-sense");
     const url = base + "/tasks/" + taskId + "/download" + (query || "");
     if (_inIframe && _bridgeConnected) {
       const native = await bridgeDownload(url, fname || "clip_sense_output.mp4");
       if (native && native.ok && native.path && /[\\/]/.test(String(native.path))) {
-        showToast("已保存到: " + native.path);
+        showToast("宸蹭繚瀛樺埌: " + native.path);
         bridgeShowInFolder(native.path);
         return;
       }
@@ -405,9 +405,9 @@ async function downloadOutput(taskId, fname, query) {
     a.href = objUrl; a.download = fname || "output.mp4";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function() { URL.revokeObjectURL(objUrl); }, 3000);
-    showToast("已下载: " + (fname || "output.mp4"));
+    showToast("宸蹭笅杞? " + (fname || "output.mp4"));
   } catch (e) {
-    showToast("下载失败: " + e.message, "error");
+    showToast("涓嬭浇澶辫触: " + e.message, "error");
   }
 }
 
@@ -418,11 +418,11 @@ function showToast(body, type) {
 }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] React failed to load. Check network.</div>'"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] ReactDOM failed to load. Check network.</div>'"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] Babel failed to load. Check network.</div>'"></script>
 <script>
 console.log("[clip-sense] CDN loaded: React=" + typeof React + ", ReactDOM=" + typeof ReactDOM + ", Babel=" + (typeof Babel !== "undefined"));
@@ -432,234 +432,234 @@ console.log("[clip-sense] CDN loaded: React=" + typeof React + ", ReactDOM=" + t
 console.log("[clip-sense] Babel script executing...");
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─── i18n dictionary ────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ i18n dictionary 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const I18N_DICT = {
   zh: {
-    "app.title": "智剪工坊",
-    "app.subtitle": "AI 智能视频剪辑",
-    "tabs.create": "创建",
-    "tabs.tasks": "任务列表",
-    "tabs.library": "素材库",
-    "tabs.settings": "设置",
-    "banner.noKey.title": "尚未配置 DashScope API Key",
-    "banner.noKey.desc": "高光提取、段落拆条、口播精编需要 API Key。静音精剪可免费使用。",
-    "banner.noKey.cta": "前往配置",
-    "modal.title": "任务已开始",
-    "modal.desc": "视频正在处理中，您可以继续其他操作或前往任务列表查看进度。",
-    "modal.continue": "继续创建",
-    "modal.goTasks": "前往任务列表",
-    "mode.highlight_extract": "高光提取",
-    "mode.silence_clean": "静音精剪",
-    "mode.topic_split": "段落拆条",
-    "mode.talking_polish": "口播精编",
-    "mode.highlight_extract.desc": "AI 识别精彩片段，自动剪出高光合集",
-    "mode.silence_clean.desc": "自动检测并移除静音/空白段落",
-    "mode.topic_split.desc": "AI 按主题自动拆分长视频为多个短视频",
-    "mode.talking_polish.desc": "AI 去除口误、废话、重复，精炼口播",
-    "status.pending": "等待中",
-    "status.running": "处理中",
-    "status.succeeded": "已完成",
-    "status.failed": "失败",
-    "status.cancelled": "已取消",
-    "create.modeLabel": "剪辑模式",
-    "create.upload": "上传视频",
-    "create.uploadHint": "拖拽或点击上传 MP4 / MOV / MKV",
-    "create.uploadChange": "更换视频",
-    "create.flavor": "选段口味",
-    "create.flavorPlaceholder": "搞笑 / 争议 / 干货 / 全部",
-    "create.targetCount": "目标片段数",
-    "create.targetDuration": "每段目标时长(秒)",
-    "create.silencePreset": "预设方案",
-    "create.preset.conservative": "保守",
-    "create.preset.standard": "标准",
-    "create.preset.aggressive": "激进",
-    "create.threshold": "静音阈值",
-    "create.minSilence": "最短静音(秒)",
-    "create.padding": "保留边距(秒)",
-    "create.segDuration": "每段期望时长",
-    "create.segDur.short": "1-3分钟",
-    "create.segDur.medium": "3-5分钟",
-    "create.segDur.auto": "自动",
-    "create.burnSubtitle": "嵌入字幕",
-    "create.submit": "开始剪辑",
-    "create.submitting": "正在提交...",
-    "create.costEstimate": "预估费用",
-    "create.costFree": "免费（纯本地）",
-    "preview.empty.title": "等待剪辑",
-    "preview.empty.hint": "选择模式并上传视频开始",
-    "preview.step.setup": "准备",
-    "preview.step.check_deps": "检查",
-    "preview.step.transcribe": "转写",
-    "preview.step.analyze": "分析",
-    "preview.step.execute": "处理",
-    "preview.step.subtitle": "字幕",
-    "preview.step.finalize": "完成",
-    "preview.processing": "正在处理视频...",
-    "preview.downloadVideo": "下载视频",
-    "preview.downloadSrt": "下载字幕",
-    "preview.viewInTasks": "在任务列表中查看",
-    "tasks.filter.status": "状态",
-    "tasks.filter.mode": "模式",
-    "tasks.filter.all": "全部",
-    "tasks.filter.allModes": "全部模式",
-    "tasks.empty.title": "暂无任务",
-    "tasks.empty.hint": "在「创建」页发起一次剪辑后，任务会出现在这里",
-    "tasks.untitled": "无标题",
-    "tasks.totalCount": "共 {n} 个任务",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.retry": "重试",
-    "tasks.detail.delete": "删除",
-    "tasks.detail.cancel": "取消",
-    "tasks.detail.download": "下载",
-    "tasks.detail.confirmDelete": "确定删除?",
-    "tasks.detail.runningHint": "正在处理...",
-    "tasks.detail.noSilenceDetected": "未检测到静音段，输出为原视频副本。可尝试调低阈值或缩短最小静音时长。",
+    "app.title": "鏅哄壀宸ュ潑",
+    "app.subtitle": "AI 鏅鸿兘瑙嗛鍓緫",
+    "tabs.create": "鍒涘缓",
+    "tabs.tasks": "浠诲姟鍒楄〃",
+    "tabs.library": "绱犳潗搴?,
+    "tabs.settings": "璁剧疆",
+    "banner.noKey.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "banner.noKey.desc": "楂樺厜鎻愬彇銆佹钀芥媶鏉°€佸彛鎾簿缂栭渶瑕?API Key銆傞潤闊崇簿鍓彲鍏嶈垂浣跨敤銆?,
+    "banner.noKey.cta": "鍓嶅線閰嶇疆",
+    "modal.title": "浠诲姟宸插紑濮?,
+    "modal.desc": "瑙嗛姝ｅ湪澶勭悊涓紝鎮ㄥ彲浠ョ户缁叾浠栨搷浣滄垨鍓嶅線浠诲姟鍒楄〃鏌ョ湅杩涘害銆?,
+    "modal.continue": "缁х画鍒涘缓",
+    "modal.goTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "mode.highlight_extract": "楂樺厜鎻愬彇",
+    "mode.silence_clean": "闈欓煶绮惧壀",
+    "mode.topic_split": "娈佃惤鎷嗘潯",
+    "mode.talking_polish": "鍙ｆ挱绮剧紪",
+    "mode.highlight_extract.desc": "AI 璇嗗埆绮惧僵鐗囨锛岃嚜鍔ㄥ壀鍑洪珮鍏夊悎闆?,
+    "mode.silence_clean.desc": "鑷姩妫€娴嬪苟绉婚櫎闈欓煶/绌虹櫧娈佃惤",
+    "mode.topic_split.desc": "AI 鎸変富棰樿嚜鍔ㄦ媶鍒嗛暱瑙嗛涓哄涓煭瑙嗛",
+    "mode.talking_polish.desc": "AI 鍘婚櫎鍙ｈ銆佸簾璇濄€侀噸澶嶏紝绮剧偧鍙ｆ挱",
+    "status.pending": "绛夊緟涓?,
+    "status.running": "澶勭悊涓?,
+    "status.succeeded": "宸插畬鎴?,
+    "status.failed": "澶辫触",
+    "status.cancelled": "宸插彇娑?,
+    "create.modeLabel": "鍓緫妯″紡",
+    "create.upload": "涓婁紶瑙嗛",
+    "create.uploadHint": "鎷栨嫿鎴栫偣鍑讳笂浼?MP4 / MOV / MKV",
+    "create.uploadChange": "鏇存崲瑙嗛",
+    "create.flavor": "閫夋鍙ｅ懗",
+    "create.flavorPlaceholder": "鎼炵瑧 / 浜夎 / 骞茶揣 / 鍏ㄩ儴",
+    "create.targetCount": "鐩爣鐗囨鏁?,
+    "create.targetDuration": "姣忔鐩爣鏃堕暱(绉?",
+    "create.silencePreset": "棰勮鏂规",
+    "create.preset.conservative": "淇濆畧",
+    "create.preset.standard": "鏍囧噯",
+    "create.preset.aggressive": "婵€杩?,
+    "create.threshold": "闈欓煶闃堝€?,
+    "create.minSilence": "鏈€鐭潤闊?绉?",
+    "create.padding": "淇濈暀杈硅窛(绉?",
+    "create.segDuration": "姣忔鏈熸湜鏃堕暱",
+    "create.segDur.short": "1-3鍒嗛挓",
+    "create.segDur.medium": "3-5鍒嗛挓",
+    "create.segDur.auto": "鑷姩",
+    "create.burnSubtitle": "宓屽叆瀛楀箷",
+    "create.submit": "寮€濮嬪壀杈?,
+    "create.submitting": "姝ｅ湪鎻愪氦...",
+    "create.costEstimate": "棰勪及璐圭敤",
+    "create.costFree": "鍏嶈垂锛堢函鏈湴锛?,
+    "preview.empty.title": "绛夊緟鍓緫",
+    "preview.empty.hint": "閫夋嫨妯″紡骞朵笂浼犺棰戝紑濮?,
+    "preview.step.setup": "鍑嗗",
+    "preview.step.check_deps": "妫€鏌?,
+    "preview.step.transcribe": "杞啓",
+    "preview.step.analyze": "鍒嗘瀽",
+    "preview.step.execute": "澶勭悊",
+    "preview.step.subtitle": "瀛楀箷",
+    "preview.step.finalize": "瀹屾垚",
+    "preview.processing": "姝ｅ湪澶勭悊瑙嗛...",
+    "preview.downloadVideo": "涓嬭浇瑙嗛",
+    "preview.downloadSrt": "涓嬭浇瀛楀箷",
+    "preview.viewInTasks": "鍦ㄤ换鍔″垪琛ㄤ腑鏌ョ湅",
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.mode": "妯″紡",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.allModes": "鍏ㄩ儴妯″紡",
+    "tasks.empty.title": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": "鍦ㄣ€屽垱寤恒€嶉〉鍙戣捣涓€娆″壀杈戝悗锛屼换鍔′細鍑虹幇鍦ㄨ繖閲?,
+    "tasks.untitled": "鏃犳爣棰?,
+    "tasks.totalCount": "鍏?{n} 涓换鍔?,
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.retry": "閲嶈瘯",
+    "tasks.detail.delete": "鍒犻櫎",
+    "tasks.detail.cancel": "鍙栨秷",
+    "tasks.detail.download": "涓嬭浇",
+    "tasks.detail.confirmDelete": "纭畾鍒犻櫎?",
+    "tasks.detail.runningHint": "姝ｅ湪澶勭悊...",
+    "tasks.detail.noSilenceDetected": "鏈娴嬪埌闈欓煶娈碉紝杈撳嚭涓哄師瑙嗛鍓湰銆傚彲灏濊瘯璋冧綆闃堝€兼垨缂╃煭鏈€灏忛潤闊虫椂闀裤€?,
     "tasks.detail.id": "ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.duration": "时长",
-    "tasks.detail.outputDuration": "输出时长",
-    "tasks.detail.createdAt": "创建时间",
-    "tasks.detail.step": "当前步骤",
-    "tasks.detail.transcript": "完整字幕预览",
-    "tasks.detail.transcriptLoading": "正在加载转写文本…",
-    "tasks.detail.transcriptEmpty": "该任务暂无转写文本",
-    "tasks.detail.transcriptError": "转写文本加载失败",
-    "tasks.detail.transcriptShow": "查看字幕",
-    "tasks.detail.transcriptHide": "收起字幕",
-    "tasks.detail.transcriptCopy": "复制全文",
-    "tasks.detail.transcriptDownloadSrt": "下载 SRT",
-    "tasks.detail.transcriptCopied": "已复制到剪贴板",
-    "tasks.empty.noSelection.title": "未选择任务",
-    "tasks.empty.noSelection.hint": "从左侧列表选择一个任务查看详情",
-    "library.title": "素材库",
-    "library.empty": "上传第一个视频素材",
-    "library.uploadBtn": "上传新视频",
-    "library.transcribed": "已转写",
-    "library.pending": "待转写",
-    "library.use": "使用",
-    "library.loaded": "已加载素材",
-    "library.fromLibrary": "来自素材库",
-    "settings.section.api": "API 配置",
-    "settings.section.permissions": "插件权限",
-    "settings.section.system": "系统组件",
-    "settings.section.defaults": "默认参数",
-    "settings.section.folder": "文件夹设置",
-    "settings.section.storage": "存储用量",
-    "settings.api.title": "API 配置",
-    "settings.api.callout": "必填项",
-    "settings.api.key.show": "显示",
-    "settings.api.key.hide": "隐藏",
-    "settings.api.key.save": "保存",
-    "settings.api.key.helpPrefix": "获取地址: ",
-    "settings.api.key.helpLink": "阿里云百炼控制台",
-    "settings.api.key.label": "DashScope ASR Key（语音转写）",
-    "settings.api.key.help": "高光提取、段落拆条、口播精编仍需要百炼 Paraformer 做语音转写；内容分析默认使用 Synapse 主程序已配置的大模型。",
-    "settings.api.analysis.advanced": "高级：使用单独百炼 Qwen 做内容分析",
-    "settings.api.analysis.provider": "内容分析模型",
-    "settings.api.analysis.host": "默认：Synapse 主程序大模型",
-    "settings.api.analysis.dashscope": "自定义：百炼 Qwen Key",
-    "settings.api.analysis.key.label": "百炼 Qwen API Key",
-    "settings.api.analysis.key.help": "只有选择自定义并填写此 Key 时，内容分析才会绕过主程序大模型，改用百炼 Qwen 接口。",
-    "settings.system.intro.strong": "FFmpeg 是 ClipSense 的硬性依赖：4 种剪辑模式都需要它来探测时长、抽取音频、剪切拼接和烧字幕。",
-    "settings.system.intro.body": "FFmpeg 是系统级组件（共享 PATH 安装），并非本插件私有——任何已经装好 ffmpeg 的机器都会自动检测到，无需重复安装；同样，安装/卸载也会影响其他用到 ffmpeg 的插件和程序。",
-    "settings.system.platform.win": "Windows: 「一键安装」会调用 winget 自动安装 Gyan.FFmpeg，无需管理员权限。",
-    "settings.system.platform.mac": "macOS: 「一键安装」会调用 Homebrew 自动安装 ffmpeg。",
-    "settings.system.platform.linux": "Linux: apt / dnf 需要 root 权限。如果 Synapse 以普通用户身份运行，请按提示在终端执行 sudo apt-get install ffmpeg。",
-    "settings.system.detecting": "正在检测...",
-    "settings.system.status.found": "已安装 v{ver}",
-    "settings.system.status.foundNoVer": "已安装",
-    "settings.system.status.missing": "未安装",
-    "settings.system.location": "路径：{path}",
-    "settings.system.btn.install": "一键安装",
-    "settings.system.btn.recheck": "重新检测",
-    "settings.system.btn.openHome": "查看官方文档",
-    "settings.system.btn.copyCmd": "复制命令",
-    "settings.system.btn.copied": "已复制",
-    "settings.system.btn.cancel": "取消",
-    "settings.system.btn.uninstall": "卸载",
-    "settings.system.btn.uninstallConfirmBtn": "确认卸载",
-    "settings.system.installing": "安装中... ({elapsed})",
-    "settings.system.uninstalling": "卸载中... ({elapsed})",
-    "settings.system.installed": "FFmpeg 安装成功",
-    "settings.system.installFailed": "安装失败：{msg}",
-    "settings.system.uninstalled": "FFmpeg 已卸载",
-    "settings.system.uninstallFailed": "卸载失败：{msg}",
-    "settings.system.uninstallConfirm": "确定要卸载 FFmpeg 吗？\n\n注意：FFmpeg 是系统级组件（装在 Windows 用户 PATH / macOS Homebrew / Linux /usr/bin），不是 ClipSense 插件私有的——卸载会影响 Synapse 上所有依赖 FFmpeg 的插件（如字幕生成、视频翻译、配音等），以及你系统上其他用到 ffmpeg 的程序。\n\n本插件 4 种剪辑模式都将无法运行。",
-    "settings.system.requiresSudo": "Linux 需要 root 权限。请在终端手动执行：",
-    "settings.system.noMethod": "当前系统暂无自动安装方案，请前往官方文档手动下载。",
-    "settings.system.logTitle": "安装日志",
-    "settings.system.logTitleUninstall": "卸载日志",
-    "settings.system.logEmpty": "暂无输出",
-    "settings.system.manualPath": "或手动指定 FFmpeg 路径",
-    "settings.system.manualPath.placeholder": "默认: ffmpeg（在 PATH 中）",
-    "settings.system.manualPath.save": "保存路径",
-    "settings.perms.intro.strong": "本插件需要以下高级权限才能完整工作。",
-    "settings.perms.intro.body": "首次安装时未自动授予；点击下方按钮一键授权（等价于在「设置中心 → 插件管理 → 权限」勾选保存）。",
-    "settings.perms.allOk": "所有所需权限已授予。",
-    "settings.perms.btn.grantAll": "一键授予所有权限",
-    "settings.perms.granting": "授予中...",
-    "settings.perms.granted": "权限已授予，插件已重新加载",
-    "settings.perms.grantFailed": "授权失败：{msg}",
-    "settings.perms.col.permission": "权限",
-    "settings.perms.col.feature": "用途",
-    "settings.perms.col.status": "状态",
-    "settings.perms.status.ok": "已授予",
-    "settings.perms.status.missing": "未授予",
-    "settings.defaults.title": "默认参数",
-    "settings.defaults.subtitle": "默认嵌入字幕",
-    "settings.defaults.format": "默认输出格式",
-    "settings.label.outputDir": "视频输出目录",
-    "settings.outputDir.placeholder": "默认: <插件数据目录>/tasks/",
-    "settings.label.uploadsDir": "上传视频缓存目录",
-    "settings.uploadsDir.placeholder": "默认: <插件数据目录>/uploads/",
-    "settings.btn.browse": "选择",
-    "settings.btn.open": "打开",
-    "settings.pickOutput": "选择视频输出目录",
-    "settings.pickUploads": "选择上传缓存目录",
-    "settings.folder.openFailed": "打开文件夹失败：{msg}",
-    "settings.folder.savedTo": "已保存到 {path}",
-    "settings.stats.outputDir": "输出目录",
-    "settings.stats.uploadsDir": "上传缓存",
-    "settings.stats.tasksDir": "任务工作目录",
-    "settings.stats.fileCount": "{n} 个文件",
-    "settings.stats.pathLabel": "扫描路径",
-    "settings.stats.scopeHint": "仅统计上列路径内的文件。用「下载」保存到系统文件夹的视频不计入；在「创建」页上传或任务完成后，此处数字才会增加。每次进入本页会重新统计。",
-    "settings.cache.clearBtn": "清理上传缓存",
-    "settings.cache.clearOutputBtn": "清理输出文件",
-    "settings.cache.confirmClear": "确认清空上传缓存目录？已上传的原始文件将被删除（不影响已完成的任务输出）。",
-    "settings.cache.confirmClearOutput": "确认清空输出目录？所有任务的输出视频和字幕将被删除，任务记录不受影响。",
-    "settings.cache.cleared": "已清理 {mb} MB（{n} 个文件）",
-    "settings.storage.title": "存储",
-    "settings.storage.files": "文件数",
-    "settings.storage.size": "总大小",
-    "picker.title": "选择文件夹",
-    "picker.crumb.root": "返回起点",
-    "picker.shortcut.start": "起点",
-    "picker.loading": "加载中...",
-    "picker.empty": "目录为空",
-    "picker.created": "已新建文件夹「{name}」",
-    "picker.error.load": "加载失败：{msg}",
-    "picker.error.create": "新建失败：{msg}",
-    "picker.btn.cancel": "取消",
-    "picker.btn.choose": "选用此处",
-    "picker.btn.newFolder": "新建文件夹",
-    "picker.btn.confirmCreate": "新建",
-    "picker.newFolder.placeholder": "输入新文件夹名称",
-    "toast.taskCreated": "任务已创建",
-    "toast.createFail": "创建失败",
-    "toast.needKey": "请先在设置中配置 API Key",
-    "toast.needVideo": "请先上传视频",
-    "toast.deleted": "已删除",
-    "toast.cancelled": "已取消",
-    "toast.retryCreated": "重试任务已创建",
-    "toast.downloading": "下载中...",
-    "toast.uploadFail": "上传失败",
-    "toast.savedSettings": "设置已保存",
-    "toast.saveFailed": "保存失败",
-    "error.title": "处理失败",
-    "err.title": "插件 UI 渲染出错",
-    "err.retry": "重试渲染",
-    "err.stackLabel": "错误堆栈 (复制给开发者)",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.duration": "鏃堕暱",
+    "tasks.detail.outputDuration": "杈撳嚭鏃堕暱",
+    "tasks.detail.createdAt": "鍒涘缓鏃堕棿",
+    "tasks.detail.step": "褰撳墠姝ラ",
+    "tasks.detail.transcript": "瀹屾暣瀛楀箷棰勮",
+    "tasks.detail.transcriptLoading": "姝ｅ湪鍔犺浇杞啓鏂囨湰鈥?,
+    "tasks.detail.transcriptEmpty": "璇ヤ换鍔℃殏鏃犺浆鍐欐枃鏈?,
+    "tasks.detail.transcriptError": "杞啓鏂囨湰鍔犺浇澶辫触",
+    "tasks.detail.transcriptShow": "鏌ョ湅瀛楀箷",
+    "tasks.detail.transcriptHide": "鏀惰捣瀛楀箷",
+    "tasks.detail.transcriptCopy": "澶嶅埗鍏ㄦ枃",
+    "tasks.detail.transcriptDownloadSrt": "涓嬭浇 SRT",
+    "tasks.detail.transcriptCopied": "宸插鍒跺埌鍓创鏉?,
+    "tasks.empty.noSelection.title": "鏈€夋嫨浠诲姟",
+    "tasks.empty.noSelection.hint": "浠庡乏渚у垪琛ㄩ€夋嫨涓€涓换鍔℃煡鐪嬭鎯?,
+    "library.title": "绱犳潗搴?,
+    "library.empty": "涓婁紶绗竴涓棰戠礌鏉?,
+    "library.uploadBtn": "涓婁紶鏂拌棰?,
+    "library.transcribed": "宸茶浆鍐?,
+    "library.pending": "寰呰浆鍐?,
+    "library.use": "浣跨敤",
+    "library.loaded": "宸插姞杞界礌鏉?,
+    "library.fromLibrary": "鏉ヨ嚜绱犳潗搴?,
+    "settings.section.api": "API 閰嶇疆",
+    "settings.section.permissions": "鎻掍欢鏉冮檺",
+    "settings.section.system": "绯荤粺缁勪欢",
+    "settings.section.defaults": "榛樿鍙傛暟",
+    "settings.section.folder": "鏂囦欢澶硅缃?,
+    "settings.section.storage": "瀛樺偍鐢ㄩ噺",
+    "settings.api.title": "API 閰嶇疆",
+    "settings.api.callout": "蹇呭～椤?,
+    "settings.api.key.show": "鏄剧ず",
+    "settings.api.key.hide": "闅愯棌",
+    "settings.api.key.save": "淇濆瓨",
+    "settings.api.key.helpPrefix": "鑾峰彇鍦板潃: ",
+    "settings.api.key.helpLink": "闃块噷浜戠櫨鐐兼帶鍒跺彴",
+    "settings.api.key.label": "DashScope ASR Key锛堣闊宠浆鍐欙級",
+    "settings.api.key.help": "楂樺厜鎻愬彇銆佹钀芥媶鏉°€佸彛鎾簿缂栦粛闇€瑕佺櫨鐐?Paraformer 鍋氳闊宠浆鍐欙紱鍐呭鍒嗘瀽榛樿浣跨敤 Synapse 涓荤▼搴忓凡閰嶇疆鐨勫ぇ妯″瀷銆?,
+    "settings.api.analysis.advanced": "楂樼骇锛氫娇鐢ㄥ崟鐙櫨鐐?Qwen 鍋氬唴瀹瑰垎鏋?,
+    "settings.api.analysis.provider": "鍐呭鍒嗘瀽妯″瀷",
+    "settings.api.analysis.host": "榛樿锛歋ynapse 涓荤▼搴忓ぇ妯″瀷",
+    "settings.api.analysis.dashscope": "鑷畾涔夛細鐧剧偧 Qwen Key",
+    "settings.api.analysis.key.label": "鐧剧偧 Qwen API Key",
+    "settings.api.analysis.key.help": "鍙湁閫夋嫨鑷畾涔夊苟濉啓姝?Key 鏃讹紝鍐呭鍒嗘瀽鎵嶄細缁曡繃涓荤▼搴忓ぇ妯″瀷锛屾敼鐢ㄧ櫨鐐?Qwen 鎺ュ彛銆?,
+    "settings.system.intro.strong": "FFmpeg 鏄?ClipSense 鐨勭‖鎬т緷璧栵細4 绉嶅壀杈戞ā寮忛兘闇€瑕佸畠鏉ユ帰娴嬫椂闀裤€佹娊鍙栭煶棰戙€佸壀鍒囨嫾鎺ュ拰鐑у瓧骞曘€?,
+    "settings.system.intro.body": "FFmpeg 鏄郴缁熺骇缁勪欢锛堝叡浜?PATH 瀹夎锛夛紝骞堕潪鏈彃浠剁鏈夆€斺€斾换浣曞凡缁忚濂?ffmpeg 鐨勬満鍣ㄩ兘浼氳嚜鍔ㄦ娴嬪埌锛屾棤闇€閲嶅瀹夎锛涘悓鏍凤紝瀹夎/鍗歌浇涔熶細褰卞搷鍏朵粬鐢ㄥ埌 ffmpeg 鐨勬彃浠跺拰绋嬪簭銆?,
+    "settings.system.platform.win": "Windows: 銆屼竴閿畨瑁呫€嶄細璋冪敤 winget 鑷姩瀹夎 Gyan.FFmpeg锛屾棤闇€绠＄悊鍛樻潈闄愩€?,
+    "settings.system.platform.mac": "macOS: 銆屼竴閿畨瑁呫€嶄細璋冪敤 Homebrew 鑷姩瀹夎 ffmpeg銆?,
+    "settings.system.platform.linux": "Linux: apt / dnf 闇€瑕?root 鏉冮檺銆傚鏋?Synapse 浠ユ櫘閫氱敤鎴疯韩浠借繍琛岋紝璇锋寜鎻愮ず鍦ㄧ粓绔墽琛?sudo apt-get install ffmpeg銆?,
+    "settings.system.detecting": "姝ｅ湪妫€娴?..",
+    "settings.system.status.found": "宸插畨瑁?v{ver}",
+    "settings.system.status.foundNoVer": "宸插畨瑁?,
+    "settings.system.status.missing": "鏈畨瑁?,
+    "settings.system.location": "璺緞锛歿path}",
+    "settings.system.btn.install": "涓€閿畨瑁?,
+    "settings.system.btn.recheck": "閲嶆柊妫€娴?,
+    "settings.system.btn.openHome": "鏌ョ湅瀹樻柟鏂囨。",
+    "settings.system.btn.copyCmd": "澶嶅埗鍛戒护",
+    "settings.system.btn.copied": "宸插鍒?,
+    "settings.system.btn.cancel": "鍙栨秷",
+    "settings.system.btn.uninstall": "鍗歌浇",
+    "settings.system.btn.uninstallConfirmBtn": "纭鍗歌浇",
+    "settings.system.installing": "瀹夎涓?.. ({elapsed})",
+    "settings.system.uninstalling": "鍗歌浇涓?.. ({elapsed})",
+    "settings.system.installed": "FFmpeg 瀹夎鎴愬姛",
+    "settings.system.installFailed": "瀹夎澶辫触锛歿msg}",
+    "settings.system.uninstalled": "FFmpeg 宸插嵏杞?,
+    "settings.system.uninstallFailed": "鍗歌浇澶辫触锛歿msg}",
+    "settings.system.uninstallConfirm": "纭畾瑕佸嵏杞?FFmpeg 鍚楋紵\n\n娉ㄦ剰锛欶Fmpeg 鏄郴缁熺骇缁勪欢锛堣鍦?Windows 鐢ㄦ埛 PATH / macOS Homebrew / Linux /usr/bin锛夛紝涓嶆槸 ClipSense 鎻掍欢绉佹湁鐨勨€斺€斿嵏杞戒細褰卞搷 Synapse 涓婃墍鏈変緷璧?FFmpeg 鐨勬彃浠讹紙濡傚瓧骞曠敓鎴愩€佽棰戠炕璇戙€侀厤闊崇瓑锛夛紝浠ュ強浣犵郴缁熶笂鍏朵粬鐢ㄥ埌 ffmpeg 鐨勭▼搴忋€俓n\n鏈彃浠?4 绉嶅壀杈戞ā寮忛兘灏嗘棤娉曡繍琛屻€?,
+    "settings.system.requiresSudo": "Linux 闇€瑕?root 鏉冮檺銆傝鍦ㄧ粓绔墜鍔ㄦ墽琛岋細",
+    "settings.system.noMethod": "褰撳墠绯荤粺鏆傛棤鑷姩瀹夎鏂规锛岃鍓嶅線瀹樻柟鏂囨。鎵嬪姩涓嬭浇銆?,
+    "settings.system.logTitle": "瀹夎鏃ュ織",
+    "settings.system.logTitleUninstall": "鍗歌浇鏃ュ織",
+    "settings.system.logEmpty": "鏆傛棤杈撳嚭",
+    "settings.system.manualPath": "鎴栨墜鍔ㄦ寚瀹?FFmpeg 璺緞",
+    "settings.system.manualPath.placeholder": "榛樿: ffmpeg锛堝湪 PATH 涓級",
+    "settings.system.manualPath.save": "淇濆瓨璺緞",
+    "settings.perms.intro.strong": "鏈彃浠堕渶瑕佷互涓嬮珮绾ф潈闄愭墠鑳藉畬鏁村伐浣溿€?,
+    "settings.perms.intro.body": "棣栨瀹夎鏃舵湭鑷姩鎺堜簣锛涚偣鍑讳笅鏂规寜閽竴閿巿鏉冿紙绛変环浜庡湪銆岃缃腑蹇?鈫?鎻掍欢绠＄悊 鈫?鏉冮檺銆嶅嬀閫変繚瀛橈級銆?,
+    "settings.perms.allOk": "鎵€鏈夋墍闇€鏉冮檺宸叉巿浜堛€?,
+    "settings.perms.btn.grantAll": "涓€閿巿浜堟墍鏈夋潈闄?,
+    "settings.perms.granting": "鎺堜簣涓?..",
+    "settings.perms.granted": "鏉冮檺宸叉巿浜堬紝鎻掍欢宸查噸鏂板姞杞?,
+    "settings.perms.grantFailed": "鎺堟潈澶辫触锛歿msg}",
+    "settings.perms.col.permission": "鏉冮檺",
+    "settings.perms.col.feature": "鐢ㄩ€?,
+    "settings.perms.col.status": "鐘舵€?,
+    "settings.perms.status.ok": "宸叉巿浜?,
+    "settings.perms.status.missing": "鏈巿浜?,
+    "settings.defaults.title": "榛樿鍙傛暟",
+    "settings.defaults.subtitle": "榛樿宓屽叆瀛楀箷",
+    "settings.defaults.format": "榛樿杈撳嚭鏍煎紡",
+    "settings.label.outputDir": "瑙嗛杈撳嚭鐩綍",
+    "settings.outputDir.placeholder": "榛樿: <鎻掍欢鏁版嵁鐩綍>/tasks/",
+    "settings.label.uploadsDir": "涓婁紶瑙嗛缂撳瓨鐩綍",
+    "settings.uploadsDir.placeholder": "榛樿: <鎻掍欢鏁版嵁鐩綍>/uploads/",
+    "settings.btn.browse": "閫夋嫨",
+    "settings.btn.open": "鎵撳紑",
+    "settings.pickOutput": "閫夋嫨瑙嗛杈撳嚭鐩綍",
+    "settings.pickUploads": "閫夋嫨涓婁紶缂撳瓨鐩綍",
+    "settings.folder.openFailed": "鎵撳紑鏂囦欢澶瑰け璐ワ細{msg}",
+    "settings.folder.savedTo": "宸蹭繚瀛樺埌 {path}",
+    "settings.stats.outputDir": "杈撳嚭鐩綍",
+    "settings.stats.uploadsDir": "涓婁紶缂撳瓨",
+    "settings.stats.tasksDir": "浠诲姟宸ヤ綔鐩綍",
+    "settings.stats.fileCount": "{n} 涓枃浠?,
+    "settings.stats.pathLabel": "鎵弿璺緞",
+    "settings.stats.scopeHint": "浠呯粺璁′笂鍒楄矾寰勫唴鐨勬枃浠躲€傜敤銆屼笅杞姐€嶄繚瀛樺埌绯荤粺鏂囦欢澶圭殑瑙嗛涓嶈鍏ワ紱鍦ㄣ€屽垱寤恒€嶉〉涓婁紶鎴栦换鍔″畬鎴愬悗锛屾澶勬暟瀛楁墠浼氬鍔犮€傛瘡娆¤繘鍏ユ湰椤典細閲嶆柊缁熻銆?,
+    "settings.cache.clearBtn": "娓呯悊涓婁紶缂撳瓨",
+    "settings.cache.clearOutputBtn": "娓呯悊杈撳嚭鏂囦欢",
+    "settings.cache.confirmClear": "纭娓呯┖涓婁紶缂撳瓨鐩綍锛熷凡涓婁紶鐨勫師濮嬫枃浠跺皢琚垹闄わ紙涓嶅奖鍝嶅凡瀹屾垚鐨勪换鍔¤緭鍑猴級銆?,
+    "settings.cache.confirmClearOutput": "纭娓呯┖杈撳嚭鐩綍锛熸墍鏈変换鍔＄殑杈撳嚭瑙嗛鍜屽瓧骞曞皢琚垹闄わ紝浠诲姟璁板綍涓嶅彈褰卞搷銆?,
+    "settings.cache.cleared": "宸叉竻鐞?{mb} MB锛坽n} 涓枃浠讹級",
+    "settings.storage.title": "瀛樺偍",
+    "settings.storage.files": "鏂囦欢鏁?,
+    "settings.storage.size": "鎬诲ぇ灏?,
+    "picker.title": "閫夋嫨鏂囦欢澶?,
+    "picker.crumb.root": "杩斿洖璧风偣",
+    "picker.shortcut.start": "璧风偣",
+    "picker.loading": "鍔犺浇涓?..",
+    "picker.empty": "鐩綍涓虹┖",
+    "picker.created": "宸叉柊寤烘枃浠跺す銆寋name}銆?,
+    "picker.error.load": "鍔犺浇澶辫触锛歿msg}",
+    "picker.error.create": "鏂板缓澶辫触锛歿msg}",
+    "picker.btn.cancel": "鍙栨秷",
+    "picker.btn.choose": "閫夌敤姝ゅ",
+    "picker.btn.newFolder": "鏂板缓鏂囦欢澶?,
+    "picker.btn.confirmCreate": "鏂板缓",
+    "picker.newFolder.placeholder": "杈撳叆鏂版枃浠跺す鍚嶇О",
+    "toast.taskCreated": "浠诲姟宸插垱寤?,
+    "toast.createFail": "鍒涘缓澶辫触",
+    "toast.needKey": "璇峰厛鍦ㄨ缃腑閰嶇疆 API Key",
+    "toast.needVideo": "璇峰厛涓婁紶瑙嗛",
+    "toast.deleted": "宸插垹闄?,
+    "toast.cancelled": "宸插彇娑?,
+    "toast.retryCreated": "閲嶈瘯浠诲姟宸插垱寤?,
+    "toast.downloading": "涓嬭浇涓?..",
+    "toast.uploadFail": "涓婁紶澶辫触",
+    "toast.savedSettings": "璁剧疆宸蹭繚瀛?,
+    "toast.saveFailed": "淇濆瓨澶辫触",
+    "error.title": "澶勭悊澶辫触",
+    "err.title": "鎻掍欢 UI 娓叉煋鍑洪敊",
+    "err.retry": "閲嶈瘯娓叉煋",
+    "err.stackLabel": "閿欒鍫嗘爤 (澶嶅埗缁欏紑鍙戣€?",
   },
   en: {
     "app.title": "ClipSense",
@@ -748,7 +748,7 @@ const I18N_DICT = {
     "tasks.detail.createdAt": "Created at",
     "tasks.detail.step": "Current step",
     "tasks.detail.transcript": "Full transcript",
-    "tasks.detail.transcriptLoading": "Loading transcript…",
+    "tasks.detail.transcriptLoading": "Loading transcript鈥?,
     "tasks.detail.transcriptEmpty": "No transcript available for this task",
     "tasks.detail.transcriptError": "Failed to load transcript",
     "tasks.detail.transcriptShow": "Show transcript",
@@ -787,7 +787,7 @@ const I18N_DICT = {
     "settings.api.analysis.dashscope": "Custom: Bailian Qwen Key",
     "settings.api.analysis.key.label": "Bailian Qwen API Key",
     "settings.api.analysis.key.help": "Only when this custom branch is selected and a key is saved will analysis bypass the main LLM and call Bailian Qwen.",
-    "settings.system.intro.strong": "FFmpeg is a hard dependency for ClipSense — every editing mode needs it for probing, audio extraction, segment cut/concat, and subtitle burn-in.",
+    "settings.system.intro.strong": "FFmpeg is a hard dependency for ClipSense 鈥?every editing mode needs it for probing, audio extraction, segment cut/concat, and subtitle burn-in.",
     "settings.system.intro.body": "FFmpeg is a system-level component (installed on the shared PATH) and is NOT private to this plugin. Any machine that already has ffmpeg will be auto-detected with no need to reinstall; conversely, install/uninstall here affects every other plugin and program on your system that uses ffmpeg.",
     "settings.system.platform.win": "Windows: \"Install\" runs winget to install Gyan.FFmpeg, no admin rights required.",
     "settings.system.platform.mac": "macOS: \"Install\" runs Homebrew to install ffmpeg.",
@@ -811,7 +811,7 @@ const I18N_DICT = {
     "settings.system.installFailed": "Install failed: {msg}",
     "settings.system.uninstalled": "FFmpeg uninstalled",
     "settings.system.uninstallFailed": "Uninstall failed: {msg}",
-    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nFFmpeg is a system-level component (Windows user PATH / macOS Homebrew / Linux /usr/bin), not private to ClipSense — uninstalling will break every other Synapse plugin that depends on FFmpeg (subtitle, dubbing, translation…) plus any other program on your system that uses it.\n\nAll 4 ClipSense editing modes will stop working.",
+    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nFFmpeg is a system-level component (Windows user PATH / macOS Homebrew / Linux /usr/bin), not private to ClipSense 鈥?uninstalling will break every other Synapse plugin that depends on FFmpeg (subtitle, dubbing, translation鈥? plus any other program on your system that uses it.\n\nAll 4 ClipSense editing modes will stop working.",
     "settings.system.requiresSudo": "Linux needs root. Run this in a terminal:",
     "settings.system.noMethod": "No automated install method on this system. Please follow the official docs to install manually.",
     "settings.system.logTitle": "Install log",
@@ -821,7 +821,7 @@ const I18N_DICT = {
     "settings.system.manualPath.placeholder": "Default: ffmpeg (on PATH)",
     "settings.system.manualPath.save": "Save path",
     "settings.perms.intro.strong": "ClipSense needs the following advanced permissions to work end-to-end.",
-    "settings.perms.intro.body": "Not auto-granted on first install — click below to grant them all (equivalent to ticking the boxes in Setup Center → Plugin Manager → Permissions).",
+    "settings.perms.intro.body": "Not auto-granted on first install 鈥?click below to grant them all (equivalent to ticking the boxes in Setup Center 鈫?Plugin Manager 鈫?Permissions).",
     "settings.perms.allOk": "All required permissions granted.",
     "settings.perms.btn.grantAll": "Grant all permissions",
     "settings.perms.granting": "Granting...",
@@ -920,7 +920,7 @@ function useT() {
   return _i18n.t;
 }
 
-// ── Mode definitions ──
+// 鈹€鈹€ Mode definitions 鈹€鈹€
 const MODE_DEFS = [
   { id: "highlight_extract", iconKey: "sparkles" },
   { id: "silence_clean",     iconKey: "headphones" },
@@ -931,7 +931,7 @@ function modeList(t) {
   return MODE_DEFS.map(m => ({ ...m, name: t("mode." + m.id) }));
 }
 
-// ── SVG Icon (calls the function!) ──
+// 鈹€鈹€ SVG Icon (calls the function!) 鈹€鈹€
 function OAIcon({ name, style }) {
   const svg = (window.SynapseIcons && window.SynapseIcons[name]) ? window.SynapseIcons[name]() : "";
   return <span className="oa-icon" style={style} dangerouslySetInnerHTML={{ __html: svg }} />;
@@ -944,7 +944,7 @@ function Ico({ name, style: s }) {
   return <span className="ico" style={s} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
-// Tiny clipboard helper — falls back to a hidden textarea + execCommand
+// Tiny clipboard helper 鈥?falls back to a hidden textarea + execCommand
 // for the iframe / non-secure-context cases where navigator.clipboard is
 // unavailable. Never throws (best-effort copy).
 function copyToClipboard(text) {
@@ -967,12 +967,12 @@ function copyToClipboard(text) {
   } catch (_) { return false; }
 }
 
-// ── Status helpers ──
+// 鈹€鈹€ Status helpers 鈹€鈹€
 const STATUS_CLS = { pending: "tag-orange", running: "tag-blue", succeeded: "tag-green", failed: "tag-red", cancelled: "tag-gray" };
 function statusLabel(s, t) { return t("status." + s); }
 function statusCls(s) { return STATUS_CLS[s] || "tag-gray"; }
 
-// ── Pipeline steps ──
+// 鈹€鈹€ Pipeline steps 鈹€鈹€
 const PIPELINE_STEPS = ["setup", "check_deps", "transcribe", "analyze", "execute", "subtitle", "finalize"];
 
 function PipelineProgress({ currentStep, status }) {
@@ -990,7 +990,7 @@ function PipelineProgress({ currentStep, status }) {
   );
 }
 
-// ── ErrorPanel ──
+// 鈹€鈹€ ErrorPanel 鈹€鈹€
 function ErrorPanel({ errorKind, errorMessage, errorHints }) {
   const t = useT();
   return (
@@ -1009,7 +1009,7 @@ function ErrorPanel({ errorKind, errorMessage, errorHints }) {
   );
 }
 
-// ── TaskStartedModal ──
+// 鈹€鈹€ TaskStartedModal 鈹€鈹€
 function TaskStartedModal({ open, onClose, onGoToTasks }) {
   const t = useT();
   if (!open) return null;
@@ -1032,7 +1032,7 @@ function TaskStartedModal({ open, onClose, onGoToTasks }) {
   );
 }
 
-// ─── App ───
+// 鈹€鈹€鈹€ App 鈹€鈹€鈹€
 function App() {
   const t = useT();
   const [tab, setTab] = useState("create");
@@ -1082,8 +1082,8 @@ function App() {
         </h1>
         <div className="header-right">
           {ffmpegReady
-            ? <span className="tag tag-green">FFmpeg ✓</span>
-            : <span className="tag tag-red">FFmpeg ✗</span>}
+            ? <span className="tag tag-green">FFmpeg 鉁?/span>
+            : <span className="tag tag-red">FFmpeg 鉁?/span>}
         </div>
       </div>
 
@@ -1137,7 +1137,7 @@ function App() {
   );
 }
 
-// ─── Create Tab ───
+// 鈹€鈹€鈹€ Create Tab 鈹€鈹€鈹€
 function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
   const t = useT();
   const MODES = modeList(t);
@@ -1163,7 +1163,7 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
         setFile(null);
         setUploadResult({ path: item.source_path, url: "" });
         setPreviewTask(null);
-        showToast(t("library.loaded") || "已加载素材: " + (item.source_name || item.source_path.split(/[/\\]/).pop()));
+        showToast(t("library.loaded") || "宸插姞杞界礌鏉? " + (item.source_name || item.source_path.split(/[/\\]/).pop()));
       }
     });
   }, []);
@@ -1266,7 +1266,7 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
                     <OAIcon name="film" style={{fontSize:20}} />
                     <span className="text-sm" style={{fontWeight:500}}>{uploadResult.path.split(/[/\\]/).pop()}</span>
                   </div>
-                  <div className="text-xs text-dim" style={{color: "var(--success)"}}>{t("library.fromLibrary") || "来自素材库"}</div>
+                  <div className="text-xs text-dim" style={{color: "var(--success)"}}>{t("library.fromLibrary") || "鏉ヨ嚜绱犳潗搴?}</div>
                   <button className="btn btn-sm" style={{marginTop:6}}
                           onClick={e => { e.stopPropagation(); fileRef.current && fileRef.current.click(); }}>
                     {t("create.uploadChange")}
@@ -1373,9 +1373,9 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
             <div className="form-row">
               <div className="grid-2" style={{gap:8}}>
                 {[
-                  { key: "remove_filler", label: "去废话" },
-                  { key: "remove_stutter", label: "去口误" },
-                  { key: "remove_repetition", label: "去重复" },
+                  { key: "remove_filler", label: "鍘诲簾璇? },
+                  { key: "remove_stutter", label: "鍘诲彛璇? },
+                  { key: "remove_repetition", label: "鍘婚噸澶? },
                 ].map(sw => (
                   <div key={sw.key} className="flex items-center gap-2">
                     <div className={`switch ${params[sw.key] !== false ? "on" : ""}`}
@@ -1400,7 +1400,7 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
           </div>
 
           <div className="text-xs text-dim" style={{margin: "12px 0 16px"}}>
-            {t("create.costEstimate")}: {isFree ? t("create.costFree") : "~¥1.5 / 30min"}
+            {t("create.costEstimate")}: {isFree ? t("create.costFree") : "~楼1.5 / 30min"}
           </div>
 
           <button className="btn btn-primary" style={{width: "100%", justifyContent: "center", padding: "10px"}}
@@ -1460,7 +1460,7 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
                       <div style={{padding:"8px 12px", marginBottom:8, borderRadius:6,
                                    background:"var(--warning-bg, #fff3cd)", color:"var(--warning-text, #856404)",
                                    fontSize:13, display:"flex", alignItems:"center", gap:6}}>
-                        <span>⚠️</span>
+                        <span>鈿狅笍</span>
                         <span>{t("tasks.detail.noSilenceDetected")}</span>
                       </div>
                     )}
@@ -1469,11 +1469,11 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
                       <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginTop:8}}>
                         <button className="btn btn-sm" disabled={previewTopicIdx <= 0}
                                 onClick={() => setPreviewTopicIdx(i => Math.max(0, i - 1))}
-                                style={{minWidth:32}}>◀</button>
+                                style={{minWidth:32}}>鈼€</button>
                         <span className="text-sm">{previewTopicIdx + 1} / {pTopicFiles.length}</span>
                         <button className="btn btn-sm" disabled={previewTopicIdx >= pTopicFiles.length - 1}
                                 onClick={() => setPreviewTopicIdx(i => Math.min(pTopicFiles.length - 1, i + 1))}
-                                style={{minWidth:32}}>▶</button>
+                                style={{minWidth:32}}>鈻?/button>
                       </div>
                     )}
                   </>
@@ -1526,9 +1526,9 @@ function CreateTab({ apiReady, ffmpegReady, goToTasks }) {
   );
 }
 
-// ─── Transcript Card ───
+// 鈹€鈹€鈹€ Transcript Card 鈹€鈹€鈹€
 // Shown inside the Tasks-tab detail panel when the user clicks the
-// "查看字幕" button. Reads from GET /tasks/{id}/transcript and renders the
+// "鏌ョ湅瀛楀箷" button. Reads from GET /tasks/{id}/transcript and renders the
 // per-sentence timeline plus the joined full text. SRT download reuses the
 // existing GET /tasks/{id}/subtitle endpoint when the pipeline produced one.
 function _fmtTs(sec) {
@@ -1590,7 +1590,7 @@ function TranscriptCard({ t, taskId, hasSubtitleFile, loading, error, data, onRe
       ) : error ? (
         <div className="empty-state" style={{padding: "16px", color: "var(--danger, #dc2626)"}}>
           <div className="text-sm" style={{marginBottom: 8}}>{t("tasks.detail.transcriptError")}: {error}</div>
-          <button className="btn btn-sm" onClick={onReload}>↻</button>
+          <button className="btn btn-sm" onClick={onReload}>鈫?/button>
         </div>
       ) : !data || (!sentences || sentences.length === 0) && !fullText ? (
         <div className="empty-state" style={{padding: "16px"}}>
@@ -1605,7 +1605,7 @@ function TranscriptCard({ t, taskId, hasSubtitleFile, loading, error, data, onRe
               return (
                 <div key={i} className="transcript-line" style={{display: "flex", gap: 10, padding: "4px 0", borderBottom: i < sentences.length - 1 ? "1px dashed var(--border)" : "none"}}>
                   <span className="text-xs text-muted" style={{flex: "0 0 auto", fontFamily: "ui-monospace, monospace", paddingTop: 2}}>
-                    {_fmtTs(start)}–{_fmtTs(end)}
+                    {_fmtTs(start)}鈥搟_fmtTs(end)}
                   </span>
                   <span className="text-sm transcript-text" style={{flex: 1, lineHeight: 1.55, whiteSpace: "pre-wrap", color: "var(--text)"}}>{s.text || ""}</span>
                 </div>
@@ -1620,7 +1620,7 @@ function TranscriptCard({ t, taskId, hasSubtitleFile, loading, error, data, onRe
   );
 }
 
-// ─── Tasks Tab ───
+// 鈹€鈹€鈹€ Tasks Tab 鈹€鈹€鈹€
 function TasksTab({ refreshSignal = 0 }) {
   const t = useT();
   const MODES = modeList(t);
@@ -1630,12 +1630,12 @@ function TasksTab({ refreshSignal = 0 }) {
   const [modeFilter, setModeFilter] = useState("");
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
-  // ── transcript preview state (lazy, per-selected-task) ──
+  // 鈹€鈹€ transcript preview state (lazy, per-selected-task) 鈹€鈹€
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [transcriptData, setTranscriptData] = useState(null);
   const [transcriptLoading, setTranscriptLoading] = useState(false);
   const [transcriptError, setTranscriptError] = useState(null);
-  // ── multi-topic navigation ──
+  // 鈹€鈹€ multi-topic navigation 鈹€鈹€
   const [topicIdx, setTopicIdx] = useState(0);
 
   // Reset transcript view whenever the user picks a different task so
@@ -1852,7 +1852,7 @@ function TasksTab({ refreshSignal = 0 }) {
                       <div style={{padding:"8px 12px", marginBottom:8, borderRadius:6,
                                    background:"var(--warning-bg, #fff3cd)", color:"var(--warning-text, #856404)",
                                    fontSize:13, display:"flex", alignItems:"center", gap:6}}>
-                        <span>⚠️</span>
+                        <span>鈿狅笍</span>
                         <span>{t("tasks.detail.noSilenceDetected")}</span>
                       </div>
                     )}
@@ -1861,11 +1861,11 @@ function TasksTab({ refreshSignal = 0 }) {
                       <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap:12, marginTop:8}}>
                         <button className="btn btn-sm" disabled={topicIdx <= 0}
                                 onClick={() => setTopicIdx(i => Math.max(0, i - 1))}
-                                style={{minWidth:32}}>◀</button>
+                                style={{minWidth:32}}>鈼€</button>
                         <span className="text-sm">{topicIdx + 1} / {topicFiles.length}</span>
                         <button className="btn btn-sm" disabled={topicIdx >= topicFiles.length - 1}
                                 onClick={() => setTopicIdx(i => Math.min(topicFiles.length - 1, i + 1))}
-                                style={{minWidth:32}}>▶</button>
+                                style={{minWidth:32}}>鈻?/button>
                       </div>
                     )}
                   </div>
@@ -1924,7 +1924,7 @@ function TasksTab({ refreshSignal = 0 }) {
   );
 }
 
-// ─── Library Tab ───
+// 鈹€鈹€鈹€ Library Tab 鈹€鈹€鈹€
 function LibraryTab({ onUseItem }) {
   const t = useT();
   const [items, setItems] = useState([]);
@@ -1983,7 +1983,7 @@ function LibraryTab({ onUseItem }) {
             <div className="flex gap-2 items-center">
               {item.source_path && onUseItem && (
                 <button className="btn btn-sm btn-primary" onClick={() => onUseItem(item)}>
-                  {t("library.use") || "使用"}
+                  {t("library.use") || "浣跨敤"}
                 </button>
               )}
               <button className="btn btn-sm btn-danger" onClick={() => handleDelete(item.id)}>
@@ -1997,7 +1997,7 @@ function LibraryTab({ onUseItem }) {
   );
 }
 
-// ─── In-plugin folder picker (mirror seedance-video) ───
+// 鈹€鈹€鈹€ In-plugin folder picker (mirror seedance-video) 鈹€鈹€鈹€
 // Native Tauri folder dialogs have been unreliable across capability/version
 // combos, so we serve our own browser-style picker backed by
 // /storage/list-dir + /storage/mkdir. This requires zero host or Tauri
@@ -2138,7 +2138,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
             {loading && <div className="folder-picker__empty">{t("picker.loading")}</div>}
             {!loading && !isAnchor && parent != null && (
               <div className="folder-picker__item" onClick={() => handleNavigate(parent)}>
-                <span className="folder-picker__item-icon">↰</span>
+                <span className="folder-picker__item-icon">鈫?/span>
                 <span className="folder-picker__item-name">..</span>
               </div>
             )}
@@ -2184,7 +2184,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
   );
 }
 
-// ─── Permissions panel (mirror seedance-video) ───
+// 鈹€鈹€鈹€ Permissions panel (mirror seedance-video) 鈹€鈹€鈹€
 // Drives the in-app "Grant" banner so first-time users are not silently
 // broken by an un-granted manifest permission.
 function PermissionsPanel({ status, onChanged }) {
@@ -2282,10 +2282,10 @@ function PermissionsPanel({ status, onChanged }) {
   );
 }
 
-// ─── FFmpeg installer card (mirror seedance-video) ───
+// 鈹€鈹€鈹€ FFmpeg installer card (mirror seedance-video) 鈹€鈹€鈹€
 // Fire-and-poll one-click install/uninstall via winget/brew/apt with a
 // tail-50 log panel. Replaces the dumb path-input field clip-sense had
-// in v1.0.0 — we keep that as a fallback inside SettingsTab.
+// in v1.0.0 鈥?we keep that as a fallback inside SettingsTab.
 function FfmpegInstaller({ onInstalled, onUninstalled }) {
   const t = useT();
   const [snap, setSnap] = useState(null);
@@ -2604,8 +2604,8 @@ function normalizeFolderConfigValue(s) {
   if (!v) return "";
   const low = v.toLowerCase();
   if (v.indexOf("<") !== -1) return "";
-  if (v.indexOf("插件数据") !== -1) return "";
-  if (v.indexOf("默认:") === 0 || low.indexOf("default:") === 0) return "";
+  if (v.indexOf("鎻掍欢鏁版嵁") !== -1) return "";
+  if (v.indexOf("榛樿:") === 0 || low.indexOf("default:") === 0) return "";
   if (low.indexOf("plugin data dir") !== -1 || low.indexOf("<plugin") !== -1) return "";
   return v;
 }
@@ -2619,7 +2619,7 @@ function normalizeFolderFieldsInConfig(body) {
   return out;
 }
 
-// ─── Settings Tab ───
+// 鈹€鈹€鈹€ Settings Tab 鈹€鈹€鈹€
 function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
   const t = useT();
   const [config, setConfig] = useState({});
@@ -2656,7 +2656,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
   }, [refreshStorage, refreshPerms]);
 
   // Re-fetch stats whenever user switches back to this tab (first mount
-  // often happens before any uploads / completed tasks — otherwise the
+  // often happens before any uploads / completed tasks 鈥?otherwise the
   // three cards stay at 0 MB until a full page reload).
   useEffect(() => {
     if (storageRefreshTick > 0) refreshStorage();
@@ -2681,7 +2681,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
 
   const updateField = (key, value) => setConfig(prev => ({ ...prev, [key]: value }));
 
-  // Folder picker plumbing — clones seedance's "Browse" + "Open" pair so
+  // Folder picker plumbing 鈥?clones seedance's "Browse" + "Open" pair so
   // every Folders row gets a working in-plugin file dialog (no Tauri /
   // host cooperation required) PLUS an OS-level "open in Explorer / Finder"
   // button that mkdir's the target on demand.
@@ -2726,7 +2726,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
 
   return (
     <div style={{maxWidth: 640}}>
-      {/* ── 1. API 配置 ── */}
+      {/* 鈹€鈹€ 1. API 閰嶇疆 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="key"/> {t("settings.section.api")}</h3>
         <div className={"form-row" + (config.dashscope_api_key ? "" : " oa-config-field-callout")}
@@ -2753,23 +2753,23 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <div className="label">共享中转站名称（可选）</div>
+            <div className="label">鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</div>
             <input className="input" type="text"
                    value={config.dashscope_relay_endpoint || ""}
                    onChange={e => updateField("dashscope_relay_endpoint", e.target.value)}
                    onBlur={e => save({ dashscope_relay_endpoint: e.target.value.trim() })}
-                   placeholder="例如: yunwu-audio" />
+                   placeholder="渚嬪: yunwu-audio" />
             <div className="text-xs text-dim" style={{marginTop: 4}}>
-              来自 LLM 配置页 relay_endpoints；填写后 ASR/Qwen 请求优先走该中转站。
+              鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涘～鍐欏悗 ASR/Qwen 璇锋眰浼樺厛璧拌涓浆绔欍€?
             </div>
           </div>
           <div className="form-row">
-            <div className="label">中转站失败策略</div>
+            <div className="label">涓浆绔欏け璐ョ瓥鐣?/div>
             <select className="input select"
                     value={config.dashscope_relay_fallback_policy || "official"}
                     onChange={e => { updateField("dashscope_relay_fallback_policy", e.target.value); save({ dashscope_relay_fallback_policy: e.target.value }); }}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
@@ -2818,13 +2818,13 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
         </details>
       </div>
 
-      {/* ── 2. 插件权限 ── */}
+      {/* 鈹€鈹€ 2. 鎻掍欢鏉冮檺 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="key"/> {t("settings.section.permissions")}</h3>
         <PermissionsPanel status={permsStatus} onChanged={refreshPerms} />
       </div>
 
-      {/* ── 3. 系统组件（FFmpeg 一键安装） ── */}
+      {/* 鈹€鈹€ 3. 绯荤粺缁勪欢锛團Fmpeg 涓€閿畨瑁咃級 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="package"/> {t("settings.section.system")}</h3>
         <div className="deps-help">
@@ -2847,7 +2847,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
           }}
         />
 
-        {/* Manual override — kept for the "ffmpeg lives in a non-PATH
+        {/* Manual override 鈥?kept for the "ffmpeg lives in a non-PATH
             location" power user. Hidden behind a thin row so it does
             not compete with the one-click installer above. */}
         <div className="form-row" style={{marginTop: 14}}>
@@ -2866,7 +2866,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
         </div>
       </div>
 
-      {/* ── 4. 默认参数 ── */}
+      {/* 鈹€鈹€ 4. 榛樿鍙傛暟 鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="settings"/> {t("settings.section.defaults")}</h3>
         <div className="grid-2">
@@ -2892,7 +2892,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
         </div>
       </div>
 
-      {/* ── 5. 文件夹设置（视频输出 / 上传缓存 + 选择 / 打开） ── */}
+      {/* 鈹€鈹€ 5. 鏂囦欢澶硅缃紙瑙嗛杈撳嚭 / 涓婁紶缂撳瓨 + 閫夋嫨 / 鎵撳紑锛?鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="folder"/> {t("settings.section.folder")}</h3>
 
@@ -2996,7 +2996,7 @@ function SettingsTab({ storageRefreshTick, onApiKeyChange, onFfmpegChange }) {
   );
 }
 
-// ─── Error Boundary ───
+// 鈹€鈹€鈹€ Error Boundary 鈹€鈹€鈹€
 class PluginErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -3041,7 +3041,7 @@ class PluginErrorBoundary extends React.Component {
   }
 }
 
-// ─── Mount ───
+// 鈹€鈹€鈹€ Mount 鈹€鈹€鈹€
 console.log("[clip-sense] Mounting React app...");
 try {
   window.__csRendered = true;

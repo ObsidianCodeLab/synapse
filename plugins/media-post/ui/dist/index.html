@@ -1,13 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Launch Kit — 发布物料工坊</title>
+  <title>Launch Kit 鈥?鍙戝竷鐗╂枡宸ュ潑</title>
   <!--
     Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
     The 5-file _assets bundle is a verbatim copy of plugins/tongyi-image/
-    ui/dist/_assets/ per docs/media-post-plan.md §9.7. Plugins MUST NOT
+    ui/dist/_assets/ per docs/media-post-plan.md 搂9.7. Plugins MUST NOT
     depend on host-mounted /api/plugins/_sdk/* (removed in SDK 0.7.0).
   -->
   <script src="_assets/bootstrap.js"></script>
@@ -15,9 +15,9 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/markdown-mini.js"></script>
   <script src="_assets/i18n.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -116,8 +116,8 @@
     /* OA Kit helpers (minimal subset; rest comes from styles.css) */
     .oa-section-label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 12px; }
     .oa-section-label::before { content: ""; display: inline-block; width: 3px; height: 16px; border-radius: 2px; background: var(--primary); }
-    /* .oa-hero-title comes verbatim from _assets/styles.css §7 (gradient
-     * icon chip + text + sub) — do NOT override here, otherwise the App
+    /* .oa-hero-title comes verbatim from _assets/styles.css 搂7 (gradient
+     * icon chip + text + sub) 鈥?do NOT override here, otherwise the App
      * header collapses to a plain text label and stops matching tongyi-image.
      * For per-tab section headings use the .oa-section-label small-bar style
      * (or .setting-section h3 inside SettingsTab). */
@@ -127,7 +127,7 @@
     .oa-pill.orange { background: rgba(245,158,11,.15); color: #d97706; }
     .oa-pill.gray { background: var(--bg-hover); color: var(--text-dim); }
     /* .oa-config-banner / __icon / __text / __action all come from
-     * _assets/styles.css §1 (orange filled CTA). DO NOT override here —
+     * _assets/styles.css 搂1 (orange filled CTA). DO NOT override here 鈥?
      * the previous overrides shrunk the CTA to a dull gray-on-white pill
      * and broke the visual contract with seedance-video / tongyi-image.
      * If you need a danger variant, prefer the kit's `--info` modifier or
@@ -142,9 +142,9 @@
     .oa-error-coach__title { font-size: 13px; font-weight: 600; color: var(--danger); margin-bottom: 6px; }
     .oa-error-coach__list { list-style: disc; margin-left: 20px; font-size: 12px; color: var(--text); }
     .oa-error-coach__actions { margin-top: 10px; display: flex; gap: 8px; }
-    /* .oa-settings-section / __title come from _assets/styles.css §6
+    /* .oa-settings-section / __title come from _assets/styles.css 搂6
      * (with shadow + matching border + standardized padding). Only the
-     * `.disabled` modifier needs a local rule. Same for .oa-list-panel —
+     * `.disabled` modifier needs a local rule. Same for .oa-list-panel 鈥?
      * the kit owns the full card-style frame; do NOT shrink padding here
      * or the list panel collapses to a borderless 4px box. */
     .oa-settings-section__title.disabled { color: var(--text-dim); }
@@ -166,7 +166,7 @@
     .modal-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 18px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
     @media (max-width: 860px) { .split-layout { flex-direction: column; } .split-left { width: 100%; min-width: unset; } }
-    /* ── system component callout body (settings) — vendored from
+    /* 鈹€鈹€ system component callout body (settings) 鈥?vendored from
      * seedance-video so the FFmpeg installer card matches its visual
      * contract; do not localise. */
     .deps-help {
@@ -237,7 +237,7 @@
       vertical-align: middle;
     }
     @keyframes sysdep-spin { to { transform: rotate(360deg); } }
-    /* ── inline tiny SVG wrapper for section titles + icon buttons ── */
+    /* 鈹€鈹€ inline tiny SVG wrapper for section titles + icon buttons 鈹€鈹€ */
     .mp-ico { display: inline-flex; width: 16px; height: 16px; vertical-align: -3px; flex: none; color: currentColor; }
     .mp-ico > svg { width: 100%; height: 100%; }
     .mp-ico--lg { width: 20px; height: 20px; }
@@ -257,7 +257,7 @@
       color: var(--primary);
       background: linear-gradient(135deg, rgba(249,115,22,.14), rgba(250,204,21,.12));
     }
-    /* ── info tooltip (per-field "what does this do?" popover) ── */
+    /* 鈹€鈹€ info tooltip (per-field "what does this do?" popover) 鈹€鈹€ */
     .mp-info-tip { position: relative; display: inline-flex; align-items: center; margin-left: 4px; }
     .mp-info-tip__btn {
       width: 16px; height: 16px; border: 1px solid var(--border);
@@ -289,10 +289,10 @@
   </style>
 </head>
 <body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__mp_loading">正在加载插件...</div></div>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__mp_loading">姝ｅ湪鍔犺浇鎻掍欢...</div></div>
 <script>
 /* =================================================================
- * In-page diagnostics — mirror of subtitle-craft fix 523d5d0f and
+ * In-page diagnostics 鈥?mirror of subtitle-craft fix 523d5d0f and
  * clip-sense fix 1cadcacd.
  *
  * Why every line matters:
@@ -322,11 +322,11 @@ setTimeout(function() {
   el.style.flexDirection = "column";
   el.style.textAlign = "center";
   el.style.lineHeight = "1.8";
-  el.innerHTML = '<b>插件初始化超时</b><br/>可能原因：<br/>1. CDN 脚本加载失败 (unpkg.com)<br/>2. Babel 编译错误<br/>3. React 渲染失败<br/><br/><span style="font-size:11px;color:#94a3b8">请按 F12 打开开发者工具查看控制台错误</span>';
+  el.innerHTML = '<b>鎻掍欢鍒濆鍖栬秴鏃?/b><br/>鍙兘鍘熷洜锛?br/>1. CDN 鑴氭湰鍔犺浇澶辫触 (unpkg.com)<br/>2. Babel 缂栬瘧閿欒<br/>3. React 娓叉煋澶辫触<br/><br/><span style="font-size:11px;color:#94a3b8">璇锋寜 F12 鎵撳紑寮€鍙戣€呭伐鍏锋煡鐪嬫帶鍒跺彴閿欒</span>';
 }, 10000);
 </script>
 <script>
-// ─── Bridge SDK ──
+// 鈹€鈹€鈹€ Bridge SDK 鈹€鈹€
 const BRIDGE_VER = 1;
 let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
@@ -413,11 +413,11 @@ function showToast(body, type) {
 function buildPreviewUrl(rel) { return _detectApiBase() + "/api/plugins/" + PLUGIN_ID + "/uploads/" + String(rel || "").replace(/\\/g, "/").replace(/^\//, ""); }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] React failed to load. Check network.</div>'"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] ReactDOM failed to load. Check network.</div>'"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] Babel failed to load. Check network.</div>'"></script>
 <script>
 console.log("[media-post] CDN loaded: React=" + typeof React + ", ReactDOM=" + typeof ReactDOM + ", Babel=" + (typeof Babel !== "undefined"));
@@ -427,274 +427,274 @@ console.log("[media-post] CDN loaded: React=" + typeof React + ", ReactDOM=" + t
 console.log("[media-post] Babel script executing...");
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// ─── i18n dictionary (8 namespaces × zh/en, ~180 keys per locale) ───────
+// 鈹€鈹€鈹€ i18n dictionary (8 namespaces 脳 zh/en, ~180 keys per locale) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const I18N_DICT = {
   zh: {
-    "app.title": "发布物料工坊",
-    "app.subtitle": "DashScope · 智能选封面 / 横竖屏适配 / SEO 包 / 章节卡",
+    "app.title": "鍙戝竷鐗╂枡宸ュ潑",
+    "app.subtitle": "DashScope 路 鏅鸿兘閫夊皝闈?/ 妯珫灞忛€傞厤 / SEO 鍖?/ 绔犺妭鍗?,
     // Tabs
-    "mediaPost.tabs.create": "创建",
-    "mediaPost.tabs.tasks": "任务",
-    "mediaPost.tabs.library": "素材库",
-    "mediaPost.tabs.settings": "设置",
-    "mediaPost.tabs.create.sub": "选择模式 → 上传视频 → 调参 → 一键运行",
-    "mediaPost.tabs.tasks.sub": "实时进度 / 历史任务 / 详情查看",
-    "mediaPost.tabs.library.sub": "封面 / 多尺寸 / SEO 文案 / 章节卡 — 沉淀的素材",
-    "mediaPost.tabs.settings.sub": "API Key / VLM 参数 / 章节卡 / 成本控制 / 协同",
+    "mediaPost.tabs.create": "鍒涘缓",
+    "mediaPost.tabs.tasks": "浠诲姟",
+    "mediaPost.tabs.library": "绱犳潗搴?,
+    "mediaPost.tabs.settings": "璁剧疆",
+    "mediaPost.tabs.create.sub": "閫夋嫨妯″紡 鈫?涓婁紶瑙嗛 鈫?璋冨弬 鈫?涓€閿繍琛?,
+    "mediaPost.tabs.tasks.sub": "瀹炴椂杩涘害 / 鍘嗗彶浠诲姟 / 璇︽儏鏌ョ湅",
+    "mediaPost.tabs.library.sub": "灏侀潰 / 澶氬昂瀵?/ SEO 鏂囨 / 绔犺妭鍗?鈥?娌夋穩鐨勭礌鏉?,
+    "mediaPost.tabs.settings.sub": "API Key / VLM 鍙傛暟 / 绔犺妭鍗?/ 鎴愭湰鎺у埗 / 鍗忓悓",
     // Global API-key banner (shown above the tab content when key missing)
-    "mediaPost.banner.noKey.title": "尚未配置 DashScope API Key",
-    "mediaPost.banner.noKey.desc": "所有创建任务都会失败。请前往设置页填入阿里云百炼 DashScope API Key。",
-    "mediaPost.banner.noKey.cta": "前往配置",
+    "mediaPost.banner.noKey.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "mediaPost.banner.noKey.desc": "鎵€鏈夊垱寤轰换鍔￠兘浼氬け璐ャ€傝鍓嶅線璁剧疆椤靛～鍏ラ樋閲屼簯鐧剧偧 DashScope API Key銆?,
+    "mediaPost.banner.noKey.cta": "鍓嶅線閰嶇疆",
     // Empty-state titles/hints for the right preview pane and list panes.
-    "mediaPost.preview.empty.title": "等待运行任务",
-    "mediaPost.preview.empty.hint": "选择模式 → 上传视频 → 调参 → 一键运行",
-    "mediaPost.tasks.empty.title": "尚无任务",
-    "mediaPost.tasks.empty.hint": "去『创建』页跑第一个任务",
-    "mediaPost.tasks.detail.empty.title": "未选择任务",
-    "mediaPost.tasks.detail.empty.hint": "从左侧列表点击一个任务查看详情",
-    "mediaPost.tasks.total": "共 {n} 个任务",
-    "mediaPost.library.count": "共 {n} 个素材",
-    "mediaPost.library.empty.title": "暂无素材",
-    "mediaPost.library.empty.hint": "在创建页跑一个任务，产出物会自动出现在这里",
+    "mediaPost.preview.empty.title": "绛夊緟杩愯浠诲姟",
+    "mediaPost.preview.empty.hint": "閫夋嫨妯″紡 鈫?涓婁紶瑙嗛 鈫?璋冨弬 鈫?涓€閿繍琛?,
+    "mediaPost.tasks.empty.title": "灏氭棤浠诲姟",
+    "mediaPost.tasks.empty.hint": "鍘汇€庡垱寤恒€忛〉璺戠涓€涓换鍔?,
+    "mediaPost.tasks.detail.empty.title": "鏈€夋嫨浠诲姟",
+    "mediaPost.tasks.detail.empty.hint": "浠庡乏渚у垪琛ㄧ偣鍑讳竴涓换鍔℃煡鐪嬭鎯?,
+    "mediaPost.tasks.total": "鍏?{n} 涓换鍔?,
+    "mediaPost.library.count": "鍏?{n} 涓礌鏉?,
+    "mediaPost.library.empty.title": "鏆傛棤绱犳潗",
+    "mediaPost.library.empty.hint": "鍦ㄥ垱寤洪〉璺戜竴涓换鍔★紝浜у嚭鐗╀細鑷姩鍑虹幇鍦ㄨ繖閲?,
     // Modes
-    "mediaPost.modes.cover_pick.title": "智能选封面",
-    "mediaPost.modes.cover_pick.desc": "VLM 6 维评分排序 top 8",
-    "mediaPost.modes.multi_aspect.title": "横竖屏适配",
-    "mediaPost.modes.multi_aspect.desc": "smart-recompose 主体跟踪",
-    "mediaPost.modes.seo_pack.title": "5 平台 SEO 包",
-    "mediaPost.modes.seo_pack.desc": "抖音 / B 站 / 视频号 / 小红书 / YouTube",
-    "mediaPost.modes.chapter_cards.title": "章节卡 PNG",
-    "mediaPost.modes.chapter_cards.desc": "Playwright HTML 渲染 + drawtext 兜底",
+    "mediaPost.modes.cover_pick.title": "鏅鸿兘閫夊皝闈?,
+    "mediaPost.modes.cover_pick.desc": "VLM 6 缁磋瘎鍒嗘帓搴?top 8",
+    "mediaPost.modes.multi_aspect.title": "妯珫灞忛€傞厤",
+    "mediaPost.modes.multi_aspect.desc": "smart-recompose 涓讳綋璺熻釜",
+    "mediaPost.modes.seo_pack.title": "5 骞冲彴 SEO 鍖?,
+    "mediaPost.modes.seo_pack.desc": "鎶栭煶 / B 绔?/ 瑙嗛鍙?/ 灏忕孩涔?/ YouTube",
+    "mediaPost.modes.chapter_cards.title": "绔犺妭鍗?PNG",
+    "mediaPost.modes.chapter_cards.desc": "Playwright HTML 娓叉煋 + drawtext 鍏滃簳",
     // Forms
-    "mediaPost.forms.video.label": "视频文件",
-    "mediaPost.forms.video.placeholder": "点击或拖拽上传 mp4 / mkv / mov",
-    "mediaPost.forms.video.helper": "建议时长 ≤30 分钟，否则成本与耗时增长较快",
-    "mediaPost.forms.quantity.label": "需要的封面数",
-    "mediaPost.forms.quantity.helper": "8 张为推荐值；VLM 一次评分 8 帧",
-    "mediaPost.forms.threshold.label": "最低评分阈值",
-    "mediaPost.forms.threshold.helper": "0~10；低于该分的候选会被淘汰，3.0 为默认",
-    "mediaPost.forms.platformHint.label": "平台偏好（影响构图建议）",
-    "mediaPost.forms.platformHint.universal": "通用（无偏好）",
-    "mediaPost.forms.platformHint.tiktok": "抖音 / TikTok（偏向人脸特写）",
-    "mediaPost.forms.platformHint.bilibili": "B 站（偏向信息密度）",
-    "mediaPost.forms.platformHint.youtube": "YouTube（偏向氛围感）",
-    "mediaPost.forms.aspects.label": "目标比例（多选）",
-    "mediaPost.forms.aspects.9_16": "竖版 9:16（抖音/视频号）",
-    "mediaPost.forms.aspects.1_1": "方版 1:1（视频号方图）",
-    "mediaPost.forms.fps.label": "帧采样率 (fps)",
-    "mediaPost.forms.fps.helper": "默认 2.0；越高主体跟踪越细但成本越高",
-    "mediaPost.forms.platforms.label": "目标平台（多选）",
-    "mediaPost.forms.platforms.tiktok": "抖音 / TikTok",
-    "mediaPost.forms.platforms.bilibili": "B 站",
-    "mediaPost.forms.platforms.wechat": "视频号",
-    "mediaPost.forms.platforms.xiaohongshu": "小红书",
+    "mediaPost.forms.video.label": "瑙嗛鏂囦欢",
+    "mediaPost.forms.video.placeholder": "鐐瑰嚮鎴栨嫋鎷戒笂浼?mp4 / mkv / mov",
+    "mediaPost.forms.video.helper": "寤鸿鏃堕暱 鈮?0 鍒嗛挓锛屽惁鍒欐垚鏈笌鑰楁椂澧為暱杈冨揩",
+    "mediaPost.forms.quantity.label": "闇€瑕佺殑灏侀潰鏁?,
+    "mediaPost.forms.quantity.helper": "8 寮犱负鎺ㄨ崘鍊硷紱VLM 涓€娆¤瘎鍒?8 甯?,
+    "mediaPost.forms.threshold.label": "鏈€浣庤瘎鍒嗛槇鍊?,
+    "mediaPost.forms.threshold.helper": "0~10锛涗綆浜庤鍒嗙殑鍊欓€変細琚窐姹帮紝3.0 涓洪粯璁?,
+    "mediaPost.forms.platformHint.label": "骞冲彴鍋忓ソ锛堝奖鍝嶆瀯鍥惧缓璁級",
+    "mediaPost.forms.platformHint.universal": "閫氱敤锛堟棤鍋忓ソ锛?,
+    "mediaPost.forms.platformHint.tiktok": "鎶栭煶 / TikTok锛堝亸鍚戜汉鑴哥壒鍐欙級",
+    "mediaPost.forms.platformHint.bilibili": "B 绔欙紙鍋忓悜淇℃伅瀵嗗害锛?,
+    "mediaPost.forms.platformHint.youtube": "YouTube锛堝亸鍚戞皼鍥存劅锛?,
+    "mediaPost.forms.aspects.label": "鐩爣姣斾緥锛堝閫夛級",
+    "mediaPost.forms.aspects.9_16": "绔栫増 9:16锛堟姈闊?瑙嗛鍙凤級",
+    "mediaPost.forms.aspects.1_1": "鏂圭増 1:1锛堣棰戝彿鏂瑰浘锛?,
+    "mediaPost.forms.fps.label": "甯ч噰鏍风巼 (fps)",
+    "mediaPost.forms.fps.helper": "榛樿 2.0锛涜秺楂樹富浣撹窡韪秺缁嗕絾鎴愭湰瓒婇珮",
+    "mediaPost.forms.platforms.label": "鐩爣骞冲彴锛堝閫夛級",
+    "mediaPost.forms.platforms.tiktok": "鎶栭煶 / TikTok",
+    "mediaPost.forms.platforms.bilibili": "B 绔?,
+    "mediaPost.forms.platforms.wechat": "瑙嗛鍙?,
+    "mediaPost.forms.platforms.xiaohongshu": "灏忕孩涔?,
     "mediaPost.forms.platforms.youtube": "YouTube",
-    "mediaPost.forms.titleHint.label": "标题灵感（可选）",
-    "mediaPost.forms.titleHint.placeholder": "例如：开箱深度评测 / 旅行 vlog / 游戏教程...",
-    "mediaPost.forms.subtitle.label": "字幕摘录 / 剧情提示",
-    "mediaPost.forms.subtitle.placeholder": "粘贴 1~3 段关键字幕，或直接描述视频主题",
-    "mediaPost.forms.instruction.label": "额外指令（可选）",
-    "mediaPost.forms.instruction.placeholder": "例如：突出科技感 / 适合 25-35 岁人群 / 多用 emoji",
-    "mediaPost.forms.includeChapters.label": "在描述中追加章节时间戳",
-    "mediaPost.forms.chapters.label": "章节列表",
-    "mediaPost.forms.chapters.helper": "格式：每行一章，'00:00 章节标题'；可粘贴 YouTube 章节",
-    "mediaPost.forms.chapters.placeholder": "00:00 开场\n02:30 第二段\n05:10 总结",
-    "mediaPost.forms.template.label": "卡片模板",
-    "mediaPost.forms.template.modern": "现代（modern）",
-    "mediaPost.forms.template.minimal": "极简（minimal）",
-    "mediaPost.forms.template.retro": "复古（retro）",
-    "mediaPost.forms.template.youtube_style": "YouTube 风格（youtube_style）",
-    "mediaPost.forms.template.custom": "自定义（custom）",
-    "mediaPost.forms.template.modern.desc": "白底高对比，适合教程／发布会等正式场景",
-    "mediaPost.forms.template.minimal.desc": "纯文字极简卡，适合资讯类、文档配套",
-    "mediaPost.forms.template.retro.desc": "暗色复古配色，适合深度访谈／纪录片",
-    "mediaPost.forms.template.youtube_style.desc": "粗体大字＋强调色，对标 YouTube 章节卡视觉",
-    "mediaPost.forms.template.custom.desc": "读取自定义模板目录下 <id>.html，需自行准备 HTML 文件",
-    "mediaPost.forms.size.label": "卡片尺寸",
-    "mediaPost.forms.size.16_9": "横版 16:9 (1280×720)",
-    "mediaPost.forms.size.1_1": "方版 1:1 (1080×1080)",
-    "mediaPost.forms.size.9_16": "竖版 9:16 (1080×1920)",
-    "mediaPost.forms.start.cover_pick": "开始智能选封面",
-    "mediaPost.forms.start.multi_aspect": "开始横竖屏适配",
-    "mediaPost.forms.start.seo_pack": "开始生成 SEO 包",
-    "mediaPost.forms.start.chapter_cards": "开始渲染章节卡",
-    "mediaPost.forms.start.confirm": "确认并继续 (¥{cost})",
+    "mediaPost.forms.titleHint.label": "鏍囬鐏垫劅锛堝彲閫夛級",
+    "mediaPost.forms.titleHint.placeholder": "渚嬪锛氬紑绠辨繁搴﹁瘎娴?/ 鏃呰 vlog / 娓告垙鏁欑▼...",
+    "mediaPost.forms.subtitle.label": "瀛楀箷鎽樺綍 / 鍓ф儏鎻愮ず",
+    "mediaPost.forms.subtitle.placeholder": "绮樿创 1~3 娈靛叧閿瓧骞曪紝鎴栫洿鎺ユ弿杩拌棰戜富棰?,
+    "mediaPost.forms.instruction.label": "棰濆鎸囦护锛堝彲閫夛級",
+    "mediaPost.forms.instruction.placeholder": "渚嬪锛氱獊鍑虹鎶€鎰?/ 閫傚悎 25-35 宀佷汉缇?/ 澶氱敤 emoji",
+    "mediaPost.forms.includeChapters.label": "鍦ㄦ弿杩颁腑杩藉姞绔犺妭鏃堕棿鎴?,
+    "mediaPost.forms.chapters.label": "绔犺妭鍒楄〃",
+    "mediaPost.forms.chapters.helper": "鏍煎紡锛氭瘡琛屼竴绔狅紝'00:00 绔犺妭鏍囬'锛涘彲绮樿创 YouTube 绔犺妭",
+    "mediaPost.forms.chapters.placeholder": "00:00 寮€鍦篭n02:30 绗簩娈礬n05:10 鎬荤粨",
+    "mediaPost.forms.template.label": "鍗＄墖妯℃澘",
+    "mediaPost.forms.template.modern": "鐜颁唬锛坢odern锛?,
+    "mediaPost.forms.template.minimal": "鏋佺畝锛坢inimal锛?,
+    "mediaPost.forms.template.retro": "澶嶅彜锛坮etro锛?,
+    "mediaPost.forms.template.youtube_style": "YouTube 椋庢牸锛坹outube_style锛?,
+    "mediaPost.forms.template.custom": "鑷畾涔夛紙custom锛?,
+    "mediaPost.forms.template.modern.desc": "鐧藉簳楂樺姣旓紝閫傚悎鏁欑▼锛忓彂甯冧細绛夋寮忓満鏅?,
+    "mediaPost.forms.template.minimal.desc": "绾枃瀛楁瀬绠€鍗★紝閫傚悎璧勮绫汇€佹枃妗ｉ厤濂?,
+    "mediaPost.forms.template.retro.desc": "鏆楄壊澶嶅彜閰嶈壊锛岄€傚悎娣卞害璁胯皥锛忕邯褰曠墖",
+    "mediaPost.forms.template.youtube_style.desc": "绮椾綋澶у瓧锛嬪己璋冭壊锛屽鏍?YouTube 绔犺妭鍗¤瑙?,
+    "mediaPost.forms.template.custom.desc": "璇诲彇鑷畾涔夋ā鏉跨洰褰曚笅 <id>.html锛岄渶鑷鍑嗗 HTML 鏂囦欢",
+    "mediaPost.forms.size.label": "鍗＄墖灏哄",
+    "mediaPost.forms.size.16_9": "妯増 16:9 (1280脳720)",
+    "mediaPost.forms.size.1_1": "鏂圭増 1:1 (1080脳1080)",
+    "mediaPost.forms.size.9_16": "绔栫増 9:16 (1080脳1920)",
+    "mediaPost.forms.start.cover_pick": "寮€濮嬫櫤鑳介€夊皝闈?,
+    "mediaPost.forms.start.multi_aspect": "寮€濮嬫í绔栧睆閫傞厤",
+    "mediaPost.forms.start.seo_pack": "寮€濮嬬敓鎴?SEO 鍖?,
+    "mediaPost.forms.start.chapter_cards": "寮€濮嬫覆鏌撶珷鑺傚崱",
+    "mediaPost.forms.start.confirm": "纭骞剁户缁?(楼{cost})",
     // Tasks tab
-    "mediaPost.tasks.all": "全部任务",
-    "mediaPost.tasks.filter.mode": "模式",
-    "mediaPost.tasks.filter.status": "状态",
-    "mediaPost.tasks.filter.all": "全部",
-    "mediaPost.tasks.filter.search": "搜索任务 ID 或视频名…",
-    "mediaPost.tasks.empty": "尚无任务，去创建页开始第一个任务",
-    "mediaPost.tasks.detail.empty": "请在左侧选择一个任务以查看详情",
-    "mediaPost.tasks.actions.cancel": "取消",
-    "mediaPost.tasks.actions.retry": "重试",
-    "mediaPost.tasks.actions.approve": "确认成本继续",
-    "mediaPost.tasks.actions.delete": "删除",
-    "mediaPost.tasks.actions.copyId": "复制任务 ID",
-    "mediaPost.tasks.detail.cover": "封面候选（共 {n} 张）",
-    "mediaPost.tasks.detail.recompose": "横竖屏输出",
-    "mediaPost.tasks.detail.seo": "SEO 文案（{n} 个平台）",
-    "mediaPost.tasks.detail.chapters": "章节卡（共 {n} 张）",
-    "mediaPost.tasks.detail.copy": "复制",
-    "mediaPost.tasks.detail.copyAll": "复制全部",
-    "mediaPost.tasks.detail.download": "下载",
-    "mediaPost.tasks.detail.scoreLabel": "总分",
+    "mediaPost.tasks.all": "鍏ㄩ儴浠诲姟",
+    "mediaPost.tasks.filter.mode": "妯″紡",
+    "mediaPost.tasks.filter.status": "鐘舵€?,
+    "mediaPost.tasks.filter.all": "鍏ㄩ儴",
+    "mediaPost.tasks.filter.search": "鎼滅储浠诲姟 ID 鎴栬棰戝悕鈥?,
+    "mediaPost.tasks.empty": "灏氭棤浠诲姟锛屽幓鍒涘缓椤靛紑濮嬬涓€涓换鍔?,
+    "mediaPost.tasks.detail.empty": "璇峰湪宸︿晶閫夋嫨涓€涓换鍔′互鏌ョ湅璇︽儏",
+    "mediaPost.tasks.actions.cancel": "鍙栨秷",
+    "mediaPost.tasks.actions.retry": "閲嶈瘯",
+    "mediaPost.tasks.actions.approve": "纭鎴愭湰缁х画",
+    "mediaPost.tasks.actions.delete": "鍒犻櫎",
+    "mediaPost.tasks.actions.copyId": "澶嶅埗浠诲姟 ID",
+    "mediaPost.tasks.detail.cover": "灏侀潰鍊欓€夛紙鍏?{n} 寮狅級",
+    "mediaPost.tasks.detail.recompose": "妯珫灞忚緭鍑?,
+    "mediaPost.tasks.detail.seo": "SEO 鏂囨锛坽n} 涓钩鍙帮級",
+    "mediaPost.tasks.detail.chapters": "绔犺妭鍗★紙鍏?{n} 寮狅級",
+    "mediaPost.tasks.detail.copy": "澶嶅埗",
+    "mediaPost.tasks.detail.copyAll": "澶嶅埗鍏ㄩ儴",
+    "mediaPost.tasks.detail.download": "涓嬭浇",
+    "mediaPost.tasks.detail.scoreLabel": "鎬诲垎",
     // Library tab
-    "mediaPost.library.covers": "封面库",
-    "mediaPost.library.aspects": "多尺寸库",
-    "mediaPost.library.seo": "SEO 文案库",
-    "mediaPost.library.chapters": "章节卡库",
-    "mediaPost.library.empty": "暂无素材，先在「创建」页跑一个任务",
+    "mediaPost.library.covers": "灏侀潰搴?,
+    "mediaPost.library.aspects": "澶氬昂瀵稿簱",
+    "mediaPost.library.seo": "SEO 鏂囨搴?,
+    "mediaPost.library.chapters": "绔犺妭鍗″簱",
+    "mediaPost.library.empty": "鏆傛棤绱犳潗锛屽厛鍦ㄣ€屽垱寤恒€嶉〉璺戜竴涓换鍔?,
     // Errors
-    "mediaPost.errors.network.label": "网络错误",
-    "mediaPost.errors.network.h1": "请检查网络连接",
-    "mediaPost.errors.network.h2": "若使用代理请确认 dashscope.aliyuncs.com 可达",
-    "mediaPost.errors.network.h3": "稍后自动重试 3 次",
-    "mediaPost.errors.timeout.label": "超时",
-    "mediaPost.errors.timeout.h1": "视频太长可能引发超时（multi_aspect 建议 ≤30 分钟）",
-    "mediaPost.errors.timeout.h2": "可在 Settings 调高超时阈值",
-    "mediaPost.errors.timeout.h3": "或分段处理",
-    "mediaPost.errors.auth.label": "认证错误",
-    "mediaPost.errors.auth.h1": "Settings → API Key 重新填写",
-    "mediaPost.errors.auth.h2": "确认 Key 与 base_url 地域匹配",
-    "mediaPost.errors.quota.label": "额度不足或并发受限",
-    "mediaPost.errors.quota.h1": "阿里云百炼控制台充值或升级账户配额",
-    "mediaPost.errors.quota.h2": "DashScope VLM 并发上限较低，等待当前任务完成",
-    "mediaPost.errors.quota.h3": "或在 Settings 切换 API Key",
-    "mediaPost.errors.moderation.label": "内容审核未过",
-    "mediaPost.errors.moderation.h1": "VLM 拒绝分析（敏感内容）",
-    "mediaPost.errors.moderation.h2": "可手动选封面或换视频",
-    "mediaPost.errors.dependency.label": "依赖缺失",
-    "mediaPost.errors.dependency.h1": "前往 Settings 查看 ffmpeg 安装引导",
-    "mediaPost.errors.dependency.h2": "章节卡 HTML 渲染需要 Playwright + 中文字体；已自动降级到 drawtext",
-    "mediaPost.errors.format.label": "格式错误",
-    "mediaPost.errors.format.h1": "确认是有效 mp4/mkv/mov",
-    "mediaPost.errors.format.h2": "ffprobe 无法解析说明文件损坏",
-    "mediaPost.errors.duration.label": "时长 / 体积超限",
-    "mediaPost.errors.duration.h1": "multi_aspect 模式建议 ≤30 分钟（成本随时长线性增长）",
-    "mediaPost.errors.duration.h2": "cover_pick / seo_pack 可处理任意时长",
-    "mediaPost.errors.unknown.label": "未知错误",
-    "mediaPost.errors.unknown.h1": "请将 task_id 反馈给开发者",
-    "mediaPost.errors.unknown.h2": "截图 metadata.json 一并提供",
+    "mediaPost.errors.network.label": "缃戠粶閿欒",
+    "mediaPost.errors.network.h1": "璇锋鏌ョ綉缁滆繛鎺?,
+    "mediaPost.errors.network.h2": "鑻ヤ娇鐢ㄤ唬鐞嗚纭 dashscope.aliyuncs.com 鍙揪",
+    "mediaPost.errors.network.h3": "绋嶅悗鑷姩閲嶈瘯 3 娆?,
+    "mediaPost.errors.timeout.label": "瓒呮椂",
+    "mediaPost.errors.timeout.h1": "瑙嗛澶暱鍙兘寮曞彂瓒呮椂锛坢ulti_aspect 寤鸿 鈮?0 鍒嗛挓锛?,
+    "mediaPost.errors.timeout.h2": "鍙湪 Settings 璋冮珮瓒呮椂闃堝€?,
+    "mediaPost.errors.timeout.h3": "鎴栧垎娈靛鐞?,
+    "mediaPost.errors.auth.label": "璁よ瘉閿欒",
+    "mediaPost.errors.auth.h1": "Settings 鈫?API Key 閲嶆柊濉啓",
+    "mediaPost.errors.auth.h2": "纭 Key 涓?base_url 鍦板煙鍖归厤",
+    "mediaPost.errors.quota.label": "棰濆害涓嶈冻鎴栧苟鍙戝彈闄?,
+    "mediaPost.errors.quota.h1": "闃块噷浜戠櫨鐐兼帶鍒跺彴鍏呭€兼垨鍗囩骇璐︽埛閰嶉",
+    "mediaPost.errors.quota.h2": "DashScope VLM 骞跺彂涓婇檺杈冧綆锛岀瓑寰呭綋鍓嶄换鍔″畬鎴?,
+    "mediaPost.errors.quota.h3": "鎴栧湪 Settings 鍒囨崲 API Key",
+    "mediaPost.errors.moderation.label": "鍐呭瀹℃牳鏈繃",
+    "mediaPost.errors.moderation.h1": "VLM 鎷掔粷鍒嗘瀽锛堟晱鎰熷唴瀹癸級",
+    "mediaPost.errors.moderation.h2": "鍙墜鍔ㄩ€夊皝闈㈡垨鎹㈣棰?,
+    "mediaPost.errors.dependency.label": "渚濊禆缂哄け",
+    "mediaPost.errors.dependency.h1": "鍓嶅線 Settings 鏌ョ湅 ffmpeg 瀹夎寮曞",
+    "mediaPost.errors.dependency.h2": "绔犺妭鍗?HTML 娓叉煋闇€瑕?Playwright + 涓枃瀛椾綋锛涘凡鑷姩闄嶇骇鍒?drawtext",
+    "mediaPost.errors.format.label": "鏍煎紡閿欒",
+    "mediaPost.errors.format.h1": "纭鏄湁鏁?mp4/mkv/mov",
+    "mediaPost.errors.format.h2": "ffprobe 鏃犳硶瑙ｆ瀽璇存槑鏂囦欢鎹熷潖",
+    "mediaPost.errors.duration.label": "鏃堕暱 / 浣撶Н瓒呴檺",
+    "mediaPost.errors.duration.h1": "multi_aspect 妯″紡寤鸿 鈮?0 鍒嗛挓锛堟垚鏈殢鏃堕暱绾挎€у闀匡級",
+    "mediaPost.errors.duration.h2": "cover_pick / seo_pack 鍙鐞嗕换鎰忔椂闀?,
+    "mediaPost.errors.unknown.label": "鏈煡閿欒",
+    "mediaPost.errors.unknown.h1": "璇峰皢 task_id 鍙嶉缁欏紑鍙戣€?,
+    "mediaPost.errors.unknown.h2": "鎴浘 metadata.json 涓€骞舵彁渚?,
     // Settings
     "mediaPost.settings.api.title": "API Key",
     "mediaPost.settings.api.label": "DashScope API Key",
-    "mediaPost.settings.api.helper": "前往阿里云百炼控制台 → API Key 管理获取；本地仅保存，不上传",
+    "mediaPost.settings.api.helper": "鍓嶅線闃块噷浜戠櫨鐐兼帶鍒跺彴 鈫?API Key 绠＄悊鑾峰彇锛涙湰鍦颁粎淇濆瓨锛屼笉涓婁紶",
     "mediaPost.settings.api.placeholder": "sk-...",
-    "mediaPost.settings.api.required": "必填项",
-    "mediaPost.settings.api.show": "显示",
-    "mediaPost.settings.api.hide": "隐藏",
-    "mediaPost.settings.api.saveBtn": "保存",
-    "mediaPost.settings.api.test": "测试连接",
-    "mediaPost.settings.api.ok": "已配置",
-    "mediaPost.settings.api.missing": "未配置",
-    "mediaPost.settings.api.toast.saved": "API Key 已保存",
-    "mediaPost.settings.api.toast.cleared": "API Key 已清除",
-    "mediaPost.settings.vlm.title": "VLM 参数",
-    "mediaPost.settings.vlm.fps": "采样帧率（multi_aspect）",
-    "mediaPost.settings.vlm.fps.tip": "multi_aspect 模式下，按多少帧/秒抽取关键帧送入视觉模型分析。值越高画面越精细但耗时与费用越高。常用 1.0~3.0；短视频 (<60s) 推荐 2.0；超长视频可降至 1.0。",
-    "mediaPost.settings.vlm.batch": "VLM 批大小（固定 8）",
-    "mediaPost.settings.vlm.batch.tip": "每次请求 Qwen-VL 时打包的图片数量。后端固定为 8（DashScope 上限同时也是性价比最高的批大小），UI 仅做展示，无法修改。",
-    "mediaPost.settings.vlm.concurrency": "并发批数",
-    "mediaPost.settings.vlm.concurrency.tip": "同一任务内允许并发执行的 VLM 批次数。增大可缩短整体耗时，但会按倍数推高瞬时 QPS、显存与费用，触发 quota 报警时调小。建议 1~4，企业账号可至 8。",
-    "mediaPost.settings.chapter.title": "章节卡",
-    "mediaPost.settings.chapter.template": "默认模板",
-    "mediaPost.settings.chapter.template.helper": "新建「章节卡」任务时使用的默认 HTML 模板；可在 Create 页临时切换",
-    "mediaPost.settings.chapter.templates_dir": "自定义模板目录",
-    "mediaPost.settings.chapter.playwright": "Playwright 渲染状态",
-    "mediaPost.settings.chapter.playwright.checking": "检测中…",
-    "mediaPost.settings.chapter.playwright.ok": "Playwright 就绪 · A 路（HTML 渲染）",
-    "mediaPost.settings.chapter.playwright.fallback": "未就绪 · 自动降级 B 路（ffmpeg drawtext）",
-    "mediaPost.settings.chapter.playwright.recheck": "重新检测",
-    "mediaPost.settings.chapter.playwright.help": "若希望使用 A 路得到更精致的 HTML 卡片，请按下方命令安装；未安装也不影响出片，B 路仅样式较朴素。",
-    "mediaPost.settings.chapter.playwright.cmd1": "1. 安装库：",
-    "mediaPost.settings.chapter.playwright.cmd2": "2. 安装 Chromium：",
-    "mediaPost.settings.chapter.playwright.copy": "复制",
-    "mediaPost.settings.chapter.playwright.error": "上次错误：",
-    "mediaPost.settings.cost.title": "成本控制",
-    "mediaPost.settings.cost.warn": "单任务确认阈值 ¥",
-    "mediaPost.settings.cost.duration": "multi_aspect 时长上限（分钟）",
-    "mediaPost.settings.storage.title": "数据存储",
-    "mediaPost.settings.storage.dataDir": "插件数据目录（由宿主分配，只读）",
-    "mediaPost.settings.storage.openFolder": "打开文件夹",
-    "mediaPost.settings.storage.copyPath": "复制路径",
-    "mediaPost.settings.storage.uploads": "上传素材 (uploads)",
-    "mediaPost.settings.storage.tasks": "任务产物 (tasks)",
-    "mediaPost.settings.storage.fileCount": "{n} 个文件",
-    "mediaPost.settings.storage.refresh": "刷新统计",
-    "mediaPost.settings.storage.totals": "合计：{files} 个文件 · {mb} MB",
-    "mediaPost.settings.storage.note": "本插件不暴露自定义存放路径：所有上传与产物均归属于宿主指定的数据目录，便于统一备份与清理。",
-    "mediaPost.settings.system.title": "系统组件",
-    "mediaPost.settings.system.intro.strong": "本插件依赖以下系统组件，缺失会自动降级或失败。",
-    "mediaPost.settings.system.intro.body": "通过下方一键安装即可，安装日志直接在卡片内显示，无需打开终端。",
-    "mediaPost.settings.system.intro.item1": "FFmpeg：用于关键帧抽取、动态裁剪、章节卡 drawtext 兜底渲染。",
-    "mediaPost.settings.system.intro.item2": "Playwright（可选）：用于 A 路 HTML 章节卡渲染。未安装时自动降级为 ffmpeg drawtext。",
-    "mediaPost.settings.system.detecting": "正在检测…",
-    "mediaPost.settings.system.found": "已安装 v{ver}",
-    "mediaPost.settings.system.foundNoVer": "已安装",
-    "mediaPost.settings.system.missing": "未安装",
-    "mediaPost.settings.system.installing": "安装中… {elapsed}",
-    "mediaPost.settings.system.uninstalling": "卸载中… {elapsed}",
-    "mediaPost.settings.system.installed": "FFmpeg 已成功安装",
-    "mediaPost.settings.system.uninstalled": "FFmpeg 已成功卸载",
-    "mediaPost.settings.system.installFailed": "安装失败：{msg}",
-    "mediaPost.settings.system.uninstallFailed": "卸载失败：{msg}",
-    "mediaPost.settings.system.location": "可执行文件：{path}",
-    "mediaPost.settings.system.requiresSudo": "当前安装方式需要管理员权限，请在终端中执行：",
-    "mediaPost.settings.system.noMethod": "未识别到自动安装方式，请按操作系统手册手动安装 FFmpeg。",
-    "mediaPost.settings.system.uninstallConfirm": "确定要卸载 FFmpeg 吗？卸载后本插件以及其它依赖 FFmpeg 的功能将无法工作，需重新安装才能恢复。",
-    "mediaPost.settings.system.logTitle": "安装日志",
-    "mediaPost.settings.system.logTitleUninstall": "卸载日志",
-    "mediaPost.settings.system.logEmpty": "尚无日志输出…",
-    "mediaPost.settings.system.btn.install": "一键安装",
-    "mediaPost.settings.system.btn.uninstall": "卸载",
-    "mediaPost.settings.system.btn.uninstallConfirm": "确认卸载",
-    "mediaPost.settings.system.btn.recheck": "重新检测",
-    "mediaPost.settings.system.btn.openHome": "打开主页",
-    "mediaPost.settings.system.btn.copyCmd": "复制命令",
-    "mediaPost.settings.system.btn.copied": "已复制",
-    "mediaPost.settings.handoff.title": "跨插件协同（v2.0 启用）",
-    "mediaPost.settings.handoff.disabled": "等待 v2.0 — 将与 clip-sense / subtitle-craft / avatar-studio 互通素材",
-    "mediaPost.settings.save": "保存设置",
-    "mediaPost.settings.saved": "已保存",
-    "mediaPost.settings.saveFailed": "保存失败",
+    "mediaPost.settings.api.required": "蹇呭～椤?,
+    "mediaPost.settings.api.show": "鏄剧ず",
+    "mediaPost.settings.api.hide": "闅愯棌",
+    "mediaPost.settings.api.saveBtn": "淇濆瓨",
+    "mediaPost.settings.api.test": "娴嬭瘯杩炴帴",
+    "mediaPost.settings.api.ok": "宸查厤缃?,
+    "mediaPost.settings.api.missing": "鏈厤缃?,
+    "mediaPost.settings.api.toast.saved": "API Key 宸蹭繚瀛?,
+    "mediaPost.settings.api.toast.cleared": "API Key 宸叉竻闄?,
+    "mediaPost.settings.vlm.title": "VLM 鍙傛暟",
+    "mediaPost.settings.vlm.fps": "閲囨牱甯х巼锛坢ulti_aspect锛?,
+    "mediaPost.settings.vlm.fps.tip": "multi_aspect 妯″紡涓嬶紝鎸夊灏戝抚/绉掓娊鍙栧叧閿抚閫佸叆瑙嗚妯″瀷鍒嗘瀽銆傚€艰秺楂樼敾闈㈣秺绮剧粏浣嗚€楁椂涓庤垂鐢ㄨ秺楂樸€傚父鐢?1.0~3.0锛涚煭瑙嗛 (<60s) 鎺ㄨ崘 2.0锛涜秴闀胯棰戝彲闄嶈嚦 1.0銆?,
+    "mediaPost.settings.vlm.batch": "VLM 鎵瑰ぇ灏忥紙鍥哄畾 8锛?,
+    "mediaPost.settings.vlm.batch.tip": "姣忔璇锋眰 Qwen-VL 鏃舵墦鍖呯殑鍥剧墖鏁伴噺銆傚悗绔浐瀹氫负 8锛圖ashScope 涓婇檺鍚屾椂涔熸槸鎬т环姣旀渶楂樼殑鎵瑰ぇ灏忥級锛孶I 浠呭仛灞曠ず锛屾棤娉曚慨鏀广€?,
+    "mediaPost.settings.vlm.concurrency": "骞跺彂鎵规暟",
+    "mediaPost.settings.vlm.concurrency.tip": "鍚屼竴浠诲姟鍐呭厑璁稿苟鍙戞墽琛岀殑 VLM 鎵规鏁般€傚澶у彲缂╃煭鏁翠綋鑰楁椂锛屼絾浼氭寜鍊嶆暟鎺ㄩ珮鐬椂 QPS銆佹樉瀛樹笌璐圭敤锛岃Е鍙?quota 鎶ヨ鏃惰皟灏忋€傚缓璁?1~4锛屼紒涓氳处鍙峰彲鑷?8銆?,
+    "mediaPost.settings.chapter.title": "绔犺妭鍗?,
+    "mediaPost.settings.chapter.template": "榛樿妯℃澘",
+    "mediaPost.settings.chapter.template.helper": "鏂板缓銆岀珷鑺傚崱銆嶄换鍔℃椂浣跨敤鐨勯粯璁?HTML 妯℃澘锛涘彲鍦?Create 椤典复鏃跺垏鎹?,
+    "mediaPost.settings.chapter.templates_dir": "鑷畾涔夋ā鏉跨洰褰?,
+    "mediaPost.settings.chapter.playwright": "Playwright 娓叉煋鐘舵€?,
+    "mediaPost.settings.chapter.playwright.checking": "妫€娴嬩腑鈥?,
+    "mediaPost.settings.chapter.playwright.ok": "Playwright 灏辩华 路 A 璺紙HTML 娓叉煋锛?,
+    "mediaPost.settings.chapter.playwright.fallback": "鏈氨缁?路 鑷姩闄嶇骇 B 璺紙ffmpeg drawtext锛?,
+    "mediaPost.settings.chapter.playwright.recheck": "閲嶆柊妫€娴?,
+    "mediaPost.settings.chapter.playwright.help": "鑻ュ笇鏈涗娇鐢?A 璺緱鍒版洿绮捐嚧鐨?HTML 鍗＄墖锛岃鎸変笅鏂瑰懡浠ゅ畨瑁咃紱鏈畨瑁呬篃涓嶅奖鍝嶅嚭鐗囷紝B 璺粎鏍峰紡杈冩湸绱犮€?,
+    "mediaPost.settings.chapter.playwright.cmd1": "1. 瀹夎搴擄細",
+    "mediaPost.settings.chapter.playwright.cmd2": "2. 瀹夎 Chromium锛?,
+    "mediaPost.settings.chapter.playwright.copy": "澶嶅埗",
+    "mediaPost.settings.chapter.playwright.error": "涓婃閿欒锛?,
+    "mediaPost.settings.cost.title": "鎴愭湰鎺у埗",
+    "mediaPost.settings.cost.warn": "鍗曚换鍔＄‘璁ら槇鍊?楼",
+    "mediaPost.settings.cost.duration": "multi_aspect 鏃堕暱涓婇檺锛堝垎閽燂級",
+    "mediaPost.settings.storage.title": "鏁版嵁瀛樺偍",
+    "mediaPost.settings.storage.dataDir": "鎻掍欢鏁版嵁鐩綍锛堢敱瀹夸富鍒嗛厤锛屽彧璇伙級",
+    "mediaPost.settings.storage.openFolder": "鎵撳紑鏂囦欢澶?,
+    "mediaPost.settings.storage.copyPath": "澶嶅埗璺緞",
+    "mediaPost.settings.storage.uploads": "涓婁紶绱犳潗 (uploads)",
+    "mediaPost.settings.storage.tasks": "浠诲姟浜х墿 (tasks)",
+    "mediaPost.settings.storage.fileCount": "{n} 涓枃浠?,
+    "mediaPost.settings.storage.refresh": "鍒锋柊缁熻",
+    "mediaPost.settings.storage.totals": "鍚堣锛歿files} 涓枃浠?路 {mb} MB",
+    "mediaPost.settings.storage.note": "鏈彃浠朵笉鏆撮湶鑷畾涔夊瓨鏀捐矾寰勶細鎵€鏈変笂浼犱笌浜х墿鍧囧綊灞炰簬瀹夸富鎸囧畾鐨勬暟鎹洰褰曪紝渚夸簬缁熶竴澶囦唤涓庢竻鐞嗐€?,
+    "mediaPost.settings.system.title": "绯荤粺缁勪欢",
+    "mediaPost.settings.system.intro.strong": "鏈彃浠朵緷璧栦互涓嬬郴缁熺粍浠讹紝缂哄け浼氳嚜鍔ㄩ檷绾ф垨澶辫触銆?,
+    "mediaPost.settings.system.intro.body": "閫氳繃涓嬫柟涓€閿畨瑁呭嵆鍙紝瀹夎鏃ュ織鐩存帴鍦ㄥ崱鐗囧唴鏄剧ず锛屾棤闇€鎵撳紑缁堢銆?,
+    "mediaPost.settings.system.intro.item1": "FFmpeg锛氱敤浜庡叧閿抚鎶藉彇銆佸姩鎬佽鍓€佺珷鑺傚崱 drawtext 鍏滃簳娓叉煋銆?,
+    "mediaPost.settings.system.intro.item2": "Playwright锛堝彲閫夛級锛氱敤浜?A 璺?HTML 绔犺妭鍗℃覆鏌撱€傛湭瀹夎鏃惰嚜鍔ㄩ檷绾т负 ffmpeg drawtext銆?,
+    "mediaPost.settings.system.detecting": "姝ｅ湪妫€娴嬧€?,
+    "mediaPost.settings.system.found": "宸插畨瑁?v{ver}",
+    "mediaPost.settings.system.foundNoVer": "宸插畨瑁?,
+    "mediaPost.settings.system.missing": "鏈畨瑁?,
+    "mediaPost.settings.system.installing": "瀹夎涓€?{elapsed}",
+    "mediaPost.settings.system.uninstalling": "鍗歌浇涓€?{elapsed}",
+    "mediaPost.settings.system.installed": "FFmpeg 宸叉垚鍔熷畨瑁?,
+    "mediaPost.settings.system.uninstalled": "FFmpeg 宸叉垚鍔熷嵏杞?,
+    "mediaPost.settings.system.installFailed": "瀹夎澶辫触锛歿msg}",
+    "mediaPost.settings.system.uninstallFailed": "鍗歌浇澶辫触锛歿msg}",
+    "mediaPost.settings.system.location": "鍙墽琛屾枃浠讹細{path}",
+    "mediaPost.settings.system.requiresSudo": "褰撳墠瀹夎鏂瑰紡闇€瑕佺鐞嗗憳鏉冮檺锛岃鍦ㄧ粓绔腑鎵ц锛?,
+    "mediaPost.settings.system.noMethod": "鏈瘑鍒埌鑷姩瀹夎鏂瑰紡锛岃鎸夋搷浣滅郴缁熸墜鍐屾墜鍔ㄥ畨瑁?FFmpeg銆?,
+    "mediaPost.settings.system.uninstallConfirm": "纭畾瑕佸嵏杞?FFmpeg 鍚楋紵鍗歌浇鍚庢湰鎻掍欢浠ュ強鍏跺畠渚濊禆 FFmpeg 鐨勫姛鑳藉皢鏃犳硶宸ヤ綔锛岄渶閲嶆柊瀹夎鎵嶈兘鎭㈠銆?,
+    "mediaPost.settings.system.logTitle": "瀹夎鏃ュ織",
+    "mediaPost.settings.system.logTitleUninstall": "鍗歌浇鏃ュ織",
+    "mediaPost.settings.system.logEmpty": "灏氭棤鏃ュ織杈撳嚭鈥?,
+    "mediaPost.settings.system.btn.install": "涓€閿畨瑁?,
+    "mediaPost.settings.system.btn.uninstall": "鍗歌浇",
+    "mediaPost.settings.system.btn.uninstallConfirm": "纭鍗歌浇",
+    "mediaPost.settings.system.btn.recheck": "閲嶆柊妫€娴?,
+    "mediaPost.settings.system.btn.openHome": "鎵撳紑涓婚〉",
+    "mediaPost.settings.system.btn.copyCmd": "澶嶅埗鍛戒护",
+    "mediaPost.settings.system.btn.copied": "宸插鍒?,
+    "mediaPost.settings.handoff.title": "璺ㄦ彃浠跺崗鍚岋紙v2.0 鍚敤锛?,
+    "mediaPost.settings.handoff.disabled": "绛夊緟 v2.0 鈥?灏嗕笌 clip-sense / subtitle-craft / avatar-studio 浜掗€氱礌鏉?,
+    "mediaPost.settings.save": "淇濆瓨璁剧疆",
+    "mediaPost.settings.saved": "宸蹭繚瀛?,
+    "mediaPost.settings.saveFailed": "淇濆瓨澶辫触",
     // Common
-    "mediaPost.common.start": "开始",
-    "mediaPost.common.cancel": "取消",
-    "mediaPost.common.retry": "重试",
-    "mediaPost.common.delete": "删除",
-    "mediaPost.common.copy": "复制",
-    "mediaPost.common.download": "下载",
-    "mediaPost.common.copyLog": "复制日志",
-    "mediaPost.common.continue": "继续创建",
-    "mediaPost.common.goTasks": "前往任务列表",
-    "mediaPost.common.taskStarted": "任务已开始",
-    "mediaPost.common.refresh": "刷新",
-    "mediaPost.common.loading": "加载中…",
-    "mediaPost.common.status.pending": "等待中",
-    "mediaPost.common.status.running": "运行中",
-    "mediaPost.common.status.completed": "已完成",
-    "mediaPost.common.status.failed": "失败",
-    "mediaPost.common.status.cancelled": "已取消",
-    "mediaPost.common.status.approval_required": "等待确认",
-    "mediaPost.common.api.missing.title": "尚未配置 DashScope API Key",
-    "mediaPost.common.api.missing.desc": "cover_pick / multi_aspect / seo_pack 模式都需要 Key 才能运行。",
-    "mediaPost.common.api.missing.cta": "前往设置",
+    "mediaPost.common.start": "寮€濮?,
+    "mediaPost.common.cancel": "鍙栨秷",
+    "mediaPost.common.retry": "閲嶈瘯",
+    "mediaPost.common.delete": "鍒犻櫎",
+    "mediaPost.common.copy": "澶嶅埗",
+    "mediaPost.common.download": "涓嬭浇",
+    "mediaPost.common.copyLog": "澶嶅埗鏃ュ織",
+    "mediaPost.common.continue": "缁х画鍒涘缓",
+    "mediaPost.common.goTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "mediaPost.common.taskStarted": "浠诲姟宸插紑濮?,
+    "mediaPost.common.refresh": "鍒锋柊",
+    "mediaPost.common.loading": "鍔犺浇涓€?,
+    "mediaPost.common.status.pending": "绛夊緟涓?,
+    "mediaPost.common.status.running": "杩愯涓?,
+    "mediaPost.common.status.completed": "宸插畬鎴?,
+    "mediaPost.common.status.failed": "澶辫触",
+    "mediaPost.common.status.cancelled": "宸插彇娑?,
+    "mediaPost.common.status.approval_required": "绛夊緟纭",
+    "mediaPost.common.api.missing.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "mediaPost.common.api.missing.desc": "cover_pick / multi_aspect / seo_pack 妯″紡閮介渶瑕?Key 鎵嶈兘杩愯銆?,
+    "mediaPost.common.api.missing.cta": "鍓嶅線璁剧疆",
     // Cost
-    "mediaPost.cost.estimate": "预估成本",
-    "mediaPost.cost.free": "免费（本地运行）",
-    "mediaPost.cost.warn_10": "成本超过 ¥10，需要确认",
-    "mediaPost.cost.warn_30": "成本超过 ¥30，请仔细确认",
+    "mediaPost.cost.estimate": "棰勪及鎴愭湰",
+    "mediaPost.cost.free": "鍏嶈垂锛堟湰鍦拌繍琛岋級",
+    "mediaPost.cost.warn_10": "鎴愭湰瓒呰繃 楼10锛岄渶瑕佺‘璁?,
+    "mediaPost.cost.warn_30": "鎴愭湰瓒呰繃 楼30锛岃浠旂粏纭",
   },
   en: {
     "app.title": "Launch Kit",
-    "app.subtitle": "DashScope · Smart Cover / Recompose / SEO / Chapter Cards",
+    "app.subtitle": "DashScope 路 Smart Cover / Recompose / SEO / Chapter Cards",
     "mediaPost.tabs.create": "Create",
     "mediaPost.tabs.tasks": "Tasks",
     "mediaPost.tabs.library": "Library",
     "mediaPost.tabs.settings": "Settings",
-    "mediaPost.tabs.create.sub": "Pick a mode → upload video → tune params → run",
+    "mediaPost.tabs.create.sub": "Pick a mode 鈫?upload video 鈫?tune params 鈫?run",
     "mediaPost.tabs.tasks.sub": "Live progress / history / detail panels",
     "mediaPost.tabs.library.sub": "Covers / aspects / SEO copy / chapter cards",
     "mediaPost.tabs.settings.sub": "API Key / VLM / Chapters / Cost / Cross-plugin",
@@ -702,7 +702,7 @@ const I18N_DICT = {
     "mediaPost.banner.noKey.desc": "All create tasks will fail. Open Settings and paste your Aliyun Bailian DashScope API key.",
     "mediaPost.banner.noKey.cta": "Open Settings",
     "mediaPost.preview.empty.title": "Waiting for a task",
-    "mediaPost.preview.empty.hint": "Pick a mode → upload video → tune params → run",
+    "mediaPost.preview.empty.hint": "Pick a mode 鈫?upload video 鈫?tune params 鈫?run",
     "mediaPost.tasks.empty.title": "No tasks yet",
     "mediaPost.tasks.empty.hint": "Open the Create tab and run your first task.",
     "mediaPost.tasks.detail.empty.title": "No task selected",
@@ -710,7 +710,7 @@ const I18N_DICT = {
     "mediaPost.tasks.total": "{n} task(s) total",
     "mediaPost.library.count": "{n} asset(s)",
     "mediaPost.library.empty.title": "No assets yet",
-    "mediaPost.library.empty.hint": "Run a task on the Create tab — outputs will land here automatically.",
+    "mediaPost.library.empty.hint": "Run a task on the Create tab 鈥?outputs will land here automatically.",
     "mediaPost.modes.cover_pick.title": "Smart Cover Pick",
     "mediaPost.modes.cover_pick.desc": "Qwen-VL 6-axis aesthetic scoring",
     "mediaPost.modes.multi_aspect.title": "Smart Recompose",
@@ -721,7 +721,7 @@ const I18N_DICT = {
     "mediaPost.modes.chapter_cards.desc": "Playwright + ffmpeg drawtext fallback",
     "mediaPost.forms.video.label": "Video file",
     "mediaPost.forms.video.placeholder": "Click or drop mp4 / mkv / mov",
-    "mediaPost.forms.video.helper": "≤30 min recommended; cost grows linearly with duration",
+    "mediaPost.forms.video.helper": "鈮?0 min recommended; cost grows linearly with duration",
     "mediaPost.forms.quantity.label": "Cover count",
     "mediaPost.forms.quantity.helper": "8 is recommended (one VLM batch)",
     "mediaPost.forms.threshold.label": "Min score threshold",
@@ -764,20 +764,20 @@ const I18N_DICT = {
     "mediaPost.forms.template.youtube_style.desc": "Bold-large-type with accent colour, mirrors YouTube chapter cards",
     "mediaPost.forms.template.custom.desc": "Reads <id>.html from your custom templates dir; bring your own HTML",
     "mediaPost.forms.size.label": "Card size",
-    "mediaPost.forms.size.16_9": "Landscape 16:9 (1280×720)",
-    "mediaPost.forms.size.1_1": "Square 1:1 (1080×1080)",
-    "mediaPost.forms.size.9_16": "Vertical 9:16 (1080×1920)",
+    "mediaPost.forms.size.16_9": "Landscape 16:9 (1280脳720)",
+    "mediaPost.forms.size.1_1": "Square 1:1 (1080脳1080)",
+    "mediaPost.forms.size.9_16": "Vertical 9:16 (1080脳1920)",
     "mediaPost.forms.start.cover_pick": "Start cover pick",
     "mediaPost.forms.start.multi_aspect": "Start recompose",
     "mediaPost.forms.start.seo_pack": "Start SEO pack",
     "mediaPost.forms.start.chapter_cards": "Render chapter cards",
-    "mediaPost.forms.start.confirm": "Confirm & continue (¥{cost})",
+    "mediaPost.forms.start.confirm": "Confirm & continue (楼{cost})",
     "mediaPost.tasks.all": "All tasks",
     "mediaPost.tasks.filter.mode": "Mode",
     "mediaPost.tasks.filter.status": "Status",
     "mediaPost.tasks.filter.all": "All",
-    "mediaPost.tasks.filter.search": "Search task ID or video…",
-    "mediaPost.tasks.empty": "No tasks yet — create one from the Create tab",
+    "mediaPost.tasks.filter.search": "Search task ID or video鈥?,
+    "mediaPost.tasks.empty": "No tasks yet 鈥?create one from the Create tab",
     "mediaPost.tasks.detail.empty": "Pick a task on the left to view details",
     "mediaPost.tasks.actions.cancel": "Cancel",
     "mediaPost.tasks.actions.retry": "Retry",
@@ -796,13 +796,13 @@ const I18N_DICT = {
     "mediaPost.library.aspects": "Recomposed",
     "mediaPost.library.seo": "SEO pack",
     "mediaPost.library.chapters": "Chapter cards",
-    "mediaPost.library.empty": "Empty — run a task from Create",
+    "mediaPost.library.empty": "Empty 鈥?run a task from Create",
     "mediaPost.errors.network.label": "Network error",
     "mediaPost.errors.network.h1": "Check network",
     "mediaPost.errors.network.h2": "Verify proxy reaches dashscope.aliyuncs.com",
     "mediaPost.errors.network.h3": "Will auto-retry 3 times",
     "mediaPost.errors.timeout.label": "Timeout",
-    "mediaPost.errors.timeout.h1": "Long video may timeout (multi_aspect ≤30 min)",
+    "mediaPost.errors.timeout.h1": "Long video may timeout (multi_aspect 鈮?0 min)",
     "mediaPost.errors.timeout.h2": "Increase timeout in Settings",
     "mediaPost.errors.timeout.h3": "Or split video",
     "mediaPost.errors.auth.label": "Auth error",
@@ -822,14 +822,14 @@ const I18N_DICT = {
     "mediaPost.errors.format.h1": "Verify mp4/mkv/mov",
     "mediaPost.errors.format.h2": "File corrupted if ffprobe fails",
     "mediaPost.errors.duration.label": "Duration / Size Exceeded",
-    "mediaPost.errors.duration.h1": "multi_aspect ≤30 min recommended",
+    "mediaPost.errors.duration.h1": "multi_aspect 鈮?0 min recommended",
     "mediaPost.errors.duration.h2": "cover_pick / seo_pack handle any length",
     "mediaPost.errors.unknown.label": "Unknown Error",
     "mediaPost.errors.unknown.h1": "Report task_id to developer",
     "mediaPost.errors.unknown.h2": "Screenshot metadata.json",
     "mediaPost.settings.api.title": "API Key",
     "mediaPost.settings.api.label": "DashScope API Key",
-    "mediaPost.settings.api.helper": "Get one from Aliyun Bailian console → API Key. Stored locally only.",
+    "mediaPost.settings.api.helper": "Get one from Aliyun Bailian console 鈫?API Key. Stored locally only.",
     "mediaPost.settings.api.placeholder": "sk-...",
     "mediaPost.settings.api.required": "Required",
     "mediaPost.settings.api.show": "Show",
@@ -842,19 +842,19 @@ const I18N_DICT = {
     "mediaPost.settings.api.toast.cleared": "API Key cleared",
     "mediaPost.settings.vlm.title": "VLM Parameters",
     "mediaPost.settings.vlm.fps": "Sample fps (multi_aspect)",
-    "mediaPost.settings.vlm.fps.tip": "Frames-per-second sampled and sent to the vision model in multi_aspect mode. Higher = sharper crop choices but more cost and latency. Typical 1.0–3.0; short clips (<60s) prefer 2.0; long-form may drop to 1.0.",
+    "mediaPost.settings.vlm.fps.tip": "Frames-per-second sampled and sent to the vision model in multi_aspect mode. Higher = sharper crop choices but more cost and latency. Typical 1.0鈥?.0; short clips (<60s) prefer 2.0; long-form may drop to 1.0.",
     "mediaPost.settings.vlm.batch": "VLM batch size (locked to 8)",
-    "mediaPost.settings.vlm.batch.tip": "Number of frames packed into a single Qwen-VL request. Locked at 8 (DashScope's sweet spot — both the API limit and best price-per-frame). Display only; not editable from the UI.",
+    "mediaPost.settings.vlm.batch.tip": "Number of frames packed into a single Qwen-VL request. Locked at 8 (DashScope's sweet spot 鈥?both the API limit and best price-per-frame). Display only; not editable from the UI.",
     "mediaPost.settings.vlm.concurrency": "Concurrent batches",
-    "mediaPost.settings.vlm.concurrency.tip": "How many VLM batches the plugin runs in parallel for a single task. Higher = shorter wall-clock but multiplies QPS, GPU pressure and cost. Lower if you hit quota errors. 1–4 is safe for most users; enterprise accounts can go up to 8.",
+    "mediaPost.settings.vlm.concurrency.tip": "How many VLM batches the plugin runs in parallel for a single task. Higher = shorter wall-clock but multiplies QPS, GPU pressure and cost. Lower if you hit quota errors. 1鈥? is safe for most users; enterprise accounts can go up to 8.",
     "mediaPost.settings.chapter.title": "Chapter cards",
     "mediaPost.settings.chapter.template": "Default template",
     "mediaPost.settings.chapter.template.helper": "HTML template the Chapter Cards mode picks by default; you can override per task on Create",
     "mediaPost.settings.chapter.templates_dir": "Custom templates dir",
     "mediaPost.settings.chapter.playwright": "Playwright status",
-    "mediaPost.settings.chapter.playwright.checking": "Probing…",
-    "mediaPost.settings.chapter.playwright.ok": "Playwright ready · A path (HTML render)",
-    "mediaPost.settings.chapter.playwright.fallback": "Not ready · auto fallback to B path (ffmpeg drawtext)",
+    "mediaPost.settings.chapter.playwright.checking": "Probing鈥?,
+    "mediaPost.settings.chapter.playwright.ok": "Playwright ready 路 A path (HTML render)",
+    "mediaPost.settings.chapter.playwright.fallback": "Not ready 路 auto fallback to B path (ffmpeg drawtext)",
     "mediaPost.settings.chapter.playwright.recheck": "Re-check",
     "mediaPost.settings.chapter.playwright.help": "Install commands below if you want the prettier A path; without it, the plugin still produces cards via the simpler B path.",
     "mediaPost.settings.chapter.playwright.cmd1": "1. Install lib:",
@@ -862,7 +862,7 @@ const I18N_DICT = {
     "mediaPost.settings.chapter.playwright.copy": "Copy",
     "mediaPost.settings.chapter.playwright.error": "Last error: ",
     "mediaPost.settings.cost.title": "Cost control",
-    "mediaPost.settings.cost.warn": "Per-task confirm threshold ¥",
+    "mediaPost.settings.cost.warn": "Per-task confirm threshold 楼",
     "mediaPost.settings.storage.title": "Storage",
     "mediaPost.settings.storage.dataDir": "Plugin data directory (host-allocated, read-only)",
     "mediaPost.settings.storage.openFolder": "Open folder",
@@ -871,30 +871,30 @@ const I18N_DICT = {
     "mediaPost.settings.storage.tasks": "Task outputs",
     "mediaPost.settings.storage.fileCount": "{n} files",
     "mediaPost.settings.storage.refresh": "Refresh",
-    "mediaPost.settings.storage.totals": "Total: {files} files · {mb} MB",
-    "mediaPost.settings.storage.note": "This plugin doesn't expose custom paths — every upload and artifact lives under the host-managed data dir, which keeps backups and cleanup centralized.",
+    "mediaPost.settings.storage.totals": "Total: {files} files 路 {mb} MB",
+    "mediaPost.settings.storage.note": "This plugin doesn't expose custom paths 鈥?every upload and artifact lives under the host-managed data dir, which keeps backups and cleanup centralized.",
     "mediaPost.settings.system.title": "System components",
-    "mediaPost.settings.system.intro.strong": "This plugin depends on the following system components — missing ones will auto-fallback or fail.",
-    "mediaPost.settings.system.intro.body": "Use the in-plugin installer below — install logs render right inside the card, no terminal needed.",
+    "mediaPost.settings.system.intro.strong": "This plugin depends on the following system components 鈥?missing ones will auto-fallback or fail.",
+    "mediaPost.settings.system.intro.body": "Use the in-plugin installer below 鈥?install logs render right inside the card, no terminal needed.",
     "mediaPost.settings.system.intro.item1": "FFmpeg: keyframe extraction, dynamic crop, drawtext fallback for chapter cards.",
     "mediaPost.settings.system.intro.item2": "Playwright (optional): A-path HTML chapter card render. Without it the plugin auto-falls back to ffmpeg drawtext.",
-    "mediaPost.settings.system.detecting": "Detecting…",
+    "mediaPost.settings.system.detecting": "Detecting鈥?,
     "mediaPost.settings.system.found": "Installed v{ver}",
     "mediaPost.settings.system.foundNoVer": "Installed",
     "mediaPost.settings.system.missing": "Not installed",
-    "mediaPost.settings.system.installing": "Installing… {elapsed}",
-    "mediaPost.settings.system.uninstalling": "Uninstalling… {elapsed}",
+    "mediaPost.settings.system.installing": "Installing鈥?{elapsed}",
+    "mediaPost.settings.system.uninstalling": "Uninstalling鈥?{elapsed}",
     "mediaPost.settings.system.installed": "FFmpeg installed successfully",
     "mediaPost.settings.system.uninstalled": "FFmpeg uninstalled",
     "mediaPost.settings.system.installFailed": "Install failed: {msg}",
     "mediaPost.settings.system.uninstallFailed": "Uninstall failed: {msg}",
     "mediaPost.settings.system.location": "Executable: {path}",
-    "mediaPost.settings.system.requiresSudo": "This install method needs admin rights — run the following in a terminal:",
-    "mediaPost.settings.system.noMethod": "No automatic install method on this OS — please install FFmpeg manually.",
+    "mediaPost.settings.system.requiresSudo": "This install method needs admin rights 鈥?run the following in a terminal:",
+    "mediaPost.settings.system.noMethod": "No automatic install method on this OS 鈥?please install FFmpeg manually.",
     "mediaPost.settings.system.uninstallConfirm": "Uninstall FFmpeg? This plugin and any other FFmpeg-dependent feature will stop working until reinstalled.",
     "mediaPost.settings.system.logTitle": "Install log",
     "mediaPost.settings.system.logTitleUninstall": "Uninstall log",
-    "mediaPost.settings.system.logEmpty": "No log output yet…",
+    "mediaPost.settings.system.logEmpty": "No log output yet鈥?,
     "mediaPost.settings.system.btn.install": "Install",
     "mediaPost.settings.system.btn.uninstall": "Uninstall",
     "mediaPost.settings.system.btn.uninstallConfirm": "Confirm uninstall",
@@ -904,7 +904,7 @@ const I18N_DICT = {
     "mediaPost.settings.system.btn.copied": "Copied",
     "mediaPost.settings.cost.duration": "multi_aspect duration cap (min)",
     "mediaPost.settings.handoff.title": "Cross-plugin handoff (v2.0)",
-    "mediaPost.settings.handoff.disabled": "Pending v2.0 — clip-sense / subtitle-craft / avatar-studio handoff",
+    "mediaPost.settings.handoff.disabled": "Pending v2.0 鈥?clip-sense / subtitle-craft / avatar-studio handoff",
     "mediaPost.settings.save": "Save settings",
     "mediaPost.settings.saved": "Saved",
     "mediaPost.settings.saveFailed": "Save failed",
@@ -919,7 +919,7 @@ const I18N_DICT = {
     "mediaPost.common.goTasks": "Go to tasks",
     "mediaPost.common.taskStarted": "Task started",
     "mediaPost.common.refresh": "Refresh",
-    "mediaPost.common.loading": "Loading…",
+    "mediaPost.common.loading": "Loading鈥?,
     "mediaPost.common.status.pending": "Pending",
     "mediaPost.common.status.running": "Running",
     "mediaPost.common.status.completed": "Completed",
@@ -931,8 +931,8 @@ const I18N_DICT = {
     "mediaPost.common.api.missing.cta": "Open settings",
     "mediaPost.cost.estimate": "Estimated cost",
     "mediaPost.cost.free": "Free (local)",
-    "mediaPost.cost.warn_10": "Cost above ¥10, please confirm",
-    "mediaPost.cost.warn_30": "Cost above ¥30, double-check before continuing",
+    "mediaPost.cost.warn_10": "Cost above 楼10, please confirm",
+    "mediaPost.cost.warn_30": "Cost above 楼30, double-check before continuing",
   },
 };
 
@@ -965,7 +965,7 @@ function useI18n() {
   return { t, locale };
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const STATUS_TAG = {
   pending: "tag-gray", running: "tag-warm",
   completed: "tag-green", failed: "tag-red",
@@ -987,14 +987,14 @@ function parseChapters(text) {
   return out;
 }
 
-// ─── Cost preview & API key banner ──────────────────────────────────────
+// 鈹€鈹€鈹€ Cost preview & API key banner 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function CostBanner({ preview, t }) {
   if (!preview) return null;
   const klass = preview.cost_kind === "danger" ? "danger" : preview.cost_kind === "warn" ? "warn" : "";
-  const amount = preview.total_cny > 0 ? `¥${preview.total_cny.toFixed(4)}` : t("mediaPost.cost.free");
+  const amount = preview.total_cny > 0 ? `楼${preview.total_cny.toFixed(4)}` : t("mediaPost.cost.free");
   return (
     <div className={`oa-cost ${klass}`}>
-      <span>{t("mediaPost.cost.estimate")} · {preview.items.map(i => i.description).join(" / ") || "—"}</span>
+      <span>{t("mediaPost.cost.estimate")} 路 {preview.items.map(i => i.description).join(" / ") || "鈥?}</span>
       <span className="oa-cost__amount">{amount}</span>
     </div>
   );
@@ -1017,7 +1017,7 @@ function ApiKeyBanner({ missing, t, onGo }) {
   );
 }
 
-// ─── Mode forms ─────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Mode forms 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function CoverPickForm({ value, onChange, t }) {
   return (
     <>
@@ -1169,7 +1169,7 @@ function ChapterCardsForm({ value, onChange, t }) {
   );
 }
 
-// ─── Create tab ─────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Create tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 const DEFAULT_FORMS = {
   cover_pick: { quantity: 8, min_score_threshold: 3.0, platform_hint: "universal" },
   multi_aspect: { target_aspects: ["9:16"], recompose_fps: 2.0 },
@@ -1315,7 +1315,7 @@ function CreateTab({ t, settings, onTaskCreated, gotoSettings }) {
                   : video
                     ? (<>
                         <video className="upload-preview" src={video.url} controls />
-                        <div className="text-xs text-muted" style={{marginTop:6}}>{video.filename} · {fmtBytes(video.size)}</div>
+                        <div className="text-xs text-muted" style={{marginTop:6}}>{video.filename} 路 {fmtBytes(video.size)}</div>
                       </>)
                     : <>{t("mediaPost.forms.video.placeholder")}</>}
               </div>
@@ -1374,7 +1374,7 @@ function CreateTab({ t, settings, onTaskCreated, gotoSettings }) {
                 <div className="modal-title">{t("mediaPost.common.taskStarted")}</div>
                 <div className="modal-desc">
                   ID: <code>{startedTask.id}</code><br/>
-                  {t("mediaPost.cost.estimate")}: ¥{(startedTask.cost_estimated || 0).toFixed(4)}
+                  {t("mediaPost.cost.estimate")}: 楼{(startedTask.cost_estimated || 0).toFixed(4)}
                 </div>
                 <div className="modal-actions">
                   <button className="btn" onClick={() => setStartedTask(null)}>{t("mediaPost.common.continue")}</button>
@@ -1391,10 +1391,10 @@ function CreateTab({ t, settings, onTaskCreated, gotoSettings }) {
   );
 }
 
-// ─── Tasks tab — list + 4 detail panels ─────────────────────────────────
+// 鈹€鈹€鈹€ Tasks tab 鈥?list + 4 detail panels 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function TaskCard({ task, selected, onClick, t }) {
-  // Per-mode SVG glyph (kit fallback chain): cover_pick→image, multi_aspect→video,
-  // seo_pack→listTask, chapter_cards→book. Keeps thumbnails on the no-emoji rule.
+  // Per-mode SVG glyph (kit fallback chain): cover_pick鈫抜mage, multi_aspect鈫抳ideo,
+  // seo_pack鈫抣istTask, chapter_cards鈫抌ook. Keeps thumbnails on the no-emoji rule.
   const iconName = ({
     cover_pick:    "image",
     multi_aspect:  "video",
@@ -1407,11 +1407,11 @@ function TaskCard({ task, selected, onClick, t }) {
       <div className="task-thumb"
            dangerouslySetInnerHTML={{__html: iconHtml}} />
       <div className="task-info">
-        <h4>{task.id} · {t(`mediaPost.modes.${task.mode}.title`)}</h4>
+        <h4>{task.id} 路 {t(`mediaPost.modes.${task.mode}.title`)}</h4>
         <div className="task-meta">
           <span className={`tag ${STATUS_TAG[task.status] || "tag-gray"}`}>{t(`mediaPost.common.status.${task.status}`) || task.status}</span>
           <span>{fmtDate(task.created_at)}</span>
-          {task.cost_estimated > 0 && <span>¥{task.cost_estimated.toFixed(4)}</span>}
+          {task.cost_estimated > 0 && <span>楼{task.cost_estimated.toFixed(4)}</span>}
         </div>
         {task.status === "running" && (
           <div className="progress"><div style={{width: `${(task.progress || 0) * 100}%`}} /></div>
@@ -1435,7 +1435,7 @@ function CoverGallery({ taskId, t }) {
           <div key={it.id} className="image-card">
             <img src={buildPreviewUrl(it.cover_path)} alt={`cover-${it.rank}`} />
             <div className="image-card__caption">
-              #{it.rank} · {t("mediaPost.tasks.detail.scoreLabel")} {(it.overall_score || 0).toFixed(2)}
+              #{it.rank} 路 {t("mediaPost.tasks.detail.scoreLabel")} {(it.overall_score || 0).toFixed(2)}
             </div>
             <div className="image-card-actions">
               <button onClick={() => copyToClipboard(it.cover_path)}>{t("mediaPost.tasks.detail.copy")}</button>
@@ -1460,14 +1460,14 @@ function RecomposeViewer({ taskId, t }) {
       {items.map(it => (
         <div key={it.id} className={`oa-collapse ${open[it.id] ? "open" : ""}`}>
           <div className="oa-collapse__header" onClick={() => setOpen({...open, [it.id]: !open[it.id]})}>
-            <span><strong>{it.aspect}</strong> · {it.output_w}×{it.output_h} · {(it.duration_sec || 0).toFixed(1)}s</span>
-            <span className="oa-collapse__arrow">▶</span>
+            <span><strong>{it.aspect}</strong> 路 {it.output_w}脳{it.output_h} 路 {(it.duration_sec || 0).toFixed(1)}s</span>
+            <span className="oa-collapse__arrow">鈻?/span>
           </div>
           <div className="oa-collapse__body">
             <video controls style={{width: "100%", maxHeight: 320, background: "#000", borderRadius: 6}}
                    src={buildPreviewUrl(it.output_path)} />
             <div className="text-xs text-muted" style={{marginTop:6}}>
-              fps={it.fps_used} · ema={it.ema_alpha_used} · scenes={it.scene_cut_count}
+              fps={it.fps_used} 路 ema={it.ema_alpha_used} 路 scenes={it.scene_cut_count}
             </div>
             <div className="flex gap-2" style={{marginTop:8}}>
               <button className="btn btn-sm" onClick={() => copyToClipboard(it.output_path)}>{t("mediaPost.tasks.detail.copy")}</button>
@@ -1536,7 +1536,7 @@ function ChaptersGallery({ taskId, t }) {
         {items.map(it => (
           <div key={it.id} className="image-card">
             <img src={buildPreviewUrl(it.png_path)} alt={`ch-${it.chapter_index}`} />
-            <div className="image-card__caption">#{it.chapter_index} · {it.title}</div>
+            <div className="image-card__caption">#{it.chapter_index} 路 {it.title}</div>
           </div>
         ))}
       </div>
@@ -1549,7 +1549,7 @@ function ErrorCoach({ task, t, onRetry }) {
   const kind = task.error_kind || "unknown";
   return (
     <div className="oa-error-coach">
-      <div className="oa-error-coach__title">{t(`mediaPost.errors.${kind}.label`)} · {task.error_message || ""}</div>
+      <div className="oa-error-coach__title">{t(`mediaPost.errors.${kind}.label`)} 路 {task.error_message || ""}</div>
       <ul className="oa-error-coach__list">
         {[1,2,3].map(i => {
           const k = `mediaPost.errors.${kind}.h${i}`;
@@ -1611,7 +1611,7 @@ function TasksTab({ t, refreshTrigger }) {
             <div style={{fontSize:15, fontWeight:600, color:"var(--text)", marginBottom:2}}>
               {t(`mediaPost.modes.${tk.mode}.title`)}
             </div>
-            <div className="text-xs text-dim">ID: <code>{tk.id}</code> · {fmtDate(tk.created_at)}</div>
+            <div className="text-xs text-dim">ID: <code>{tk.id}</code> 路 {fmtDate(tk.created_at)}</div>
           </div>
           <div className="flex gap-2">
             <span className={`oa-pill ${tk.status === "completed" ? "green" : tk.status === "failed" ? "red" : tk.status === "approval_required" ? "orange" : "gray"}`}>
@@ -1646,7 +1646,7 @@ function TasksTab({ t, refreshTrigger }) {
                 <select className="input select" value={filterMode}
                         onChange={e => setFilterMode(e.target.value)}
                         style={{flex:1, minWidth:120}}>
-                  <option value="">{t("mediaPost.tasks.filter.all")} · {t("mediaPost.tasks.filter.mode")}</option>
+                  <option value="">{t("mediaPost.tasks.filter.all")} 路 {t("mediaPost.tasks.filter.mode")}</option>
                   {["cover_pick","multi_aspect","seo_pack","chapter_cards"].map(m => (
                     <option key={m} value={m}>{t(`mediaPost.modes.${m}.title`)}</option>
                   ))}
@@ -1654,7 +1654,7 @@ function TasksTab({ t, refreshTrigger }) {
                 <select className="input select" value={filterStatus}
                         onChange={e => setFilterStatus(e.target.value)}
                         style={{flex:1, minWidth:120}}>
-                  <option value="">{t("mediaPost.tasks.filter.all")} · {t("mediaPost.tasks.filter.status")}</option>
+                  <option value="">{t("mediaPost.tasks.filter.all")} 路 {t("mediaPost.tasks.filter.status")}</option>
                   {["pending","running","completed","failed","cancelled","approval_required"].map(s => (
                     <option key={s} value={s}>{t(`mediaPost.common.status.${s}`)}</option>
                   ))}
@@ -1700,7 +1700,7 @@ function TasksTab({ t, refreshTrigger }) {
   );
 }
 
-// ─── Library tab ────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Library tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function LibraryTab({ t }) {
   const [sub, setSub] = useState("covers");
   const SUBS = ["covers", "aspects", "seo", "chapters"];
@@ -1728,7 +1728,7 @@ function LibraryTab({ t }) {
   );
 }
 
-// ─── Settings tab helpers ───────────────────────────────────────────────
+// 鈹€鈹€鈹€ Settings tab helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Chapter card template IDs MUST mirror mediapost_chapter_renderer.builtin_template_ids().
 // Mismatch = "validation failed: template_id 'dark' not in [...]" at task creation.
 const MP_TEMPLATE_IDS = ["modern", "minimal", "retro", "youtube_style", "custom"];
@@ -1743,10 +1743,10 @@ function MpIco({ name, lg }) {
                dangerouslySetInnerHTML={{__html: html}} />;
 }
 
-// Inline help bubble. We deliberately use a click-to-toggle design —
+// Inline help bubble. We deliberately use a click-to-toggle design 鈥?
 // pure :hover tooltips disappear too easily on touch screens and inside
 // the iframe sandbox, which makes them unusable for the long explanations
-// the user is asking for ("VLM 这个是干嘛的、什么意思").
+// the user is asking for ("VLM 杩欎釜鏄共鍢涚殑銆佷粈涔堟剰鎬?).
 function MpInfo({ children }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -1769,7 +1769,7 @@ function MpInfo({ children }) {
   );
 }
 
-// FfmpegInstaller — verbatim port of seedance-video's component. Talks to
+// FfmpegInstaller 鈥?verbatim port of seedance-video's component. Talks to
 // the in-plugin /system/components + /system/{dep_id}/{install,uninstall,status}
 // routes wired in plugin.py. Same fire-and-poll cadence (3s tick) so a
 // running install survives the user re-opening the Settings tab.
@@ -1836,7 +1836,7 @@ function FfmpegInstaller({ t, onInstalled }) {
             }
           }
         }
-      } catch (e) { /* network blip — try again next tick */ }
+      } catch (e) { /* network blip 鈥?try again next tick */ }
     };
     tick();
     pollRef.current = setInterval(tick, 3000);
@@ -2171,7 +2171,7 @@ function SettingsTab({ t, settings, onSaved }) {
 
   return (
     <div style={{maxWidth: 640}}>
-      {/* ── API Key (Seedance-style field-level callout) ──────────────── */}
+      {/* 鈹€鈹€ API Key (Seedance-style field-level callout) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="key"/>{t("mediaPost.settings.api.title")}</h3>
         <div className={"form-row" + (apiOk ? "" : " oa-config-field-callout")}
@@ -2199,26 +2199,26 @@ function SettingsTab({ t, settings, onSaved }) {
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <label className="label">共享中转站名称（可选）</label>
+            <label className="label">鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</label>
             <input className="input" type="text"
                    value={draft.dashscope_relay_endpoint || ""}
                    onChange={e => set("dashscope_relay_endpoint", e.target.value)}
-                   placeholder="例如: yunwu-vision" />
-            <p className="text-xs text-dim" style={{marginTop:4}}>来自 LLM 配置页 relay_endpoints；保存后 VLM 请求优先走该中转站。</p>
+                   placeholder="渚嬪: yunwu-vision" />
+            <p className="text-xs text-dim" style={{marginTop:4}}>鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涗繚瀛樺悗 VLM 璇锋眰浼樺厛璧拌涓浆绔欍€?/p>
           </div>
           <div className="form-row">
-            <label className="label">中转站失败策略</label>
+            <label className="label">涓浆绔欏け璐ョ瓥鐣?/label>
             <select className="input select"
                     value={draft.dashscope_relay_fallback_policy || "official"}
                     onChange={e => set("dashscope_relay_fallback_policy", e.target.value)}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* ── VLM parameters ─────────────────────────────────────────────── */}
+      {/* 鈹€鈹€ VLM parameters 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="settings"/>{t("mediaPost.settings.vlm.title")}</h3>
         <div className="grid-2">
@@ -2258,7 +2258,7 @@ function SettingsTab({ t, settings, onSaved }) {
         </div>
       </div>
 
-      {/* ── Chapter cards (template + live Playwright probe) ──────────── */}
+      {/* 鈹€鈹€ Chapter cards (template + live Playwright probe) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="palette"/>{t("mediaPost.settings.chapter.title")}</h3>
         <div className="form-row">
@@ -2320,7 +2320,7 @@ function SettingsTab({ t, settings, onSaved }) {
         </div>
       </div>
 
-      {/* ── Cost control ───────────────────────────────────────────────── */}
+      {/* 鈹€鈹€ Cost control 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="sparkles"/>{t("mediaPost.settings.cost.title")}</h3>
         <div className="grid-2">
@@ -2337,7 +2337,7 @@ function SettingsTab({ t, settings, onSaved }) {
         </div>
       </div>
 
-      {/* ── System dependencies (in-plugin FFmpeg installer) ──────────── */}
+      {/* 鈹€鈹€ System dependencies (in-plugin FFmpeg installer) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="download"/>{t("mediaPost.settings.system.title")}</h3>
         <div className="deps-help">
@@ -2351,7 +2351,7 @@ function SettingsTab({ t, settings, onSaved }) {
         <FfmpegInstaller t={t} onInstalled={() => { /* nothing else needs reload */ }} />
       </div>
 
-      {/* ── Storage (read-only — host owns the path) ──────────────────── */}
+      {/* 鈹€鈹€ Storage (read-only 鈥?host owns the path) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title"><MpIco name="folder"/>{t("mediaPost.settings.storage.title")}</h3>
         <div className="form-row">
@@ -2408,14 +2408,14 @@ function SettingsTab({ t, settings, onSaved }) {
         </div>
       </div>
 
-      {/* ── Handoff (disabled, v2.0) ──────────────────────────────────── */}
+      {/* 鈹€鈹€ Handoff (disabled, v2.0) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title disabled"><MpIco name="globe"/>{t("mediaPost.settings.handoff.title")}</h3>
         <div className="text-sm text-muted">{t("mediaPost.settings.handoff.disabled")}</div>
         <span className="oa-pill gray" style={{marginTop:8}}>v2.0 only</span>
       </div>
 
-      {/* ── Bottom save bar — right-aligned per UX feedback ───────────── */}
+      {/* 鈹€鈹€ Bottom save bar 鈥?right-aligned per UX feedback 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="flex items-center justify-end gap-2" style={{marginTop:12}}>
         {savedFlash && <span className="oa-pill green">{t("mediaPost.settings.saved")}</span>}
         <button className="btn btn-primary" onClick={save}>{t("mediaPost.settings.save")}</button>
@@ -2424,7 +2424,7 @@ function SettingsTab({ t, settings, onSaved }) {
   );
 }
 
-// ─── App shell ──────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ App shell 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 function App() {
   const { t, locale } = useI18n();
   const [tab, setTab] = useState("create");
@@ -2445,7 +2445,7 @@ function App() {
   // Theme + locale are owned by the host shell (Synapse main window).
   // The bridge listens for `bridge:theme-change` (see <script> at top of file)
   // and SynapseI18n re-emits onChange when host locale flips. We deliberately
-  // do NOT render plugin-local toggles for either — that would create a second
+  // do NOT render plugin-local toggles for either 鈥?that would create a second
   // source of truth that drifts from every other plugin. Mirrors tongyi-image
   // (see plugins/tongyi-image/ui/dist/index.html L848-L863, where the
   // `.header-right` slot is documented as intentionally empty).
@@ -2463,7 +2463,7 @@ function App() {
             <span className="oa-hero-title__sub">{t("app.subtitle")}</span>
           </span>
         </h1>
-        {/* header-right intentionally empty — see comment above. */}
+        {/* header-right intentionally empty 鈥?see comment above. */}
         <div className="header-right" />
       </div>
       <div className="tabs">
