@@ -953,7 +953,7 @@ class Settings(BaseSettings):
     )
     inbox_broadcast_url: str = Field(
         default="",
-        description="可选 L0 广播 JSON URL。Synapse 默认留空，不走 openakita CDN。",
+        description="可选 L0 广播 JSON URL。Synapse 默认留空，不走 synapse CDN。",
     )
     inbox_api_url: str = Field(
         default="",

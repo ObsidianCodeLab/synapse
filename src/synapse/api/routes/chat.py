@@ -2037,7 +2037,7 @@ async def chat(request: Request, body: ChatRequest):
     # double_texting_allow_interrupt is enabled).
     from .double_texting import DoubleTextingPolicy, resolve_policy
 
-    _dt_header = request.headers.get("x-openakita-doubletexting")
+    _dt_header = request.headers.get("x-synapse-doubletexting")
     _dt_policy = resolve_policy(channel="desktop", header_value=_dt_header)
 
     # STEER hands the new message to the running ReAct loop via
