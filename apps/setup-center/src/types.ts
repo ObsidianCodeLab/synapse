@@ -109,6 +109,7 @@ export type ViewId =
   | "im"
   | "onboarding"
   | "token_stats"
+  | "skill_usage"
   | "mcp"
   | "scheduler"
   | "memory"

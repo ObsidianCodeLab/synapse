@@ -37,38 +37,6 @@ SKILL_INSTALL_CIRCUIT_THRESHOLD = 2
 SKILL_INSTALL_CIRCUIT_COOLDOWN_SECONDS = 300
 
 
-def compute_load_only_ids() -> set[str] | None:
-    """计算 Agent 启动时应从磁盘 parse 的 skill_id 集合（目录名）。
-
-    Returns:
-        None 表示保持全量 ``load_all``；非空集合则只 parse 这些 id。
-    """
-    from synapse.agents.factory import ESSENTIAL_SYSTEM_SKILLS
-    from synapse.skills.allowlist_io import read_allowlist
-    from synapse.skills.load_scope import get_skill_load_extra_ids, normalize_skill_dir_id
-    from synapse.utils.whaleclouddevtool import ensure_whalecloud_dev_tools_in_allowlist
-
-    ids = {normalize_skill_dir_id(x) for x in ESSENTIAL_SYSTEM_SKILLS}
-    extra = get_skill_load_extra_ids()
-    if extra:
-        ids |= extra
-
-    _, external_allowlist = read_allowlist()
-
-    if external_allowlist is not None:
-        effective = ensure_whalecloud_dev_tools_in_allowlist(
-            {normalize_skill_dir_id(x) for x in external_allowlist},
-            project_root=settings.project_root,
-        )
-        ids |= effective or set()
-        return ids
-
-    if extra:
-        return ids
-
-    return None
-
-
 class SkillManager:
     """
     技能管理器。
@@ -120,43 +88,46 @@ class SkillManager:
         - skills/ (项目级别)
         - .cursor/skills/ (Cursor 兼容)
         """
-        only_ids = compute_load_only_ids()
-        loaded = self._loader.load_all(
-            settings.project_root,
-            only_ids=only_ids,
-        )
-        if only_ids is not None:
-            logger.info(
-                "Loaded %d skills (selective only_ids=%d ids)",
-                loaded,
-                len(only_ids),
-            )
-        else:
-            logger.info(f"Loaded {loaded} skills from standard directories")
+        # 外部技能 allowlist 过滤（支持 DEFAULT_DISABLED_SKILLS 默认禁用）。
+        # 先读取 allowlist，并在扫描阶段跳过未启用的外部技能，避免启动时
+        # 解析/注册几百个随后会被 prune 掉的 SKILL.md。
+        agent_skills: set[str] = set()
+        effective: set[str] | None = None
+        try:
+            cfg_path = settings.project_root / "data" / "skills.json"
+            external_allowlist: set[str] | None = None
+            if cfg_path.exists():
+                raw = cfg_path.read_text(encoding="utf-8")
+                cfg = json.loads(raw) if raw.strip() else {}
+                al = cfg.get("external_allowlist", None)
+                if isinstance(al, list):
+                    external_allowlist = {str(x).strip() for x in al if str(x).strip()}
+            from synapse.skills.preset_utils import collect_preset_referenced_skills
 
-        if only_ids is None:
-            # 全量加载后仍走 allowlist 裁剪（与历史行为一致）
-            try:
-                cfg_path = settings.project_root / "data" / "skills.json"
-                external_allowlist: set[str] | None = None
-                if cfg_path.exists():
-                    raw = cfg_path.read_text(encoding="utf-8")
-                    cfg = json.loads(raw) if raw.strip() else {}
-                    al = cfg.get("external_allowlist", None)
-                    if isinstance(al, list):
-                        external_allowlist = {str(x).strip() for x in al if str(x).strip()}
+            agent_skills = collect_preset_referenced_skills()
+            if external_allowlist is not None:
                 effective = self._loader.compute_effective_allowlist(external_allowlist)
-                from synapse.skills.preset_utils import collect_preset_referenced_skills
+        except Exception as e:
+            logger.warning(f"Failed to read skills allowlist before scan: {e}")
 
-                agent_skills = collect_preset_referenced_skills()
-                removed = self._loader.prune_external_by_allowlist(
-                    effective,
-                    agent_referenced_skills=agent_skills,
-                )
-                if removed:
-                    logger.info(f"External skills filtered: {removed} disabled")
-            except Exception as e:
-                logger.warning(f"Failed to apply skills allowlist: {e}")
+        load_filter = self._loader.build_preparse_allowlist_filter(
+            effective,
+            agent_referenced_skills=agent_skills,
+        )
+        loaded = self._loader.load_all(settings.project_root, load_filter=load_filter)
+        logger.info(f"Loaded {loaded} skills from standard directories")
+
+        try:
+            if effective is None:
+                effective = self._loader.compute_effective_allowlist(None)
+            removed = self._loader.prune_external_by_allowlist(
+                effective,
+                agent_referenced_skills=agent_skills,
+            )
+            if removed:
+                logger.info(f"External skills filtered: {removed} disabled")
+        except Exception as e:
+            logger.warning(f"Failed to apply skills allowlist after scan: {e}")
 
         self._catalog_text = self._catalog.generate_catalog()
         logger.info(f"Generated skill catalog with {self._catalog.skill_count} skills")

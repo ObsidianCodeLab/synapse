@@ -13,6 +13,7 @@ import type { LinkDiagnostic } from "./components/LinkDiagnosticsPanel";
 const SkillManager = lazy(() => import("./views/SkillManager").then(m => ({ default: m.SkillManager })));
 const IMView = lazy(() => import("./views/IMView").then(m => ({ default: m.IMView })));
 const TokenStatsView = lazy(() => import("./views/TokenStatsView").then(m => ({ default: m.TokenStatsView })));
+const SkillUsageView = lazy(() => import("./views/SkillUsageView").then(m => ({ default: m.SkillUsageView })));
 const MCPView = lazy(() => import("./views/MCPView").then(m => ({ default: m.MCPView })));
 const PluginManagerView = lazy(() => import("./views/PluginManagerView"));
 const PluginAppHost = lazy(() => import("./views/PluginAppHost"));
@@ -96,6 +97,7 @@ import {
   IWHALECLOUD_DEPARTMENT_TEAMS,
   IWHALECLOUD_DEPARTMENTS,
   IWHALECLOUD_POSITIONS,
+  WEB_SEARCH_ENV_KEYS,
 } from "./constants";
 import { safeFetch } from "./providers";
 import { whalecloudHeart } from "./api/rdUnifiedService";
@@ -106,6 +108,33 @@ import {
   slugify, joinPath, toFileUrl,
   envGet, envSet,
 } from "./utils";
+import type { AppServiceStatus } from "./AppContext";
+
+type ServiceStatus = AppServiceStatus & {
+  port?: number;
+  heartbeatPhase?: string;
+  heartbeatHttpReady?: boolean;
+  heartbeatImReady?: boolean;
+  heartbeatReady?: boolean;
+  lastLinkDiagnostic?: LinkDiagnostic | null;
+};
+
+const externalRunningStatus = (pid: number | null = null): ServiceStatus => ({
+  running: true,
+  pid,
+  pidFile: "",
+  managedBy: "external",
+  isManagedChild: false,
+});
+
+const stoppedStatus = (): ServiceStatus => ({
+  running: false,
+  pid: null,
+  pidFile: "",
+  managedBy: "unknown",
+  isManagedChild: false,
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 // 前后端交互路由原则（全局适用）：
 //   后端运行中 → 所有配置读写、模型列表、连接测试 **优先走后端 HTTP API**
@@ -135,10 +164,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useVersionCheck } from "./hooks/useVersionCheck";
 import { useEnvManager } from "./hooks/useEnvManager";
-import { useExpandPanel } from "./hooks/useExpandPanel";
 import { AdvancedView } from "./views/AdvancedView";
+import { ToolsView } from "./views/ToolsView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import WebSearchProviderPanel from "./components/WebSearchProviderPanel";
 import { OnboardingCoreAgentPanel } from "./views/OnboardingCoreAgentPanel";
 import { OnboardingWhaleSkillsPanel } from "./views/OnboardingWhaleSkillsPanel";
 
@@ -171,7 +199,7 @@ const EnvFieldContext = createContext<EnvFieldCtx | null>(null);
 const _HASH_TO_VIEW: Record<string, ViewId> = {
   "chat": "chat", "im": "im", "skills": "skills", "mcp": "mcp",
   "scheduler": "scheduler", "memory": "memory", "status": "status",
-  "token-stats": "token_stats", "identity": "identity",
+  "token-stats": "token_stats", "skill-usage": "skill_usage", "identity": "identity",
   "dashboard": "dashboard", "org-editor": "org_editor",
   "pixel-office": "pixel_office",
   "agent-manager": "agent_manager", "agent-store": "agent_store",
@@ -715,7 +743,7 @@ export function App() {
       // 2. 设置服务状态为已运行
       const baseUrl = "http://127.0.0.1:18900";
       setApiBaseUrl(baseUrl);
-      setServiceStatus({ running: true, pid: obDetectedService?.pid ?? null, pidFile: "" });
+      setServiceStatus(externalRunningStatus(obDetectedService?.pid ?? null));
       // 3. 刷新状态 & 自动检查端点
       refreshStatus("local", baseUrl, true);
       autoCheckEndpoints(baseUrl);
@@ -956,13 +984,7 @@ export function App() {
   const [autostartEnabled, setAutostartEnabled] = useState<boolean | null>(null);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState<boolean | null>(null);
   // autoStartBackend 已合并到"开机自启"：--background 模式自动拉起后端，无需独立开关
-  const [serviceStatus, setServiceStatus] = useState<{
-    running: boolean;
-    pid: number | null;
-    pidFile: string;
-    port?: number;
-    lastLinkDiagnostic?: LinkDiagnostic | null;
-  } | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus | null>(null);
   const backendBootPhase = useMemo((): "unknown" | "starting" | "running" | "stopped" | "error" => {
     if (serviceStatus?.running) return "running";
     if (serviceStatus === null) return IS_TAURI ? "starting" : "unknown";
@@ -1003,8 +1025,6 @@ export function App() {
     shouldUseHttpApi,
     httpApiBase,
   });
-  const webSearchPanelRef = useExpandPanel("web-search");
-
   const envFieldCtx = useMemo<EnvFieldCtx>(() => ({
     envDraft, setEnvDraft, secretShown, setSecretShown, busy, t,
   }), [envDraft, secretShown, busy, t]);
@@ -1034,7 +1054,7 @@ export function App() {
       if (cancelled) return;
       const capBase = IS_CAPACITOR ? apiBaseUrl : "";
       if (!IS_CAPACITOR) setApiBaseUrl("");
-      setServiceStatus({ running: true, pid: null, pidFile: "" });
+      setServiceStatus(externalRunningStatus());
       try {
         const hRes = await safeFetch(`${capBase}/api/health`, { signal: AbortSignal.timeout(3_000) });
         const hData = await hRes.json();
@@ -1110,7 +1130,7 @@ export function App() {
               const healthData = await healthRes.json();
               const svcVersion = healthData.version || "";
               setApiBaseUrl(url);
-              setServiceStatus({ running: true, pid: healthData.pid || null, pidFile: "" });
+              setServiceStatus(externalRunningStatus(healthData.pid || null));
               if (svcVersion) setBackendVersion(svcVersion);
               try { await refreshStatus("local", url, true); } catch { /* ignore */ }
               autoCheckEndpoints(url);
@@ -1161,14 +1181,14 @@ export function App() {
                     if (serviceReady) {
                       notifySuccess(t("topbar.autoStartSuccess"));
                     } else {
-                      setServiceStatus({ running: false, pid: null, pidFile: "" });
+                      setServiceStatus(stoppedStatus());
                       notifyError(t("topbar.autoStartFail"));
                     }
                   }
                 }
               } catch { /* is_backend_auto_starting 不可用，忽略 */ }
               if (!handled && !cancelled) {
-                setServiceStatus({ running: false, pid: null, pidFile: "" });
+                setServiceStatus(stoppedStatus());
               }
             }
           }
@@ -1253,7 +1273,7 @@ export function App() {
             setHeartbeatState("alive");
             if (IS_TAURI) try { await invoke("set_tray_backend_status", { status: "alive" }); } catch { /* ignore */ }
           }
-          setServiceStatus(prev => prev ? { ...prev, running: true } : { running: true, pid: null, pidFile: "" });
+          setServiceStatus(prev => prev ? { ...prev, running: true } : externalRunningStatus());
           // 提取后端版本
           try {
             const data = await res.json();
@@ -1290,7 +1310,7 @@ export function App() {
                 setHeartbeatState("degraded");
                 try { await invoke("set_tray_backend_status", { status: "degraded" }); } catch { /* ignore */ }
               }
-              setServiceStatus(prev => prev ? { ...prev, running: true } : { running: true, pid: null, pidFile: "" });
+              setServiceStatus(prev => prev ? { ...prev, running: true } : externalRunningStatus());
               return;
             }
           } catch { /* invoke 失败，视为不可用 */ }
@@ -1302,7 +1322,7 @@ export function App() {
           setHeartbeatState("dead");
           if (IS_TAURI) try { await invoke("set_tray_backend_status", { status: "dead" }); } catch { /* ignore */ }
         }
-        setServiceStatus(prev => prev ? { ...prev, running: false } : { running: false, pid: null, pidFile: "" });
+        setServiceStatus(prev => prev ? { ...prev, running: false } : stoppedStatus());
         setBackendVersion(null);
         // 注意：不要在 dead 状态下重置 heartbeatFailCount！
         // 否则下轮心跳 failCount 从 0 开始 → 进入 suspect → 再次变为 dead → 重复发送系统通知。
@@ -2355,10 +2375,19 @@ export function App() {
 
       // 检测服务是否运行
       let alive = false;
+      let liveBackendPid: number | null = null;
       try {
         const ping = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(2000) });
         alive = ping.ok;
-      } catch { alive = false; }
+        if (ping.ok) {
+          try {
+            const healthData = await ping.json();
+            liveBackendPid = typeof healthData?.pid === "number" ? healthData.pid : null;
+          } catch { /* health payload is best-effort for ownership checks */ }
+        }
+      } catch {
+        alive = false;
+      }
 
       if (!alive && !startIfStopped) {
         setRestartOverlay({ phase: "notRunning" });
@@ -2373,7 +2402,22 @@ export function App() {
       setRestartOverlay({ phase: "restarting" });
       const wsId = currentWorkspaceId || workspaces[0]?.id;
 
-      if (IS_TAURI && wsId && venvDir && dataMode === "local") {
+      let freshServiceStatus: ServiceStatus | null = null;
+      if (IS_TAURI && wsId && dataMode === "local") {
+        try {
+          const ss = await invoke<ServiceStatus>("synapse_service_status", { workspaceId: wsId });
+          freshServiceStatus = ss.running ? ss : externalRunningStatus(liveBackendPid);
+          setServiceStatus(freshServiceStatus);
+        } catch {
+          freshServiceStatus = externalRunningStatus(liveBackendPid);
+        }
+      }
+      const tauriStatusMatchesHealthPid =
+        liveBackendPid === null || freshServiceStatus?.pid === liveBackendPid;
+      const tauriManagedBackend =
+        freshServiceStatus?.isManagedChild === true && tauriStatusMatchesHealthPid;
+
+      if (IS_TAURI && wsId && venvDir && dataMode === "local" && tauriManagedBackend) {
         if (alive) {
           // ── Tauri 本地模式：进程级重启（杀旧进程 → 启新进程） ──
           try {
@@ -2390,7 +2434,7 @@ export function App() {
 
         setRestartOverlay({ phase: "waiting" });
         try {
-          const ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>(
+          const ss = await invoke<ServiceStatus>(
             "synapse_service_start", { venvDir, workspaceId: wsId },
           );
           setServiceStatus(ss);
@@ -2403,12 +2447,27 @@ export function App() {
           return;
         }
       } else if (alive) {
-        // ── Web / Capacitor 模式：进程内重启（唯一可用方式） ──
+        // ── Web / Capacitor / 外部本地后端：进程内重启 ──
         try {
           await fetch(`${base}/api/config/restart`, { method: "POST", signal: AbortSignal.timeout(3000) });
         } catch { /* 请求可能因服务关闭而失败 */ }
 
         await waitForServiceDown(base, 15000);
+      } else if (startIfStopped && IS_TAURI && wsId && venvDir && dataMode === "local") {
+        setRestartOverlay({ phase: "waiting" });
+        try {
+          const ss = await invoke<ServiceStatus>(
+            "synapse_service_start", { venvDir, workspaceId: wsId },
+          );
+          setServiceStatus(ss);
+        } catch (e) {
+          setRestartOverlay({ phase: "fail" });
+          setTimeout(() => {
+            setRestartOverlay(null);
+            notifyError(t("config.restartFail") + ": " + String(e));
+          }, 2500);
+          return;
+        }
       } else if (!startIfStopped) {
         setRestartOverlay({ phase: "notRunning" });
         setTimeout(() => {
@@ -2443,7 +2502,7 @@ export function App() {
       if (recovered) {
         setRestartOverlay({ phase: "done" });
         setServiceStatus((prev) =>
-          prev ? { ...prev, running: true } : { running: true, pid: null, pidFile: "" }
+          prev ? { ...prev, running: true } : externalRunningStatus()
         );
         try { await refreshStatus(undefined, undefined, true); } catch { /* ignore */ }
         try { await loadSavedEndpoints(); } catch { /* ignore */ }
@@ -2514,7 +2573,8 @@ export function App() {
           "DESKTOP_VISION_ENABLED", "DESKTOP_VISION_MAX_RETRIES", "DESKTOP_VISION_TIMEOUT",
           "DESKTOP_CLICK_DELAY", "DESKTOP_TYPE_INTERVAL", "DESKTOP_MOVE_DURATION",
           "DESKTOP_FAILSAFE", "DESKTOP_PAUSE",
-          "WHISPER_MODEL", "WHISPER_LANGUAGE", "GITHUB_TOKEN",
+          ...WEB_SEARCH_ENV_KEYS,
+          "GITHUB_TOKEN",
         ];
       case "agent":
         return [
@@ -2650,7 +2710,7 @@ export function App() {
               if (healthData.version) setBackendVersion(healthData.version);
             } catch { /* ignore parse error */ }
             setServiceStatus((prev) =>
-              prev ? { ...prev, running: true } : { running: true, pid: null, pidFile: "" }
+              prev ? { ...prev, running: true } : externalRunningStatus()
             );
           }
         } catch {
@@ -2658,7 +2718,7 @@ export function App() {
           setBackendVersion(null);
           if (effectiveDataMode !== "remote") {
             setServiceStatus((prev) =>
-              prev ? { ...prev, running: false } : { running: false, pid: null, pidFile: "" }
+              prev ? { ...prev, running: false } : stoppedStatus()
             );
           }
         }
@@ -2814,7 +2874,7 @@ export function App() {
         // was started externally (not via this app).
         if (effectiveDataMode !== "remote" && currentWorkspaceId) {
           try {
-            const ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_status", { workspaceId: currentWorkspaceId });
+            const ss = await invoke<ServiceStatus>("synapse_service_status", { workspaceId: currentWorkspaceId });
             setServiceStatus((prev) => ({
               running: prev?.running ?? serviceAlive,
               pid: ss.pid ?? prev?.pid ?? null,
@@ -2902,7 +2962,7 @@ export function App() {
       // This is the fallback when the HTTP API is not alive.
       if (effectiveDataMode !== "remote") {
         try {
-          const ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_status", {
+          const ss = await invoke<ServiceStatus>("synapse_service_status", {
             workspaceId: currentWorkspaceId,
           });
           setServiceStatus(ss);
@@ -3057,13 +3117,13 @@ export function App() {
     try {
       setDataMode("local");
       setApiBaseUrl("http://127.0.0.1:18900");
-      const ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_start", {
+      const ss = await invoke<ServiceStatus>("synapse_service_start", {
         venvDir,
         workspaceId: effectiveWsId,
       });
       setServiceStatus(ss);
       const ready = await waitForServiceReady("http://127.0.0.1:18900");
-      const real = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_status", {
+      const real = await invoke<ServiceStatus>("synapse_service_status", {
         workspaceId: effectiveWsId,
       });
       setServiceStatus(real);
@@ -3118,7 +3178,7 @@ export function App() {
     const ver = conflictDialog?.version || "";
     setDataMode("local");
     setApiBaseUrl("http://127.0.0.1:18900");
-    setServiceStatus({ running: true, pid: null, pidFile: "" });
+    setServiceStatus(externalRunningStatus());
     setConflictDialog(null);
     setPendingStartWsId(null);
     const _busyId = notifyLoading(t("connect.testing"));
@@ -3179,7 +3239,7 @@ export function App() {
     }
     // 2. PID-based kill as fallback (handles locally started services)
     try {
-      const ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_stop", { workspaceId: id });
+      const ss = await invoke<ServiceStatus>("synapse_service_stop", { workspaceId: id });
       setServiceStatus(ss);
     } catch { /* PID file might not exist for externally started services */ }
     // 3. Quick verify — is the port freed?
@@ -3195,7 +3255,7 @@ export function App() {
     }
     // Final status
     try {
-      const final_ss = await invoke<{ running: boolean; pid: number | null; pidFile: string }>("synapse_service_status", { workspaceId: id });
+      const final_ss = await invoke<ServiceStatus>("synapse_service_status", { workspaceId: id });
       setServiceStatus(final_ss);
     } catch { /* ignore */ }
   }
@@ -3438,6 +3498,12 @@ export function App() {
         providers={providers}
         doLoadProviders={doLoadProviders}
         loadSavedEndpoints={loadSavedEndpoints}
+        onEndpointConfigChanged={async (endpointType) => {
+          await refreshStatus(undefined, undefined, true);
+          if (endpointType === "endpoints") {
+            autoCheckEndpoints(httpApiBase());
+          }
+        }}
         readWorkspaceFile={readWorkspaceFile}
         writeWorkspaceFile={writeWorkspaceFile}
         venvDir={venvDir}
@@ -3504,272 +3570,21 @@ export function App() {
   }
 
   function renderTools() {
-    const keysTools = [
-      "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "FORCE_IPV4",
-      "TOOL_MAX_PARALLEL", "FORCE_TOOL_CALL_MAX_RETRIES", "FORCE_TOOL_CALL_IM_FLOOR", "CONFIRMATION_TEXT_MAX_RETRIES",
-      "ALLOW_PARALLEL_TOOLS_WITH_INTERRUPT_CHECKS",
-      "MCP_ENABLED", "MCP_TIMEOUT",
-      "DESKTOP_ENABLED", "DESKTOP_DEFAULT_MONITOR", "DESKTOP_COMPRESSION_QUALITY",
-      "DESKTOP_MAX_WIDTH", "DESKTOP_MAX_HEIGHT", "DESKTOP_CACHE_TTL",
-      "DESKTOP_UIA_TIMEOUT", "DESKTOP_UIA_RETRY_INTERVAL", "DESKTOP_UIA_MAX_RETRIES",
-      "DESKTOP_VISION_ENABLED", "DESKTOP_VISION_MAX_RETRIES", "DESKTOP_VISION_TIMEOUT",
-      "DESKTOP_CLICK_DELAY", "DESKTOP_TYPE_INTERVAL", "DESKTOP_MOVE_DURATION",
-      "DESKTOP_FAILSAFE", "DESKTOP_PAUSE",
-      "WHISPER_MODEL", "WHISPER_LANGUAGE", "GITHUB_TOKEN",
-      "WEB_SEARCH_PROVIDER", "BOCHA_API_KEY", "TAVILY_API_KEY", "JINA_API_KEY", "SEARXNG_BASE_URL",
-    ];
-
-    const list = skillsDetail || [];
-    const systemSkills = list.filter((s) => !!s.system);
-    const externalSkills = list.filter((s) => !s.system);
-
     return (
-      <>
-        <div className="card">
-          <h3 className="text-base font-bold tracking-tight">{t("config.toolsTitle")}</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-3">{t("config.toolsHint")}</p>
-
-          {/* ── MCP ── */}
-          <details className="group rounded-lg border border-border">
-            <summary className="cursor-pointer flex items-center justify-between px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <span className="flex items-center gap-1.5">
-                <ChevronRight className="size-4 shrink-0 transition-transform group-open:rotate-90 text-muted-foreground" />
-                {t("config.toolsMCP")}
-              </span>
-              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none" onClick={(e) => e.stopPropagation()}>
-                <span>{disabledViews.includes("mcp") ? t("config.toolsSkillsDisabled") : t("config.toolsSkillsEnabled")}</span>
-                <div
-                  onClick={async () => {
-                    const willDisable = !disabledViews.includes("mcp");
-                    toggleViewDisabled("mcp");
-                    setEnvDraft((p) => ({ ...p, MCP_ENABLED: willDisable ? "false" : "true" }));
-                    try {
-                      const entries = { MCP_ENABLED: willDisable ? "false" : "true" };
-                      if (shouldUseHttpApi()) {
-                        await safeFetch(`${httpApiBase()}/api/config/env`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ entries }),
-                        });
-                        notifySuccess(willDisable
-                          ? t("config.mcpDisabledNeedRestart", { defaultValue: "MCP 已禁用，重启后生效" })
-                          : t("config.mcpEnabledNeedRestart", { defaultValue: "MCP 已启用，重启后生效" }));
-                      }
-                    } catch { /* ignore */ }
-                  }}
-                  className="relative shrink-0 transition-colors duration-200 rounded-full"
-                  style={{
-                    width: 40, height: 22,
-                    background: disabledViews.includes("mcp") ? "var(--line, #d1d5db)" : "var(--ok, #22c55e)",
-                  }}
-                >
-                  <div className="absolute top-0.5 rounded-full bg-white shadow-sm transition-[left] duration-200" style={{
-                    width: 18, height: 18,
-                    left: disabledViews.includes("mcp") ? 2 : 20,
-                  }} />
-                </div>
-              </label>
-            </summary>
-            <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-              <div className="grid2">
-                {FT({ k: "MCP_TIMEOUT", label: "Timeout (s)", placeholder: "60" })}
-              </div>
-            </div>
-          </details>
-
-          {/* ── Skills ── */}
-          <details className="group/skills rounded-lg border border-border mt-2">
-            <summary className="cursor-pointer flex items-center justify-between px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <span className="flex items-center gap-1.5">
-                <ChevronRight className="size-4 shrink-0 transition-transform group-open/skills:rotate-90 text-muted-foreground" />
-                {t("config.toolsSkills")}
-              </span>
-              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none" onClick={(e) => e.stopPropagation()}>
-                <span>{disabledViews.includes("skills") ? t("config.toolsSkillsDisabled") : t("config.toolsSkillsEnabled")}</span>
-                <div
-                  onClick={() => toggleViewDisabled("skills")}
-                  className="relative shrink-0 transition-colors duration-200 rounded-full"
-                  style={{
-                    width: 40, height: 22,
-                    background: disabledViews.includes("skills") ? "var(--line, #d1d5db)" : "var(--ok, #22c55e)",
-                  }}
-                >
-                  <div className="absolute top-0.5 rounded-full bg-white shadow-sm transition-[left] duration-200" style={{
-                    width: 18, height: 18,
-                    left: disabledViews.includes("skills") ? 2 : 20,
-                  }} />
-                </div>
-              </label>
-            </summary>
-            <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
-              <button
-                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-accent/50 transition-colors"
-                onClick={() => {
-                  if (!skillsDetail) return;
-                  const m: Record<string, boolean> = {};
-                  for (const s of skillsDetail) { if (s?.skill_id) m[s.skill_id] = true; }
-                  setSkillsSelection(m);
-                  setSkillsTouched(true);
-                }}
-              >
-                {t("config.toolsEnableAll")}
-              </button>
-              <button
-                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-accent/50 transition-colors"
-                onClick={() => {
-                  if (!skillsDetail) return;
-                  const m: Record<string, boolean> = {};
-                  for (const s of skillsDetail) { if (s?.skill_id) m[s.skill_id] = false; }
-                  setSkillsSelection(m);
-                  setSkillsTouched(true);
-                }}
-              >
-                {t("config.toolsDisableAll")}
-              </button>
-              <span className="text-xs text-muted-foreground ml-auto">
-                {skillsDetail ? t("config.toolsSkillsCount", { enabled: Object.values(skillsSelection).filter(Boolean).length, total: skillsDetail.length }) : ""}
-              </span>
-            </div>
-          </details>
-
-          {/* ── Desktop Automation ── */}
-          <details className="group/desktop rounded-lg border border-border mt-2">
-            <summary className="cursor-pointer flex items-center justify-between px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <span className="flex items-center gap-1.5">
-                <ChevronRight className="size-4 shrink-0 transition-transform group-open/desktop:rotate-90 text-muted-foreground" />
-                {t("config.toolsDesktop")}
-              </span>
-              <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none" onClick={(e) => e.stopPropagation()}>
-                <span>{envDraft["DESKTOP_ENABLED"] === "false" ? t("config.toolsSkillsDisabled") : t("config.toolsSkillsEnabled")}</span>
-                <div
-                  onClick={() => setEnvDraft((p) => ({ ...p, DESKTOP_ENABLED: p.DESKTOP_ENABLED === "false" ? "true" : "false" }))}
-                  className="relative shrink-0 transition-colors duration-200 rounded-full"
-                  style={{
-                    width: 40, height: 22,
-                    background: envDraft["DESKTOP_ENABLED"] === "false" ? "var(--line, #d1d5db)" : "var(--ok, #22c55e)",
-                  }}
-                >
-                  <div className="absolute top-0.5 rounded-full bg-white shadow-sm transition-[left] duration-200" style={{
-                    width: 18, height: 18,
-                    left: envDraft["DESKTOP_ENABLED"] === "false" ? 2 : 20,
-                  }} />
-                </div>
-              </label>
-            </summary>
-            <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-              <div className="grid3">
-                {FT({ k: "DESKTOP_DEFAULT_MONITOR", label: t("config.toolsMonitor"), placeholder: "0" })}
-                {FT({ k: "DESKTOP_MAX_WIDTH", label: t("config.toolsMaxW"), placeholder: "1920" })}
-                {FT({ k: "DESKTOP_MAX_HEIGHT", label: t("config.toolsMaxH"), placeholder: "1080" })}
-              </div>
-              <details className="group/deskadv rounded-lg border border-border">
-                <summary className="cursor-pointer flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors text-muted-foreground">
-                  <ChevronRight className="size-4 shrink-0 transition-transform group-open/deskadv:rotate-90" />
-                  {t("config.toolsDesktopAdvanced")}
-                </summary>
-                <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-                  <div className="grid3">
-                    {FT({ k: "DESKTOP_COMPRESSION_QUALITY", label: t("config.toolsCompression"), placeholder: "85" })}
-                    {FT({ k: "DESKTOP_CACHE_TTL", label: "Cache TTL", placeholder: "1.0" })}
-                    {FB({ k: "DESKTOP_FAILSAFE", label: "Failsafe" })}
-                  </div>
-                  {FB({ k: "DESKTOP_VISION_ENABLED", label: t("config.toolsVision"), help: t("config.toolsVisionHelp") })}
-                  <div className="grid3">
-                    {FT({ k: "DESKTOP_CLICK_DELAY", label: "Click Delay", placeholder: "0.1" })}
-                    {FT({ k: "DESKTOP_TYPE_INTERVAL", label: "Type Interval", placeholder: "0.03" })}
-                    {FT({ k: "DESKTOP_MOVE_DURATION", label: "Move Duration", placeholder: "0.15" })}
-                  </div>
-                </div>
-              </details>
-            </div>
-          </details>
-
-          {/* ── Model Downloads & Voice Recognition — hidden (not actively used) ── */}
-
-          {/* ── Tool Parallelism ── */}
-          <details className="group/net rounded-lg border border-border mt-2">
-            <summary className="cursor-pointer flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <ChevronRight className="size-4 shrink-0 transition-transform group-open/net:rotate-90 text-muted-foreground" />
-              {t("config.toolsParallel")}
-            </summary>
-            <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-              <div className="grid2">
-                {FT({ k: "TOOL_MAX_PARALLEL", label: t("config.toolsParallel"), placeholder: "1", help: t("config.toolsParallelHelp") })}
-              </div>
-            </div>
-          </details>
-
-          {/* ── Hallucination Guard ── */}
-          <details className="group/hguard rounded-lg border border-border mt-2">
-            <summary className="cursor-pointer flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <ChevronDown className="size-4 shrink-0 transition-transform group-open/hguard:rotate-180 text-muted-foreground" />
-              {t("config.toolsHallucinationGuard")}
-            </summary>
-            <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-              <p className="text-xs text-muted-foreground">{t("config.toolsHallucinationGuardHint")}</p>
-              <div className="grid2">
-                {FS({ k: "FORCE_TOOL_CALL_MAX_RETRIES", label: t("config.toolsForceRetry"), options: [
-                  { value: "0", label: t("config.guardOff") },
-                  { value: "1", label: "1" },
-                  { value: "2", label: "2" },
-                  { value: "3", label: "3" },
-                ] })}
-                {FS({ k: "FORCE_TOOL_CALL_IM_FLOOR", label: t("config.toolsImFloor"), options: [
-                  { value: "0", label: t("config.guardSameAsGlobal") },
-                  { value: "1", label: "1" },
-                  { value: "2", label: "2" },
-                ] })}
-              </div>
-              <div className="grid2">
-                {FS({ k: "CONFIRMATION_TEXT_MAX_RETRIES", label: t("config.toolsConfirmTextRetry"), options: [
-                  { value: "0", label: t("config.guardOff") },
-                  { value: "1", label: "1" },
-                  { value: "2", label: "2" },
-                  { value: "3", label: "3" },
-                ] })}
-              </div>
-            </div>
-          </details>
-
-          {/* ── Web Search Provider ── */}
-          <details
-            ref={webSearchPanelRef}
-            data-panel-id="web-search"
-            className="group/wsearch rounded-lg border border-border mt-2"
-          >
-            <summary className="cursor-pointer flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium select-none list-none [&::-webkit-details-marker]:hidden hover:bg-accent/50 transition-colors">
-              <ChevronRight className="size-4 shrink-0 transition-transform group-open/wsearch:rotate-90 text-muted-foreground" />
-              {t("toolsWebSearch.sectionTitle", "网页搜索源（Web Search Source）")}
-            </summary>
-            <div className="flex flex-col gap-2.5 px-4 py-3 border-t border-border">
-              <WebSearchProviderPanel
-                envDraft={envDraft}
-                onEnvChange={setEnvDraft}
-                onSaveEnv={async () => {
-                  const keys = ["WEB_SEARCH_PROVIDER", "BOCHA_API_KEY", "TAVILY_API_KEY", "JINA_API_KEY", "SEARXNG_BASE_URL"];
-                  await saveEnvKeys(keys);
-                }}
-                busy={busy}
-                apiBaseUrl={apiBaseUrl}
-              />
-            </div>
-          </details>
-
-        </div>
-
-        {/* ── CLI 命令行工具管理 (desktop only) ── */}
-        {IS_TAURI && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h3 className="text-base font-bold tracking-tight">{t("config.cliTitle")}</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-3">{t("config.cliDesc")}</p>
-          <CliManager />
-        </div>
-        )}
-      </>
+      <ToolsView
+        envDraft={envDraft}
+        setEnvDraft={setEnvDraft}
+        busy={busy}
+        disabledViews={disabledViews}
+        toggleViewDisabled={toggleViewDisabled}
+        shouldUseHttpApi={shouldUseHttpApi}
+        httpApiBase={httpApiBase}
+        apiBaseUrl={apiBaseUrl}
+        saveEnvKeys={saveEnvKeys}
+        setView={navigateToView}
+      />
     );
   }
-
-  // CliManager -> ./components/CliManager.tsx
 
   function renderAgentSystem() {
     return <AgentSystemView {..._configViewProps} serviceRunning={!!serviceStatus?.running} apiBaseUrl={apiBaseUrl} />;
@@ -4099,7 +3914,7 @@ export function App() {
         const earlyProbe = await fetch("http://127.0.0.1:18900/api/health", { signal: AbortSignal.timeout(3000) }).then(r => r.ok).catch(() => false);
         if (earlyProbe) {
           log("✓ 后端已在运行（由 ob-welcome 提前启动）");
-          setServiceStatus({ running: true, pid: null, pidFile: "" });
+          setServiceStatus(externalRunningStatus());
           httpReady = true;
           updateTask("service-start", { status: "done", detail: "已在运行" });
           logTask("启动后端服务", "done", "已在运行");
@@ -4129,7 +3944,7 @@ export function App() {
             const res = await fetch("http://127.0.0.1:18900/api/health", { signal: AbortSignal.timeout(3000) });
             if (res.ok) {
               log("✓ HTTP 服务已就绪");
-              setServiceStatus({ running: true, pid: null, pidFile: "" });
+              setServiceStatus(externalRunningStatus());
               httpReady = true;
               updateTask("http-wait", { status: "done", detail: `${(i + 1) * 2}s` });
               logTask("等待 HTTP 服务就绪", "done", `${(i + 1) * 2}s`);
@@ -4491,7 +4306,7 @@ export function App() {
                           try {
                             const res = await fetch("http://127.0.0.1:18900/api/health", { signal: AbortSignal.timeout(3000) });
                             if (res.ok) {
-                              setServiceStatus({ running: true, pid: null, pidFile: "" });
+                              setServiceStatus(externalRunningStatus());
                               break;
                             }
                           } catch { /* not ready yet */ }
@@ -5757,6 +5572,14 @@ export function App() {
         />
       );
     }
+    if (view === "skill_usage") {
+      return (
+        <SkillUsageView
+          serviceRunning={serviceStatus?.running ?? false}
+          apiBaseUrl={apiBaseUrl}
+        />
+      );
+    }
     if (view === "mcp") {
       return disabledViews.includes("mcp") ? (
         <div className="card" style={{ opacity: 0.5, textAlign: "center", padding: 40 }}>
@@ -6039,7 +5862,7 @@ export function App() {
         installFetchInterceptor();
         setTauriRemoteLoginUrl(null);
         setDataMode("remote");
-        setServiceStatus({ running: true, pid: null, pidFile: "" });
+        setServiceStatus(externalRunningStatus());
         notifySuccess(t("connect.success"));
         void refreshStatus("remote", tauriRemoteLoginUrl, true).then(() => {
           autoCheckEndpoints(tauriRemoteLoginUrl);
@@ -6143,7 +5966,7 @@ export function App() {
           onDisconnect={() => {
             setTauriRemoteMode(false);
             setDataMode("local");
-            setServiceStatus({ running: false, pid: null, pidFile: "" });
+            setServiceStatus(stoppedStatus());
             resetEnvLoaded();
             notifySuccess(t("topbar.disconnected"));
           }}
@@ -6284,7 +6107,7 @@ export function App() {
                       setApiBaseUrl(url);
                       localStorage.setItem("synapse_apiBaseUrl", url);
                       setDataMode("remote");
-                      setServiceStatus({ running: true, pid: null, pidFile: "" });
+                      setServiceStatus(externalRunningStatus());
                       setConnectDialogOpen(false);
                       connected = true;
                       notifySuccess(t("connect.success"));
