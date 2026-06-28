@@ -1,5 +1,8 @@
 """L1 Unit Tests: Session state machine, message management."""
 
+import json
+import threading
+import time
 from datetime import datetime
 
 import pytest
@@ -81,6 +84,87 @@ class TestSessionCreation:
         assert restored.context.focus_terms == s.context.focus_terms
 
 
+class TestSessionPersistence:
+    def test_save_sessions_uses_strict_atomic_json_write(self, tmp_path, monkeypatch):
+        manager = SessionManager(storage_path=tmp_path / "sessions")
+        session = manager.get_session("cli", "chat-1", "user-1")
+        session.add_message("user", "hello")
+        calls = {}
+
+        def spy(path, data, **kwargs):
+            calls["path"] = path
+            calls["data"] = data
+            calls["kwargs"] = kwargs
+
+        monkeypatch.setattr("synapse.sessions.manager.atomic_json_write", spy)
+
+        assert manager._save_sessions() is True
+
+        assert calls["path"] == tmp_path / "sessions" / "sessions.json"
+        assert calls["kwargs"]["indent"] is None
+        assert calls["kwargs"]["fsync"] is True
+        assert calls["kwargs"]["allow_fallback"] is False
+        assert calls["data"][0]["context"]["messages"][0]["content"] == "hello"
+
+    def test_save_sessions_serializes_concurrent_writes(self, tmp_path, monkeypatch):
+        from synapse.utils.atomic_io import atomic_json_write as real_atomic_json_write
+
+        manager = SessionManager(storage_path=tmp_path / "sessions")
+        session = manager.get_session("cli", "chat-1", "user-1")
+        session.add_message("user", "hello")
+
+        failures = []
+        start = threading.Barrier(8)
+        counter_lock = threading.Lock()
+        active_writes = 0
+        max_active_writes = 0
+
+        def spy(path, data, **kwargs):
+            nonlocal active_writes, max_active_writes
+            with counter_lock:
+                active_writes += 1
+                max_active_writes = max(max_active_writes, active_writes)
+            try:
+                time.sleep(0.001)
+                real_atomic_json_write(path, data, **kwargs)
+            finally:
+                with counter_lock:
+                    active_writes -= 1
+
+        def worker(worker_id: int) -> None:
+            start.wait()
+            for i in range(20):
+                if not manager._save_sessions():
+                    failures.append((worker_id, i))
+
+        from synapse.sessions import manager as manager_module
+
+        monkeypatch.setattr(manager_module, "atomic_json_write", spy)
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        sessions_file = tmp_path / "sessions" / "sessions.json"
+        data = json.loads(sessions_file.read_text(encoding="utf-8"))
+
+        assert failures == []
+        assert max_active_writes == 1
+        assert len(data) == 1
+        assert data[0]["context"]["messages"][0]["content"] == "hello"
+        assert not sessions_file.with_suffix(sessions_file.suffix + ".tmp").exists()
+
+    def test_persist_keeps_dirty_on_atomic_write_failure(self, tmp_path, monkeypatch):
+        manager = SessionManager(storage_path=tmp_path / "sessions")
+        manager._dirty = True
+        monkeypatch.setattr(manager, "_save_sessions", lambda: False)
+
+        manager.persist()
+
+        assert manager._dirty is True
+
+
 class TestSessionState:
     def test_all_states_exist(self):
         assert SessionState.ACTIVE.value == "active"
@@ -107,6 +191,15 @@ class TestSessionContext:
         ctx = SessionContext()
         ctx.variables["key"] = "value"
         assert ctx.variables["key"] == "value"
+
+    def test_to_dict_returns_independent_snapshot(self):
+        ctx = SessionContext()
+        ctx.messages.append({"role": "user", "content": {"text": "hello"}})
+        snapshot = ctx.to_dict()
+
+        ctx.messages[0]["content"]["text"] = "changed"
+
+        assert snapshot["messages"][0]["content"]["text"] == "hello"
 
     def test_task_lifecycle(self):
         ctx = SessionContext()

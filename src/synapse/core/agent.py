@@ -1441,6 +1441,7 @@ class Agent:
 
         # 状态
         self._initialized = False
+        self._initialize_lock = asyncio.Lock()
         self._running = False
 
         self._last_finalized_trace: list[dict] = []
@@ -2073,6 +2074,21 @@ class Agent:
         if self._initialized:
             return
 
+        async with self._initialize_lock:
+            if self._initialized:
+                return
+            await self._initialize_unlocked(
+                start_scheduler=start_scheduler,
+                lightweight=lightweight,
+                share_from=share_from,
+            )
+
+    async def _initialize_unlocked(
+        self,
+        start_scheduler: bool = True,
+        lightweight: bool = False,
+        share_from: "Agent | None" = None,
+    ) -> None:
         if share_from is not None and not lightweight:
             # share_from 隐含 lightweight：full-init 路径会再次跑一遍
             # _load_plugins，等于白白浪费 share_from 的缓存。这里直接报错让
@@ -2824,19 +2840,33 @@ class Agent:
 
         clear_all_skill_caches()
 
-        if rescan:
-            try:
-                self.skill_loader.load_all(settings.project_root)
-            except Exception as e:
-                logger.warning("propagate_skill_change: load_all failed: %s", e)
-
+        external_allowlist = None
+        effective = None
+        agent_skills: set[str] = set()
         try:
             from ..skills.allowlist_io import read_allowlist
             from ..skills.preset_utils import collect_preset_referenced_skills
 
             _, external_allowlist = read_allowlist()
-            effective = self.skill_loader.compute_effective_allowlist(external_allowlist)
             agent_skills = collect_preset_referenced_skills()
+            if external_allowlist is not None:
+                effective = self.skill_loader.compute_effective_allowlist(external_allowlist)
+        except Exception as e:
+            logger.warning("propagate_skill_change: allowlist pre-read failed: %s", e)
+
+        if rescan:
+            try:
+                load_filter = self.skill_loader.build_preparse_allowlist_filter(
+                    effective,
+                    agent_referenced_skills=agent_skills,
+                )
+                self.skill_loader.load_all(settings.project_root, load_filter=load_filter)
+            except Exception as e:
+                logger.warning("propagate_skill_change: load_all failed: %s", e)
+
+        try:
+            if effective is None:
+                effective = self.skill_loader.compute_effective_allowlist(external_allowlist)
             self.skill_loader.prune_external_by_allowlist(
                 effective, agent_referenced_skills=agent_skills
             )
@@ -7503,18 +7533,11 @@ class Agent:
         if usage_sources:
             summary["usage_source"] = "mixed" if len(usage_sources) > 1 else next(iter(usage_sources))
         try:
-            re = self.reasoning_engine
-            ctx_mgr = getattr(self, "context_manager", None) or getattr(
-                re, "_context_manager", None
-            )
-            if ctx_mgr and hasattr(ctx_mgr, "get_max_context_tokens"):
-                msgs = getattr(re, "_last_working_messages", None) or []
-                ctx_tokens = ctx_mgr.estimate_messages_tokens(msgs) if msgs else 0
-                ctx_limit = ctx_mgr.get_max_context_tokens()
-                summary["context_tokens"] = ctx_tokens
-                summary["context_limit"] = ctx_limit
-                summary["history_context_tokens"] = ctx_tokens
-                summary["history_context_limit"] = ctx_limit
+            from .context_stats import get_context_snapshot
+
+            snapshot = get_context_snapshot(self)
+            if snapshot is not None:
+                summary.update(snapshot.to_dict())
         except Exception:
             pass
         return summary

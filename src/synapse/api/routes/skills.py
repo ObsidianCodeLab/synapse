@@ -23,7 +23,6 @@ import asyncio
 import json
 import logging
 import re
-import time
 from pathlib import Path
 
 import httpx
@@ -44,18 +43,19 @@ registered at the bottom of this module."""
 
 _organize_cache: dict | None = None
 _organize_cache_hash: str | None = None
-
-_internal_skills_cache: dict[str, dict] = {}
-_internal_skills_cache_at: dict[str, float] = {}
-_INTERNAL_SKILLS_CACHE_TTL = 3600
+_skills_list_task: asyncio.Task[dict] | None = None
+_skills_list_task_revision = 0
+_skills_reload_task: asyncio.Task[dict] | None = None
+_skills_cache_revision = 0
 
 
 def _invalidate_skills_cache() -> None:
     """Clear the cached skill list so the next GET /api/skills re-scans disk."""
-    global _skills_cache, _organize_cache, _organize_cache_hash
+    global _skills_cache, _organize_cache, _organize_cache_hash, _skills_cache_revision
     _skills_cache = None
     _organize_cache = None
     _organize_cache_hash = None
+    _skills_cache_revision += 1
 
 
 def _resolve_agent(request: Request):
@@ -136,6 +136,36 @@ async def _propagate(request: Request, action: str, *, rescan: bool = True) -> N
         logger.warning("propagate_skill_change(%s) failed: %s", action, e)
 
 
+async def _coalesce_task(name: str, task: asyncio.Task[dict]) -> dict:
+    """Await an in-flight task and log when this request joins existing work."""
+    logger.info("%s already in progress; joining existing task", name)
+    return await asyncio.shield(task)
+
+
+async def _reload_all_skills_response(request: Request, loader, registry) -> dict:
+    """Run the expensive full reload path and return the public API response."""
+    await _propagate(request, "reload", rescan=True)
+    total = len(registry.list_all())
+    issues = _skill_load_issues(loader)
+    result: dict = {
+        "status": "ok",
+        "reloaded": "all",
+        "total": total,
+    }
+    if issues:
+        result.update(
+            {
+                "partial": True,
+                "skipped_count": len(issues),
+                "skipped_skills": issues,
+                "warning": (
+                    f"已刷新可用技能，但有 {len(issues)} 个技能未加载。其他技能可正常使用。"
+                ),
+            }
+        )
+    return result
+
+
 def _skill_load_issues(loader, *, limit: int = 20) -> list[dict[str, str]]:
     """Return concise non-fatal skill load diagnostics from the active loader."""
     raw = getattr(loader, "last_load_issues", []) or []
@@ -188,27 +218,14 @@ async def _auto_translate_new_skills(request: Request, install_url: str) -> None
         logger.warning(f"Auto-translate after install failed: {e}")
 
 
-@router.get("/api/skills")
-async def list_skills(request: Request, rescan: bool = False):
-    """List all available skills with their config schemas.
-
-    Returns ALL discovered skills (including disabled ones) with correct
-    ``enabled`` status derived from ``data/skills.json`` allowlist.
-
-    Uses a module-level cache to avoid re-scanning disk on every request.
-    The cache is invalidated by install/uninstall/reload/edit operations via
-    the cross-layer on-change callback.
-
-    Pass ``?rescan=1`` to force a full disk scan even when the Agent registry
-    is available.
-    """
+async def _build_skills_list_response(request: Request) -> dict:
+    """Build the complete skills list response and populate the module cache."""
     global _skills_cache
-    if _skills_cache is not None and not rescan:
-        return _skills_cache
-
+    started_revision = _skills_cache_revision
     from synapse.skills.allowlist_io import read_allowlist
 
     skills_json_path, external_allowlist = read_allowlist()
+    # 用于生成 relative_path 的 base 仍需项目根目录
     try:
         from synapse.config import settings
 
@@ -216,30 +233,24 @@ async def list_skills(request: Request, rescan: bool = False):
     except Exception:
         base_path = skills_json_path.parent.parent
 
-    # 优先从 Agent 的已初始化 loader/registry 读取，避免重复扫盘
-    actual_agent = _resolve_agent(request)
-    agent_loader = getattr(actual_agent, "skill_loader", None) if actual_agent else None
-    agent_registry = getattr(actual_agent, "skill_registry", None) if actual_agent else None
+    try:
+        from synapse.skills.loader import SkillLoader
 
-    if agent_loader is not None and agent_registry is not None and not rescan:
-        all_skills = agent_registry.list_all()
-        try:
-            effective_allowlist = agent_loader.compute_effective_allowlist(external_allowlist)
-        except Exception:
-            effective_allowlist = external_allowlist
-    else:
-        try:
-            from synapse.skills.loader import SkillLoader
+        loader = SkillLoader()
+        await asyncio.to_thread(loader.load_all, base_path)
+        all_skills = loader.registry.list_all()
+        effective_allowlist = loader.compute_effective_allowlist(external_allowlist)
+    except Exception:
+        actual_agent = _resolve_agent(request)
+        if actual_agent is None:
+            return {"skills": []}
+        registry = getattr(actual_agent, "skill_registry", None)
+        if registry is None:
+            return {"skills": []}
+        all_skills = registry.list_all()
+        effective_allowlist = external_allowlist
 
-            loader = SkillLoader()
-            await asyncio.to_thread(loader.load_all, base_path)
-            all_skills = loader.registry.list_all()
-            effective_allowlist = loader.compute_effective_allowlist(external_allowlist)
-        except Exception:
-            if agent_registry is None:
-                return {"skills": []}
-            all_skills = agent_registry.list_all()
-            effective_allowlist = external_allowlist
+    from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_entry
 
     skills = []
     for skill in all_skills:
@@ -250,8 +261,8 @@ async def list_skills(request: Request, rescan: bool = False):
 
         is_system = bool(skill.system)
         sid = getattr(skill, "skill_id", skill.name)
-        from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_entry
-
+        # 研发工具（浩鲸 whalecloud-dev-tool-*）恒为启用：不受 skills.json 勾选影响，
+        # 研发会议室强制依赖，前端不应将其展示为可禁用的普通外部技能。
         is_enabled = (
             is_system
             or effective_allowlist is None
@@ -274,11 +285,7 @@ async def list_skills(request: Request, rescan: bool = False):
         try:
             from synapse.skills.runtime_registry import read_skill_runtime_registry
 
-            runtime_state = (
-                read_skill_runtime_registry()
-                .get("skills", {})
-                .get(str(sid), {})
-            )
+            runtime_state = read_skill_runtime_registry().get("skills", {}).get(str(sid), {})
             if not isinstance(runtime_state, dict):
                 runtime_state = {}
         except Exception:
@@ -294,7 +301,6 @@ async def list_skills(request: Request, rescan: bool = False):
                 "permission_profile": getattr(skill, "permission_profile", ""),
                 "name": skill.name,
                 "description": skill.description,
-                "label": getattr(skill, "label", None) or None,
                 "name_i18n": skill.name_i18n or None,
                 "description_i18n": skill.description_i18n or None,
                 "system": is_system,
@@ -330,8 +336,40 @@ async def list_skills(request: Request, rescan: bool = False):
     skills.sort(key=_sort_key)
 
     result = {"skills": skills}
-    _skills_cache = result
+    if started_revision == _skills_cache_revision:
+        _skills_cache = result
     return result
+
+
+@router.get("/api/skills")
+async def list_skills(request: Request):
+    """List all available skills with their config schemas.
+
+    Returns ALL discovered skills (including disabled ones) with correct
+    ``enabled`` status derived from ``data/skills.json`` allowlist.
+
+    Uses a module-level cache to avoid re-scanning disk on every request.
+    The cache is invalidated by install/uninstall/reload/edit operations via
+    the cross-layer on-change callback.
+    """
+    global _skills_list_task, _skills_list_task_revision
+    if _skills_cache is not None:
+        return _skills_cache
+    if (
+        _skills_list_task is not None
+        and not _skills_list_task.done()
+        and _skills_list_task_revision == _skills_cache_revision
+    ):
+        return await _coalesce_task("skills list build", _skills_list_task)
+
+    task = asyncio.create_task(_build_skills_list_response(request))
+    _skills_list_task = task
+    _skills_list_task_revision = _skills_cache_revision
+    try:
+        return await asyncio.shield(task)
+    finally:
+        if _skills_list_task is task and task.done():
+            _skills_list_task = None
 
 
 _ORGANIZE_BATCH_SIZE = 50
@@ -344,6 +382,7 @@ def _compact(text: str, limit: int) -> str:
 
 def _compute_skill_list_hash(ids: set[str]) -> str:
     import hashlib
+
     return hashlib.sha256(",".join(sorted(ids)).encode()).hexdigest()[:16]
 
 
@@ -391,9 +430,7 @@ async def organize_skills(request: Request):
             external_skills, _ = await _load_external_skills_for_organize()
         except Exception as e:
             logger.warning("Failed to load skills for AI organize: %s", e)
-            raise HTTPException(
-                status_code=500, detail="技能列表读取失败，无法生成整理请求"
-            ) from e
+            raise HTTPException(status_code=500, detail="技能列表读取失败，无法生成整理请求") from e
         skill_items = [
             {
                 "id": s.skill_id,
@@ -422,7 +459,8 @@ async def organize_skills(request: Request):
 
     unclassified = [s for s in skill_items if s["id"] not in existing_bindings]
     pre_bound = {
-        sid: cat for sid, cat in existing_bindings.items()
+        sid: cat
+        for sid, cat in existing_bindings.items()
         if sid in known_ids and cat in existing_cat_names
     }
 
@@ -454,17 +492,17 @@ async def organize_skills(request: Request):
 
     existing_hint = ""
     if existing_cat_names:
-        existing_hint = (
-            f"\n已有分类供参考（可复用）: {', '.join(sorted(existing_cat_names))}\n"
-        )
+        existing_hint = f"\n已有分类供参考（可复用）: {', '.join(sorted(existing_cat_names))}\n"
 
-    phase1_prompt = "\n".join([
-        f"共{len(unclassified)}个待分类技能:",
-        *names_lines,
-        existing_hint,
-        "生成4-12个中文分类（可复用已有分类），返回严格JSON。",
-        '{"categories":[{"name":"X","description":"Y"}]}',
-    ])
+    phase1_prompt = "\n".join(
+        [
+            f"共{len(unclassified)}个待分类技能:",
+            *names_lines,
+            existing_hint,
+            "生成4-12个中文分类（可复用已有分类），返回严格JSON。",
+            '{"categories":[{"name":"X","description":"Y"}]}',
+        ]
+    )
 
     try:
         phase1_resp = await agent.brain.think_lightweight(
@@ -511,18 +549,18 @@ async def organize_skills(request: Request):
     ]
 
     async def _classify_batch(batch: list[dict]) -> dict[str, str]:
-        lines = "\n".join(
-            f"- {s['id']}|{s['name']}|{_compact(s['desc'], 30)}" for s in batch
+        lines = "\n".join(f"- {s['id']}|{s['name']}|{_compact(s['desc'], 30)}" for s in batch)
+        prompt = "\n".join(
+            [
+                f"可选分类: {cat_list_str}",
+                f"技能({len(batch)}个):",
+                lines,
+                "",
+                "为每个技能选择最合适的分类，返回严格JSON。",
+                "bindings的key必须是上方id，value必须是上方可选分类之一，不要凭空创造。",
+                '{"bindings":{"skill_id":"category_name"}}',
+            ]
         )
-        prompt = "\n".join([
-            f"可选分类: {cat_list_str}",
-            f"技能({len(batch)}个):",
-            lines,
-            "",
-            "为每个技能选择最合适的分类，返回严格JSON。",
-            "bindings的key必须是上方id，value必须是上方可选分类之一，不要凭空创造。",
-            '{"bindings":{"skill_id":"category_name"}}',
-        ])
         resp = await agent.brain.think_lightweight(
             prompt,
             system="技能分类助手。只返回JSON对象，无其他文本。",
@@ -733,14 +771,14 @@ async def update_skill_config(request: Request):
     except Exception:
         config_file = Path.cwd() / "data" / "skill_configs.json"
 
-    from synapse.utils.atomic_io import read_json_safe, safe_json_write
+    from synapse.utils.atomic_io import atomic_json_write, read_json_safe
 
     existing = read_json_safe(config_file) or {}
     if not isinstance(existing, dict):
         existing = {}
 
     existing[skill_name] = config_values
-    safe_json_write(config_file, existing)
+    atomic_json_write(config_file, existing)
 
     return {"status": "ok", "skill": skill_name, "config": config_values}
 
@@ -768,7 +806,9 @@ async def install_skill(request: Request):
         return {"error": "url is required"}
     category_raw = body.get("category")
     category = (
-        str(category_raw).strip() if isinstance(category_raw, str) and category_raw.strip() else None
+        str(category_raw).strip()
+        if isinstance(category_raw, str) and category_raw.strip()
+        else None
     )
 
     try:
@@ -890,6 +930,7 @@ async def install_skill(request: Request):
 
     # 自动翻译（可选，不阻塞成功返回）—— 后台执行，避免拖慢安装路径
     try:
+
         async def _bg_translate(req=request, src_url=url):
             try:
                 await _auto_translate_new_skills(req, src_url)
@@ -921,6 +962,7 @@ async def uninstall_skill(request: Request):
     if not skill_id:
         return {"error": "skill_id is required"}
 
+    # 研发工具（浩鲸 whalecloud-dev-tool-*）为研发会议室强制依赖，禁止卸载。
     from synapse.utils.whaleclouddevtool import is_whalecloud_dev_tool_skill_id
 
     if is_whalecloud_dev_tool_skill_id(skill_id):
@@ -986,6 +1028,7 @@ async def reload_skills(request: Request):
     POST body: { "skill_name": "optional-name" }
     如果 skill_name 为空或未提供，则重新扫描并加载所有技能。
     """
+    global _skills_reload_task
     agent = _resolve_agent(request)
     if agent is None:
         return {"error": "Agent not initialized"}
@@ -1010,27 +1053,16 @@ async def reload_skills(request: Request):
             await _propagate(request, "reload", rescan=False)
             return {"status": "ok", "reloaded": [skill_name]}
 
-        await _propagate(request, "reload", rescan=True)
-        total = len(registry.list_all())
-        issues = _skill_load_issues(loader)
-        result = {
-            "status": "ok",
-            "reloaded": "all",
-            "total": total,
-        }
-        if issues:
-            result.update(
-                {
-                    "partial": True,
-                    "skipped_count": len(issues),
-                    "skipped_skills": issues,
-                    "warning": (
-                        f"已刷新可用技能，但有 {len(issues)} 个技能未加载。"
-                        "其他技能可正常使用。"
-                    ),
-                }
-            )
-        return result
+        if _skills_reload_task is not None and not _skills_reload_task.done():
+            return await _coalesce_task("skills reload", _skills_reload_task)
+
+        task = asyncio.create_task(_reload_all_skills_response(request, loader, registry))
+        _skills_reload_task = task
+        try:
+            return await asyncio.shield(task)
+        finally:
+            if _skills_reload_task is task and task.done():
+                _skills_reload_task = None
     except Exception as e:
         logger.error(f"Skill reload failed: {e}")
         return {"error": str(e)}
@@ -1130,6 +1162,13 @@ async def update_skill_content(skill_name: str, request: Request):
     except Exception as e:
         return {"error": f"Failed to write SKILL.md: {e}"}
 
+    try:
+        from synapse.skills.usage_events import get_skill_usage_log
+
+        get_skill_usage_log().record(skill_name, "edit")
+    except Exception:
+        logger.debug("skill usage edit event record failed", exc_info=True)
+
     reloaded = False
     if loader:
         try:
@@ -1180,115 +1219,6 @@ async def search_marketplace(q: str = "agent"):
         return {"skills": [], "count": 0, "error": str(e)}
 
 
-def _normalize_internal_skill_type(skill_type: str) -> str:
-    normalized = (skill_type or "official").strip()
-    if normalized not in ("official", "self_operated"):
-        raise HTTPException(status_code=400, detail="skill_type 必须为 official 或 self_operated")
-    return normalized
-
-
-async def _get_internal_skills_data(skill_type: str, *, refresh: bool = False) -> dict:
-    global _internal_skills_cache, _internal_skills_cache_at
-
-    now = time.time()
-    cached = _internal_skills_cache.get(skill_type)
-    cached_at = _internal_skills_cache_at.get(skill_type, 0.0)
-    if not refresh and cached is not None and now - cached_at < _INTERNAL_SKILLS_CACHE_TTL:
-        return cached
-
-    from synapse.skills.platform_crawler import crawl
-
-    try:
-        data = await asyncio.to_thread(crawl, skill_type)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    _internal_skills_cache[skill_type] = data
-    _internal_skills_cache_at[skill_type] = now
-    return data
-
-
-@router.get("/api/internal-skills/hot")
-async def internal_skills_hot(skill_type: str = "official", refresh: bool = False):
-    """内部技能热榜（下载 / 星标 / 最近更新 Top8）。"""
-    from synapse.skills.platform_crawler import group_hot_columns
-
-    normalized = _normalize_internal_skill_type(skill_type)
-    data = await _get_internal_skills_data(normalized, refresh=refresh)
-    hot_flat = data.get(normalized, {}).get("hot") or []
-    return {"skill_type": normalized, "columns": group_hot_columns(hot_flat)}
-
-
-@router.get("/api/internal-skills/all")
-async def internal_skills_all(skill_type: str = "official", refresh: bool = False):
-    """内部技能全量列表。"""
-    normalized = _normalize_internal_skill_type(skill_type)
-    data = await _get_internal_skills_data(normalized, refresh=refresh)
-    return {
-        "skill_type": normalized,
-        "skills": data.get(normalized, {}).get("all") or [],
-        "total": len(data.get(normalized, {}).get("all") or []),
-    }
-
-
-@router.post("/api/internal-skills/install")
-async def internal_skills_install(request: Request):
-    """通过 whalehub 安装内部技能到项目 ``skills/`` 目录。"""
-    from synapse.skills.allowlist_io import upsert_skill_ids
-    from synapse.skills.platform_crawler import install_skill as _install_internal_skill
-    from synapse.skills.platform_crawler import skills_install_dir
-
-    body = await request.json()
-    slug = (body.get("slug") or "").strip()
-    if not slug:
-        return {"error": "slug is required"}
-
-    try:
-        await asyncio.to_thread(_install_internal_skill, slug)
-    except ValueError as exc:
-        return {"error": str(exc)}
-    except RuntimeError as exc:
-        logger.error("Internal skill install failed (%s): %s", slug, exc)
-        return {"error": str(exc)}
-    except Exception as exc:
-        logger.error("Internal skill install failed (%s): %s", slug, exc, exc_info=True)
-        return {"error": str(exc)}
-
-    target_dir = skills_install_dir() / slug
-    skill_md = target_dir / "SKILL.md"
-    if not skill_md.is_file():
-        import shutil
-
-        shutil.rmtree(str(target_dir), ignore_errors=True)
-        return {"error": f"技能已下载，但未找到有效的 SKILL.md: {skill_md}"}
-
-    try:
-        from synapse.skills.parser import SkillParser
-
-        SkillParser().parse_directory(target_dir)
-    except Exception as exc:
-        import shutil
-
-        logger.error("Installed internal skill %s has invalid SKILL.md, removing: %s", slug, exc)
-        shutil.rmtree(str(target_dir), ignore_errors=True)
-        return {
-            "error": (
-                f"技能文件已下载，但 SKILL.md 格式无效，无法加载：{exc}。"
-                "该技能可能不兼容 Synapse 格式，已自动清理。"
-            )
-        }
-
-    try:
-        upsert_skill_ids({slug})
-    except Exception as exc:
-        logger.warning("Failed to upsert %s into skills.json: %s", slug, exc)
-
-    await _propagate(request, "install")
-    return {"status": "ok", "slug": slug, "skill_id": slug, "install_dir": str(target_dir)}
-
-
 # ──────────────────────────────────────────────────────────────────────
 # Cross-layer event subscribers
 #
@@ -1303,10 +1233,21 @@ async def internal_skills_install(request: Request):
 
 
 def _broadcast_ws_event(action: str) -> None:
-    """WebSocket 广播（fire-and-forget）。"""
-    from synapse.api.routes.websocket import fire_event
+    """WebSocket 广播 ``skills:changed``（fire-and-forget，跨线程/跨事件循环安全）。
 
-    fire_event("skills:changed", {"action": action})
+    ``propagate_skill_change`` 经由 ``asyncio.to_thread`` 在工作线程内触发本回调，
+    而工作线程没有 running loop。旧实现用 ``asyncio.ensure_future`` 在该线程里会
+    直接抛 ``RuntimeError`` 并被吞掉，导致安装 / 卸载 / reload 后 WS ``skills:changed``
+    事件从不送达——仅靠该事件实时刷新的面板（OrgEditorView / SkillConflictsPanel）
+    因此收不到更新。``fire_event`` 通过 engine_bridge 把广播调度回 API 事件循环，
+    从任意线程调用都安全，且无可达 loop 时会优雅丢弃而非报错。
+    """
+    try:
+        from synapse.api.routes.websocket import fire_event
+
+        fire_event("skills:changed", {"action": action})
+    except Exception:
+        pass
 
 
 def _on_skills_changed_api(action: str) -> None:
@@ -1321,4 +1262,3 @@ try:
     register_on_change(_on_skills_changed_api)
 except Exception:
     pass
-

@@ -1,6 +1,6 @@
 [package]
 name = "synapse-desktop"
-version = "1.27.23"
+version = "1.27.24"
 description = "Synapse Setup Center"
 authors = ["Synapse"]
 edition = "2021"

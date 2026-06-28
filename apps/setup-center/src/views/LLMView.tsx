@@ -1688,6 +1688,7 @@ export function LLMView(props: LLMViewProps) {
               ))}
             </TableBody>
           </Table>
+          </>
         )}
       </div>
 

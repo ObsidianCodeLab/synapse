@@ -39,6 +39,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
+def _record_skill_usage_event(skill_name: str, action: str) -> None:
+    """记录一条技能用量事件（供监控面板「技能用量」统计）。
+
+    埋点是尽力而为的：任何异常都吞掉，绝不影响技能加载/执行主流程。
+    """
+    try:
+        from ...skills.usage_events import get_skill_usage_log
+
+        get_skill_usage_log().record(skill_name, action)
+    except Exception:  # noqa: BLE001
+        logger.debug("skill usage event record failed", exc_info=True)
+
+
 # Skill 内容专用阈值（~32000 tokens），高于通用的 MAX_TOOL_RESULT_CHARS (16000 chars)。
 # Skill body 是高质量结构化指令，截断会严重影响 LLM 执行效果。
 # 部分技能（如 docx）的 SKILL.md 引用了多个同目录子文件，内联后总量可达 50K+。
@@ -78,59 +92,15 @@ class SkillsHandler:
     def __init__(self, agent: "Agent"):
         self.agent = agent
 
-    def _maybe_clear_archive_doc_pending(self, tool_name: str, params: dict, result: str) -> None:
-        skill = str(params.get("skill_name") or "").strip().lower()
-        if tool_name not in ("execute_skill", "run_skill_script"):
-            return
-        if "doc-generate" not in skill and "doc_generate" not in skill:
-            return
-        if str(result or "").strip().startswith("❌"):
-            return
-        try:
-            from synapse.rd_meeting.work_plan import (
-                clear_archive_doc_pending,
-                meeting_context_from_session,
-                session_id_from_agent,
-            )
-
-            ctx = meeting_context_from_session(session_id_from_agent(self.agent))
-            if ctx:
-                clear_archive_doc_pending(ctx["scope_id"])
-        except Exception:
-            pass
-
     async def handle(self, tool_name: str, params: dict[str, Any]) -> str:
         """处理工具调用"""
-        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
-
-        session_id = session_id_from_agent(self.agent)
-        if tool_name == "execute_skill":
-            gate_err = check_host_forward_gate(
-                session_id,
-                tool_name,
-                skill_name=str(params.get("skill_name") or ""),
-                agent=self.agent,
-            )
-            if gate_err:
-                return gate_err
-        elif tool_name == "run_skill_script":
-            gate_err = check_host_forward_gate(
-                session_id,
-                tool_name,
-                skill_name=str(params.get("skill_name") or ""),
-                agent=self.agent,
-            )
-            if gate_err:
-                return gate_err
         try:
             if tool_name == "list_skills":
                 return self._list_skills(params)
             elif tool_name == "get_skill_info":
                 return self._get_skill_info(params)
             elif tool_name == "run_skill_script":
-                out = self._run_skill_script(params)
-                self._maybe_clear_archive_doc_pending(tool_name, params, out)
-                return out
+                return self._run_skill_script(params)
             elif tool_name == "get_skill_reference":
                 return self._get_skill_reference(params)
             elif tool_name == "install_skill":
@@ -142,9 +112,7 @@ class SkillsHandler:
             elif tool_name == "manage_skill_enabled":
                 return self._manage_skill_enabled(params)
             elif tool_name == "execute_skill":
-                out = await self._execute_skill(params)
-                self._maybe_clear_archive_doc_pending(tool_name, params, out)
-                return out
+                return await self._execute_skill(params)
             elif tool_name == "uninstall_skill":
                 return self._uninstall_skill(params)
             else:
@@ -184,7 +152,7 @@ class SkillsHandler:
             f"{len(discoverable_external)} 可发现, "
             f"{len(disabled_external)} 禁用):\n\n"
             "默认返回紧凑目录，避免把所有技能说明塞进对话上下文。"
-            "需要完整描述时再次调用 `list_skills({\"verbose\": true})`；"
+            '需要完整描述时再次调用 `list_skills({"verbose": true})`；'
             "需要准确路径时优先用 `get_skill_info(skill_name)`，或显式传 `include_paths: true`。\n\n"
         )
 
@@ -351,6 +319,7 @@ class SkillsHandler:
         usage_tracker = getattr(self.agent, "_skill_usage_tracker", None)
         if usage_tracker:
             usage_tracker.record(skill.skill_id)
+        _record_skill_usage_event(skill.name, "load")
 
         # F7: inject allowed_tools into policy engine
         if skill.allowed_tools:
@@ -444,17 +413,9 @@ class SkillsHandler:
 
     def _run_skill_script(self, params: dict) -> str:
         """运行技能脚本"""
-        from ...skills.loader import normalize_script_args
-
         skill_name = params["skill_name"]
         script_name = params["script_name"]
-        args, args_err = normalize_script_args(params.get("args", []))
-        if args_err:
-            return (
-                f"❌ 参数 args 格式错误: {args_err}\n\n"
-                "**正确用法**: `args` 必须是字符串数组，每个 flag/值单独一项，例如：\n"
-                '`args=["--server_url", "http://host:10001", "--limit", "10"]`'
-            )
+        args = params.get("args", [])
         cwd_raw = params.get("cwd")
 
         resolved_cwd: Path | None = None
@@ -493,8 +454,14 @@ class SkillsHandler:
         try:
             import time
 
-            deps = list(getattr(skill_entry, "python_dependencies", []) or []) if skill_entry else []
-            py_env = (getattr(skill_entry, "python_env", "") or "").strip().lower() if skill_entry else ""
+            deps = (
+                list(getattr(skill_entry, "python_dependencies", []) or []) if skill_entry else []
+            )
+            py_env = (
+                (getattr(skill_entry, "python_env", "") or "").strip().lower()
+                if skill_entry
+                else ""
+            )
             spec = None
             if skill_entry and (deps or py_env == "skill"):
                 from ...runtime_manager import (
@@ -600,52 +567,10 @@ class SkillsHandler:
                     f"2. 使用管理员权限运行"
                 )
             else:
-                extra = self._base_scripts_failure_hint(skill_name, script_name, output)
                 return (
                     f"❌ 脚本执行失败:\n{output}\n\n"
                     f"**建议**: 请检查脚本参数是否正确，或使用 `get_skill_info` 查看技能使用说明"
-                    f"{extra}"
                 )
-
-    @staticmethod
-    def _base_scripts_failure_hint(skill_name: str, script_name: str, output: str) -> str:
-        """针对 whalecloud-dev-tool-base-scripts 常见参数/URL 误用给出可执行修正提示。"""
-        if skill_name != "whalecloud-dev-tool-base-scripts":
-            return ""
-
-        text = output.lower()
-        lines: list[str] = []
-
-        if "his_order_search" in text and ("404" in text or "cannot post" in text):
-            if ":11011" in output:
-                lines.append(
-                    "历史工单检索误用了 GITNEXUS_URL（:11011）。"
-                    "hybrid/relation/cypher 脚本的 `--server_url` 须用系统提示中的 SERVER_URL（同 SYNAPSE_URL，:10001）。"
-                )
-            else:
-                lines.append(
-                    "请确认 `--server_url` 使用系统提示中的 SERVER_URL（研发统一服务），"
-                    "不要用 GITNEXUS_URL。"
-                )
-
-        if script_name == "gnx-tools.js":
-            if "missing --url" in text or "gitnexus_url" in text:
-                lines.append(
-                    "gnx-tools 须传 `--url`，取值系统提示 GITNEXUS_URL（:11011）。"
-                )
-            if "need --repo" in text or "need --repo and --query" in text:
-                lines.append(
-                    "gnx-tools search 须同时传 `--repo`（系统提示 REPO_NAME）与 `--query`。"
-                )
-
-        if script_name in {"hybrid_query.py", "relation_query.py", "cypher_query.py"}:
-            if "--server_url" not in output and "required" in text:
-                lines.append("须传 `--server_url`，取值系统提示 SERVER_URL。")
-
-        if not lines:
-            return ""
-
-        return "\n" + "\n".join(f"- {line}" for line in lines)
 
     @staticmethod
     def _diagnose_missing_skill_module(skill_entry: Any, output: str) -> str:
@@ -695,22 +620,8 @@ class SkillsHandler:
         if content:
             output = f"# 参考文档: {ref_name}\n\n{content}"
             return self._truncate_skill_content("get_skill_reference", output)
-
-        hint = ""
-        if ref_name in {"REFERENCE.md", ""}:
-            skill = self.agent.skill_registry.get(skill_name)
-            if skill:
-                from synapse.skills.exposure import build_skill_exposure
-
-                exposed = build_skill_exposure(skill)
-                if exposed.references:
-                    refs = ", ".join(exposed.references)
-                    hint = (
-                        f"\n\n**可用参考文档**: {refs}\n"
-                        f'请使用 `get_skill_reference(skill_name="{skill_name}", '
-                        f'ref_name="<文件名>")`，例如 ref_name="{exposed.references[0]}"。'
-                    )
-        return f"❌ 未找到参考文档: {skill_name}/{ref_name}{hint}"
+        else:
+            return f"❌ 未找到参考文档: {skill_name}/{ref_name}"
 
     async def _install_skill(self, params: dict) -> str:
         """安装技能"""
@@ -946,6 +857,7 @@ class SkillsHandler:
         usage_tracker = getattr(self.agent, "_skill_usage_tracker", None)
         if usage_tracker:
             usage_tracker.record(skill.skill_id)
+        _record_skill_usage_event(skill.name, "load")
 
         # F7: inject temporary tool allowlist
         if skill.allowed_tools:
@@ -1007,6 +919,9 @@ class SkillsHandler:
             endpoint_override = skill.model
 
         try:
+            agent_voice = ""
+            if hasattr(self.agent, "_resolve_agent_voice"):
+                agent_voice = self.agent._resolve_agent_voice()
             result = await self.agent.reasoning_engine.run(
                 fork_messages,
                 tools=tools,
@@ -1017,6 +932,7 @@ class SkillsHandler:
                 conversation_id=fork_conv_id,
                 is_sub_agent=True,
                 endpoint_override=endpoint_override,
+                agent_voice=agent_voice,
             )
         except Exception as e:
             logger.error("Fork execution of skill '%s' failed: %s", skill_name, e, exc_info=True)

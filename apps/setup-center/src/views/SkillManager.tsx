@@ -86,6 +86,41 @@ function friendlyError(e: unknown, t: (key: string) => string, context: ErrorCon
   return t(contextMap[context]);
 }
 
+type CategoryMassAction = "enable" | "disable";
+
+type CategoryMassActionResult = {
+  status?: string;
+  name?: string;
+  added?: number;
+  removed?: number;
+  system_count?: number;
+  total?: number;
+  processed?: number;
+  error?: string;
+  detail?: string;
+};
+
+type CategoryMassProgressEvent = {
+  stage?: string;
+  message?: string;
+  percent?: number;
+  total?: number;
+  processed?: number;
+  finished?: boolean;
+  error?: string;
+  result?: CategoryMassActionResult;
+};
+
+type CategoryMassProgressState = {
+  category: string;
+  action: CategoryMassAction;
+  stage: string;
+  message: string;
+  percent: number;
+  total: number;
+  processed: number;
+};
+
 // ─── 分类对话框（新建 / 编辑） ───
 
 type CategoryDialogState = {
@@ -1346,6 +1381,7 @@ export function SkillManager({
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [groupView, setGroupView] = useState(true);
   const [categoryBusy, setCategoryBusy] = useState<string | null>(null);
+  const [categoryMassProgress, setCategoryMassProgress] = useState<CategoryMassProgressState | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [categoryDialogState, setCategoryDialogState] = useState<CategoryDialogState>(null);
   const [categoryDeleteConfirm, setCategoryDeleteConfirm] = useState<string | null>(null);
@@ -1371,6 +1407,7 @@ export function SkillManager({
   // 已安装技能加载的请求时序守卫：并发的 loadSkills 中只有"最新"那次允许写入
   // 状态，避免较早发出的请求晚到后用旧/坏数据覆盖较新成功结果（last-write-wins 倒灌）。
   const skillsRequestId = useRef(0);
+  const refreshingRef = useRef(false);
   const detailRequestNameRef = useRef<string | null>(null);
   const { t } = useTranslation();
 
@@ -1488,7 +1525,7 @@ export function SkillManager({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(180_000),
       });
       let data: Record<string, unknown> | null = null;
       try {
@@ -1538,8 +1575,12 @@ export function SkillManager({
   // 否则静默 reload 技能与分类列表
   const enabledDirtyRef = useRef(enabledDirty);
   useEffect(() => { enabledDirtyRef.current = enabledDirty; }, [enabledDirty]);
+  useEffect(() => { refreshingRef.current = refreshing; }, [refreshing]);
   useEffect(() => {
     const onChange = () => {
+      if (refreshingRef.current) {
+        return;
+      }
       if (enabledDirtyRef.current) {
         toast.info(t("skills.realtimeDirtyHint"));
         return;
@@ -1568,61 +1609,113 @@ export function SkillManager({
   );
 
   // ── 大类启用/禁用 / 创建 / 删除（mass action over allowlist） ──
-  const handleCategoryEnableAll = useCallback(async (name: string) => {
-    if (apiBaseUrl == null) return;
-    setCategoryBusy(name);
-    try {
-      const res = await safeFetch(`${apiBaseUrl}/api/skill-categories/${encodeURIComponent(name)}/enable`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-        signal: AbortSignal.timeout(15_000),
-      });
-      const data = await res.json().catch(() => ({}));
-      const count = data?.added ?? -1;
-      const sysCount = data?.system_count ?? 0;
-      if (count === 0 && sysCount > 0) {
-        toast.info(t("skills.category.allSystemSkills", { name: displayCategoryName(name), count: sysCount }));
-      } else if (count === 0) {
-        toast.warning(t("skills.category.noSkillsInCategory", { name: displayCategoryName(name) }));
-      } else {
-        toast.success(t("skills.category.enabledAll", { name: displayCategoryName(name) }));
-      }
-      await refreshAfterCategoryMutation();
-    } catch (e) {
-      toast.error(friendlyError(e, t, "save"));
-    } finally {
-      setCategoryBusy(null);
+  const runCategoryMassAction = useCallback(async (
+    name: string,
+    action: CategoryMassAction,
+  ): Promise<CategoryMassActionResult> => {
+    const actionPath = action === "enable" ? "enable" : "disable";
+    const url = `${apiBaseUrl}/api/skill-categories/${encodeURIComponent(name)}/${actionPath}?stream=1`;
+    const res = await safeFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: "{}",
+      signal: AbortSignal.timeout(120_000),
+    });
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("text/event-stream") || !res.body) {
+      return await res.json().catch(() => ({}));
     }
-  }, [apiBaseUrl, t, displayCategoryName, refreshAfterCategoryMutation]);
 
-  const handleCategoryDisableAll = useCallback(async (name: string) => {
-    if (apiBaseUrl == null) return;
-    setCategoryBusy(name);
-    try {
-      const res = await safeFetch(`${apiBaseUrl}/api/skill-categories/${encodeURIComponent(name)}/disable`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-        signal: AbortSignal.timeout(15_000),
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResult: CategoryMassActionResult | null = null;
+    const applyProgress = (event: CategoryMassProgressEvent) => {
+      if (event.result) finalResult = event.result;
+      const percent = Math.max(0, Math.min(100, Number(event.percent ?? 0)));
+      setCategoryMassProgress({
+        category: name,
+        action,
+        stage: String(event.stage || ""),
+        message: String(event.message || ""),
+        percent,
+        total: Number(event.total || event.result?.total || 0),
+        processed: Number(event.processed || event.result?.processed || 0),
       });
-      const data = await res.json().catch(() => ({}));
-      const count = data?.removed ?? -1;
+      if (event.error) throw new Error(event.error);
+    };
+
+    const parseBlock = (block: string) => {
+      const dataLines = block
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart());
+      if (dataLines.length === 0) return;
+      const raw = dataLines.join("\n");
+      if (!raw) return;
+      const event = JSON.parse(raw) as CategoryMassProgressEvent;
+      applyProgress(event);
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() || "";
+      for (const block of blocks) parseBlock(block);
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) parseBlock(buffer);
+    return finalResult || {};
+  }, [apiBaseUrl]);
+
+  const handleCategoryMassAction = useCallback(async (name: string, action: CategoryMassAction) => {
+    if (apiBaseUrl == null || categoryBusy) return;
+    setCategoryBusy(name);
+    setCategoryMassProgress({
+      category: name,
+      action,
+      stage: "starting",
+      message: t("skills.category.massStarting"),
+      percent: 5,
+      total: 0,
+      processed: 0,
+    });
+    try {
+      const data = await runCategoryMassAction(name, action);
+      const count = action === "enable" ? data?.added ?? -1 : data?.removed ?? -1;
       const sysCount = data?.system_count ?? 0;
       if (count === 0 && sysCount > 0) {
         toast.info(t("skills.category.allSystemSkills", { name: displayCategoryName(name), count: sysCount }));
       } else if (count === 0) {
         toast.warning(t("skills.category.noSkillsInCategory", { name: displayCategoryName(name) }));
+      } else if (action === "enable") {
+        toast.success(t("skills.category.enabledAll", { name: displayCategoryName(name) }));
       } else {
         toast.success(t("skills.category.disabledAll", { name: displayCategoryName(name) }));
       }
+      setCategoryMassProgress((prev) => prev && prev.category === name
+        ? { ...prev, stage: "syncing", message: t("skills.category.massSyncing"), percent: 95 }
+        : prev);
       await refreshAfterCategoryMutation();
     } catch (e) {
       toast.error(friendlyError(e, t, "save"));
     } finally {
       setCategoryBusy(null);
+      setCategoryMassProgress(null);
     }
-  }, [apiBaseUrl, t, displayCategoryName, refreshAfterCategoryMutation]);
+  }, [apiBaseUrl, categoryBusy, runCategoryMassAction, t, displayCategoryName, refreshAfterCategoryMutation]);
+
+  const handleCategoryEnableAll = useCallback(
+    (name: string) => handleCategoryMassAction(name, "enable"),
+    [handleCategoryMassAction],
+  );
+
+  const handleCategoryDisableAll = useCallback(
+    (name: string) => handleCategoryMassAction(name, "disable"),
+    [handleCategoryMassAction],
+  );
 
   const handleCategoryDialogSubmit = useCallback(async (
     mode: "create" | "edit",
@@ -2429,7 +2522,7 @@ export function SkillManager({
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({}),
-                  signal: AbortSignal.timeout(15_000),
+                  signal: AbortSignal.timeout(180_000),
                 });
                 const data = await res.json();
                 if (data.error) { setError(friendlyError(data.error, t, "reload")); return; }
@@ -2659,6 +2752,10 @@ export function SkillManager({
                   const readonly = meta?.system_readonly ?? false;
                   const total = items.length;
                   const enabled = items.filter(s => s.enabled).length;
+                  const massProgress = categoryMassProgress?.category === catName ? categoryMassProgress : null;
+                  const massProgressLabel = massProgress
+                    ? t(`skills.category.massStage.${massProgress.stage || "working"}`, massProgress.message || t("skills.category.massWorking"))
+                    : "";
                   const collapsed = !expandedCategories.has(catName);
                   const toggleCollapse = () => setExpandedCategories(prev => {
                     const next = new Set(prev);
@@ -2666,7 +2763,11 @@ export function SkillManager({
                     return next;
                   });
                   return (
-                    <div key={catName} className="flex flex-col rounded-md border border-border/60 bg-card/40 p-3">
+                    <div
+                      key={catName}
+                      className="flex flex-col rounded-md border border-border/60 bg-card/40 p-3"
+                      aria-busy={!!massProgress}
+                    >
                       <div
                         className="flex flex-wrap items-center gap-2 cursor-pointer select-none"
                         onClick={toggleCollapse}
@@ -2697,26 +2798,31 @@ export function SkillManager({
                           const massActionDisabled = readonly || isAllSystem;
                           const editable = meta ? (meta.declared ?? true) : false;
                           const editDeleteDisabled = massActionDisabled || !editable;
+                          const enableBusy = massProgress?.action === "enable";
+                          const disableBusy = massProgress?.action === "disable";
+                          const busyDisabled = !!categoryBusy;
                           return (
                             <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-2 text-xs"
+                                className="h-7 min-w-[4.75rem] px-2 text-xs"
                                 onClick={() => handleCategoryEnableAll(catName)}
-                                disabled={massActionDisabled}
+                                disabled={massActionDisabled || busyDisabled}
                                 title={t("skills.category.enableAllTitle")}
                               >
+                                {enableBusy && <Loader2 className="animate-spin" size={12} />}
                                 {t("skills.category.enableAll")}
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-2 text-xs"
+                                className="h-7 min-w-[4.75rem] px-2 text-xs"
                                 onClick={() => handleCategoryDisableAll(catName)}
-                                disabled={massActionDisabled}
+                                disabled={massActionDisabled || busyDisabled}
                                 title={t("skills.category.disableAllTitle")}
                               >
+                                {disableBusy && <Loader2 className="animate-spin" size={12} />}
                                 {t("skills.category.disableAll")}
                               </Button>
                               <Button
@@ -2728,7 +2834,7 @@ export function SkillManager({
                                   originalName: catName,
                                   currentDescription: meta?.description ?? null,
                                 })}
-                                disabled={editDeleteDisabled}
+                                disabled={editDeleteDisabled || busyDisabled}
                                 title={!editable ? t("skills.category.notDeclaredReadonly") : t("skills.category.edit")}
                               >
                                 {t("skills.category.edit")}
@@ -2738,7 +2844,7 @@ export function SkillManager({
                                 size="sm"
                                 className="h-7 px-2 text-xs text-destructive hover:text-destructive"
                                 onClick={() => requestCategoryDelete(catName)}
-                                disabled={editDeleteDisabled || categoryBusy === catName}
+                                disabled={editDeleteDisabled || busyDisabled}
                                 title={!editable ? t("skills.category.notDeclaredReadonly") : t("skills.category.deleteTitle")}
                               >
                                 {t("skills.category.delete")}
@@ -2747,6 +2853,32 @@ export function SkillManager({
                           );
                         })()}
                       </div>
+                      {massProgress && (
+                        <div className="mt-3 grid gap-1.5" aria-live="polite">
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{massProgressLabel}</span>
+                            {massProgress.total > 0 && (
+                              <span className="shrink-0 tabular-nums">
+                                {massProgress.processed}/{massProgress.total}
+                              </span>
+                            )}
+                            <span className="shrink-0 tabular-nums">{Math.round(massProgress.percent)}%</span>
+                          </div>
+                          <div
+                            className="h-1.5 overflow-hidden rounded-full bg-muted"
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.round(massProgress.percent)}
+                          >
+                            <div
+                              className="h-full rounded-full bg-primary transition-[width] duration-300"
+                              style={{ width: `${Math.max(5, Math.min(100, massProgress.percent))}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                       {!collapsed && (
                         <div className="flex flex-col gap-2 mt-2">
                           {items.map((skill) => (

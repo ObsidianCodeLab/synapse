@@ -9,6 +9,14 @@ import IWHALECLOUD_ONBOARDING from "./config/iwhalecloud-onboarding.json";
 // registry_class 字段仅 Python 使用，前端忽略
 export const BUILTIN_PROVIDERS: ProviderInfo[] = SHARED_PROVIDERS as ProviderInfo[];
 
+export const WEB_SEARCH_ENV_KEYS = [
+  "WEB_SEARCH_PROVIDER",
+  "BOCHA_API_KEY",
+  "TAVILY_API_KEY",
+  "JINA_API_KEY",
+  "SEARXNG_BASE_URL",
+];
+
 /** 中国区提供商 slug（与 wizard constants 一致） */
 export const CHINA_SLUGS = new Set([
   "dashscope", "kimi-cn", "minimax-cn", "siliconflow",

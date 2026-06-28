@@ -2124,6 +2124,17 @@ fn write_pid_file(workspace_id: &str, pid: u32, started_by: &str) -> Result<(), 
     Ok(())
 }
 
+fn status_managed_by_from_pid_file(data: &PidFileData) -> &str {
+    if data.started_by == "external" {
+        "external"
+    } else {
+        // A PID file can outlive the Tauri process that wrote it. Without a
+        // live MANAGED_CHILD handle in this process, "tauri" only means
+        // historical origin, not current ownership.
+        "unknown"
+    }
+}
+
 /// 读取 PID 文件，兼容旧版纯数字格式
 fn read_pid_file(workspace_id: &str) -> Option<PidFileData> {
     let path = service_pid_file(workspace_id);
@@ -3291,7 +3302,8 @@ enum VersionCheckResult {
 ///
 /// 此函数合并了「是否有后端在运行」和「版本是否匹配」两个检查，
 /// 只发一次 HTTP 请求，避免 setup 阶段重复探测。
-fn startup_version_check(app_version: &str, port: u16) -> VersionCheckResult {
+fn startup_version_check(workspace_id: &str, app_version: &str, port: u16) -> VersionCheckResult {
+    let external_dev = external_backend_dev_mode();
     let client = match reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(3))
         .no_proxy()
@@ -3311,10 +3323,18 @@ fn startup_version_check(app_version: &str, port: u16) -> VersionCheckResult {
         Ok(r) if r.status().is_success() => r,
         Ok(r) => {
             log_to_file(&format!("[version_check] health check non-success: {}", r.status()));
+            if external_dev {
+                log_to_file("[version_check] external-backend dev mode: backend is not healthy; skip bundled auto-start");
+                return VersionCheckResult::RunningOk;
+            }
             return VersionCheckResult::NotRunning;
         }
         Err(e) => {
             log_to_file(&format!("[version_check] health check failed: {e}"));
+            if external_dev {
+                log_to_file("[version_check] external-backend dev mode: backend is not running; skip bundled auto-start");
+                return VersionCheckResult::RunningOk;
+            }
             return VersionCheckResult::NotRunning;
         }
     };
@@ -3330,6 +3350,18 @@ fn startup_version_check(app_version: &str, port: u16) -> VersionCheckResult {
         .unwrap_or("")
         .trim_start_matches('v');
     let desktop_version = app_version.trim_start_matches('v');
+
+    if external_dev {
+        if let Some(pid) = json.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32) {
+            let _ = write_pid_file(workspace_id, pid, "external");
+        }
+        log_to_file(&format!(
+            "[version_check] external-backend dev mode: keeping running backend version={} for ws={}",
+            if backend_version.is_empty() { "unknown" } else { backend_version },
+            workspace_id
+        ));
+        return VersionCheckResult::RunningOk;
+    }
 
     // 版本一致、dev 版本、或无法判断 → 保持现有后端
     if backend_version.is_empty()
@@ -3709,13 +3741,35 @@ fn main() {
             let state = read_state_file();
             if let Some(ref ws_id) = state.current_workspace_id {
                 let port = read_workspace_api_port(ws_id).unwrap_or(18900);
-                let check_result = startup_version_check(&app_version, port);
+                if cfg!(debug_assertions) || external_backend_dev_mode() {
+                    if let Some(pid) = probe_synapse_health(port) {
+                        let should_adopt = read_pid_file(ws_id)
+                            .map(|data| !is_pid_file_valid(&data))
+                            .unwrap_or(true);
+                        if should_adopt {
+                            match write_pid_file(ws_id, pid, "external") {
+                                Ok(()) => log_to_file(&format!(
+                                    "[auto-start] adopted dev backend pid={} for ws={}",
+                                    pid, ws_id
+                                )),
+                                Err(e) => log_to_file(&format!(
+                                    "[auto-start] failed to adopt dev backend pid={}: {}",
+                                    pid, e
+                                )),
+                            }
+                        }
+                    }
+                }
+
+                let check_result = startup_version_check(ws_id, &app_version, port);
                 let need_start = !matches!(check_result, VersionCheckResult::RunningOk);
                 log_to_file(&format!(
                     "[auto-start] app_version={}, ws_id={}, port={}, need_start={}",
                     app_version, ws_id, port, need_start
                 ));
-                if need_start {
+                if need_start && external_backend_dev_mode() {
+                    log_to_file("[auto-start] external-backend dev mode: skip bundled auto-start");
+                } else if need_start {
                     if pip_install_is_running() {
                         log_to_file("[auto-start] skipped: pip install is still running");
                     } else {
@@ -3847,7 +3901,7 @@ fn main() {
                             consecutive_failures = 0;
                             continue;
                         }
-                        let check_result = startup_version_check(&app_version_for_hb, port);
+                        let check_result = startup_version_check(&ws_id, &app_version_for_hb, port);
                         let need_start = !matches!(check_result, VersionCheckResult::RunningOk);
                         if !need_start {
                             consecutive_failures = 0;
@@ -4070,6 +4124,14 @@ struct ServiceStatus {
     running: bool,
     pid: Option<u32>,
     pid_file: String,
+    /// "tauri" = Tauri owns/started the backend; "external" = already-running
+    /// local backend adopted from the port; "unknown" = no trustworthy source.
+    #[serde(default)]
+    managed_by: String,
+    /// True only when this process is still held in MANAGED_CHILD and Tauri can
+    /// stop/start it through the child handle.
+    #[serde(default)]
+    is_managed_child: bool,
     /// 后端心跳阶段："starting" | "initializing" | "running" | "restarting" | "stopping" | ""
     #[serde(default)]
     heartbeat_phase: String,
@@ -4082,7 +4144,14 @@ struct ServiceStatus {
 }
 
 /// 构造 ServiceStatus，自动填充心跳信息
-fn build_service_status(workspace_id: &str, running: bool, pid: Option<u32>, pid_file_str: String) -> ServiceStatus {
+fn build_service_status(
+    workspace_id: &str,
+    running: bool,
+    pid: Option<u32>,
+    pid_file_str: String,
+    managed_by: &str,
+    is_managed_child: bool,
+) -> ServiceStatus {
     let (heartbeat_phase, heartbeat_stale, heartbeat_age_secs) = if let Some(hb) = read_heartbeat_file(workspace_id) {
         let now = now_epoch_secs() as f64;
         let age = now - hb.timestamp;
@@ -4095,6 +4164,8 @@ fn build_service_status(workspace_id: &str, running: bool, pid: Option<u32>, pid
         running,
         pid,
         pid_file: pid_file_str,
+        managed_by: managed_by.to_string(),
+        is_managed_child,
         heartbeat_phase,
         heartbeat_stale,
         heartbeat_age_secs,
@@ -4121,14 +4192,28 @@ fn synapse_service_status(workspace_id: String) -> Result<ServiceStatus, String>
             if mp.workspace_id == workspace_id {
                 match mp.child.try_wait() {
                     Ok(None) => {
-                        return Ok(build_service_status(&workspace_id, true, Some(mp.pid), pf));
+                        return Ok(build_service_status(
+                            &workspace_id,
+                            true,
+                            Some(mp.pid),
+                            pf,
+                            "tauri",
+                            true,
+                        ));
                     }
                     _ => {
                         // 进程已退出，清理 handle、PID 文件和心跳文件
                         *guard = None;
                         let _ = fs::remove_file(&pid_file);
                         remove_heartbeat_file(&workspace_id);
-                        return Ok(build_service_status(&workspace_id, false, None, pf));
+                        return Ok(build_service_status(
+                            &workspace_id,
+                            false,
+                            None,
+                            pf,
+                            "unknown",
+                            false,
+                        ));
                     }
                 }
             }
@@ -4137,17 +4222,32 @@ fn synapse_service_status(workspace_id: String) -> Result<ServiceStatus, String>
 
     // ── 2. 回退到 PID 文件 ──
     if let Some(data) = read_pid_file(&workspace_id) {
-        if is_pid_file_valid(&data) {
+        let valid = is_pid_file_valid(&data);
+        if valid {
             // PID 文件有效，但如果心跳超过 60 秒没更新，进程可能卡死
             // 此时仍报告 running（让前端根据心跳状态决定是否提示用户）
-            return Ok(build_service_status(&workspace_id, true, Some(data.pid), pf));
+            return Ok(build_service_status(
+                &workspace_id,
+                true,
+                Some(data.pid),
+                pf,
+                status_managed_by_from_pid_file(&data),
+                false,
+            ));
         } else {
             // Stale PID，清理 PID 文件和心跳文件
             let _ = fs::remove_file(&pid_file);
             remove_heartbeat_file(&workspace_id);
         }
     }
-    Ok(build_service_status(&workspace_id, false, None, pf))
+    Ok(build_service_status(
+        &workspace_id,
+        false,
+        None,
+        pf,
+        "unknown",
+        false,
+    ))
 }
 
 /// 检查进程是否仍在运行（供前端心跳二次确认用）。
@@ -4430,6 +4530,30 @@ fn read_env_kv(path: &Path) -> Vec<(String, String)> {
 #[tauri::command]
 fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<ServiceStatus, String> {
     log_to_file(&format!("[service_start] called: ws={}, venv={}", workspace_id, venv_dir));
+    if external_backend_dev_mode() {
+        let port = read_workspace_api_port(&workspace_id).unwrap_or(18900);
+        if let Some(pid) = probe_synapse_health(port) {
+            write_pid_file(&workspace_id, pid, "external")?;
+            let pid_file = service_pid_file(&workspace_id).to_string_lossy().to_string();
+            log_to_file(&format!(
+                "[service_start] external-backend dev mode: adopted running backend pid={} for ws={}",
+                pid, workspace_id
+            ));
+            return Ok(build_service_status(
+                &workspace_id,
+                true,
+                Some(pid),
+                pid_file,
+                "external",
+                false,
+            ));
+        }
+        log_to_file("[service_start] external-backend dev mode: backend is not running; refusing bundled start");
+        return Err(format!(
+            "外部后端开发模式已启用，请先在另一个终端启动 `synapse serve` 并确认 http://127.0.0.1:{}/api/health 可访问。",
+            port
+        ));
+    }
     if pip_install_is_running() {
         log_to_file("[service_start] rejected: pip install is still running");
         return Err("pip 安装仍在进行中，请等待安装完成后再启动服务。".to_string());
@@ -4452,7 +4576,14 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
             if mp.workspace_id == workspace_id {
                 match mp.child.try_wait() {
                     Ok(None) => {
-                        return Ok(build_service_status(&workspace_id, true, Some(mp.pid), pf));
+                        return Ok(build_service_status(
+                            &workspace_id,
+                            true,
+                            Some(mp.pid),
+                            pf,
+                            "tauri",
+                            true,
+                        ));
                     }
                     _ => { *guard = None; }
                 }
@@ -4469,7 +4600,14 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
                 let _ = fs::remove_file(&pid_file);
                 remove_heartbeat_file(&workspace_id);
             } else {
-                return Ok(build_service_status(&workspace_id, true, Some(data.pid), pf));
+                return Ok(build_service_status(
+                    &workspace_id,
+                    true,
+                    Some(data.pid),
+                    pf,
+                    status_managed_by_from_pid_file(&data),
+                    false,
+                ));
             }
         } else {
             let _ = fs::remove_file(&pid_file);
@@ -4501,7 +4639,14 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
                 "[service_start] port {} occupied but Synapse health OK (pid={}), reusing existing backend",
                 effective_port, pid
             ));
-            return Ok(build_service_status(&workspace_id, true, Some(pid), pf));
+            return Ok(build_service_status(
+                &workspace_id,
+                true,
+                Some(pid),
+                pf,
+                "external",
+                false,
+            ));
         }
         // 端口被占用，等待最多 10 秒（处理 TIME_WAIT 等场景）
         if !wait_for_port_free(effective_port, 10_000) {
@@ -4644,7 +4789,14 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
         ));
     }
 
-    Ok(build_service_status(&workspace_id, true, Some(pid), pf))
+    Ok(build_service_status(
+        &workspace_id,
+        true,
+        Some(pid),
+        pf,
+        "tauri",
+        true,
+    ))
 }
 
 #[tauri::command]
@@ -4667,7 +4819,14 @@ fn synapse_service_stop(workspace_id: String) -> Result<ServiceStatus, String> {
                 // 等待端口释放（最多 10 秒），确保后续重启不会遇到端口冲突
                 let _ = wait_for_port_free(effective_port, 10_000);
                 remove_heartbeat_file(&workspace_id);
-                return Ok(build_service_status(&workspace_id, false, None, pid_file.to_string_lossy().to_string()));
+                return Ok(build_service_status(
+                    &workspace_id,
+                    false,
+                    None,
+                    pid_file.to_string_lossy().to_string(),
+                    "unknown",
+                    false,
+                ));
             } else {
                 *guard = Some(mp);
             }
@@ -4684,7 +4843,14 @@ fn synapse_service_stop(workspace_id: String) -> Result<ServiceStatus, String> {
     remove_heartbeat_file(&workspace_id);
     // 等待端口释放（最多 10 秒），确保后续重启不会遇到端口冲突
     let _ = wait_for_port_free(effective_port, 10_000);
-    Ok(build_service_status(&workspace_id, false, None, pid_file.to_string_lossy().to_string()))
+    Ok(build_service_status(
+        &workspace_id,
+        false,
+        None,
+        pid_file.to_string_lossy().to_string(),
+        "unknown",
+        false,
+    ))
 }
 
 #[tauri::command]

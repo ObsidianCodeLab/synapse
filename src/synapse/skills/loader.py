@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,9 @@ from .registry import SkillRegistry
 _CURRENT_PLATFORM = sys.platform  # "win32", "darwin", "linux"
 
 logger = logging.getLogger(__name__)
+
+_RuntimeRegistryRecord = dict[str, object]
+SkillLoadFilter = Callable[[Path], bool]
 
 
 @dataclass
@@ -46,10 +50,11 @@ class SkillLoadIssue:
 
 
 def normalize_script_args(args: Any) -> tuple[list[str], str | None]:
-    """Normalize ``run_skill_script`` argv to a list of strings.
+    """将 ``run_skill_script`` 的 argv 规范化为字符串列表。
 
-    LLMs sometimes pass a shell-style string instead of a JSON string array;
-    split with :func:`shlex.split` when the value is a single string.
+    LLM 有时会传入 shell 风格的单个字符串（而非 JSON 字符串数组），
+    此时用 :func:`shlex.split` 拆分；列表中的标量项做字符串化，
+    非标量项则返回错误提示。
     """
     if args is None:
         return [], None
@@ -94,12 +99,10 @@ def _resolve_user_workspace_skills() -> Path:
     except Exception:
         import os
 
-        from synapse.synapse_home import resolve_synapse_home
-
         root = os.environ.get("SYNAPSE_ROOT", "").strip()
         if root:
             return Path(root) / "workspaces" / "default" / "skills"
-        return resolve_synapse_home() / "workspaces" / "default" / "skills"
+        return Path.home() / ".synapse" / "workspaces" / "default" / "skills"
 
 
 def _builtin_skills_root() -> Path | None:
@@ -317,14 +320,13 @@ class SkillLoader:
         self,
         base_path: Path | None = None,
         *,
-        only_ids: set[str] | None = None,
+        load_filter: SkillLoadFilter | None = None,
     ) -> int:
         """
         从所有标准目录加载技能
 
         Args:
             base_path: 基础路径
-            only_ids: 非空时仅 parse 目录名在此集合内的 skill（id = 目录名）
 
         Returns:
             加载的技能数量
@@ -343,6 +345,7 @@ class SkillLoader:
 
         directories = self.discover_skill_directories(base_path)
         loaded = 0
+        runtime_records: list[_RuntimeRegistryRecord] = []
 
         for skill_dir in directories:
             # __builtin__ / skills/system/ 等只读源以及被识别为 system 的根
@@ -352,20 +355,25 @@ class SkillLoader:
             except Exception:
                 builtin_root = None
             is_readonly_root = (
-                builtin_root is not None
-                and skill_dir.resolve() == builtin_root.resolve()
+                builtin_root is not None and skill_dir.resolve() == builtin_root.resolve()
             )
             loaded += self.load_from_directory(
                 skill_dir,
                 _readonly=is_readonly_root,
-                only_ids=only_ids,
+                load_filter=load_filter,
+                _runtime_registry_records=runtime_records,
             )
 
-        loaded += self._load_cli_anything_skills(only_ids=only_ids)
+        loaded += self._load_cli_anything_skills(_runtime_registry_records=runtime_records)
+        self._flush_runtime_registry_records(runtime_records)
 
         return loaded
 
-    def _load_cli_anything_skills(self, *, only_ids: set[str] | None = None) -> int:
+    def _load_cli_anything_skills(
+        self,
+        *,
+        _runtime_registry_records: list[_RuntimeRegistryRecord] | None = None,
+    ) -> int:
         """Discover and load SKILL.md files from pip-installed cli-anything-* packages.
 
         CLI-Anything generates SKILL.md alongside each CLI harness. When installed
@@ -399,9 +407,11 @@ class SkillLoader:
                         full_path = rel_path.locate()
                         if isinstance(full_path, Path) and full_path.exists():
                             skill_dir = full_path.parent
-                            if only_ids is not None and skill_dir.name not in only_ids:
-                                continue
-                            skill = self.load_skill(skill_dir, force=True)
+                            skill = self.load_skill(
+                                skill_dir,
+                                force=True,
+                                _runtime_registry_records=_runtime_registry_records,
+                            )
                             if skill:
                                 loaded += 1
                                 logger.info(
@@ -414,13 +424,25 @@ class SkillLoader:
             logger.info(f"Loaded {loaded} cli-anything skills from pip packages")
         return loaded
 
+    @staticmethod
+    def _flush_runtime_registry_records(records: list[_RuntimeRegistryRecord]) -> None:
+        if not records:
+            return
+        try:
+            from .runtime_registry import mark_skills_loaded
+
+            mark_skills_loaded(records)
+        except Exception:
+            logger.debug("Failed to update skill runtime registry batch", exc_info=True)
+
     def load_from_directory(
         self,
         directory: Path,
         *,
         force: bool = True,
         _readonly: bool = False,
-        only_ids: set[str] | None = None,
+        load_filter: SkillLoadFilter | None = None,
+        _runtime_registry_records: list[_RuntimeRegistryRecord] | None = None,
     ) -> int:
         """从目录递归加载所有技能。
 
@@ -447,6 +469,8 @@ class SkillLoader:
             return 0
 
         loaded = 0
+        runtime_records = _runtime_registry_records if _runtime_registry_records is not None else []
+        flush_runtime_records = _runtime_registry_records is None
 
         for item in directory.iterdir():
             if not item.is_dir():
@@ -454,12 +478,15 @@ class SkillLoader:
 
             skill_md = item / "SKILL.md"
             if skill_md.exists():
-                if only_ids is not None and item.name not in only_ids:
-                    continue
-                if not force and item.name in self._loaded_skills:
+                if load_filter is not None and not load_filter(item):
+                    logger.debug("Skipped skill before parse by load filter: %s", item)
                     continue
                 try:
-                    skill = self.load_skill(item, force=force)
+                    skill = self.load_skill(
+                        item,
+                        force=force,
+                        _runtime_registry_records=runtime_records,
+                    )
                     if skill:
                         loaded += 1
                         cat = skill.metadata.category
@@ -484,7 +511,8 @@ class SkillLoader:
                     item,
                     force=force,
                     _readonly=child_readonly,
-                    only_ids=only_ids,
+                    load_filter=load_filter,
+                    _runtime_registry_records=runtime_records,
                 )
             elif item.name.startswith(".") or item.name.startswith("_"):
                 continue
@@ -493,11 +521,77 @@ class SkillLoader:
                     item,
                     force=force,
                     _readonly=_readonly,
-                    only_ids=only_ids,
+                    load_filter=load_filter,
+                    _runtime_registry_records=runtime_records,
                 )
 
+        if flush_runtime_records:
+            self._flush_runtime_registry_records(runtime_records)
         logger.info(f"Loaded {loaded} skills from {directory}")
         return loaded
+
+    @staticmethod
+    def _cheap_skill_id_candidates(skill_dir: Path) -> set[str]:
+        """Return allowlist keys for a skill directory without parsing SKILL.md."""
+        candidates = {skill_dir.name}
+        parts = list(skill_dir.parts)
+
+        for index, part in enumerate(parts):
+            if part in RESERVED_NAMESPACE_DIRS and index < len(parts) - 1:
+                rel = Path(*parts[index + 1 :]).as_posix()
+                if rel:
+                    candidates.add(rel)
+
+        # Most bundled external skills use namespaced metadata in the form
+        # ``synapse/skills@<dir>``. Preset profiles and default allowlists use
+        # that key, so matching it here avoids reading SKILL.md just to learn it.
+        candidates.add(f"synapse/skills@{skill_dir.name}")
+        candidates.add(f"jimliu/baoyu-skills@{skill_dir.name}")
+        candidates.add(f"obra/superpowers@{skill_dir.name.removeprefix('superpowers-')}")
+
+        try:
+            skill_md = skill_dir / "SKILL.md"
+            with skill_md.open("r", encoding="utf-8") as handle:
+                for _ in range(24):
+                    line = handle.readline()
+                    if not line or line.strip() == "---" and _ > 0:
+                        break
+                    if line.lstrip().startswith("name:"):
+                        raw_name = line.split(":", 1)[1].strip().strip("\"'")
+                        if raw_name:
+                            candidates.add(raw_name)
+                        break
+        except Exception:
+            pass
+
+        return {c for c in candidates if c}
+
+    @staticmethod
+    def build_preparse_allowlist_filter(
+        external_allowlist: set[str] | None,
+        *,
+        agent_referenced_skills: set[str] | None = None,
+    ) -> SkillLoadFilter | None:
+        """Build a filter that skips disabled external skills before parsing.
+
+        ``None`` preserves legacy all-external loading. When a set is provided,
+        system skills are always kept, explicitly allowed skills are loaded, and
+        preset-referenced skills are loaded so the later prune step can mark
+        them disabled instead of removing them from sub-agent discovery.
+        """
+        if external_allowlist is None:
+            return None
+
+        allowed = {str(s).strip() for s in external_allowlist if str(s).strip()}
+        keep_extra = {str(s).strip() for s in agent_referenced_skills or set() if str(s).strip()}
+
+        def _filter(skill_dir: Path) -> bool:
+            if "system" in skill_dir.parts:
+                return True
+            candidates = SkillLoader._cheap_skill_id_candidates(skill_dir)
+            return bool(candidates & allowed) or bool(candidates & keep_extra)
+
+        return _filter
 
     @staticmethod
     def _is_os_compatible(supported_os: list[str]) -> bool:
@@ -515,6 +609,7 @@ class SkillLoader:
         *,
         plugin_source: str | None = None,
         force: bool = False,
+        _runtime_registry_records: list[_RuntimeRegistryRecord] | None = None,
     ) -> ParsedSkill | None:
         """加载单个技能。
 
@@ -600,18 +695,22 @@ class SkillLoader:
 
             self._loaded_skills[sid] = skill
             try:
-                from .runtime_registry import mark_skill_loaded
-
                 deps = getattr(skill.metadata, "python_dependencies", []) or []
-                mark_skill_loaded(
-                    sid,
-                    source_path=str(skill_dir),
-                    enabled=True,
-                    dependencies=deps,
-                )
+                record: _RuntimeRegistryRecord = {
+                    "skill_id": sid,
+                    "source_path": str(skill_dir),
+                    "enabled": True,
+                    "dependencies": list(deps),
+                }
+                if _runtime_registry_records is not None:
+                    _runtime_registry_records.append(record)
+                else:
+                    from .runtime_registry import mark_skills_loaded
+
+                    mark_skills_loaded([record])
             except Exception:
                 logger.debug("Failed to update skill runtime registry for %s", sid, exc_info=True)
-            # logger.info(f"Loaded skill: {sid} (name={skill.metadata.name})")
+            logger.info(f"Loaded skill: {sid} (name={skill.metadata.name})")
             return skill
 
         except Exception as e:
@@ -675,7 +774,8 @@ class SkillLoader:
 
         - skills.json 存在且有 external_allowlist -> 直接使用（用户显式选择）
         - skills.json 不存在（external_allowlist is None）-> 用全部外部技能 - DEFAULT_DISABLED_SKILLS
-        - 研发工具技能始终并入有效 allowlist，不受 skills.json 勾选影响
+        - 研发工具（浩鲸 whalecloud-dev-tool-*）技能始终并入有效 allowlist，
+          不受 skills.json 勾选 / DEFAULT_DISABLED_SKILLS 影响（研发会议室强制依赖）
         """
         from synapse.utils.whaleclouddevtool import ensure_whalecloud_dev_tools_in_allowlist
 
@@ -744,11 +844,13 @@ class SkillLoader:
                     self.registry.set_disabled(name, False)
                     continue
             except Exception:
-                pass
+                continue
 
             meta = getattr(skill, "metadata", None)
             tool_name = getattr(meta, "tool_name", None) if meta else None
-            category = getattr(meta, "category", None) if meta else getattr(skill, "category", None)
+            category = (
+                getattr(meta, "category", None) if meta else getattr(skill, "category", None)
+            )
             if is_whalecloud_dev_tool_entry(name, tool_name=tool_name, category=category):
                 self.registry.set_disabled(name, False)
                 continue
@@ -850,7 +952,7 @@ class SkillLoader:
         self,
         name: str,
         script_name: str,
-        args: list[str] | str | None = None,
+        args: Any = None,
         cwd: Path | None = None,
         python_executable: str | None = None,
         env: dict[str, str] | None = None,
@@ -890,7 +992,8 @@ class SkillLoader:
                     f"then write Python code and execute it via run_shell."
                 )
 
-        # 确定如何运行脚本
+        # 确定如何运行脚本。LLM 可能传入 shell 风格字符串或混合类型，
+        # 统一经 normalize_script_args 规范化为 argv 列表，避免拼接出错。
         raw_args = args
         args, args_err = normalize_script_args(args)
         if args_err:
@@ -1147,4 +1250,3 @@ class SkillLoader:
         """获取技能的处理器名称"""
         skill = self._loaded_skills.get(name)
         return skill.metadata.handler if skill else None
-
