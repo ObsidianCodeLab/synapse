@@ -56,12 +56,12 @@ async def test_mcp_memory_provider_retrieves_and_records_without_user_prompting(
         tools={"search": "search_memory", "record_turn": "add_message"},
     )
 
-    items = await provider.retrieve("Akita", limit=3)
+    items = await provider.retrieve("Synapse", limit=3)
     await provider.record_turn("user", "hello")
 
-    assert items[0]["content"] == "remembered:Akita"
+    assert items[0]["content"] == "remembered:Synapse"
     assert client.calls == [
-        ("memos", "search_memory", {"query": "Akita", "limit": 3}),
+        ("memos", "search_memory", {"query": "Synapse", "limit": 3}),
         ("memos", "add_message", {"role": "user", "content": "hello"}),
     ]
 

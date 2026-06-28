@@ -14,9 +14,12 @@ UPSTREAM = Path(r"D:/github/openakita")
 REPLACEMENTS = (
     ("from openakita.", "from synapse."),
     ("import openakita.", "import synapse."),
+    ("from openakita import", "from synapse import"),
+    ("import openakita", "import synapse"),
     ("openakita.", "synapse."),
     ("OpenAkita", "Synapse"),
     ("OPENAKITA_", "SYNAPSE_"),
+    ("settings.openakita_home", "settings.synapse_home"),
 )
 
 

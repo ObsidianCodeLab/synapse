@@ -57,7 +57,7 @@ _BOOTSTRAP_JS_INLINED = r"""/**
 
   function send(type, payload, requestId) {
     try {
-      var msg = { __akita_bridge: true, version: BRIDGE_VERSION, type: type };
+      var msg = { __synapse_bridge: true, version: BRIDGE_VERSION, type: type };
       if (payload !== undefined) msg.payload = payload;
       if (requestId !== undefined) msg.requestId = requestId;
       window.parent.postMessage(msg, "*");
@@ -79,7 +79,7 @@ _BOOTSTRAP_JS_INLINED = r"""/**
   window.addEventListener("message", function (event) {
     if (event.source !== window.parent) return;
     var d = event.data;
-    if (!d || d.__akita_bridge !== true || typeof d.type !== "string") return;
+    if (!d || d.__synapse_bridge !== true || typeof d.type !== "string") return;
 
     switch (d.type) {
       case "bridge:init":

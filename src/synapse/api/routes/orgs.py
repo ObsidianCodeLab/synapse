@@ -280,7 +280,7 @@ async def create_from_template(request: Request):
 
 @router.post("/import", status_code=201)
 async def import_org(request: Request, file: UploadFile = File(...)):
-    """Import an organization from .json / .akita-org file with name dedup."""
+    """Import an organization from .json / .synapse-org file with name dedup."""
     mgr = _get_manager(request)
 
     content = await file.read()
@@ -458,7 +458,7 @@ async def export_org(request: Request, org_id: str):
 
     org_dir = mgr._org_dir(org_id)
     export_data: dict[str, Any] = {
-        "format": "akita-org",
+        "format": "synapse-org",
         "version": "1.0",
         "organization": org.to_dict(),
         "files": {},

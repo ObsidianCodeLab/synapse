@@ -331,6 +331,8 @@ Harness 运行时（rd_meeting/）
 
 ---
 
+![Alt](https://repobeats.axiom.co/api/embed/4d46aafe3a973768f018aa08735c832f04e13746.svg "Repobeats analytics image")
+
 <p align="center">
   <strong>Synapse · 智能研发助手 — 工作台驱动的 BSS 团队 AI 研发交付</strong><br/>
   <sub>浩鲸科技 · BSS 团队 · 内部研发使用</sub>

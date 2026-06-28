@@ -228,8 +228,8 @@ class TestAgentResolveVoice:
     def test_resolve_voice_falls_back_to_agent_name_when_no_profile(self):
         agent = self._make_stub_agent()
         agent._agent_profile = None
-        agent.name = "Akita-Local"
-        assert agent._resolve_agent_voice() == "Akita-Local"
+        agent.name = "Synapse-Local"
+        assert agent._resolve_agent_voice() == "Synapse-Local"
 
     def test_resolve_voice_falls_back_to_settings_when_all_empty(self):
         from synapse.config import settings

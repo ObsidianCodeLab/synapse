@@ -730,7 +730,7 @@ export function AgentManagerView({
         <input
           ref={importInputRef}
           type="file"
-          accept=".akita-agent,.json"
+          accept=".synapse-agent,.json"
           style={{ display: "none" }}
           onChange={handleImportFile}
         />

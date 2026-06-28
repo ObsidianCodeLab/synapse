@@ -51,6 +51,13 @@ class Settings(BaseSettings):
         description="单次 grep（文件内容搜索）最大耗时（秒），超时返回提示以避免 worker 被大目录卡住。",
     )
 
+    glob_timeout_sec: int = Field(
+        default=30,
+        ge=5,
+        le=600,
+        description="单次 glob（文件名模式搜索）最大耗时（秒），超时返回提示以避免 worker 被大目录卡住。",
+    )
+
     # PR-R1: 系统 prompt / catalog header 的语言。
     # 取值 "zh"（中文，默认）/ "en"（英文）。tool_catalog header、AGENTS.md 段
     # 引导文本等会按此切换；工具自身的 description 仍按工具定义里的语言。
@@ -912,6 +919,74 @@ class Settings(BaseSettings):
             "先 push 一条 task_complete 到 root inbox 唤醒 root 产出最终汇总，"
             "等 root 二次 IDLE 后再 set completed。关闭后退回到一阶段判定。"
         ),
+    )
+
+    # === Inbox / 站内信（Synapse：统一服务 pull + 本地聚合） ===
+    inbox_enabled: bool = Field(
+        default=True,
+        description="是否启用站内信本地存储与 WebSocket 事件。关闭后不写入、不广播 unread。",
+    )
+    inbox_unified_pull_enabled: bool = Field(
+        default=True,
+        description="是否定时从研发统一服务拉取 SYNAPSE_RD_VIEW_SYSTEM_INFO 全局通知。",
+    )
+    inbox_unified_service_url: str = Field(
+        default="",
+        description="研发统一服务 base URL；留空则从 synapse_home/devservice.ip + inbox_unified_service_port 推断。",
+    )
+    inbox_unified_service_port: int = Field(
+        default=10001,
+        ge=1,
+        le=65535,
+        description="研发统一服务端口（默认 10001）。",
+    )
+    inbox_push_enabled: bool = Field(
+        default=False,
+        description="是否允许 POST /api/inbox/push（本机调试入口，非生产主通道）。",
+    )
+    inbox_push_token: str = Field(
+        default="",
+        description=(
+            "统一服务推送鉴权 token（Header: X-Synapse-Inbox-Push-Token 或 Authorization: Bearer）。"
+            "留空时仅允许本机 127.0.0.1 调用 push（开发态）。"
+        ),
+    )
+    inbox_broadcast_url: str = Field(
+        default="",
+        description="可选 L0 广播 JSON URL。Synapse 默认留空，不走 openakita CDN。",
+    )
+    inbox_api_url: str = Field(
+        default="",
+        description="可选 L1 平台 API base URL。Synapse 默认留空，由统一服务 push 代替轮询。",
+    )
+    inbox_poll_interval_sec: int = Field(
+        default=1800,
+        ge=60,
+        description="后台拉取间隔（秒）；无 broadcast/api URL 时 loop 仍运行但 refresh 为 no-op。",
+    )
+    inbox_register_enabled: bool = Field(
+        default=False,
+        description="是否启用 L1 register/poll/ack。Synapse 默认关闭，依赖 push。",
+    )
+    inbox_channel: str = Field(
+        default="release",
+        description="站内信 targeting 使用的客户端渠道标识。",
+    )
+    inbox_minisign_public_key: str = Field(
+        default="",
+        description="L0 broadcast minisign 公钥；留空跳过验签。",
+    )
+    inbox_minisign_executable: str = Field(
+        default="minisign",
+        description="minisign 可执行文件名/路径。",
+    )
+    telemetry_enabled: bool = Field(
+        default=False,
+        description="是否允许升级事件遥测上报（依赖 inbox_register_enabled）。",
+    )
+    updater_policy_endpoint: str = Field(
+        default="",
+        description="可选 updater 策略 API；Synapse 桌面更新走自有 tauri.conf，默认留空。",
     )
 
     # === 组织编排 · 用户命令生命周期看门狗 ===

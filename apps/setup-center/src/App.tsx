@@ -28,6 +28,7 @@ const SkillStoreView = lazy(() => import("./views/SkillStoreView").then(m => ({ 
 const SecurityView = lazy(() => import("./views/SecurityView"));
 const PendingApprovalsView = lazy(() => import("./views/PendingApprovalsView").then(m => ({ default: m.PendingApprovalsView })));
 const PetView = lazy(() => import("./views/PetView").then(m => ({ default: m.PetView })));
+const InboxView = lazy(() => import("./views/InboxView").then(m => ({ default: m.InboxView })));
 const WorkbenchPlaceholderView = lazy(() =>
   import("./views/workbench/WorkbenchPlaceholderView").then((m) => ({ default: m.WorkbenchPlaceholderView })),
 );
@@ -71,6 +72,7 @@ import { ChevronRight, ChevronDown, Loader2, AlertTriangle, CheckCircle2, Eye, E
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -97,7 +99,7 @@ import {
 } from "./constants";
 import { safeFetch } from "./providers";
 import { whalecloudHeart } from "./api/rdUnifiedService";
-import { fetchPendingHumanIntervention, type MeetingRoomListItem } from "./api/meetingRoomService";
+import type { MeetingRoomListItem } from "./api/meetingRoomService";
 import { setMeetingRoomFocus } from "./rd-meeting/focus";
 import { DevToolsSkillPanel } from "./components/product/DevToolsSkillPanel";
 import {
@@ -125,6 +127,8 @@ import { DegradedBanner } from "./components/DegradedBanner";
 import { ModalOverlay } from "./components/ModalOverlay";
 import { Sidebar } from "./components/Sidebar";
 import { Topbar } from "./components/Topbar";
+import { INBOX_REFRESH_EVENT, INBOX_UNREAD_CHANGED_EVENT } from "./components/InboxBadge";
+import { isHighPriorityInbox, type InboxUpdatePayload, type InboxWsMessagePayload } from "./inboxTypes";
 import { useNotifications } from "./hooks/useNotifications";
 import { notifySuccess, notifyError, notifyLoading, dismissLoading } from "./utils/notify";
 import { Toaster } from "@/components/ui/sonner";
@@ -419,9 +423,11 @@ export function App() {
   const [bugReportOpen, setBugReportOpen] = useState(false);
   const [feedbackPrefill, setFeedbackPrefill] = useState<FeedbackPrefill | null>(null);
   const [feedbackRefreshKey, setFeedbackRefreshKey] = useState(0);
-  const [unreadFeedbackCount, setUnreadFeedbackCount] = useState(0);
+  const [inboxRefreshKey, setInboxRefreshKey] = useState(0);
+  const [inboxDialogOpen, setInboxDialogOpen] = useState(false);
+  const [inboxUnreadCount, setInboxUnreadCount] = useState(0);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
-  const [pendingHumanInterventions, setPendingHumanInterventions] = useState<MeetingRoomListItem[]>([]);
+  const [pendingApprovalFocusId, setPendingApprovalFocusId] = useState<string | null>(null);
   const [disabledViews, setDisabledViews] = useState<string[]>([]);
   const [multiAgentEnabled, setMultiAgentEnabled] = useState(false);
   const [storeVisible, setStoreVisible] = useState(() => localStorage.getItem("synapse_storeVisible") === "true");
@@ -430,6 +436,22 @@ export function App() {
       setView(nextView);
     });
   }, []);
+
+  const handleOpenMeetingFromInbox = useCallback((item: MeetingRoomListItem) => {
+    setInboxDialogOpen(false);
+    setMeetingRoomFocus({
+      roomId: item.room_id,
+      scopeType: item.scope_type,
+      scopeId: item.scope_id,
+    });
+    transitionToView("workbench_meeting");
+  }, [transitionToView]);
+
+  const handleOpenApprovalFromInbox = useCallback((pendingId: string) => {
+    setInboxDialogOpen(false);
+    setPendingApprovalFocusId(pendingId);
+    transitionToView("pending_approvals");
+  }, [transitionToView]);
   /** 顶部栏：重新打开首次安装引导（等同 Ctrl+Shift+O，桌面端） */
   const enterOnboardingFromTopbar = useCallback(() => {
     setObStep("ob-welcome");
@@ -1365,9 +1387,41 @@ export function App() {
     };
   }, []);
 
-  // ── Web mode: subscribe to WebSocket events (replaces Tauri listen() for real-time updates) ──
+  const fetchInboxUnreadCount = useCallback(async () => {
+    if (!shouldUseHttpApi()) {
+      setInboxUnreadCount(0);
+      setPendingApprovalsCount(0);
+      return;
+    }
+    try {
+      const resp = await safeFetch(`${httpApiBase()}/api/inbox/unread-count`, {
+        signal: AbortSignal.timeout(3_000),
+      });
+      const data = await resp.json();
+      const next = Math.max(0, Number(data?.unread_count || 0));
+      setInboxUnreadCount(next);
+      setPendingApprovalsCount(Math.max(0, Number(data?.categories?.approval?.unread || 0)));
+      window.dispatchEvent(
+        new CustomEvent(INBOX_UNREAD_CHANGED_EVENT, {
+          detail: { unreadCount: next },
+        }),
+      );
+    } catch {
+      // Inbox is optional on older backend builds.
+    }
+  }, [serviceStatus?.running, dataMode, apiBaseUrl]);
+
   useEffect(() => {
-    if ((!IS_WEB && !IS_CAPACITOR) || !webAuthed) return;
+    void fetchInboxUnreadCount();
+    if (!serviceStatus?.running) return;
+    const timer = setInterval(() => { void fetchInboxUnreadCount(); }, 60_000);
+    return () => clearInterval(timer);
+  }, [fetchInboxUnreadCount, serviceStatus?.running]);
+
+  // ── Backend WebSocket events: keep derived status fresh across Web/Tauri ──
+  useEffect(() => {
+    if (!IS_TAURI && !IS_WEB && !IS_CAPACITOR) return;
+    if ((IS_WEB || IS_CAPACITOR) && !webAuthed) return;
     const unsub = onWsEvent((event, data) => {
       const p = data as any;
       if (!p) return;
@@ -1388,9 +1442,59 @@ export function App() {
           refreshStatus().catch(() => {});
         }, 2_000);
       }
+      if (event === "inbox:unread_changed") {
+        const next = Math.max(0, Number(p.unread_count || 0));
+        setInboxUnreadCount(next);
+        setInboxRefreshKey((value) => value + 1);
+        window.dispatchEvent(
+          new CustomEvent(INBOX_UNREAD_CHANGED_EVENT, {
+            detail: { unreadCount: next },
+          }),
+        );
+      }
+      if (event === "inbox:new_message") {
+        const payload = p as InboxWsMessagePayload;
+        setInboxRefreshKey((value) => value + 1);
+        void fetchInboxUnreadCount();
+        window.dispatchEvent(new CustomEvent(INBOX_REFRESH_EVENT));
+        if (isHighPriorityInbox(payload.priority)) {
+          const messageTitle = String(payload.title || t("inbox.newMessageFallback"));
+          toast.warning(messageTitle, {
+            description: t("inbox.newImportantMessage"),
+            action: {
+              label: t("inbox.openInbox"),
+              onClick: () => setInboxDialogOpen(true),
+            },
+          });
+        }
+      }
+      if (event === "inbox:update_available") {
+        const payload = p as InboxUpdatePayload;
+        setInboxRefreshKey((value) => value + 1);
+        void fetchInboxUnreadCount();
+        toast.info(String(payload.title || t("inbox.updateAvailable")), {
+          description: payload.version
+            ? t("inbox.updateAvailableVersion", { version: payload.version })
+            : t("inbox.updateAvailableHint"),
+          action: {
+            label: t("version.updateNow"),
+            onClick: () => { void checkForAppUpdate(); },
+          },
+        });
+        void checkForAppUpdate();
+      }
+      if (event === "skills:changed") {
+        try {
+          window.dispatchEvent(new CustomEvent("synapse:skills-changed", {
+            detail: { action: String(p.action || "") },
+          }));
+        } catch {
+          // ignore
+        }
+      }
     });
     return unsub;
-  }, [webAuthed]);
+  }, [webAuthed, fetchInboxUnreadCount, checkForAppUpdate, t]);
 
   const canUsePython = useMemo(() => {
     if (selectedPythonIdx < 0) return false;
@@ -2005,52 +2109,6 @@ export function App() {
     }
   }, [runtimeDialogOpen, serviceStatus?.running, refreshRuntimeDiagnostics]);
 
-  useEffect(() => {
-    if (!serviceStatus?.running) return;
-    const poll = async () => {
-      try {
-        const res = await safeFetch(`${httpApiBase()}/api/feedback-unread-count`, { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        setUnreadFeedbackCount(data.unread_count ?? 0);
-      } catch { /* ignore */ }
-    };
-    poll();
-    const timer = setInterval(poll, 5 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, [serviceStatus?.running, dataMode, apiBaseUrl]);
-
-  useEffect(() => {
-    if (!serviceStatus?.running) { setPendingApprovalsCount(0); return; }
-    const poll = async () => {
-      try {
-        const res = await safeFetch(`${httpApiBase()}/api/pending_approvals/stats`, { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        setPendingApprovalsCount(data.pending ?? 0);
-      } catch { /* ignore */ }
-    };
-    poll();
-    const timer = setInterval(poll, 60_000);
-    const unsub = IS_WEB ? onWsEvent((event) => {
-      if (event === "pending_approval_created" || event === "pending_approval_resolved") poll();
-    }) : undefined;
-    return () => { clearInterval(timer); unsub?.(); };
-  }, [serviceStatus?.running, dataMode, apiBaseUrl]);
-
-  useEffect(() => {
-    if (!serviceStatus?.running) {
-      setPendingHumanInterventions([]);
-      return;
-    }
-    const poll = async () => {
-      try {
-        const items = await fetchPendingHumanIntervention(httpApiBase());
-        setPendingHumanInterventions(items);
-      } catch { /* ignore */ }
-    };
-    poll();
-    const timer = setInterval(poll, 30_000);
-    return () => clearInterval(timer);
-  }, [serviceStatus?.running, dataMode, apiBaseUrl]);
 
   const fetchAgentMode = useCallback(async () => {
     if (!shouldUseHttpApi()) return;
@@ -2064,6 +2122,8 @@ export function App() {
   }, [serviceStatus?.running, dataMode, apiBaseUrl]);
 
   useEffect(() => { fetchAgentMode(); }, [fetchAgentMode]);
+
+  // ── Backend WebSocket events: keep derived status fresh across Web/Tauri ──
 
   // 桌面：离开引导后主界面需具备 userinfo.encryption 与 devservice.ip；缺失则回到对应引导步
   useEffect(() => {
@@ -5743,6 +5803,7 @@ export function App() {
           <PendingApprovalsView
             apiBaseUrl={apiBaseUrl}
             serviceRunning={serviceStatus?.running ?? false}
+            focusPendingId={pendingApprovalFocusId}
           />
         </ErrorBoundary>
       );
@@ -5989,7 +6050,6 @@ export function App() {
         onRefreshStatus={async () => { await refreshStatus(undefined, undefined, true); }}
         isWeb={IS_WEB}
         httpApiBase={httpApiBase()}
-        unreadFeedbackCount={unreadFeedbackCount}
         pendingApprovalsCount={pendingApprovalsCount}
       />
 
@@ -6053,17 +6113,8 @@ export function App() {
           serverName={IS_CAPACITOR ? (getActiveServer()?.name || undefined) : undefined}
           onServerManager={IS_CAPACITOR ? () => setShowServerManager(true) : undefined}
           setView={transitionToView}
-          unreadFeedbackCount={unreadFeedbackCount}
-          pendingApprovalsCount={pendingApprovalsCount}
-          pendingHumanInterventions={pendingHumanInterventions}
-          onOpenMeetingRoom={(item) => {
-            setMeetingRoomFocus({
-              roomId: item.room_id,
-              scopeType: item.scope_type,
-              scopeId: item.scope_id,
-            });
-            transitionToView("workbench_meeting");
-          }}
+          inboxUnreadCount={inboxUnreadCount}
+          onOpenInbox={() => setInboxDialogOpen(true)}
         />
 
         {showPwBanner && (
@@ -6348,6 +6399,24 @@ export function App() {
         )}
 
         <ConfirmDialog dialog={confirmDialog} onClose={() => setConfirmDialog(null)} />
+        <Dialog open={inboxDialogOpen} onOpenChange={setInboxDialogOpen}>
+          <DialogContent className="inboxDialogContent">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{t("inbox.title")}</DialogTitle>
+              <DialogDescription>{t("inbox.description")}</DialogDescription>
+            </DialogHeader>
+            <Suspense fallback={<div className="inboxDialogFallback"><div className="spinner" style={{ width: 24, height: 24 }} /></div>}>
+              <InboxView
+                serviceRunning={serviceStatus?.running ?? false}
+                apiBaseUrl={httpApiBase()}
+                refreshKey={inboxRefreshKey}
+                onUnreadChange={setInboxUnreadCount}
+                onOpenMeetingRoom={handleOpenMeetingFromInbox}
+                onOpenApproval={handleOpenApprovalFromInbox}
+              />
+            </Suspense>
+          </DialogContent>
+        </Dialog>
         <RuntimeEnvironmentDialog
           open={runtimeDialogOpen}
           onOpenChange={setRuntimeDialogOpen}

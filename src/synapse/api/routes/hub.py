@@ -2,8 +2,8 @@
 Agent package import/export routes + Hub/Store proxy routes.
 
 Local routes for the Setup Center frontend to call:
-- POST /api/agents/package/export     — export agent to .akita-agent
-- POST /api/agents/package/import     — import from .akita-agent
+- POST /api/agents/package/export     — export agent to .synapse-agent
+- POST /api/agents/package/import     — import from .synapse-agent
 - POST /api/agents/package/inspect    — preview package contents
 - GET  /api/agents/package/exportable — list exportable agents
 - GET  /api/hub/agents                — proxy search Agent Store
@@ -127,7 +127,7 @@ class BatchExportRequest(BaseModel):
 
 @router.post("/api/agents/package/export")
 async def export_agent(req: ExportRequest):
-    """Export an agent profile as a .akita-agent package."""
+    """Export an agent profile as a .synapse-agent package."""
     from synapse.agents.packager import AgentPackager, PackageError
 
     profile_store, skills_dir, root = _get_stores()
@@ -301,7 +301,7 @@ async def import_agent(
     file: UploadFile = File(...),
     force: bool = False,
 ):
-    """Import an agent from .akita-agent (ZIP) or .json file."""
+    """Import an agent from .synapse-agent (ZIP) or .json file."""
     import json as _json
 
     from synapse.agents.profile import AgentProfile
@@ -360,7 +360,7 @@ async def import_agent(
 
     from synapse.agents.packager import AgentInstaller, PackageError
 
-    with tempfile.NamedTemporaryFile(suffix=".akita-agent", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".synapse-agent", delete=False) as tmp:
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
@@ -386,12 +386,12 @@ async def import_agent(
 
 @router.post("/api/agents/package/inspect")
 async def inspect_package(file: UploadFile = File(...)):
-    """Preview the contents of an uploaded .akita-agent package."""
+    """Preview the contents of an uploaded .synapse-agent package."""
     from synapse.agents.packager import AgentInstaller, PackageError
 
     profile_store, skills_dir, _ = _get_stores()
 
-    with tempfile.NamedTemporaryFile(suffix=".akita-agent", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".synapse-agent", delete=False) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = Path(tmp.name)
@@ -472,7 +472,7 @@ async def hub_search_agents(
             detail=_hub_unavailable_detail(
                 "agent_store",
                 "远程 Agent Store 暂不可用。",
-                "本地 Agent 导入导出功能不受影响，可稍后重试或使用本地 .akita-agent 文件导入。",
+                "本地 Agent 导入导出功能不受影响，可稍后重试或使用本地 .synapse-agent 文件导入。",
             ),
         )
     finally:
@@ -512,7 +512,7 @@ async def hub_install_agent(request: Request, agent_id: str, force: bool = False
             detail=_hub_unavailable_detail(
                 "agent_store",
                 "远程 Agent Store 暂不可用，无法下载。",
-                "可通过 .akita-agent 文件本地导入。",
+                "可通过 .synapse-agent 文件本地导入。",
             ),
         )
     finally:

@@ -5071,6 +5071,44 @@ class ReasoningEngine:
                     )
 
                     if isinstance(result, str):
+                        # === Steer done-drain ===
+                        _steered = await self._drain_steer_before_finish(
+                            state=state,
+                            working_messages=working_messages,
+                            final_text=result,
+                            iteration=_iteration,
+                            max_iterations=max_iterations,
+                        )
+                        if _steered:
+                            if _streamed_text:
+                                if result != _raw_streamed_text:
+                                    yield {"type": "text_replace", "content": result}
+                            else:
+                                _chunk = 20
+                                for _ci in range(0, len(result), _chunk):
+                                    yield {
+                                        "type": "text_delta",
+                                        "content": result[_ci : _ci + _chunk],
+                                    }
+                                    await asyncio.sleep(0.01)
+                            for _ins_text in _steered:
+                                yield {
+                                    "type": "chain_text",
+                                    "content": f"用户插入消息: {_ins_text[:60]}",
+                                }
+                            no_tool_call_count = 0
+                            verify_incomplete_count = 0
+                            no_confirmation_text_count = 0
+                            logger.info(
+                                "[ReAct-Stream][DoneDrain] %d steered message(s) "
+                                "arrived during final-answer generation; folding "
+                                "answer into context and continuing (iter=%d/%d)",
+                                len(_steered),
+                                _iteration + 1,
+                                max_iterations,
+                            )
+                            react_trace.append(_iter_trace)
+                            continue
                         react_trace.append(_iter_trace)
                         final_exit_reason = self._last_exit_reason
                         is_verify_incomplete = final_exit_reason == "verify_incomplete"
@@ -8195,6 +8233,36 @@ class ReasoningEngine:
             return f"任务已执行完毕（使用了工具：{tool_summary}），但模型未生成文本总结。如需详情请重新提问。"
 
         return None
+
+    # ==================== Steer done-drain ====================
+
+    @staticmethod
+    async def _drain_steer_before_finish(
+        *,
+        state: "TaskState | None",
+        working_messages: list[dict],
+        final_text: str,
+        iteration: int,
+        max_iterations: int,
+    ) -> list[str]:
+        """Final-answer done-drain: rescue a message steered in during the
+        last LLM generation so the turn does not terminate while it is still
+        sitting un-read in ``pending_user_inserts``.
+        """
+        if state is None or not getattr(state, "pending_user_inserts", None):
+            return []
+        if iteration >= max_iterations - 1:
+            return []
+        drained = await state.drain_user_inserts()
+        if not drained:
+            return []
+        if final_text and final_text.strip():
+            working_messages.append(
+                {"role": "assistant", "content": [{"type": "text", "text": final_text}]}
+            )
+        for _text in drained:
+            working_messages.append(state.build_user_insert_message(_text))
+        return drained
 
     # ==================== 最终答案处理 ====================
 

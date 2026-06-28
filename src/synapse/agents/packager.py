@@ -1,8 +1,8 @@
 """
-Agent 打包与安装
+Synapse Agent 打包与安装
 
-AgentPackager: 将本地 AgentProfile + 技能打包成 .akita-agent 文件
-AgentInstaller: 从 .akita-agent 文件安装 Agent 到本地
+AgentPackager: 将本地 AgentProfile、身份文件与技能打包为 .synapse-agent ZIP
+AgentInstaller: 从 .synapse-agent 包安装 Agent 到本地 Profile 目录
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from .identity_files import PROFILE_IDENTITY_FILENAMES
 from .manifest import (
     MAX_PACKAGE_SIZE,
     MAX_SINGLE_FILE_SIZE,
@@ -35,8 +36,11 @@ class PackageError(Exception):
     """Agent 包操作错误"""
 
 
+PACKAGE_EXTENSION = ".synapse-agent"
+
+
 class AgentPackager:
-    """将本地 Agent 打包成 .akita-agent ZIP 文件"""
+    """将本地 Synapse Agent 打包为 .synapse-agent ZIP 文件"""
 
     def __init__(
         self,
@@ -62,7 +66,7 @@ class AgentPackager:
         include_skills: list[str] | None = None,
     ) -> Path:
         """
-        打包指定 Agent 为 .akita-agent 文件。
+        打包指定 Agent 为 .synapse-agent 文件。
 
         Spec v1.1: third-party skills are NOT bundled; they are declared
         as required_external_skills and fetched from their original source
@@ -149,6 +153,7 @@ class AgentPackager:
             profile_data.pop(key, None)
 
         license_3rd_party = self._generate_license_3rd_party(external_skill_refs)
+        identity_files = self._read_profile_identity_files(profile.id)
 
         def _write_zip(zf: zipfile.ZipFile) -> None:
             zf.writestr(
@@ -159,6 +164,8 @@ class AgentPackager:
                 zf.writestr("README.md", readme)
             if license_3rd_party:
                 zf.writestr("LICENSE-3RD-PARTY.md", license_3rd_party)
+            for filename, content in identity_files.items():
+                zf.writestr(f"identity/{filename}", content)
             for skill_name in bundled_skill_names:
                 skill_path = self._find_skill(skill_name)
                 if skill_path:
@@ -184,7 +191,7 @@ class AgentPackager:
             _write_zip(zf)
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = self.output_dir / f"{slug_id}.akita-agent"
+        output_path = self.output_dir / f"{slug_id}{PACKAGE_EXTENSION}"
         output_path.write_bytes(buf.getvalue())
 
         logger.info(
@@ -192,6 +199,29 @@ class AgentPackager:
             f"bundled={len(bundled_skill_names)}, external={len(external_skill_refs)})"
         )
         return output_path
+
+    def _read_profile_identity_files(self, profile_id: str) -> dict[str, str]:
+        """读取 Profile 下 identity/ 中可打包的身份文件（SOUL.md 等）。"""
+        try:
+            profile_dir = self.profile_store.get_profile_dir(profile_id)
+        except Exception:
+            return {}
+        identity_dir = profile_dir / "identity"
+        result: dict[str, str] = {}
+        for filename in sorted(PROFILE_IDENTITY_FILENAMES):
+            path = identity_dir / filename
+            if not path.is_file():
+                continue
+            try:
+                result[filename] = path.read_text(encoding="utf-8")
+            except Exception as exc:
+                logger.warning(
+                    "Failed to include identity file %s for profile %s: %s",
+                    filename,
+                    profile_id,
+                    exc,
+                )
+        return result
 
     def _to_slug(self, profile_id: str) -> str:
         slug = re.sub(r"[^a-z0-9-]", "-", profile_id.lower())
@@ -262,7 +292,7 @@ class AgentPackager:
 
 
 class AgentInstaller:
-    """从 .akita-agent ZIP 文件安装 Agent 到本地"""
+    """从 .synapse-agent ZIP 包安装 Synapse Agent 到本地"""
 
     def __init__(
         self,
@@ -273,7 +303,7 @@ class AgentInstaller:
         self.skills_dir = skills_dir
 
     def inspect(self, package_path: Path) -> dict[str, Any]:
-        """预览 .akita-agent 包内容（不执行安装）"""
+        """预览 .synapse-agent 包内容（不执行安装）"""
         self._validate_file(package_path)
 
         with zipfile.ZipFile(package_path, "r") as zf:
@@ -314,7 +344,7 @@ class AgentInstaller:
         hub_source: dict[str, Any] | None = None,
     ) -> AgentProfile:
         """
-        安装 .akita-agent 包。
+        安装 .synapse-agent 包。
 
         Spec v1.1: after extracting bundled skills, the installer attempts
         to fetch required_external_skills from their original sources.
@@ -372,6 +402,7 @@ class AgentInstaller:
 
             profile = AgentProfile.from_dict(profile_data)
             self.profile_store.save(profile)
+            self._install_identity_files(zf, profile.id)
 
         logger.info(
             f"Agent installed: {profile_id} "
@@ -380,6 +411,35 @@ class AgentInstaller:
             f"total installed: {installed_skills})"
         )
         return profile
+
+    def _install_identity_files(self, zf: zipfile.ZipFile, profile_id: str) -> None:
+        """从包内 identity/ 还原 Profile 身份文件到本地目录。"""
+        identity_members = [
+            name
+            for name in zf.namelist()
+            if name.startswith("identity/")
+            and not name.endswith("/")
+            and Path(name).name in PROFILE_IDENTITY_FILENAMES
+        ]
+        if not identity_members:
+            return
+
+        profile_dir = self.profile_store.ensure_profile_dir(profile_id)
+        identity_dir = profile_dir / "identity"
+        identity_dir.mkdir(parents=True, exist_ok=True)
+        for member in identity_members:
+            filename = Path(member).name
+            try:
+                content = zf.read(member).decode("utf-8")
+            except Exception as exc:
+                logger.warning(
+                    "Failed to install identity file %s for profile %s: %s",
+                    member,
+                    profile_id,
+                    exc,
+                )
+                continue
+            (identity_dir / filename).write_text(content, encoding="utf-8")
 
     def _validate_file(self, package_path: Path) -> None:
         if not package_path.exists():
@@ -463,7 +523,7 @@ class AgentInstaller:
         origin_type: str,
         agent_id: str = "",
     ) -> None:
-        """Write .synapse-origin.json sidecar to track provenance."""
+        """Write .synapse-origin.json sidecar to track skill provenance."""
         data = {
             "source": source,
             "version": version or "",

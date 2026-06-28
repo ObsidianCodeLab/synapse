@@ -105,7 +105,7 @@ def _resolve_via_login_shell() -> str | None:
     shell = os.environ.get("SHELL", "/bin/zsh")
     try:
         proc = subprocess.run(
-            [shell, "-l", "-c", 'printf "\\n__AKITA_PATH__\\n%s\\n__AKITA_PATH__\\n" "$PATH"'],
+            [shell, "-l", "-c", 'printf "\\n__SYNAPSE_PATH__\\n%s\\n__SYNAPSE_PATH__\\n" "$PATH"'],
             capture_output=True,
             text=True,
             timeout=10,
@@ -119,7 +119,7 @@ def _resolve_via_login_shell() -> str | None:
                 (proc.stderr or "").strip()[:500],
             )
             return None
-        parts = proc.stdout.split("__AKITA_PATH__")
+        parts = proc.stdout.split("__SYNAPSE_PATH__")
         if len(parts) < 3:
             logger.warning(
                 "[PATH] macOS login shell output missing path markers (shell=%s, stdout length=%d)",

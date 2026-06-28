@@ -91,7 +91,7 @@ def test_successful_delete_call_backs_claim():
 
 def test_failed_write_file_with_unrelated_success_does_not_back_save_claim():
     """#382: write_file 被策略拒绝后，list_directory 成功不能背书“已保存”。"""
-    text = "报告已成功保存！文件位置：D:/Akita/workspaces/default/资本论文本深度分析报告.md"
+    text = "报告已成功保存！文件位置：D:/Synapse/workspaces/default/资本论文本深度分析报告.md"
     tool_results = [
         {
             "tool_name": "write_file",
@@ -120,7 +120,7 @@ def test_failed_write_file_with_unrelated_success_does_not_back_save_claim():
 
 def test_successful_retry_backs_save_claim_after_earlier_write_failure():
     """同一工具先失败后成功时，成功回执应避免过度一致性提示。"""
-    text = "报告已成功保存！文件位置：D:/Akita/workspaces/default/report.md"
+    text = "报告已成功保存！文件位置：D:/Synapse/workspaces/default/report.md"
     tool_results = [
         {
             "tool_name": "write_file",
@@ -130,7 +130,7 @@ def test_successful_retry_backs_save_claim_after_earlier_write_failure():
         {
             "tool_name": "write_file",
             "is_error": False,
-            "content": "文件已写入: D:/Akita/workspaces/default/report.md (1024 bytes)",
+            "content": "文件已写入: D:/Synapse/workspaces/default/report.md (1024 bytes)",
         },
     ]
 

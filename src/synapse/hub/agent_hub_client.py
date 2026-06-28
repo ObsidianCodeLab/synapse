@@ -4,7 +4,7 @@ AgentHubClient — 与 Synapse Platform Agent Store 交互的客户端
 功能：
 - search: 搜索平台上的 Agent
 - get_detail: 获取 Agent 详情
-- download: 下载 .akita-agent 包并返回本地路径
+- download: 下载 .synapse-agent 包并返回本地路径
 - publish: 上传本地 Agent 到平台
 - rate: 为 Agent 评分
 """
@@ -102,7 +102,7 @@ class AgentHubClient:
             save_dir = settings.project_root / "data" / "agent_packages"
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{agent_id}.akita-agent"
+        filename = f"{agent_id}.synapse-agent"
         cd = resp.headers.get("content-disposition", "")
         if "filename=" in cd:
             filename = cd.split("filename=")[-1].strip('" ')
@@ -120,7 +120,7 @@ class AgentHubClient:
         category: str = "general",
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """上传 .akita-agent 包到平台"""
+        """上传 .synapse-agent 包到平台"""
         client = await self._get_client()
         with open(package_path, "rb") as f:
             files = {"package": (package_path.name, f, "application/zip")}

@@ -5,7 +5,7 @@ from synapse.storage.database import Database
 
 @pytest.mark.asyncio
 async def test_token_usage_sessions_include_request_ids(tmp_path):
-    db = Database(tmp_path / "akita.db")
+    db = Database(tmp_path / "synapse.db")
     await db.connect()
     try:
         await db._connection.execute(

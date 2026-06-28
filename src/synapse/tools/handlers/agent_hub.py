@@ -85,7 +85,7 @@ class AgentHubHandler:
                 f"❌ 无法连接到远程 Agent Hub: {e}\n\n"
                 f"💡 远程市场暂不可用，但你仍可以：\n"
                 f"- 使用 `list_exportable_agents` 查看本地 Agent\n"
-                f"- 使用 `export_agent` / `import_agent` 通过 .akita-agent 文件分享\n"
+                f"- 使用 `export_agent` / `import_agent` 通过 .synapse-agent 文件分享\n"
                 f"- 在 Setup Center「Agent 管理」中导入导出"
             )
 
@@ -126,7 +126,7 @@ class AgentHubHandler:
         except Exception as e:
             return (
                 f"❌ 从 Hub 下载失败: {e}\n\n"
-                f"💡 如果你已有 .akita-agent 文件，可以使用 `import_agent` 工具直接本地导入。"
+                f"💡 如果你已有 .synapse-agent 文件，可以使用 `import_agent` 工具直接本地导入。"
             )
 
         from ...agents.packager import AgentInstaller

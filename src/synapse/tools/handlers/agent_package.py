@@ -113,7 +113,7 @@ class AgentPackageHandler:
             f"📦 文件: {output_path}\n"
             f"📏 大小: {size_kb:.1f} KB\n\n"
             f"💡 导出路径: `{output_dir}`\n"
-            f"你可以将这个 `.akita-agent` 文件分享给其他用户导入使用。"
+            f"你可以将这个 `.synapse-agent` 文件分享给其他用户导入使用。"
         )
 
     async def _import(self, params: dict[str, Any]) -> str:

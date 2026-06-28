@@ -269,7 +269,7 @@ botpy.log*
 .env.bak
 
 # SDK 暂存参考代码（README 明确写明零消费者、不参与打包与 CI）
-openakita-plugin-sdk/staging/
+synapse-plugin-sdk/staging/
 
 # E2E 测试报告（手动/AI 生成的快照，pytest 只跑 .py，这些 .md 不参与 CI）
 tests/e2e/*.md

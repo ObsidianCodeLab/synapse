@@ -3478,6 +3478,69 @@ class Agent:
         """构建系统提示词（统一使用编译管线 v2）。"""
         return self._build_system_prompt_compiled_sync(task_description, session_type=session_type)
 
+    def _prepare_prompt_identity_dir(self) -> Path:
+        """Return an identity dir whose files match the active Identity object.
+
+        Profile identities may inherit SOUL.md / AGENT.md from the global
+        identity while keeping USER.md / MEMORY.md inside the profile dir.
+        The prompt compiler accepts one directory, so materialize the resolved
+        source files into a private runtime input dir for custom identities.
+        """
+        identity = getattr(self, "identity", None)
+        soul_path = Path(getattr(identity, "soul_path", settings.soul_path))
+        agent_path = Path(getattr(identity, "agent_path", settings.agent_path))
+        user_path = Path(getattr(identity, "user_path", settings.user_path))
+        paths = {
+            "SOUL.md": soul_path,
+            "AGENT.md": agent_path,
+            "USER.md": user_path,
+        }
+
+        global_identity_dir = settings.identity_path.resolve()
+        source_dirs = {p.parent.resolve() for p in paths.values()}
+        if len(source_dirs) == 1:
+            return next(iter(source_dirs))
+
+        profile_id = getattr(self, "_agent_profile_id", None) or getattr(self, "name", "agent")
+        safe_profile_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(profile_id)).strip("._")
+        runtime_root = Path(
+            getattr(self, "_prompt_identity_runtime_root", None) or settings.synapse_home
+        )
+        resolved_dir = runtime_root / "runtime" / "profile_identity" / (safe_profile_id or "agent")
+        resolved_dir.mkdir(parents=True, exist_ok=True)
+
+        for filename, src in paths.items():
+            dst = resolved_dir / filename
+            try:
+                content = src.read_text(encoding="utf-8") if src.exists() else ""
+            except Exception as exc:
+                logger.warning("Failed to read resolved identity file %s: %s", src, exc)
+                content = ""
+            existing = ""
+            try:
+                existing = dst.read_text(encoding="utf-8") if dst.exists() else ""
+            except Exception:
+                existing = ""
+            if existing != content:
+                dst.write_text(content, encoding="utf-8")
+
+        source_meta = {
+            name: str(path)
+            for name, path in paths.items()
+            if path.parent.resolve() != global_identity_dir
+        }
+        meta_path = resolved_dir / "runtime" / "sources.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            current_meta = meta_path.read_text(encoding="utf-8") if meta_path.exists() else ""
+        except Exception:
+            current_meta = ""
+        meta_text = json.dumps(source_meta, ensure_ascii=False, sort_keys=True, indent=2)
+        if current_meta != meta_text:
+            meta_path.write_text(meta_text, encoding="utf-8")
+
+        return resolved_dir
+
     def _resolve_agent_voice(self) -> str:
         """Return the display name that SOUL.md's ``{{agent_name}}`` should expand to.
 
@@ -3512,12 +3575,14 @@ class Agent:
                 return ctx.system
 
         ctx_window = self._get_raw_context_window()
+        identity_dir = self._prepare_prompt_identity_dir()
         prompt = self.prompt_assembler._build_compiled_sync(
             task_description,
             session_type=session_type,
             context_window=ctx_window,
             is_sub_agent=self._is_sub_agent_call,
             agent_voice=self._resolve_agent_voice(),
+            identity_dir=identity_dir,
         )
         if self._custom_prompt_suffix:
             prompt += f"\n\n{self._custom_prompt_suffix}"
@@ -3835,6 +3900,7 @@ class Agent:
         except Exception:
             _working_facts_cache_key = ""
         _resolved_voice = self._resolve_agent_voice()
+        _identity_dir = self._prepare_prompt_identity_dir()
         _cache_key = (
             _conv_id,
             _effective_mode,
@@ -3854,6 +3920,7 @@ class Agent:
             _working_facts_cache_key,
             bool((session_context or {}).get("evidence_recommended", False)),
             _resolved_voice,
+            str(_identity_dir),
         )
 
         if (
@@ -3884,6 +3951,7 @@ class Agent:
                 include_project_guidelines=_strategy.include_project_guidelines,
                 intent_tool_hints=_intent_tool_hints,
                 agent_voice=_resolved_voice,
+                identity_dir=_identity_dir,
             )
             self._system_prompt_cache[_cache_key] = prompt
             self._system_prompt_cache_dirty = False
@@ -9854,6 +9922,33 @@ class Agent:
                             }
                         )
                         continue  # 继续循环，让 LLM 调用工具
+
+                    # Steer done-drain: the model produced a final answer with
+                    # no tool calls, so process_post_tool_signals did NOT drain
+                    # inserts this round. If a message was steered in via
+                    # insert_user_message while this answer was being generated
+                    # (e.g. an IM user following up on a long task), address it
+                    # now instead of finishing and dropping it. Bounded by
+                    # max_tool_iterations inside the helper, so it can never run
+                    # away. No-op for scheduler/sub-agent tasks (no inserts).
+                    _steered = await self.reasoning_engine._drain_steer_before_finish(
+                        state=(self.agent_state.current_task if self.agent_state else None),
+                        working_messages=messages,
+                        final_text=final_response or cleaned_text or "",
+                        iteration=iteration - 1,  # loop here is 1-based
+                        max_iterations=max_tool_iterations,
+                    )
+                    if _steered:
+                        no_tool_call_count = 0
+                        logger.info(
+                            "[execute_task][DoneDrain] %d steered message(s) "
+                            "arrived during final-answer generation; folding "
+                            "answer into context and continuing (iter=%d/%d)",
+                            len(_steered),
+                            iteration,
+                            max_tool_iterations,
+                        )
+                        continue
 
                     # 追问次数用尽，任务完成
                     break

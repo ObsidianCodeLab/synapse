@@ -2,7 +2,7 @@
 
 The identity files in this directory were designed with reference to the following
 open-source projects and public documentation, and have been customized and
-rewritten specifically for OpenAkita.
+rewritten specifically for Synapse.
 
 ## SOUL.md
 
@@ -26,6 +26,6 @@ rewritten specifically for OpenAkita.
 ---
 
 > The above are used solely as design inspiration and structural references.
-> All actual file contents have been fully rewritten for OpenAkita's features,
+> All actual file contents have been fully rewritten for Synapse's features,
 > values, and use cases. For any copyright concerns, please contact us via
 > project Issues.

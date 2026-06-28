@@ -2,8 +2,8 @@
 Agent Package 工具定义
 
 提供 Agent 导入导出相关工具：
-- export_agent: 导出 Agent 为 .akita-agent 包
-- import_agent: 从 .akita-agent 包导入 Agent
+- export_agent: 导出 Agent 为 .synapse-agent 包
+- import_agent: 从 .synapse-agent 包导入 Agent
 - list_exportable_agents: 列出可导出的 Agent
 - inspect_agent_package: 预览包内容
 """
@@ -12,7 +12,7 @@ AGENT_PACKAGE_TOOLS = [
     {
         "name": "export_agent",
         "category": "Agent Package",
-        "description": "Export a local Agent as a portable .akita-agent package file containing profile, prompt, and bundled skills.",
+        "description": "Export a local Agent as a portable .synapse-agent package file containing profile, prompt, and bundled skills.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -44,13 +44,13 @@ AGENT_PACKAGE_TOOLS = [
     {
         "name": "import_agent",
         "category": "Agent Package",
-        "description": "Import an Agent from a .akita-agent package file. Installs bundled skills and creates the Agent profile locally.",
+        "description": "Import an Agent from a .synapse-agent package file. Installs bundled skills and creates the Agent profile locally.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "package_path": {
                     "type": "string",
-                    "description": "Path to the .akita-agent package file",
+                    "description": "Path to the .synapse-agent package file",
                 },
                 "force": {
                     "type": "boolean",
@@ -63,7 +63,7 @@ AGENT_PACKAGE_TOOLS = [
     {
         "name": "list_exportable_agents",
         "category": "Agent Package",
-        "description": "List all Agent profiles that can be exported as .akita-agent packages.",
+        "description": "List all Agent profiles that can be exported as .synapse-agent packages.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -72,13 +72,13 @@ AGENT_PACKAGE_TOOLS = [
     {
         "name": "inspect_agent_package",
         "category": "Agent Package",
-        "description": "Preview the contents of a .akita-agent package file without installing. Shows manifest, profile, skills, and validation status.",
+        "description": "Preview the contents of a .synapse-agent package file without installing. Shows manifest, profile, skills, and validation status.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "package_path": {
                     "type": "string",
-                    "description": "Path to the .akita-agent package file to inspect",
+                    "description": "Path to the .synapse-agent package file to inspect",
                 },
             },
             "required": ["package_path"],
@@ -87,7 +87,7 @@ AGENT_PACKAGE_TOOLS = [
     {
         "name": "batch_export_agents",
         "category": "Agent Package",
-        "description": "Export multiple Agents at once. Packs all specified agents into individual .akita-agent files in the target directory.",
+        "description": "Export multiple Agents at once. Packs all specified agents into individual .synapse-agent files in the target directory.",
         "input_schema": {
             "type": "object",
             "properties": {
