@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Footage Gate · 成片质量门</title>
+  <title>Footage Gate 路 鎴愮墖璐ㄩ噺闂?/title>
   <!--
     Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
     Plugins MUST NOT depend on host-mounted /api/plugins/_sdk/* (removed in
@@ -14,9 +14,9 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/markdown-mini.js"></script>
   <script src="_assets/i18n.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #F8FAFC; --bg-card: #FFFFFF; --bg-hover: #F1F5F9;
@@ -243,7 +243,7 @@
 <body>
 <div id="root"></div>
 <script>
-// ── Bridge SDK (1:1 with tongyi-image / seedance pattern) ──
+// 鈹€鈹€ Bridge SDK (1:1 with tongyi-image / seedance pattern) 鈹€鈹€
 const BRIDGE_VER = 1;
 let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
@@ -356,228 +356,228 @@ function showToast(body, type) {
 }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 
 <script type="text/babel" data-type="module">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// ─── i18n dictionary ────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ i18n dictionary 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Single source of truth for every user-visible string in this plugin.
-// Namespace `footageGate` matches the v1.0 plan §2.5 contract #8.
+// Namespace `footageGate` matches the v1.0 plan 搂2.5 contract #8.
 const I18N_DICT = {
   zh: {
-    "app.title": "成片质量门",
-    "app.subtitle": "Footage Gate · 4 模式后期质检 · 100% 本地 FFmpeg",
-    "tabs.create": "创建任务",
-    "tabs.tasks": "任务列表",
-    "tabs.guide": "使用说明",
-    "tabs.settings": "设置",
-    "pill.ffmpeg.ok": "FFmpeg 已就绪 {ver}",
-    "pill.ffmpeg.missing": "FFmpeg 未安装",
-    "pill.ffmpeg.detecting": "正在检测 FFmpeg...",
-    "banner.noFfmpeg.title": "未检测到 FFmpeg",
-    "banner.noFfmpeg.desc": "所有模式都依赖 FFmpeg ≥ 4.4。请到「设置 → 系统依赖」一键安装。",
-    "banner.noFfmpeg.cta": "去安装",
-    "create.mode.label": "选择模式",
-    "modes.source_review": "源素材审核",
-    "modes.silence_cut": "静默剪除",
-    "modes.auto_color": "自动调色",
-    "modes.cut_qc": "剪辑边界 QC",
-    "modes.source_review.desc": "对视频/音频/图片做体检，输出风险报告与代表帧",
-    "modes.silence_cut.desc": "检测并剔除视频/音频中的静默段，自动重剪输出",
-    "modes.auto_color.desc": "采样画面统计后输出 ±8% 安全夹的调色版本，HDR 自动 tone-map",
-    "modes.cut_qc.desc": "对成片做切点抖动 / 音频突变 / 字幕安全区 / 时长一致性 4 项 QC",
-    "create.input.label": "输入素材",
-    "create.input.upload": "点击或拖拽上传 (mp4 / mov / wav / mp3 / jpg / png)",
-    "create.input.replace": "更换素材",
-    "create.input.size": "{size} MB · {kind}",
-    "create.params.title": "参数（可选）",
-    "create.silence.threshold": "静默阈值 (dB)",
-    "create.silence.minSilence": "最小静默时长 (秒)",
-    "create.silence.minSound": "最小有声时长 (秒)",
-    "create.silence.pad": "保留缓冲 (秒)",
-    "create.color.preset": "调色 preset",
-    "create.color.preset.auto": "auto · 自动",
-    "create.color.preset.subtle": "subtle · 细微",
-    "create.color.preset.cinematic": "cinematic · 电影感（v1.1）",
-    "create.color.hdr.label": "HDR → SDR tone-map",
-    "create.color.hdr.desc": "iPhone HLG / Sony PQ 自动 tone-map（推荐保持开启）",
-    "create.color.hdr.detected": "已检测到 HDR 色彩传输 — 强烈建议保持开启",
-    "create.qc.edl.label": "EDL JSON（剪辑表）",
-    "create.qc.edl.placeholder": "粘贴或上传 EDL JSON。字段名支持 in_seconds/out_seconds 或 start_seconds/end_seconds...",
-    "create.qc.autoRemux.label": "自动重渲修复",
-    "create.qc.autoRemux.desc": "检测出 issue 后自动应用修复策略并重渲，最多 {n} 次",
-    "create.qc.maxAttempts": "最大重渲次数",
-    "create.review.transcribe.label": "调用转写摘要（可选 · 收费）",
-    "create.review.transcribe.desc": "需要在设置页填写转写 API Key；不勾选则纯本地运行",
-    "create.btn.start": "创建任务",
-    "create.btn.creating": "创建中...",
-    "create.btn.needFile": "请先选择输入素材",
-    "create.preview.empty.title": "等待任务结果",
-    "create.preview.empty.hint": "选择模式 → 上传素材 → 点击「创建任务」",
-    "create.preview.task.id": "任务 ID",
-    "create.preview.task.mode": "模式",
-    "create.preview.task.status": "状态",
-    "create.preview.task.viewInTasks": "前往任务列表",
-    "modal.taskStarted.title": "任务已创建",
-    "modal.taskStarted.desc": "任务正在后台运行，可在「任务列表」查看进度。",
-    "modal.taskStarted.continue": "继续创建",
-    "modal.taskStarted.goTasks": "前往任务列表",
-    "status.pending": "等待中",
-    "status.running": "执行中",
-    "status.done": "已完成",
-    "status.failed": "失败",
-    "status.cancelled": "已取消",
-    "tasks.filter.status": "状态",
-    "tasks.filter.mode": "模式",
-    "tasks.filter.all": "全部",
-    "tasks.filter.allModes": "全部模式",
-    "tasks.empty.title": "暂无任务",
-    "tasks.empty.hint": "在「创建任务」页发起一次跑后，任务会出现在这里。",
-    "tasks.totalCount": "共 {n} 个任务",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.cancel": "取消任务",
-    "tasks.detail.retry": "重新执行",
-    "tasks.detail.delete": "删除",
-    "tasks.detail.confirmDelete": "确定删除这个任务及其工作目录?",
+    "app.title": "鎴愮墖璐ㄩ噺闂?,
+    "app.subtitle": "Footage Gate 路 4 妯″紡鍚庢湡璐ㄦ 路 100% 鏈湴 FFmpeg",
+    "tabs.create": "鍒涘缓浠诲姟",
+    "tabs.tasks": "浠诲姟鍒楄〃",
+    "tabs.guide": "浣跨敤璇存槑",
+    "tabs.settings": "璁剧疆",
+    "pill.ffmpeg.ok": "FFmpeg 宸插氨缁?{ver}",
+    "pill.ffmpeg.missing": "FFmpeg 鏈畨瑁?,
+    "pill.ffmpeg.detecting": "姝ｅ湪妫€娴?FFmpeg...",
+    "banner.noFfmpeg.title": "鏈娴嬪埌 FFmpeg",
+    "banner.noFfmpeg.desc": "鎵€鏈夋ā寮忛兘渚濊禆 FFmpeg 鈮?4.4銆傝鍒般€岃缃?鈫?绯荤粺渚濊禆銆嶄竴閿畨瑁呫€?,
+    "banner.noFfmpeg.cta": "鍘诲畨瑁?,
+    "create.mode.label": "閫夋嫨妯″紡",
+    "modes.source_review": "婧愮礌鏉愬鏍?,
+    "modes.silence_cut": "闈欓粯鍓櫎",
+    "modes.auto_color": "鑷姩璋冭壊",
+    "modes.cut_qc": "鍓緫杈圭晫 QC",
+    "modes.source_review.desc": "瀵硅棰?闊抽/鍥剧墖鍋氫綋妫€锛岃緭鍑洪闄╂姤鍛婁笌浠ｈ〃甯?,
+    "modes.silence_cut.desc": "妫€娴嬪苟鍓旈櫎瑙嗛/闊抽涓殑闈欓粯娈碉紝鑷姩閲嶅壀杈撳嚭",
+    "modes.auto_color.desc": "閲囨牱鐢婚潰缁熻鍚庤緭鍑?卤8% 瀹夊叏澶圭殑璋冭壊鐗堟湰锛孒DR 鑷姩 tone-map",
+    "modes.cut_qc.desc": "瀵规垚鐗囧仛鍒囩偣鎶栧姩 / 闊抽绐佸彉 / 瀛楀箷瀹夊叏鍖?/ 鏃堕暱涓€鑷存€?4 椤?QC",
+    "create.input.label": "杈撳叆绱犳潗",
+    "create.input.upload": "鐐瑰嚮鎴栨嫋鎷戒笂浼?(mp4 / mov / wav / mp3 / jpg / png)",
+    "create.input.replace": "鏇存崲绱犳潗",
+    "create.input.size": "{size} MB 路 {kind}",
+    "create.params.title": "鍙傛暟锛堝彲閫夛級",
+    "create.silence.threshold": "闈欓粯闃堝€?(dB)",
+    "create.silence.minSilence": "鏈€灏忛潤榛樻椂闀?(绉?",
+    "create.silence.minSound": "鏈€灏忔湁澹版椂闀?(绉?",
+    "create.silence.pad": "淇濈暀缂撳啿 (绉?",
+    "create.color.preset": "璋冭壊 preset",
+    "create.color.preset.auto": "auto 路 鑷姩",
+    "create.color.preset.subtle": "subtle 路 缁嗗井",
+    "create.color.preset.cinematic": "cinematic 路 鐢靛奖鎰燂紙v1.1锛?,
+    "create.color.hdr.label": "HDR 鈫?SDR tone-map",
+    "create.color.hdr.desc": "iPhone HLG / Sony PQ 鑷姩 tone-map锛堟帹鑽愪繚鎸佸紑鍚級",
+    "create.color.hdr.detected": "宸叉娴嬪埌 HDR 鑹插僵浼犺緭 鈥?寮虹儓寤鸿淇濇寔寮€鍚?,
+    "create.qc.edl.label": "EDL JSON锛堝壀杈戣〃锛?,
+    "create.qc.edl.placeholder": "绮樿创鎴栦笂浼?EDL JSON銆傚瓧娈靛悕鏀寔 in_seconds/out_seconds 鎴?start_seconds/end_seconds...",
+    "create.qc.autoRemux.label": "鑷姩閲嶆覆淇",
+    "create.qc.autoRemux.desc": "妫€娴嬪嚭 issue 鍚庤嚜鍔ㄥ簲鐢ㄤ慨澶嶇瓥鐣ュ苟閲嶆覆锛屾渶澶?{n} 娆?,
+    "create.qc.maxAttempts": "鏈€澶ч噸娓叉鏁?,
+    "create.review.transcribe.label": "璋冪敤杞啓鎽樿锛堝彲閫?路 鏀惰垂锛?,
+    "create.review.transcribe.desc": "闇€瑕佸湪璁剧疆椤靛～鍐欒浆鍐?API Key锛涗笉鍕鹃€夊垯绾湰鍦拌繍琛?,
+    "create.btn.start": "鍒涘缓浠诲姟",
+    "create.btn.creating": "鍒涘缓涓?..",
+    "create.btn.needFile": "璇峰厛閫夋嫨杈撳叆绱犳潗",
+    "create.preview.empty.title": "绛夊緟浠诲姟缁撴灉",
+    "create.preview.empty.hint": "閫夋嫨妯″紡 鈫?涓婁紶绱犳潗 鈫?鐐瑰嚮銆屽垱寤轰换鍔°€?,
+    "create.preview.task.id": "浠诲姟 ID",
+    "create.preview.task.mode": "妯″紡",
+    "create.preview.task.status": "鐘舵€?,
+    "create.preview.task.viewInTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "modal.taskStarted.title": "浠诲姟宸插垱寤?,
+    "modal.taskStarted.desc": "浠诲姟姝ｅ湪鍚庡彴杩愯锛屽彲鍦ㄣ€屼换鍔″垪琛ㄣ€嶆煡鐪嬭繘搴︺€?,
+    "modal.taskStarted.continue": "缁х画鍒涘缓",
+    "modal.taskStarted.goTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "status.pending": "绛夊緟涓?,
+    "status.running": "鎵ц涓?,
+    "status.done": "宸插畬鎴?,
+    "status.failed": "澶辫触",
+    "status.cancelled": "宸插彇娑?,
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.mode": "妯″紡",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.allModes": "鍏ㄩ儴妯″紡",
+    "tasks.empty.title": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": "鍦ㄣ€屽垱寤轰换鍔°€嶉〉鍙戣捣涓€娆¤窇鍚庯紝浠诲姟浼氬嚭鐜板湪杩欓噷銆?,
+    "tasks.totalCount": "鍏?{n} 涓换鍔?,
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.cancel": "鍙栨秷浠诲姟",
+    "tasks.detail.retry": "閲嶆柊鎵ц",
+    "tasks.detail.delete": "鍒犻櫎",
+    "tasks.detail.confirmDelete": "纭畾鍒犻櫎杩欎釜浠诲姟鍙婂叾宸ヤ綔鐩綍?",
     "tasks.detail.id": "ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.created": "创建时间",
-    "tasks.detail.duration": "输入时长",
-    "tasks.detail.removed": "剔除静默",
-    "tasks.detail.attempts": "重渲次数",
-    "tasks.detail.issues": "QC 问题数",
-    "tasks.detail.hdr": "HDR 源",
-    "tasks.detail.output": "输出文件",
-    "tasks.detail.report": "报告文件",
-    "tasks.detail.openOutput": "打开输出",
-    "tasks.detail.openReport": "查看报告",
-    "tasks.detail.errorKind": "错误类型",
-    "tasks.detail.errorMsg": "错误信息",
-    "tasks.detail.hints": "排查建议",
-    "tasks.detail.params": "参数",
-    "tasks.empty.noSelection.title": "未选择任务",
-    "tasks.empty.noSelection.hint": "从左侧选一个任务查看详情。",
-    "guide.intro": "成片质量门 · 4 模式一站式后期质检。点击下方任意章节展开。",
-    "guide.modes.title": "4 个模式",
-    "guide.tips.title": "使用建议",
-    "guide.upstream.title": "上游兼容性防御",
-    "guide.upstream.desc": "本插件已对 video-use / CutClaw / OpenMontage 三个上游仓库的 21 issues + 19 PRs 完整复核，识别 8 个真实踩坑并防御性落地（详见 VALIDATION.md）。",
-    "guide.workflow.title": "推荐工作流",
-    "guide.workflow.body": "1) source_review 体检 → 2) silence_cut 删静音 → 3) auto_color 调色 → 4) cut_qc 自检（可选自动重渲）。每一步都生成独立任务，可单独回看。",
-    "settings.section.api": "转写 API（可选）",
-    "settings.section.permissions": "权限",
-    "settings.section.system": "系统依赖",
-    "settings.system.intro.strong": "FFmpeg 是成片质量门的核心本地依赖。",
-    "settings.system.intro.body": "源素材审核、静默剪除、自动调色和剪辑边界 QC 都会调用 FFmpeg / FFprobe。已安装的系统级 FFmpeg 会被自动检测到；一键安装/卸载会影响同一台机器上其他依赖 FFmpeg 的程序。",
-    "settings.system.platform.win": "Windows: 一键安装会优先调用 winget 安装 Gyan.FFmpeg。",
-    "settings.system.platform.mac": "macOS: 一键安装会优先调用 Homebrew。",
-    "settings.system.platform.linux": "Linux: 一键安装会按发行版尝试 apt / dnf 等包管理器。",
-    "settings.section.defaults": "默认参数",
-    "settings.section.storage": "存储",
-    "settings.section.about": "关于",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.created": "鍒涘缓鏃堕棿",
+    "tasks.detail.duration": "杈撳叆鏃堕暱",
+    "tasks.detail.removed": "鍓旈櫎闈欓粯",
+    "tasks.detail.attempts": "閲嶆覆娆℃暟",
+    "tasks.detail.issues": "QC 闂鏁?,
+    "tasks.detail.hdr": "HDR 婧?,
+    "tasks.detail.output": "杈撳嚭鏂囦欢",
+    "tasks.detail.report": "鎶ュ憡鏂囦欢",
+    "tasks.detail.openOutput": "鎵撳紑杈撳嚭",
+    "tasks.detail.openReport": "鏌ョ湅鎶ュ憡",
+    "tasks.detail.errorKind": "閿欒绫诲瀷",
+    "tasks.detail.errorMsg": "閿欒淇℃伅",
+    "tasks.detail.hints": "鎺掓煡寤鸿",
+    "tasks.detail.params": "鍙傛暟",
+    "tasks.empty.noSelection.title": "鏈€夋嫨浠诲姟",
+    "tasks.empty.noSelection.hint": "浠庡乏渚ч€変竴涓换鍔℃煡鐪嬭鎯呫€?,
+    "guide.intro": "鎴愮墖璐ㄩ噺闂?路 4 妯″紡涓€绔欏紡鍚庢湡璐ㄦ銆傜偣鍑讳笅鏂逛换鎰忕珷鑺傚睍寮€銆?,
+    "guide.modes.title": "4 涓ā寮?,
+    "guide.tips.title": "浣跨敤寤鸿",
+    "guide.upstream.title": "涓婃父鍏煎鎬ч槻寰?,
+    "guide.upstream.desc": "鏈彃浠跺凡瀵?video-use / CutClaw / OpenMontage 涓変釜涓婃父浠撳簱鐨?21 issues + 19 PRs 瀹屾暣澶嶆牳锛岃瘑鍒?8 涓湡瀹炶俯鍧戝苟闃插尽鎬ц惤鍦帮紙璇﹁ VALIDATION.md锛夈€?,
+    "guide.workflow.title": "鎺ㄨ崘宸ヤ綔娴?,
+    "guide.workflow.body": "1) source_review 浣撴 鈫?2) silence_cut 鍒犻潤闊?鈫?3) auto_color 璋冭壊 鈫?4) cut_qc 鑷锛堝彲閫夎嚜鍔ㄩ噸娓诧級銆傛瘡涓€姝ラ兘鐢熸垚鐙珛浠诲姟锛屽彲鍗曠嫭鍥炵湅銆?,
+    "settings.section.api": "杞啓 API锛堝彲閫夛級",
+    "settings.section.permissions": "鏉冮檺",
+    "settings.section.system": "绯荤粺渚濊禆",
+    "settings.system.intro.strong": "FFmpeg 鏄垚鐗囪川閲忛棬鐨勬牳蹇冩湰鍦颁緷璧栥€?,
+    "settings.system.intro.body": "婧愮礌鏉愬鏍搞€侀潤榛樺壀闄ゃ€佽嚜鍔ㄨ皟鑹插拰鍓緫杈圭晫 QC 閮戒細璋冪敤 FFmpeg / FFprobe銆傚凡瀹夎鐨勭郴缁熺骇 FFmpeg 浼氳鑷姩妫€娴嬪埌锛涗竴閿畨瑁?鍗歌浇浼氬奖鍝嶅悓涓€鍙版満鍣ㄤ笂鍏朵粬渚濊禆 FFmpeg 鐨勭▼搴忋€?,
+    "settings.system.platform.win": "Windows: 涓€閿畨瑁呬細浼樺厛璋冪敤 winget 瀹夎 Gyan.FFmpeg銆?,
+    "settings.system.platform.mac": "macOS: 涓€閿畨瑁呬細浼樺厛璋冪敤 Homebrew銆?,
+    "settings.system.platform.linux": "Linux: 涓€閿畨瑁呬細鎸夊彂琛岀増灏濊瘯 apt / dnf 绛夊寘绠＄悊鍣ㄣ€?,
+    "settings.section.defaults": "榛樿鍙傛暟",
+    "settings.section.storage": "瀛樺偍",
+    "settings.section.about": "鍏充簬",
     "settings.api.key.label": "DashScope Paraformer API Key",
-    "settings.api.key.placeholder": "仅在 source_review 勾选「转写摘要」时使用，可留空",
-    "settings.api.key.show": "显示",
-    "settings.api.key.hide": "隐藏",
-    "settings.api.key.save": "保存",
-    "settings.api.key.help": "获取地址：阿里云百炼控制台",
-    "settings.defaults.mode": "默认模式",
-    "settings.defaults.colorPreset": "调色 preset",
-    "settings.defaults.silenceDb": "默认静默阈值 (dB)",
-    "settings.defaults.silenceMin": "默认最小静默时长 (秒)",
-    "settings.defaults.silencePad": "默认 pad (秒)",
-    "settings.defaults.autoRemux": "剪辑边界 QC 默认自动修复",
-    "settings.defaults.autoRemux.desc": "开启后，边界检测发现可修复问题时会自动尝试重新封装/重渲；适合 EDL 来源可信的流程。",
-    "settings.defaults.maxAttempts": "cut_qc 最大重渲次数",
-    "settings.defaults.minMarginV": "竖版字幕最小 MarginV",
-    "settings.defaults.timeout": "FFmpeg 超时 (秒)",
-    "settings.defaults.hdrTonemap": "自动调色默认处理 HDR 转 SDR",
-    "settings.defaults.hdrTonemap.desc": "开启后会把 iPhone HLG / Sony PQ 等 HDR 素材自动映射到更通用的 SDR 输出。",
-    "settings.defaults.retention": "任务保留天数",
-    "settings.defaults.outputDir": "输出目录",
-    "settings.defaults.outputDir.placeholder": "默认: ~/footage-gate-output",
-    "settings.defaults.naming": "输出命名规则",
-    "settings.storage.outputTitle": "成片输出目录",
-    "settings.storage.outputHelp": "留空时使用默认目录；填写路径并保存后，后续任务输出会写入该目录。",
-    "settings.storage.save": "保存",
-    "settings.storage.path": "路径",
+    "settings.api.key.placeholder": "浠呭湪 source_review 鍕鹃€夈€岃浆鍐欐憳瑕併€嶆椂浣跨敤锛屽彲鐣欑┖",
+    "settings.api.key.show": "鏄剧ず",
+    "settings.api.key.hide": "闅愯棌",
+    "settings.api.key.save": "淇濆瓨",
+    "settings.api.key.help": "鑾峰彇鍦板潃锛氶樋閲屼簯鐧剧偧鎺у埗鍙?,
+    "settings.defaults.mode": "榛樿妯″紡",
+    "settings.defaults.colorPreset": "璋冭壊 preset",
+    "settings.defaults.silenceDb": "榛樿闈欓粯闃堝€?(dB)",
+    "settings.defaults.silenceMin": "榛樿鏈€灏忛潤榛樻椂闀?(绉?",
+    "settings.defaults.silencePad": "榛樿 pad (绉?",
+    "settings.defaults.autoRemux": "鍓緫杈圭晫 QC 榛樿鑷姩淇",
+    "settings.defaults.autoRemux.desc": "寮€鍚悗锛岃竟鐣屾娴嬪彂鐜板彲淇闂鏃朵細鑷姩灏濊瘯閲嶆柊灏佽/閲嶆覆锛涢€傚悎 EDL 鏉ユ簮鍙俊鐨勬祦绋嬨€?,
+    "settings.defaults.maxAttempts": "cut_qc 鏈€澶ч噸娓叉鏁?,
+    "settings.defaults.minMarginV": "绔栫増瀛楀箷鏈€灏?MarginV",
+    "settings.defaults.timeout": "FFmpeg 瓒呮椂 (绉?",
+    "settings.defaults.hdrTonemap": "鑷姩璋冭壊榛樿澶勭悊 HDR 杞?SDR",
+    "settings.defaults.hdrTonemap.desc": "寮€鍚悗浼氭妸 iPhone HLG / Sony PQ 绛?HDR 绱犳潗鑷姩鏄犲皠鍒版洿閫氱敤鐨?SDR 杈撳嚭銆?,
+    "settings.defaults.retention": "浠诲姟淇濈暀澶╂暟",
+    "settings.defaults.outputDir": "杈撳嚭鐩綍",
+    "settings.defaults.outputDir.placeholder": "榛樿: ~/footage-gate-output",
+    "settings.defaults.naming": "杈撳嚭鍛藉悕瑙勫垯",
+    "settings.storage.outputTitle": "鎴愮墖杈撳嚭鐩綍",
+    "settings.storage.outputHelp": "鐣欑┖鏃朵娇鐢ㄩ粯璁ょ洰褰曪紱濉啓璺緞骞朵繚瀛樺悗锛屽悗缁换鍔¤緭鍑轰細鍐欏叆璇ョ洰褰曘€?,
+    "settings.storage.save": "淇濆瓨",
+    "settings.storage.path": "璺緞",
     "settings.storage.size": "{size} MB",
-    "settings.storage.files": "{count} 个文件",
-    "settings.storage.open": "打开",
-    "settings.storage.cleanup": "清理",
-    "settings.storage.outputDir": "输出目录",
-    "settings.storage.uploads": "上传缓存",
-    "settings.storage.tasks": "任务工作区",
-    "settings.storage.confirmCleanup": "确认清空 {dir}? 已生成的文件无法恢复。",
-    "settings.about.version": "版本 {ver}",
-    "settings.about.desc": "成片质量门用于本地素材质检与后期预处理，覆盖源素材审核、静默剪除、自动调色和剪辑边界 QC。插件会优先复用系统 FFmpeg，并把上传缓存、任务工作区和最终输出分开管理。",
-    "settings.system.detecting": "正在检测...",
-    "settings.system.status.ok": "已安装 {ver}",
-    "settings.system.status.foundNoVer": "已安装",
-    "settings.system.status.missing": "未安装",
-    "settings.system.installing": "安装中 {elapsed}",
-    "settings.system.uninstalling": "卸载中 {elapsed}",
-    "settings.system.btn.install": "一键安装",
-    "settings.system.btn.uninstall": "卸载",
-    "settings.system.btn.recheck": "重新检测",
-    "settings.system.btn.openHome": "官网",
-    "settings.system.btn.copyCmd": "复制命令",
-    "settings.system.btn.copied": "已复制",
-    "settings.system.btn.cancel": "取消",
-    "settings.system.btn.uninstallConfirmBtn": "确认卸载",
-    "settings.system.location": "路径：{path}",
-    "settings.system.requiresSudo": "此安装方式需要管理员权限。请在终端执行下方命令：",
-    "settings.system.uninstallConfirm": "卸载后，本插件所有模式都将无法工作。如需仅清理插件数据，请改用「设置 → 存储 → 清理」。",
-    "settings.system.installed": "FFmpeg 已安装",
-    "settings.system.uninstalled": "FFmpeg 已卸载",
-    "settings.system.installFailed": "安装失败：{msg}",
-    "settings.system.uninstallFailed": "卸载失败：{msg}",
-    "settings.system.noMethod": "当前操作系统暂无自动安装方式，请到 ffmpeg.org 手动下载。",
-    "settings.system.logTitle": "安装日志",
-    "settings.system.logTitleUninstall": "卸载日志",
-    "settings.system.logEmpty": "日志为空 — 等待第一行输出...",
-    "settings.perms.allOk": "已全部授予",
-    "settings.perms.intro.strong": "插件需要以下权限才能完整运行。",
-    "settings.perms.intro.body": "未授予的权限会让相关功能在静默状态下失败。点击下方「一键授予」一次性补齐。",
-    "settings.perms.col.permission": "权限",
-    "settings.perms.col.feature": "用途",
-    "settings.perms.col.status": "状态",
-    "settings.perms.status.ok": "已授予",
-    "settings.perms.status.missing": "未授予",
-    "settings.perms.btn.grantAll": "一键授予全部",
-    "settings.perms.granting": "授予中...",
-    "settings.perms.granted": "权限已授予",
-    "settings.perms.grantFailed": "授予失败：{msg}",
-    "err.title": "插件 UI 渲染出错",
-    "err.retry": "重试渲染",
-    "err.stackLabel": "错误堆栈（复制给开发者）",
-    "toast.copied": "已复制",
-    "toast.savedSettings": "设置已保存",
-    "toast.saveFailed": "保存失败",
-    "toast.taskCreated": "任务已创建",
-    "toast.createFailed": "创建失败：{msg}",
-    "toast.cancelOk": "任务已取消",
-    "toast.deleteOk": "任务已删除",
-    "toast.retryOk": "任务已重新创建",
-    "toast.cleanupOk": "已清理 {n} 个文件",
-    "toast.uploadFailed": "上传失败",
-    "toast.invalidEdl": "EDL JSON 解析失败 — 请检查格式",
+    "settings.storage.files": "{count} 涓枃浠?,
+    "settings.storage.open": "鎵撳紑",
+    "settings.storage.cleanup": "娓呯悊",
+    "settings.storage.outputDir": "杈撳嚭鐩綍",
+    "settings.storage.uploads": "涓婁紶缂撳瓨",
+    "settings.storage.tasks": "浠诲姟宸ヤ綔鍖?,
+    "settings.storage.confirmCleanup": "纭娓呯┖ {dir}? 宸茬敓鎴愮殑鏂囦欢鏃犳硶鎭㈠銆?,
+    "settings.about.version": "鐗堟湰 {ver}",
+    "settings.about.desc": "鎴愮墖璐ㄩ噺闂ㄧ敤浜庢湰鍦扮礌鏉愯川妫€涓庡悗鏈熼澶勭悊锛岃鐩栨簮绱犳潗瀹℃牳銆侀潤榛樺壀闄ゃ€佽嚜鍔ㄨ皟鑹插拰鍓緫杈圭晫 QC銆傛彃浠朵細浼樺厛澶嶇敤绯荤粺 FFmpeg锛屽苟鎶婁笂浼犵紦瀛樸€佷换鍔″伐浣滃尯鍜屾渶缁堣緭鍑哄垎寮€绠＄悊銆?,
+    "settings.system.detecting": "姝ｅ湪妫€娴?..",
+    "settings.system.status.ok": "宸插畨瑁?{ver}",
+    "settings.system.status.foundNoVer": "宸插畨瑁?,
+    "settings.system.status.missing": "鏈畨瑁?,
+    "settings.system.installing": "瀹夎涓?{elapsed}",
+    "settings.system.uninstalling": "鍗歌浇涓?{elapsed}",
+    "settings.system.btn.install": "涓€閿畨瑁?,
+    "settings.system.btn.uninstall": "鍗歌浇",
+    "settings.system.btn.recheck": "閲嶆柊妫€娴?,
+    "settings.system.btn.openHome": "瀹樼綉",
+    "settings.system.btn.copyCmd": "澶嶅埗鍛戒护",
+    "settings.system.btn.copied": "宸插鍒?,
+    "settings.system.btn.cancel": "鍙栨秷",
+    "settings.system.btn.uninstallConfirmBtn": "纭鍗歌浇",
+    "settings.system.location": "璺緞锛歿path}",
+    "settings.system.requiresSudo": "姝ゅ畨瑁呮柟寮忛渶瑕佺鐞嗗憳鏉冮檺銆傝鍦ㄧ粓绔墽琛屼笅鏂瑰懡浠わ細",
+    "settings.system.uninstallConfirm": "鍗歌浇鍚庯紝鏈彃浠舵墍鏈夋ā寮忛兘灏嗘棤娉曞伐浣溿€傚闇€浠呮竻鐞嗘彃浠舵暟鎹紝璇锋敼鐢ㄣ€岃缃?鈫?瀛樺偍 鈫?娓呯悊銆嶃€?,
+    "settings.system.installed": "FFmpeg 宸插畨瑁?,
+    "settings.system.uninstalled": "FFmpeg 宸插嵏杞?,
+    "settings.system.installFailed": "瀹夎澶辫触锛歿msg}",
+    "settings.system.uninstallFailed": "鍗歌浇澶辫触锛歿msg}",
+    "settings.system.noMethod": "褰撳墠鎿嶄綔绯荤粺鏆傛棤鑷姩瀹夎鏂瑰紡锛岃鍒?ffmpeg.org 鎵嬪姩涓嬭浇銆?,
+    "settings.system.logTitle": "瀹夎鏃ュ織",
+    "settings.system.logTitleUninstall": "鍗歌浇鏃ュ織",
+    "settings.system.logEmpty": "鏃ュ織涓虹┖ 鈥?绛夊緟绗竴琛岃緭鍑?..",
+    "settings.perms.allOk": "宸插叏閮ㄦ巿浜?,
+    "settings.perms.intro.strong": "鎻掍欢闇€瑕佷互涓嬫潈闄愭墠鑳藉畬鏁磋繍琛屻€?,
+    "settings.perms.intro.body": "鏈巿浜堢殑鏉冮檺浼氳鐩稿叧鍔熻兘鍦ㄩ潤榛樼姸鎬佷笅澶辫触銆傜偣鍑讳笅鏂广€屼竴閿巿浜堛€嶄竴娆℃€цˉ榻愩€?,
+    "settings.perms.col.permission": "鏉冮檺",
+    "settings.perms.col.feature": "鐢ㄩ€?,
+    "settings.perms.col.status": "鐘舵€?,
+    "settings.perms.status.ok": "宸叉巿浜?,
+    "settings.perms.status.missing": "鏈巿浜?,
+    "settings.perms.btn.grantAll": "涓€閿巿浜堝叏閮?,
+    "settings.perms.granting": "鎺堜簣涓?..",
+    "settings.perms.granted": "鏉冮檺宸叉巿浜?,
+    "settings.perms.grantFailed": "鎺堜簣澶辫触锛歿msg}",
+    "err.title": "鎻掍欢 UI 娓叉煋鍑洪敊",
+    "err.retry": "閲嶈瘯娓叉煋",
+    "err.stackLabel": "閿欒鍫嗘爤锛堝鍒剁粰寮€鍙戣€咃級",
+    "toast.copied": "宸插鍒?,
+    "toast.savedSettings": "璁剧疆宸蹭繚瀛?,
+    "toast.saveFailed": "淇濆瓨澶辫触",
+    "toast.taskCreated": "浠诲姟宸插垱寤?,
+    "toast.createFailed": "鍒涘缓澶辫触锛歿msg}",
+    "toast.cancelOk": "浠诲姟宸插彇娑?,
+    "toast.deleteOk": "浠诲姟宸插垹闄?,
+    "toast.retryOk": "浠诲姟宸查噸鏂板垱寤?,
+    "toast.cleanupOk": "宸叉竻鐞?{n} 涓枃浠?,
+    "toast.uploadFailed": "涓婁紶澶辫触",
+    "toast.invalidEdl": "EDL JSON 瑙ｆ瀽澶辫触 鈥?璇锋鏌ユ牸寮?,
   },
   en: {
     "app.title": "Footage Gate",
-    "app.subtitle": "4-mode post-production quality gate · 100% local FFmpeg",
+    "app.subtitle": "4-mode post-production quality gate 路 100% local FFmpeg",
     "tabs.create": "Create",
     "tabs.tasks": "Tasks",
     "tabs.guide": "Guide",
     "tabs.settings": "Settings",
     "pill.ffmpeg.ok": "FFmpeg ready {ver}",
     "pill.ffmpeg.missing": "FFmpeg not installed",
-    "pill.ffmpeg.detecting": "Detecting FFmpeg…",
+    "pill.ffmpeg.detecting": "Detecting FFmpeg鈥?,
     "banner.noFfmpeg.title": "FFmpeg not detected",
-    "banner.noFfmpeg.desc": "Every mode needs FFmpeg ≥ 4.4. Open Settings → System Dependencies and click Install.",
+    "banner.noFfmpeg.desc": "Every mode needs FFmpeg 鈮?4.4. Open Settings 鈫?System Dependencies and click Install.",
     "banner.noFfmpeg.cta": "Install now",
     "create.mode.label": "Choose mode",
     "modes.source_review": "Source Review",
@@ -586,12 +586,12 @@ const I18N_DICT = {
     "modes.cut_qc": "Cut Boundary QC",
     "modes.source_review.desc": "Probe a video / audio / image, output the risk report and 4 representative frames.",
     "modes.silence_cut.desc": "Detect & remove silent runs from a video / audio, then re-cut into a single output.",
-    "modes.auto_color.desc": "Sample frame stats and emit a graded version with ±8% safety clamps; HDR auto tone-mapped.",
+    "modes.auto_color.desc": "Sample frame stats and emit a graded version with 卤8% safety clamps; HDR auto tone-mapped.",
     "modes.cut_qc.desc": "Run 4 checks (visual jitter / audio spike / subtitle safe zone / duration) on the cut.",
     "create.input.label": "Input media",
     "create.input.upload": "Click or drop a file (mp4 / mov / wav / mp3 / jpg / png)",
     "create.input.replace": "Replace file",
-    "create.input.size": "{size} MB · {kind}",
+    "create.input.size": "{size} MB 路 {kind}",
     "create.params.title": "Parameters (optional)",
     "create.silence.threshold": "Silence threshold (dB)",
     "create.silence.minSilence": "Min silence length (s)",
@@ -601,27 +601,27 @@ const I18N_DICT = {
     "create.color.preset.auto": "auto",
     "create.color.preset.subtle": "subtle",
     "create.color.preset.cinematic": "cinematic (v1.1)",
-    "create.color.hdr.label": "HDR → SDR tone-map",
+    "create.color.hdr.label": "HDR 鈫?SDR tone-map",
     "create.color.hdr.desc": "Auto tone-map iPhone HLG / Sony PQ (recommended ON).",
-    "create.color.hdr.detected": "HDR transfer detected — strongly recommend keeping ON.",
+    "create.color.hdr.detected": "HDR transfer detected 鈥?strongly recommend keeping ON.",
     "create.qc.edl.label": "EDL JSON",
-    "create.qc.edl.placeholder": "Paste or upload your EDL JSON. Accepts in_seconds/out_seconds or start_seconds/end_seconds…",
+    "create.qc.edl.placeholder": "Paste or upload your EDL JSON. Accepts in_seconds/out_seconds or start_seconds/end_seconds鈥?,
     "create.qc.autoRemux.label": "Auto-remux fix",
     "create.qc.autoRemux.desc": "Auto-apply fix strategies and re-render up to {n} times when issues are found.",
     "create.qc.maxAttempts": "Max remux attempts",
-    "create.review.transcribe.label": "Use transcription summary (optional · billed)",
+    "create.review.transcribe.label": "Use transcription summary (optional 路 billed)",
     "create.review.transcribe.desc": "Requires the API Key under Settings; leave OFF for fully local runs.",
     "create.btn.start": "Create task",
-    "create.btn.creating": "Creating…",
+    "create.btn.creating": "Creating鈥?,
     "create.btn.needFile": "Pick an input file first",
     "create.preview.empty.title": "Waiting for task result",
-    "create.preview.empty.hint": "Choose mode → upload media → click \"Create task\".",
+    "create.preview.empty.hint": "Choose mode 鈫?upload media 鈫?click \"Create task\".",
     "create.preview.task.id": "Task ID",
     "create.preview.task.mode": "Mode",
     "create.preview.task.status": "Status",
     "create.preview.task.viewInTasks": "Open Tasks tab",
     "modal.taskStarted.title": "Task started",
-    "modal.taskStarted.desc": "Your task is running in the background — open the Tasks tab to follow progress.",
+    "modal.taskStarted.desc": "Your task is running in the background 鈥?open the Tasks tab to follow progress.",
     "modal.taskStarted.continue": "Keep creating",
     "modal.taskStarted.goTasks": "Open Tasks tab",
     "status.pending": "Pending",
@@ -659,13 +659,13 @@ const I18N_DICT = {
     "tasks.detail.params": "Parameters",
     "tasks.empty.noSelection.title": "No task selected",
     "tasks.empty.noSelection.hint": "Pick a task on the left to view its details.",
-    "guide.intro": "Footage Gate · 4-mode one-stop post-production gate. Click any section to expand.",
+    "guide.intro": "Footage Gate 路 4-mode one-stop post-production gate. Click any section to expand.",
     "guide.modes.title": "Four modes",
     "guide.tips.title": "Tips",
     "guide.upstream.title": "Upstream defenses",
     "guide.upstream.desc": "We have audited 21 issues + 19 PRs across video-use / CutClaw / OpenMontage and shipped 8 defensive measures (see VALIDATION.md).",
     "guide.workflow.title": "Recommended workflow",
-    "guide.workflow.body": "1) source_review → 2) silence_cut → 3) auto_color → 4) cut_qc (optional auto-remux). Each step is its own task and can be reviewed independently.",
+    "guide.workflow.body": "1) source_review 鈫?2) silence_cut 鈫?3) auto_color 鈫?4) cut_qc (optional auto-remux). Each step is its own task and can be reviewed independently.",
     "settings.section.api": "Transcription API (optional)",
     "settings.section.permissions": "Permissions",
     "settings.section.system": "System dependencies",
@@ -713,7 +713,7 @@ const I18N_DICT = {
     "settings.storage.confirmCleanup": "Wipe {dir}? Generated files cannot be recovered.",
     "settings.about.version": "Version {ver}",
     "settings.about.desc": "Footage Gate is a local media quality gate for source review, silence cutting, auto color and cut-boundary QC. It reuses system FFmpeg when available and keeps upload cache, task workspace and final outputs separated.",
-    "settings.system.detecting": "Detecting…",
+    "settings.system.detecting": "Detecting鈥?,
     "settings.system.status.ok": "Installed {ver}",
     "settings.system.status.foundNoVer": "Installed",
     "settings.system.status.missing": "Not installed",
@@ -729,15 +729,15 @@ const I18N_DICT = {
     "settings.system.btn.uninstallConfirmBtn": "Confirm uninstall",
     "settings.system.location": "Path: {path}",
     "settings.system.requiresSudo": "This install method needs administrator privileges. Run the following command in a terminal:",
-    "settings.system.uninstallConfirm": "Uninstalling will break every mode of this plugin. To clear plugin data only, use Settings → Storage → Clean up instead.",
+    "settings.system.uninstallConfirm": "Uninstalling will break every mode of this plugin. To clear plugin data only, use Settings 鈫?Storage 鈫?Clean up instead.",
     "settings.system.installed": "FFmpeg installed",
     "settings.system.uninstalled": "FFmpeg uninstalled",
     "settings.system.installFailed": "Install failed: {msg}",
     "settings.system.uninstallFailed": "Uninstall failed: {msg}",
-    "settings.system.noMethod": "No automatic install method on this OS — please download manually from ffmpeg.org.",
+    "settings.system.noMethod": "No automatic install method on this OS 鈥?please download manually from ffmpeg.org.",
     "settings.system.logTitle": "Install log",
     "settings.system.logTitleUninstall": "Uninstall log",
-    "settings.system.logEmpty": "Log empty — waiting for first output…",
+    "settings.system.logEmpty": "Log empty 鈥?waiting for first output鈥?,
     "settings.perms.allOk": "All granted",
     "settings.perms.intro.strong": "The plugin needs the permissions below to function.",
     "settings.perms.intro.body": "Missing permissions cause silent failures in dependent features. Click \"Grant all\" below to fix all at once.",
@@ -747,7 +747,7 @@ const I18N_DICT = {
     "settings.perms.status.ok": "Granted",
     "settings.perms.status.missing": "Missing",
     "settings.perms.btn.grantAll": "Grant all",
-    "settings.perms.granting": "Granting…",
+    "settings.perms.granting": "Granting鈥?,
     "settings.perms.granted": "Permissions granted",
     "settings.perms.grantFailed": "Grant failed: {msg}",
     "err.title": "Plugin UI render error",
@@ -763,7 +763,7 @@ const I18N_DICT = {
     "toast.retryOk": "Task re-queued",
     "toast.cleanupOk": "Cleaned {n} files",
     "toast.uploadFailed": "Upload failed",
-    "toast.invalidEdl": "EDL JSON parse failed — check the format",
+    "toast.invalidEdl": "EDL JSON parse failed 鈥?check the format",
   },
 };
 
@@ -829,7 +829,7 @@ function useLocale() {
   return locale;
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Constants 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const MODE_IDS = ["source_review", "silence_cut", "auto_color", "cut_qc"];
 const TAB_ICONS = { create: "clapper", tasks: "tasks", guide: "book", settings: "settings" };
@@ -879,7 +879,7 @@ function Ico(props) {
               : typeof lib[ICON_ALIAS[name]] === "function" ? ICON_ALIAS[name] : "";
     if (key) return <span className="oa-icon" dangerouslySetInnerHTML={{__html: lib[key]()}} />;
   }
-  return <span className="oa-icon" aria-hidden="true">·</span>;
+  return <span className="oa-icon" aria-hidden="true">路</span>;
 }
 
 function BrandMark() {
@@ -907,7 +907,7 @@ function statusLabel(s, t) {
 function fmtMb(bytes) { return Math.round((bytes || 0) / 1048576 * 10) / 10; }
 
 function fmtTime(ts) {
-  if (!ts) return "—";
+  if (!ts) return "鈥?;
   try {
     const d = new Date(typeof ts === "number" ? ts * 1000 : Date.parse(ts));
     return d.toLocaleString();
@@ -916,7 +916,7 @@ function fmtTime(ts) {
 
 function shortId(id) { return (id || "").slice(0, 8); }
 
-// ─── Reusable Switch ────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Reusable Switch 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function Switch({ on, onChange, ariaLabel }) {
   return (
@@ -928,7 +928,7 @@ function Switch({ on, onChange, ariaLabel }) {
   );
 }
 
-// ─── App shell ──────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ App shell 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function App() {
   const t = useT();
@@ -1025,7 +1025,7 @@ function App() {
   );
 }
 
-// ─── Create Tab ─────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Create Tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function CreateTab({ ffmpegOk, goToTasks }) {
   const t = useT();
@@ -1144,7 +1144,7 @@ function CreateTab({ ffmpegOk, goToTasks }) {
     <>
       <div className="create-workbench">
         <div className="create-main">
-          {/* Mode picker — left-rail .mode-btn horizontal row */}
+          {/* Mode picker 鈥?left-rail .mode-btn horizontal row */}
           <div className="card create-card">
             <div className="form-row">
               <div className="label">{t("create.mode.label")}</div>
@@ -1288,7 +1288,7 @@ function TaskStartedModal({ onClose, onGoToTasks }) {
   );
 }
 
-// ─── Mode-specific param forms ──────────────────────────────────────────
+// 鈹€鈹€鈹€ Mode-specific param forms 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function SilenceParamsForm({ params, onChange }) {
   const t = useT();
@@ -1404,7 +1404,7 @@ function NumberField({ label, value, min, max, step, onChange }) {
   );
 }
 
-// ─── Tasks Tab ──────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Tasks Tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function TasksTab({ refreshSignal }) {
   const t = useT();
@@ -1444,7 +1444,7 @@ function TasksTab({ refreshSignal }) {
   useEffect(() => { loadRef.current = load; }, [load]);
   useEffect(() => { if (refreshSignal > 0) loadRef.current(); }, [refreshSignal]);
 
-  // Hard contract #5 from §2.5: onEvent + setInterval fallback.
+  // Hard contract #5 from 搂2.5: onEvent + setInterval fallback.
   useEffect(() => {
     onEvent("plugin:footage-gate:task_update", () => loadRef.current());
     onEvent("plugin:footage-gate:task_progress", () => loadRef.current());
@@ -1524,14 +1524,14 @@ function TasksTab({ refreshSignal }) {
                   {tk.status === "running" ? <div className="spinner-sm" />
                    : tk.thumbs && tk.thumbs.length ? (
                      <img src={"/api/plugins/footage-gate/uploads/" + (tk.thumbs[0] || "").replace(/\\/g, "/")} alt="" />
-                   ) : <span className="text-dim text-xs">—</span>}
+                   ) : <span className="text-dim text-xs">鈥?/span>}
                 </div>
                 <div className="task-info">
-                  <h4>{shortId(tk.id)} · {t("modes." + tk.mode)}</h4>
+                  <h4>{shortId(tk.id)} 路 {t("modes." + tk.mode)}</h4>
                   <div className="task-meta">
                     <span className={"tag " + statusCls(tk.status)}>{statusLabel(tk.status, t)}</span>
                     {tk.is_hdr_source ? <span className="tag tag-orange">HDR</span> : null}
-                    {tk.qc_attempts ? <span className="tag tag-blue">remux ×{tk.qc_attempts}</span> : null}
+                    {tk.qc_attempts ? <span className="tag tag-blue">remux 脳{tk.qc_attempts}</span> : null}
                     {tk.qc_issues_count ? <span className="tag tag-red">{tk.qc_issues_count} issues</span> : null}
                     <span>{fmtTime(tk.created_at)}</span>
                   </div>
@@ -1585,11 +1585,11 @@ function TaskDetail({ t, task, onCancel, onRetry, onDelete, onOpenFolder }) {
           <KV label={t("tasks.detail.id")} value={task.id} mono />
           <KV label={t("tasks.detail.mode")} value={t("modes." + task.mode)} />
           <KV label={t("tasks.detail.created")} value={fmtTime(task.created_at)} />
-          <KV label={t("tasks.detail.duration")} value={task.duration_input_sec ? task.duration_input_sec.toFixed(2) + "s" : "—"} />
-          <KV label={t("tasks.detail.removed")} value={task.removed_seconds != null ? task.removed_seconds.toFixed(2) + "s" : "—"} />
+          <KV label={t("tasks.detail.duration")} value={task.duration_input_sec ? task.duration_input_sec.toFixed(2) + "s" : "鈥?} />
+          <KV label={t("tasks.detail.removed")} value={task.removed_seconds != null ? task.removed_seconds.toFixed(2) + "s" : "鈥?} />
           <KV label={t("tasks.detail.attempts")} value={task.qc_attempts || 0} />
-          <KV label={t("tasks.detail.issues")} value={task.qc_issues_count != null ? task.qc_issues_count : "—"} />
-          <KV label={t("tasks.detail.hdr")} value={task.is_hdr_source ? <Ico name="check" /> : "—"} />
+          <KV label={t("tasks.detail.issues")} value={task.qc_issues_count != null ? task.qc_issues_count : "鈥?} />
+          <KV label={t("tasks.detail.hdr")} value={task.is_hdr_source ? <Ico name="check" /> : "鈥?} />
         </div>
       </div>
 
@@ -1619,7 +1619,7 @@ function TaskDetail({ t, task, onCancel, onRetry, onDelete, onOpenFolder }) {
       {isFailed && task.error_kind && (
         <div className="card" style={{ borderColor: "rgba(239,68,68,.3)", background: "rgba(239,68,68,.04)" }}>
           <div className="card-title text-danger">{t("tasks.detail.errorKind")}: {task.error_kind}</div>
-          <div className="text-sm" style={{ marginBottom: 8 }}>{task.error_message || "—"}</div>
+          <div className="text-sm" style={{ marginBottom: 8 }}>{task.error_message || "鈥?}</div>
           {Array.isArray(task.error_hints) && task.error_hints.length > 0 && (
             <div>
               <div className="text-xs text-dim" style={{ marginBottom: 4 }}>{t("tasks.detail.hints")}</div>
@@ -1644,12 +1644,12 @@ function KV({ label, value, mono }) {
   return (
     <div>
       <div className="text-xs text-dim">{label}</div>
-      <div className="text-sm" style={mono ? { fontFamily: "ui-monospace, monospace", wordBreak: "break-all" } : undefined}>{value || "—"}</div>
+      <div className="text-sm" style={mono ? { fontFamily: "ui-monospace, monospace", wordBreak: "break-all" } : undefined}>{value || "鈥?}</div>
     </div>
   );
 }
 
-// ─── Guide Tab ──────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Guide Tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function GuideTab() {
   const t = useT();
@@ -1678,10 +1678,10 @@ function GuideTab() {
 
         <Collapsible title={t("guide.tips.title")}>
           <div className="guide-tip-grid">
-            <div className="guide-tip-item"><Ico name="scissors" /><span>静默剪除默认阈值 -45 dB，适合普通对话；纯音乐或环境音场景建议提高到 -30 dB。</span></div>
-            <div className="guide-tip-item"><Ico name="palette" /><span>自动调色默认开启 HDR tone-map，iPhone HLG / Sony PQ 视频建议保持开启。</span></div>
-            <div className="guide-tip-item"><Ico name="checklist" /><span>剪辑边界 QC 默认不自动 remux，确认 EDL 来源可信后再开启自动修复。</span></div>
-            <div className="guide-tip-item"><Ico name="checklist" /><span>EDL JSON 字段同时支持 in_seconds / out_seconds 与 start_seconds / end_seconds。</span></div>
+            <div className="guide-tip-item"><Ico name="scissors" /><span>闈欓粯鍓櫎榛樿闃堝€?-45 dB锛岄€傚悎鏅€氬璇濓紱绾煶涔愭垨鐜闊冲満鏅缓璁彁楂樺埌 -30 dB銆?/span></div>
+            <div className="guide-tip-item"><Ico name="palette" /><span>鑷姩璋冭壊榛樿寮€鍚?HDR tone-map锛宨Phone HLG / Sony PQ 瑙嗛寤鸿淇濇寔寮€鍚€?/span></div>
+            <div className="guide-tip-item"><Ico name="checklist" /><span>鍓緫杈圭晫 QC 榛樿涓嶈嚜鍔?remux锛岀‘璁?EDL 鏉ユ簮鍙俊鍚庡啀寮€鍚嚜鍔ㄤ慨澶嶃€?/span></div>
+            <div className="guide-tip-item"><Ico name="checklist" /><span>EDL JSON 瀛楁鍚屾椂鏀寔 in_seconds / out_seconds 涓?start_seconds / end_seconds銆?/span></div>
           </div>
         </Collapsible>
 
@@ -1706,7 +1706,7 @@ function Collapsible({ title, children, defaultOpen }) {
   );
 }
 
-// ─── Settings Tab ───────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Settings Tab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function SettingsTab({ onFfmpegChanged }) {
   const t = useT();
@@ -1731,7 +1731,7 @@ function SettingsTab({ onFfmpegChanged }) {
       if (r.body && r.body.ok) {
         setPermsStatus(r.body);
       } else if (r.status === 404) {
-        // Plugin doesn't implement permissions/check — treat as all-ok placeholder
+        // Plugin doesn't implement permissions/check 鈥?treat as all-ok placeholder
         setPermsStatus({ all_granted: true, missing: [], checks: [] });
       }
     } catch {
@@ -1766,7 +1766,7 @@ function SettingsTab({ onFfmpegChanged }) {
   return (
     <div className="centered-tab">
       <div className="centered-tab__inner">
-      {/* Section 1 — Transcription API */}
+      {/* Section 1 鈥?Transcription API */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="key" /> {t("settings.section.api")}</h3>
         <div className="form-row">
@@ -1787,13 +1787,13 @@ function SettingsTab({ onFfmpegChanged }) {
         </div>
       </div>
 
-      {/* Section 2 — Permissions */}
+      {/* Section 2 鈥?Permissions */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="shield" /> {t("settings.section.permissions")}</h3>
         <PermissionsPanel status={permsStatus} onChanged={reloadPerms} />
       </div>
 
-      {/* Section 3 — System dependency (FFmpeg) */}
+      {/* Section 3 鈥?System dependency (FFmpeg) */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="package" /> {t("settings.section.system")}</h3>
         <div className="deps-help">
@@ -1808,7 +1808,7 @@ function SettingsTab({ onFfmpegChanged }) {
         <FfmpegInstaller onInstalled={onFfmpegChanged} onUninstalled={onFfmpegChanged} />
       </div>
 
-      {/* Section 4 — Defaults */}
+      {/* Section 4 鈥?Defaults */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="settings" /> {t("settings.section.defaults")}</h3>
         <div className="grid-2">
@@ -1851,7 +1851,7 @@ function SettingsTab({ onFfmpegChanged }) {
         </div>
       </div>
 
-      {/* Section 5 — Storage */}
+      {/* Section 5 鈥?Storage */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="folder" /> {t("settings.section.storage")}</h3>
         <StoragePanel
@@ -1864,7 +1864,7 @@ function SettingsTab({ onFfmpegChanged }) {
         />
       </div>
 
-      {/* Section 6 — About */}
+      {/* Section 6 鈥?About */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"><Ico name="info" /> {t("settings.section.about")}</h3>
         <div className="about-copy" style={{ marginBottom: 8 }}>
@@ -1928,7 +1928,7 @@ function SwitchSetting({ label, desc, on, onChange }) {
   );
 }
 
-// ─── Permissions Panel (1:1 with seedance) ──────────────────────────────
+// 鈹€鈹€鈹€ Permissions Panel (1:1 with seedance) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function PermissionsPanel({ status, onChanged }) {
   const t = useT();
@@ -2014,7 +2014,7 @@ function PermissionsPanel({ status, onChanged }) {
   );
 }
 
-// ─── FFmpeg Installer (1:1 with seedance pattern) ───────────────────────
+// 鈹€鈹€鈹€ FFmpeg Installer (1:1 with seedance pattern) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function FfmpegInstaller({ onInstalled, onUninstalled }) {
   const t = useT();
@@ -2289,7 +2289,7 @@ function FfmpegInstaller({ onInstalled, onUninstalled }) {
   );
 }
 
-// ─── Storage Panel ──────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Storage Panel 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 function StoragePanel({ stats, outputDir, onOutputDirChange, onSaveOutputDir, onRefresh, t }) {
   const [cleaning, setCleaning] = useState("");
@@ -2372,7 +2372,7 @@ function StoragePanel({ stats, outputDir, onOutputDirChange, onSaveOutputDir, on
   );
 }
 
-// ─── Error Boundary (hard contract #6 from §2.5) ────────────────────────
+// 鈹€鈹€鈹€ Error Boundary (hard contract #6 from 搂2.5) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 class PluginErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null, info: null }; }
@@ -2411,7 +2411,7 @@ class PluginErrorBoundary extends React.Component {
   }
 }
 
-// ─── Mount ──────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Mount 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <PluginErrorBoundary>

@@ -1,15 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>即梦工作室</title>
+  <title>鍗虫ⅵ宸ヤ綔瀹?/title>
   <!--
     Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
     Plugins MUST NOT depend on host-mounted /api/plugins/_sdk/* (removed in
     SDK 0.7.0). See plugins-archive/_shared/web-uikit/README.md for the
     canonical reference copy. The FFmpeg one-click installer that used to
-    come from dep-gate.js is now owned by the plugin itself — see the
+    come from dep-gate.js is now owned by the plugin itself 鈥?see the
     FfmpegInstaller React component below and seedance_inline/system_deps.py.
   -->
   <script src="_assets/bootstrap.js"></script>
@@ -22,9 +22,9 @@
     React/ReactDOM/Babel still execute in declared order; preload only
     starts the downloads earlier so they finish faster).
   -->
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -321,16 +321,16 @@
     .ico { display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; vertical-align: -0.125em; flex-shrink: 0; }
     .ico svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .ico-sm { width: 14px; height: 14px; }
-    /* ── compact overrides ── */
+    /* 鈹€鈹€ compact overrides 鈹€鈹€ */
     .content { padding: 14px 16px; }
     .card { padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
     .form-row { margin-bottom: 10px; }
-    /* (.label compact-override removed — keep the upgraded label styles
+    /* (.label compact-override removed 鈥?keep the upgraded label styles
      *  defined above so all form-field labels get the section-title look) */
     .header { padding: 10px 18px; }
     .tab { padding: 9px 16px; }
     .btn { padding: 7px 14px; }
-    /* ── task started modal ── */
+    /* 鈹€鈹€ task started modal 鈹€鈹€ */
     .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 2000; animation: ak-fade-in .15s ease-out; padding: 20px; }
     .modal-card { background: var(--bg-card); border-radius: 12px; padding: 22px 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,.25); animation: ak-scale-in .15s ease-out; }
     .modal-icon { width: 42px; height: 42px; border-radius: 50%; background: rgba(34,197,94,.12); color: var(--success); display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 22px; }
@@ -339,7 +339,7 @@
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
     @keyframes ak-fade-in { from { opacity: 0; } to { opacity: 1; } }
     @keyframes ak-scale-in { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    /* ── advanced toggles row (Tongyi-style: label + switch tightly grouped) ── */
+    /* 鈹€鈹€ advanced toggles row (Tongyi-style: label + switch tightly grouped) 鈹€鈹€ */
     .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
     .toggle-row {
       display: flex; align-items: center; gap: 10px;
@@ -351,13 +351,13 @@
     .toggle-row__label { font-size: 13px; color: var(--text); flex: 1; }
     .toggle-row .switch { flex-shrink: 0; }
     .advanced-divider { height: 1px; background: var(--border); margin: 14px 0 12px; }
-    /* ── full-width primary button (block) ── */
+    /* 鈹€鈹€ full-width primary button (block) 鈹€鈹€ */
     .btn-block {
       display: flex; align-items: center; justify-content: center; gap: 8px;
       width: 100%; padding: 12px 16px; font-size: 14px; font-weight: 600;
       border-radius: 8px;
     }
-    /* ── prompt textarea wrapper with floating counter ── */
+    /* 鈹€鈹€ prompt textarea wrapper with floating counter 鈹€鈹€ */
     .prompt-wrap { position: relative; }
     .prompt-wrap .prompt-counter {
       position: absolute; bottom: 8px; right: 12px;
@@ -366,7 +366,7 @@
       background: linear-gradient(to right, transparent, var(--bg) 30%);
       padding: 2px 4px 2px 16px; border-radius: 4px;
     }
-    /* ── header: API key status pill ── */
+    /* 鈹€鈹€ header: API key status pill 鈹€鈹€ */
     .api-pill {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 3px 10px; border-radius: 999px;
@@ -379,7 +379,7 @@
       cursor: pointer;
     }
     .api-pill--missing:hover { filter: brightness(0.95); }
-    /* ── filter group (tongyi-style horizontal pill rows) ── */
+    /* 鈹€鈹€ filter group (tongyi-style horizontal pill rows) 鈹€鈹€ */
     .filter-group { display: flex; flex-direction: column; gap: 6px; }
     .filter-group + .filter-group { margin-top: 8px; }
     .filter-group__label {
@@ -389,7 +389,7 @@
     }
     .filter-group__buttons { display: flex; gap: 6px; flex-wrap: wrap; }
     .filter-group__buttons .mode-btn { padding: 5px 12px; font-size: 12px; }
-    /* ── system component callout body (settings) ── */
+    /* 鈹€鈹€ system component callout body (settings) 鈹€鈹€ */
     .deps-help {
       font-size: 12px; color: var(--text-muted); line-height: 1.7;
       background: var(--bg); border: 1px solid var(--border);
@@ -399,7 +399,7 @@
     .deps-help strong { color: var(--text); font-weight: 600; }
     .deps-help ul { margin: 6px 0 0 18px; padding: 0; }
     .deps-help li { margin: 2px 0; }
-    /* ── in-plugin FFmpeg installer (replaces retired dep-gate.js) ── */
+    /* 鈹€鈹€ in-plugin FFmpeg installer (replaces retired dep-gate.js) 鈹€鈹€ */
     .sysdep-card {
       border: 1px solid var(--border); border-radius: 8px;
       padding: 12px; margin-top: 8px; background: var(--bg-card);
@@ -505,7 +505,7 @@
       vertical-align: middle;
     }
     @keyframes sysdep-spin { to { transform: rotate(360deg); } }
-    /* ── inline ffmpeg-missing notice (storyboard) ── */
+    /* 鈹€鈹€ inline ffmpeg-missing notice (storyboard) 鈹€鈹€ */
     .inline-warn {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 12px; margin-bottom: 12px;
@@ -515,8 +515,8 @@
     .inline-warn__text { flex: 1; }
     .inline-warn__text small { display: block; color: var(--text-muted); font-size: 11px; margin-top: 2px; }
 
-    /* ── In-plugin folder picker modal ── */
-    /* Override .modal-card's 420px cap — picker needs the room for
+    /* 鈹€鈹€ In-plugin folder picker modal 鈹€鈹€ */
+    /* Override .modal-card's 420px cap 鈥?picker needs the room for
        breadcrumb + sidebar + listing + footer to all sit comfortably. */
     .folder-picker { width: min(820px, 96vw); max-width: min(820px, 96vw); max-height: 82vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
     .folder-picker__head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
@@ -541,14 +541,14 @@
     .folder-picker__foot { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg-card); }
     .folder-picker__current { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     .folder-picker__newinput { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; background: var(--bg-card); color: var(--text); }
-    /* ── centered tab layout (used by PromptGuide + Settings) ── */
+    /* 鈹€鈹€ centered tab layout (used by PromptGuide + Settings) 鈹€鈹€ */
     .centered-tab { display: flex; flex-direction: column; align-items: center; width: 100%; max-height: 100%; overflow-y: auto; padding-bottom: 24px; }
     .centered-tab__inner { width: 100%; max-width: 720px; }
     .centered-tab__footer { width: 100%; max-width: 720px; background: #fff; border-radius: var(--radius); padding: 18px 22px; margin-top: 8px; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
     @media (prefers-color-scheme: dark) {
       .centered-tab__footer { background: var(--bg-card); }
     }
-    /* ── storyboard split layout ── */
+    /* 鈹€鈹€ storyboard split layout 鈹€鈹€ */
     .storyboard-split { display: flex; gap: 20px; height: 100%; overflow: hidden; }
     .storyboard-split__left { width: 50%; min-width: 320px; overflow-y: auto; flex-shrink: 0; }
     .storyboard-split__right { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; }
@@ -673,7 +673,7 @@
 <body>
 <div id="root"></div>
 <script>
-// ── Minimal Bridge SDK with direct HTTP fallback ──
+// 鈹€鈹€ Minimal Bridge SDK with direct HTTP fallback 鈹€鈹€
 const BRIDGE_VER = 1;
 let _ctx = null, _caps = [], _pending = {}, _handlers = {};
 let _bridgeConnected = false;
@@ -781,7 +781,7 @@ function uploadFile(file) {
   return fetch(base + "/upload", { method: "POST", body: fd }).then(function(r) { return r.json(); });
 }
 
-// ── Standard SDK: showToast ──
+// 鈹€鈹€ Standard SDK: showToast 鈹€鈹€
 function showToast(body, type) {
   type = type || "success";
   if (_inIframe && _bridgeConnected) {
@@ -817,10 +817,10 @@ function sanitizeDownloadFilename(name) {
   return leaf;
 }
 
-// ── Standard SDK: downloadFile ──
+// 鈹€鈹€ Standard SDK: downloadFile 鈹€鈹€
 //
 // Strategy:
-//   1) Prefer bridge:download → Tauri's reqwest → user's Downloads folder.
+//   1) Prefer bridge:download 鈫?Tauri's reqwest 鈫?user's Downloads folder.
 //      This gives the best UX (absolute path toast + "reveal in folder").
 //   2) On *any* bridge failure (timeout, host-side reqwest error, packaged
 //      Windows builds where Defender/AV/system-proxy blocks the Rust process
@@ -901,7 +901,7 @@ function downloadFile(url, filename, localPath) {
   showToast(_bt("bridge.download.started", null, "Download started"), "success");
 }
 
-// ── Standard SDK: showInFolder ──
+// 鈹€鈹€ Standard SDK: showInFolder 鈹€鈹€
 function showInFolder(path) {
   if (_inIframe && _bridgeConnected) {
     post({ type: "bridge:show-in-folder", payload: { path: path } });
@@ -910,7 +910,7 @@ function showInFolder(path) {
   return Promise.resolve();
 }
 
-// ── Standard SDK: pickFolder ──
+// 鈹€鈹€ Standard SDK: pickFolder 鈹€鈹€
 function pickFolder(title) {
   if (_inIframe && _bridgeConnected) {
     return new Promise(function(resolve) {
@@ -923,7 +923,7 @@ function pickFolder(title) {
   return Promise.resolve(null);
 }
 
-// ── Standard SDK: copyToClipboard ──
+// 鈹€鈹€ Standard SDK: copyToClipboard 鈹€鈹€
 function copyToClipboard(text) {
   if (_inIframe && _bridgeConnected) {
     var id = uid();
@@ -942,476 +942,476 @@ window.__bridge = {
   pickFolder: pickFolder, copyToClipboard: copyToClipboard,
 };
 
-// ── React via CDN (production build) ──
+// 鈹€鈹€ React via CDN (production build) 鈹€鈹€
 </script>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 <script type="text/babel" data-type="module">
 const { useState, useEffect, useCallback, useRef } = React;
 const { pluginApi, onEvent, uploadFile, downloadFile, showToast, showInFolder, pickFolder, copyToClipboard } = window.__bridge;
 
-// ── i18n dictionary — keep keys sorted by scope: app/tabs/banner/modes/ratios/
+// 鈹€鈹€ i18n dictionary 鈥?keep keys sorted by scope: app/tabs/banner/modes/ratios/
 //    create/preview/tasks/assets/guide/storyboard/settings/status/toast/err.
 const I18N_DICT = {
   zh: {
-    "app.title": "即梦工作室",
-    "app.subtitle": "Seedance Video Generator · 文生视频 / 图生视频 / 多模态 / 视频编辑 / 长视频拼接",
+    "app.title": "鍗虫ⅵ宸ヤ綔瀹?,
+    "app.subtitle": "Seedance Video Generator 路 鏂囩敓瑙嗛 / 鍥剧敓瑙嗛 / 澶氭ā鎬?/ 瑙嗛缂栬緫 / 闀胯棰戞嫾鎺?,
     "app.api.label": "API Key",
-    "app.api.missing": "请先配置 API Key",
-    "app.api.tooltip": "点击前往设置页配置 API Key",
-    "tabs.create": "创建",
-    "tabs.tasks": "任务列表",
-    "tabs.assets": "素材库",
-    "tabs.guide": "提示词指南",
-    "tabs.storyboard": "分镜工作台",
-    "tabs.settings": "设置",
-    "banner.noKey.title": "尚未配置 ARK API Key",
-    "banner.noKey.desc": "所有创建任务都会失败。请前往设置页填入火山引擎 Volcengine Ark API Key。",
-    "banner.noKey.cta": "前往配置",
-    "modes.t2v": "文生视频",
-    "modes.i2v": "首帧",
-    "modes.i2v_end": "首尾帧",
-    "modes.multimodal": "多模态",
-    "modes.edit": "编辑",
-    "modes.extend": "延长",
-    "modes.transition": "过渡生成",
-    "create.section.mode": "生成模式",
-    "create.section.firstFrame": "首帧上传",
-    "create.section.firstLastFrame": "首尾帧上传",
-    "create.section.multimodal": "参考素材",
-    "create.section.editVideo": "原始视频",
-    "create.section.extendVideo": "待延长视频",
-    "create.section.transitionVideo": "过渡源视频",
-    "create.section.prompt": "提示词",
-    "create.section.params": "参数配置",
-    "create.section.advanced": "高级选项",
-    "create.label.model": "模型",
-    "create.label.ratio": "比例",
-    "create.label.resolution": "分辨率",
-    "create.label.duration": "时长 ({min}-{max}秒)",
-    "create.label.tier": "推理模式",
-    "create.tier.online": "在线",
-    "create.tier.flex": "离线半价",
-    "create.toggle.audio": "声音",
-    "create.toggle.watermark": "水印",
-    "create.toggle.lastFrame": "返回尾帧",
-    "create.toggle.draft": "样片模式",
-    "create.toggle.webSearch": "联网搜索",
-    "create.prompt.placeholder": "描述你想生成的视频内容...",
+    "app.api.missing": "璇峰厛閰嶇疆 API Key",
+    "app.api.tooltip": "鐐瑰嚮鍓嶅線璁剧疆椤甸厤缃?API Key",
+    "tabs.create": "鍒涘缓",
+    "tabs.tasks": "浠诲姟鍒楄〃",
+    "tabs.assets": "绱犳潗搴?,
+    "tabs.guide": "鎻愮ず璇嶆寚鍗?,
+    "tabs.storyboard": "鍒嗛暅宸ヤ綔鍙?,
+    "tabs.settings": "璁剧疆",
+    "banner.noKey.title": "灏氭湭閰嶇疆 ARK API Key",
+    "banner.noKey.desc": "鎵€鏈夊垱寤轰换鍔￠兘浼氬け璐ャ€傝鍓嶅線璁剧疆椤靛～鍏ョ伀灞卞紩鎿?Volcengine Ark API Key銆?,
+    "banner.noKey.cta": "鍓嶅線閰嶇疆",
+    "modes.t2v": "鏂囩敓瑙嗛",
+    "modes.i2v": "棣栧抚",
+    "modes.i2v_end": "棣栧熬甯?,
+    "modes.multimodal": "澶氭ā鎬?,
+    "modes.edit": "缂栬緫",
+    "modes.extend": "寤堕暱",
+    "modes.transition": "杩囨浮鐢熸垚",
+    "create.section.mode": "鐢熸垚妯″紡",
+    "create.section.firstFrame": "棣栧抚涓婁紶",
+    "create.section.firstLastFrame": "棣栧熬甯т笂浼?,
+    "create.section.multimodal": "鍙傝€冪礌鏉?,
+    "create.section.editVideo": "鍘熷瑙嗛",
+    "create.section.extendVideo": "寰呭欢闀胯棰?,
+    "create.section.transitionVideo": "杩囨浮婧愯棰?,
+    "create.section.prompt": "鎻愮ず璇?,
+    "create.section.params": "鍙傛暟閰嶇疆",
+    "create.section.advanced": "楂樼骇閫夐」",
+    "create.label.model": "妯″瀷",
+    "create.label.ratio": "姣斾緥",
+    "create.label.resolution": "鍒嗚鲸鐜?,
+    "create.label.duration": "鏃堕暱 ({min}-{max}绉?",
+    "create.label.tier": "鎺ㄧ悊妯″紡",
+    "create.tier.online": "鍦ㄧ嚎",
+    "create.tier.flex": "绂荤嚎鍗婁环",
+    "create.toggle.audio": "澹伴煶",
+    "create.toggle.watermark": "姘村嵃",
+    "create.toggle.lastFrame": "杩斿洖灏惧抚",
+    "create.toggle.draft": "鏍风墖妯″紡",
+    "create.toggle.webSearch": "鑱旂綉鎼滅储",
+    "create.prompt.placeholder": "鎻忚堪浣犳兂鐢熸垚鐨勮棰戝唴瀹?..",
     "create.prompt.counter": "{n}/5000",
-    "create.btn.optimize": "AI 优化",
-    "create.btn.optimize.title": "调用 LLM 自动润色 / 重写提示词，让画面描述更细致一致",
-    "create.btn.startVideo": "生成视频",
-    "create.btn.startDraft": "生成样片预览",
-    "create.btn.startFlex": "提交离线任务",
-    "create.upload.firstHint": "拖拽或点击上传首帧图片",
-    "create.upload.firstSubHint": "建议高清图片 (300-6000px)，比例与目标视频一致",
-    "create.upload.startFrame": "首帧图片",
-    "create.upload.startFrameHint": "起始画面",
-    "create.upload.endFrame": "尾帧图片",
-    "create.upload.endFrameHint": "结束画面",
-    "create.upload.endFrameTip": "首尾帧间的过渡由 AI 自动补全，差异越大效果越戏剧化",
-    "create.upload.multimodal": "拖拽或点击上传参考素材（可多选）",
-    "create.upload.multimodalHint": "支持图片/视频/音频，提示词中用「图片1」「视频2」引用",
-    "create.upload.multimodalTip": "提示词引用方式: 在提示词中写「图片1」「视频2」「音频1」，序号为同类素材的上传顺序",
-    "create.upload.editLabel": "拖拽或点击上传待编辑的视频",
-    "create.upload.extendLabel": "拖拽或点击上传待延长的视频",
-    "create.upload.videoHint": "支持 mp4/mov/webp 格式",
-    "create.assetPicker.choose": "从素材库选择",
-    "create.assetPicker.chooseImage": "从素材库选择图片",
-    "create.assetPicker.chooseMedia": "从素材库选择图片/音频",
-    "create.videoUrl.label": "云端视频 URL（必填）",
-    "create.videoUrl.placeholder": "粘贴 https://...mp4，例如任务详情里的云端视频 URL",
-    "create.videoUrl.hint": "Ark 编辑/延长模式要求 reference_video 是公网 http(s) URL。本地上传的视频只能在插件内预览，云端无法访问。",
-    "create.nextScene.label": "下一场景描述（过渡生成可选）",
-    "create.nextScene.placeholder": "描述过渡片段最终要自然衔接到的下一段画面...",
-    "create.upload.uploading": "上传中: {name}",
-    "create.upload.uploaded": "已上传: {name}",
-    "create.tip.t2v": "文生视频随机性较大，适合激发灵感。如有明确预期，建议先生图再图生视频",
-    "create.tip.i2v": "建议上传高清高质量图片（300-6000px），图片比例建议与目标视频一致以避免裁切",
-    "create.tip.i2v_end": "首尾帧间的画面由 AI 自动过渡补全，尾帧差异越大效果越戏剧化",
-    "create.tip.multimodal": "提示词中用「图片1」「视频2」「音频1」引用素材，序号为同类素材上传顺序",
-    "create.tip.edit": "描述要替换/增加/删除的元素、时机和位置，强调保持不变的部分",
-    "create.tip.extend": "向前/向后延长视频，或多段串联。描述延长内容 + 过渡方式",
-    "create.tip.transition": "基于上一段的云端 video_url 生成 AI 过渡/续写片段；不是本地 ffmpeg 硬拼接",
-    "preview.empty.title": "AI 视频制作就绪",
-    "preview.empty.hint": "填写参数后点击生成",
-    "preview.running.title": "正在生成中...",
-    "preview.running.hint": "通常需要 1~3 分钟，请耐心等待",
-    "preview.failed": "生成失败",
-    "preview.waiting": "等待结果...",
-    "preview.revised": "修改后提示词: {text}",
-    "preview.btn.download": "下载",
-    "preview.btn.copyVideoUrl": "复制云端视频 URL",
-    "preview.btn.new": "新建",
-    "preview.ctrl.stepBack": "逐帧后退",
-    "preview.ctrl.stepFwd": "逐帧前进",
-    "preview.ctrl.loop": "循环",
-    "modal.taskStarted.title": "任务已开始",
-    "modal.taskStarted.draft": "样片预览正在生成，通常需要 30 秒~1 分钟。可前往任务列表查看进度。",
-    "modal.taskStarted.flex": "离线任务已提交，半价模式通常需要 5~30 分钟。可前往任务列表查看进度。",
-    "modal.taskStarted.online": "视频正在云端异步生成，通常需要 1~3 分钟。可前往任务列表查看生成进度。",
-    "modal.taskStarted.continue": "继续创建",
-    "modal.taskStarted.goTasks": "前往任务列表",
-    "modal.createProgress.title": "正在提交任务",
-    "modal.createProgress.validating": "正在校验素材和参数…",
-    "modal.createProgress.submitting": "正在提交到 Ark 云端…",
-    "modal.createProgress.waiting": "正在等待任务号返回…",
-    "modal.createProgress.detail": "大图片或视频素材需要更久，请不要重复点击；系统会防止重复提交。",
-    "modal.createProgress.safe": "提示：这一步只是提交生成任务，真正的视频会在任务列表中异步生成。",
-    "tasks.filter.status": "状态",
-    "tasks.filter.type": "类型",
-    "tasks.filter.all": "全部",
-    "tasks.filter.allTypes": "全部类型",
-    "tasks.filter.running": "进行中",
-    "tasks.filter.succeeded": "已完成",
-    "tasks.filter.failed": "失败",
-    "tasks.filter.draft": "样片",
-    "tasks.filter.flex": "离线",
-    "tasks.refresh": "刷新",
-    "tasks.empty": "暂无任务",
-    "tasks.empty.title": "暂无任务",
-    "tasks.empty.hint": "在「创建」标签页创建第一个视频任务后会显示在这里",
-    "tasks.empty.noSelection.title": "选择一个任务查看详情",
-    "tasks.empty.noSelection.hint": "左侧列表中点击任意任务，可在此查看视频预览、参数、提示词与下载/重试操作",
-    "tasks.noPrompt": "(无提示词)",
-    "tasks.total": "共 {n} 个任务",
-    "tasks.tag.flex": "Flex半价",
-    "tasks.tag.draft": "样片",
-    "tasks.tag.downloaded": "已下载",
-    "tasks.tag.failed": "失败",
-    "tasks.tag.running": "生成中",
-    "tasks.tag.done": "完成",
-    "tasks.btn.retry": "重试",
-    "tasks.btn.delete": "删除",
-    "tasks.btn.editVideo": "编辑此视频",
-    "tasks.btn.extendVideo": "延长此视频",
-    "tasks.btn.transitionVideo": "生成过渡",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.confirmDelete": "确定要删除这个任务吗？此操作不可恢复。",
-    "tasks.detail.id": "任务 ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.model": "模型",
-    "tasks.detail.ratio": "画面比例",
-    "tasks.detail.duration": "时长",
-    "tasks.detail.resolution": "分辨率",
-    "tasks.detail.tier": "推理模式",
-    "tasks.detail.createdAt": "创建时间",
-    "tasks.detail.prompt": "提示词",
-    "tasks.detail.errorTitle": "失败原因",
-    "tasks.detail.runningHint": "视频正在云端异步生成，通常需要 1~3 分钟。",
-    "tasks.detail.downloaded": "本地已下载: {path}",
-    "assets.filter.all": "全部",
-    "assets.filter.image": "图片",
-    "assets.filter.video": "视频",
-    "assets.filter.audio": "音频",
-    "assets.empty.title": "暂无素材",
-    "assets.empty.hint": "在创建面板上传素材后会自动显示在这里",
-    "assets.count": "{n} 个素材",
-    "assets.intro": "这里保存创建页上传过的素材，可在创建页回选图片/音频素材。",
-    "assets.videoLimit": "本地视频仅支持预览/删除；编辑和延长模式仍需公网视频 URL。",
-    "assets.btn.delete": "删除",
-    "assets.btn.cancel": "取消",
-    "assets.confirm.title": "删除素材",
-    "assets.confirm.body": "将删除素材库中的记录，并同时删除插件上传目录里的本地文件。已生成的视频任务不会被删除。",
-    "assets.confirm.file": "素材: {name}",
-    "assets.confirm.confirm": "确认删除",
-    "assets.deleteFail": "删除失败: {msg}",
-    "assets.preview.open": "打开预览",
-    "assets.preview.close": "关闭",
-    "assets.preview.noPreview": "暂无预览",
-    "assetPicker.title": "从素材库选择",
-    "assetPicker.hint": "选择后会读取本地文件并转成 Ark 需要的 base64，用于本次创建。",
-    "assetPicker.loading": "正在加载素材…",
-    "assetPicker.empty": "暂无可选择素材。请先在创建页上传一次。",
-    "assetPicker.use": "使用此素材",
-    "assetPicker.videoDisabled": "本地视频不能作为 Ark 参考视频复用，请使用公网 http(s) 视频 URL。",
-    "assetPicker.videoDisabledShort": "仅预览/删除",
-    "assetPicker.loadFail": "读取素材失败: {msg}",
-    "assetPicker.cancel": "取消",
-    "guide.search.placeholder": "搜索模板或关键词...",
-    "guide.section.templates": "模板库（点击查看 / 套用）",
-    "guide.section.cameras": "镜头语言速查",
-    "guide.section.atmosphere": "氛围关键词库",
-    "guide.section.formulas": "提示词公式",
-    "guide.section.tips": "提示词编写技巧",
-    "guide.templates.empty": "暂无模板数据（后端未连接或正在加载中）",
-    "guide.atmosphere.light": "光影",
-    "guide.atmosphere.color": "色调",
-    "guide.atmosphere.texture": "质感",
-    "guide.atmosphere.mood": "情绪",
-    "guide.tips.body": "1. 建议 80-200 字，不超过 300 字（5000字符上限）\n2. 使用**时间轴格式**让镜头有节奏：「0-3s: 推镜头, 4-6s: 特写」\n3. 加入**镜头语言**：推/拉/摇/移/跟/环绕/升降/希区柯克变焦\n4. 加入**声音设计**：配乐风格 + 环境音效 + 人声\n5. 避免出现**人脸/真人面孔**相关描述（当前模型限制）\n6. 描述越具体，AI 越能精准生成你想要的视频",
-    "story.section.input": "故事输入",
-    "story.section.usage": "使用说明",
-    "story.section.params": "生成参数",
-    "story.workspace.title": "分镜工作台",
-    "story.workspace.hint": "可自由跳转任一阶段：输入故事、编辑分镜、查看生成进度或处理结果。",
-    "story.step.input": "输入故事",
-    "story.step.edit": "编辑分镜",
-    "story.step.generating": "生成进度",
-    "story.step.results": "结果拼接",
-    "story.empty.edit.title": "还没有分镜段落",
-    "story.empty.edit.hint": "你可以先让 AI 拆解故事，也可以直接添加空白分镜后手动编写提示词。",
-    "story.empty.generate.title": "暂无可生成的分镜",
-    "story.empty.generate.hint": "进入编辑分镜页面，添加或拆解出至少 1 段分镜后再开始生成。",
-    "story.empty.results.title": "还没有生成结果",
-    "story.empty.results.hint": "分镜生成完成后，会在这里预览每段视频并拼接成长视频。",
-    "story.btn.goInput": "去输入故事",
-    "story.btn.goEdit": "去编辑分镜",
-    "story.progress.overview": "生成总览",
-    "story.progress.queue": "分镜队列",
-    "story.progress.previewHint": "生成完成后，点击左侧分镜可在这里预览视频结果。",
-    "story.progress.waitingId": "正在提交任务并等待云端任务 ID…",
-    "story.progress.percent": "整体进度 {percent}%",
-    "story.progress.pending": "待提交",
-    "story.progress.running": "生成中",
-    "story.progress.other": "其他",
-    "story.progress.status.pending": "等待",
-    "story.progress.status.running": "生成中",
-    "story.progress.status.succeeded": "完成",
-    "story.progress.status.failed": "失败",
-    "story.label.story": "故事 / 脚本内容",
-    "story.label.totalDuration": "目标总时长 (秒)",
-    "story.label.segDuration": "每段时长 (秒)",
-    "story.label.ratio": "画面比例",
-    "story.label.style": "视觉风格",
-    "story.label.model": "模型",
-    "story.label.resolution": "分辨率",
-    "story.label.genMode": "生成模式",
-    "story.label.transition": "拼接过渡",
-    "story.gen.serial": "串行：末帧接下一段",
-    "story.gen.serialExtend": "云端续写：video_url 延长",
-    "story.gen.cloudTransition": "云端过渡：AI 生成衔接片段",
-    "story.gen.parallel": "并行：各段独立生成",
-    "story.story.placeholder": "请输入你的视频故事内容，AI 会自动拆解为多段分镜脚本...\n\n示例：一只小猫在阳光明媚的花园里探索，先好奇地闻花朵，然后追逐蝴蝶，最后在树荫下打盹。",
-    "story.estimate": "预计将拆解为 {n} 个视频片段，每段 {seg} 秒，总时长约 {total} 秒",
-    "story.decompose.idle": "AI 分镜拆解",
-    "story.decompose.busy": "AI 拆解中...",
-    "story.decompose.connect": "正在连接 AI 模型...",
-    "story.decompose.analyze": "AI 正在分析故事结构，生成分镜脚本...",
-    "story.decompose.batch": "正在生成 {n} 段分镜，请耐心等待...",
-    "story.decompose.long": "LLM 推理中，较长的故事可能需要 20-40 秒...",
-    "story.usage.body": "1. 输入你的故事或脚本，AI 会将其拆解为多段 Seedance 分镜\n2. 可以编辑每段分镜的提示词、时长和过渡方式\n3. 串行模式下，每段视频会使用上一段的尾帧作为参考，保证画面连贯\n4. 生成完成后可用 ffmpeg 拼接为完整长视频",
-    "story.usage.warn": "**注意：**Seedance 2.0 不支持含真人面部的参考图。串行链接如遇人脸审核，系统会自动降级为纯文本生成，画面连贯性可能降低。建议使用虚拟人物、动物、风景等主题。",
-    "story.edit.title": "分镜编辑 — {n} 段",
-    "story.edit.hint": "点击段落展开编辑，拖动排序，自由调整",
-    "story.btn.back": "返回",
-    "story.btn.addSeg": "添加段",
-    "story.btn.startGen": "开始生成 ({mode})",
-    "story.btn.startGenSerial": "串行接力",
-    "story.btn.startGenParallel": "并行独立",
-    "story.btn.moveUp": "上移",
-    "story.btn.moveDown": "下移",
-    "story.btn.delete": "删除",
-    "story.btn.newProject": "新建项目",
-    "story.btn.backEdit": "返回编辑",
-    "story.btn.openFolder": "打开所在文件夹",
-    "story.gen.title": "正在生成 {n} 段视频...",
-    "story.gen.serialDesc": "串行模式: 逐段生成，每段使用上一段结果作为参考",
-    "story.gen.parallelDesc": "并行模式: 所有段落同时生成",
-    "story.gen.estimate": "预计需要 {min} 分钟，请耐心等待",
-    "story.results.done": "长视频生成完成",
-    "story.results.title": "生成结果",
-    "story.results.summary": "总计: {total} 段 · 成功 {ok}{fail}",
-    "story.results.failPart": " · 失败 {n}",
-    "story.concat.title": "拼接完成",
-    "story.concat.tip": "可拼接 {n} 个视频片段",
-    "story.ffmpeg.warn.title": "FFmpeg 未安装，无法拼接长视频",
-    "story.ffmpeg.warn.hint": "请前往「设置 > 系统组件」一键安装 FFmpeg",
-    "story.ffmpeg.warn.cta": "前往安装",
-    "story.concat.idle": "拼接为长视频 ({mode})",
-    "story.concat.busy": "拼接中...",
-    "story.preview.empty": "视频预览区",
-    "story.preview.title": "预览",
-    "story.preview.inputHint": "输入故事并分解后，可在此预览每段分镜内容",
-    "story.preview.editHint": "点击左侧分镜段落，在此查看详情",
-    "story.preview.segTitle": "分镜 #{n} 预览",
-    "story.preview.generating": "视频生成中…",
-    "story.preview.selectResult": "点击左侧片段预览视频",
-    "story.concat.modeCut": "硬切",
-    "story.concat.modeFade": "交叉淡化",
-    "story.totalEstimate": "共 {n} 段，预计总时长 {sec} 秒",
-    "story.statTotal": "总计:",
-    "story.statSuccess": "成功:",
-    "story.statFail": "失败:",
-    "settings.section.api": "API 配置",
-    "settings.section.defaults": "默认参数",
-    "settings.section.folder": "文件夹设置",
-    "settings.section.webhook": "Webhook 设置",
-    "settings.section.system": "系统组件",
-    "settings.system.intro.strong": "FFmpeg 仅用于「分镜工作台」的长视频拼接，以及「素材库」的视频缩略预览。",
-    "settings.system.intro.body": "文生视频 / 图生视频 / 任务列表 / 提示词指南等核心功能不依赖 FFmpeg。如果你不需要长视频拼接，可以暂时跳过安装。\n\nFFmpeg 是系统级组件（共享 PATH 安装），并非本插件私有——任何已经装好 ffmpeg 的机器都会自动检测到，无需重复安装；同样，安装/卸载也会影响其他用到 ffmpeg 的插件和程序。",
-    "settings.system.platform.win": "Windows: 「一键安装」会调用 winget 自动安装 Gyan.FFmpeg，无需管理员权限。",
-    "settings.system.platform.mac": "macOS: 「一键安装」会调用 Homebrew 自动安装 ffmpeg。",
-    "settings.system.platform.linux": "Linux: apt / dnf 需要 root 权限。如果 Synapse 以普通用户身份运行，请按提示在终端执行 sudo apt-get install ffmpeg。",
-    "settings.system.detecting": "正在检测...",
-    "settings.system.status.found": "已安装 v{ver}",
-    "settings.system.status.foundNoVer": "已安装",
-    "settings.system.status.missing": "未安装",
-    "settings.system.location": "路径：{path}",
-    "settings.system.btn.install": "一键安装",
-    "settings.system.btn.installVia": "一键安装 ({strategy})",
-    "settings.system.btn.recheck": "重新检测",
-    "settings.system.btn.openHome": "查看官方文档",
-    "settings.system.btn.copyCmd": "复制命令",
-    "settings.system.btn.copied": "已复制",
-    "settings.system.btn.cancel": "取消",
-    "settings.system.btn.uninstall": "卸载",
-    "settings.system.btn.uninstallVia": "卸载 ({strategy})",
-    "settings.system.btn.uninstallConfirmBtn": "确认卸载",
-    "settings.system.installing": "安装中... ({elapsed})",
-    "settings.system.uninstalling": "卸载中... ({elapsed})",
-    "settings.system.installEstimate": "预计耗时约 {sec} 秒",
-    "settings.system.installed": "FFmpeg 安装成功",
-    "settings.system.installFailed": "安装失败：{msg}",
-    "settings.system.uninstalled": "FFmpeg 已卸载",
-    "settings.system.uninstallFailed": "卸载失败：{msg}",
-    "settings.system.uninstallConfirm": "确定要卸载 FFmpeg 吗？\n\n注意：FFmpeg 是系统级组件（装在 Windows 用户 PATH / macOS Homebrew / Linux /usr/bin），不是 Seedance 插件私有的——卸载会影响 Synapse 上所有依赖 FFmpeg 的插件（如字幕生成、视频翻译、配音等），以及你系统上其他用到 ffmpeg 的程序。\n\n本插件中将不可用：分镜工作台长视频拼接、素材库视频缩略预览。",
-    "settings.system.requiresSudo": "Linux 需要 root 权限。请在终端手动执行：",
-    "settings.system.requiresSudoUninstall": "Linux 需要 root 权限。请在终端手动执行：",
-    "settings.system.noMethod": "当前系统暂无自动安装方案，请前往官方文档手动下载。",
-    "settings.system.logTitle": "安装日志",
-    "settings.system.logTitleUninstall": "卸载日志",
-    "settings.system.logEmpty": "暂无输出",
-    "settings.section.permissions": "插件权限",
-    "settings.perms.intro.strong": "本插件需要以下高级权限才能完整工作。",
-    "settings.perms.intro.body": "首次安装时未自动授予；点击下方按钮一键授权（等价于在「设置中心 → 插件管理 → 权限」勾选保存）。",
-    "settings.perms.allOk": "所有所需权限已授予。",
-    "settings.perms.btn.grantAll": "一键授予所有权限",
-    "settings.perms.granting": "授予中...",
-    "settings.perms.granted": "权限已授予，插件已重新加载",
-    "settings.perms.grantFailed": "授权失败：{msg}",
-    "settings.perms.col.permission": "权限",
-    "settings.perms.col.feature": "用途",
-    "settings.perms.col.status": "状态",
-    "settings.perms.status.ok": "已授予",
-    "settings.perms.status.missing": "未授予",
-    "banner.perms.title": "插件缺少必要权限，部分功能将不可用",
-    "banner.perms.desc": "请前往「设置 → 插件权限」一键授权",
-    "banner.perms.cta": "前往授权",
+    "create.btn.optimize": "AI 浼樺寲",
+    "create.btn.optimize.title": "璋冪敤 LLM 鑷姩娑﹁壊 / 閲嶅啓鎻愮ず璇嶏紝璁╃敾闈㈡弿杩版洿缁嗚嚧涓€鑷?,
+    "create.btn.startVideo": "鐢熸垚瑙嗛",
+    "create.btn.startDraft": "鐢熸垚鏍风墖棰勮",
+    "create.btn.startFlex": "鎻愪氦绂荤嚎浠诲姟",
+    "create.upload.firstHint": "鎷栨嫿鎴栫偣鍑讳笂浼犻甯у浘鐗?,
+    "create.upload.firstSubHint": "寤鸿楂樻竻鍥剧墖 (300-6000px)锛屾瘮渚嬩笌鐩爣瑙嗛涓€鑷?,
+    "create.upload.startFrame": "棣栧抚鍥剧墖",
+    "create.upload.startFrameHint": "璧峰鐢婚潰",
+    "create.upload.endFrame": "灏惧抚鍥剧墖",
+    "create.upload.endFrameHint": "缁撴潫鐢婚潰",
+    "create.upload.endFrameTip": "棣栧熬甯ч棿鐨勮繃娓＄敱 AI 鑷姩琛ュ叏锛屽樊寮傝秺澶ф晥鏋滆秺鎴忓墽鍖?,
+    "create.upload.multimodal": "鎷栨嫿鎴栫偣鍑讳笂浼犲弬鑰冪礌鏉愶紙鍙閫夛級",
+    "create.upload.multimodalHint": "鏀寔鍥剧墖/瑙嗛/闊抽锛屾彁绀鸿瘝涓敤銆屽浘鐗?銆嶃€岃棰?銆嶅紩鐢?,
+    "create.upload.multimodalTip": "鎻愮ず璇嶅紩鐢ㄦ柟寮? 鍦ㄦ彁绀鸿瘝涓啓銆屽浘鐗?銆嶃€岃棰?銆嶃€岄煶棰?銆嶏紝搴忓彿涓哄悓绫荤礌鏉愮殑涓婁紶椤哄簭",
+    "create.upload.editLabel": "鎷栨嫿鎴栫偣鍑讳笂浼犲緟缂栬緫鐨勮棰?,
+    "create.upload.extendLabel": "鎷栨嫿鎴栫偣鍑讳笂浼犲緟寤堕暱鐨勮棰?,
+    "create.upload.videoHint": "鏀寔 mp4/mov/webp 鏍煎紡",
+    "create.assetPicker.choose": "浠庣礌鏉愬簱閫夋嫨",
+    "create.assetPicker.chooseImage": "浠庣礌鏉愬簱閫夋嫨鍥剧墖",
+    "create.assetPicker.chooseMedia": "浠庣礌鏉愬簱閫夋嫨鍥剧墖/闊抽",
+    "create.videoUrl.label": "浜戠瑙嗛 URL锛堝繀濉級",
+    "create.videoUrl.placeholder": "绮樿创 https://...mp4锛屼緥濡備换鍔¤鎯呴噷鐨勪簯绔棰?URL",
+    "create.videoUrl.hint": "Ark 缂栬緫/寤堕暱妯″紡瑕佹眰 reference_video 鏄叕缃?http(s) URL銆傛湰鍦颁笂浼犵殑瑙嗛鍙兘鍦ㄦ彃浠跺唴棰勮锛屼簯绔棤娉曡闂€?,
+    "create.nextScene.label": "涓嬩竴鍦烘櫙鎻忚堪锛堣繃娓＄敓鎴愬彲閫夛級",
+    "create.nextScene.placeholder": "鎻忚堪杩囨浮鐗囨鏈€缁堣鑷劧琛旀帴鍒扮殑涓嬩竴娈电敾闈?..",
+    "create.upload.uploading": "涓婁紶涓? {name}",
+    "create.upload.uploaded": "宸蹭笂浼? {name}",
+    "create.tip.t2v": "鏂囩敓瑙嗛闅忔満鎬ц緝澶э紝閫傚悎婵€鍙戠伒鎰熴€傚鏈夋槑纭鏈燂紝寤鸿鍏堢敓鍥惧啀鍥剧敓瑙嗛",
+    "create.tip.i2v": "寤鸿涓婁紶楂樻竻楂樿川閲忓浘鐗囷紙300-6000px锛夛紝鍥剧墖姣斾緥寤鸿涓庣洰鏍囪棰戜竴鑷翠互閬垮厤瑁佸垏",
+    "create.tip.i2v_end": "棣栧熬甯ч棿鐨勭敾闈㈢敱 AI 鑷姩杩囨浮琛ュ叏锛屽熬甯у樊寮傝秺澶ф晥鏋滆秺鎴忓墽鍖?,
+    "create.tip.multimodal": "鎻愮ず璇嶄腑鐢ㄣ€屽浘鐗?銆嶃€岃棰?銆嶃€岄煶棰?銆嶅紩鐢ㄧ礌鏉愶紝搴忓彿涓哄悓绫荤礌鏉愪笂浼犻『搴?,
+    "create.tip.edit": "鎻忚堪瑕佹浛鎹?澧炲姞/鍒犻櫎鐨勫厓绱犮€佹椂鏈哄拰浣嶇疆锛屽己璋冧繚鎸佷笉鍙樼殑閮ㄥ垎",
+    "create.tip.extend": "鍚戝墠/鍚戝悗寤堕暱瑙嗛锛屾垨澶氭涓茶仈銆傛弿杩板欢闀垮唴瀹?+ 杩囨浮鏂瑰紡",
+    "create.tip.transition": "鍩轰簬涓婁竴娈电殑浜戠 video_url 鐢熸垚 AI 杩囨浮/缁啓鐗囨锛涗笉鏄湰鍦?ffmpeg 纭嫾鎺?,
+    "preview.empty.title": "AI 瑙嗛鍒朵綔灏辩华",
+    "preview.empty.hint": "濉啓鍙傛暟鍚庣偣鍑荤敓鎴?,
+    "preview.running.title": "姝ｅ湪鐢熸垚涓?..",
+    "preview.running.hint": "閫氬父闇€瑕?1~3 鍒嗛挓锛岃鑰愬績绛夊緟",
+    "preview.failed": "鐢熸垚澶辫触",
+    "preview.waiting": "绛夊緟缁撴灉...",
+    "preview.revised": "淇敼鍚庢彁绀鸿瘝: {text}",
+    "preview.btn.download": "涓嬭浇",
+    "preview.btn.copyVideoUrl": "澶嶅埗浜戠瑙嗛 URL",
+    "preview.btn.new": "鏂板缓",
+    "preview.ctrl.stepBack": "閫愬抚鍚庨€€",
+    "preview.ctrl.stepFwd": "閫愬抚鍓嶈繘",
+    "preview.ctrl.loop": "寰幆",
+    "modal.taskStarted.title": "浠诲姟宸插紑濮?,
+    "modal.taskStarted.draft": "鏍风墖棰勮姝ｅ湪鐢熸垚锛岄€氬父闇€瑕?30 绉拁1 鍒嗛挓銆傚彲鍓嶅線浠诲姟鍒楄〃鏌ョ湅杩涘害銆?,
+    "modal.taskStarted.flex": "绂荤嚎浠诲姟宸叉彁浜わ紝鍗婁环妯″紡閫氬父闇€瑕?5~30 鍒嗛挓銆傚彲鍓嶅線浠诲姟鍒楄〃鏌ョ湅杩涘害銆?,
+    "modal.taskStarted.online": "瑙嗛姝ｅ湪浜戠寮傛鐢熸垚锛岄€氬父闇€瑕?1~3 鍒嗛挓銆傚彲鍓嶅線浠诲姟鍒楄〃鏌ョ湅鐢熸垚杩涘害銆?,
+    "modal.taskStarted.continue": "缁х画鍒涘缓",
+    "modal.taskStarted.goTasks": "鍓嶅線浠诲姟鍒楄〃",
+    "modal.createProgress.title": "姝ｅ湪鎻愪氦浠诲姟",
+    "modal.createProgress.validating": "姝ｅ湪鏍￠獙绱犳潗鍜屽弬鏁扳€?,
+    "modal.createProgress.submitting": "姝ｅ湪鎻愪氦鍒?Ark 浜戠鈥?,
+    "modal.createProgress.waiting": "姝ｅ湪绛夊緟浠诲姟鍙疯繑鍥炩€?,
+    "modal.createProgress.detail": "澶у浘鐗囨垨瑙嗛绱犳潗闇€瑕佹洿涔咃紝璇蜂笉瑕侀噸澶嶇偣鍑伙紱绯荤粺浼氶槻姝㈤噸澶嶆彁浜ゃ€?,
+    "modal.createProgress.safe": "鎻愮ず锛氳繖涓€姝ュ彧鏄彁浜ょ敓鎴愪换鍔★紝鐪熸鐨勮棰戜細鍦ㄤ换鍔″垪琛ㄤ腑寮傛鐢熸垚銆?,
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.type": "绫诲瀷",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.allTypes": "鍏ㄩ儴绫诲瀷",
+    "tasks.filter.running": "杩涜涓?,
+    "tasks.filter.succeeded": "宸插畬鎴?,
+    "tasks.filter.failed": "澶辫触",
+    "tasks.filter.draft": "鏍风墖",
+    "tasks.filter.flex": "绂荤嚎",
+    "tasks.refresh": "鍒锋柊",
+    "tasks.empty": "鏆傛棤浠诲姟",
+    "tasks.empty.title": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": "鍦ㄣ€屽垱寤恒€嶆爣绛鹃〉鍒涘缓绗竴涓棰戜换鍔″悗浼氭樉绀哄湪杩欓噷",
+    "tasks.empty.noSelection.title": "閫夋嫨涓€涓换鍔℃煡鐪嬭鎯?,
+    "tasks.empty.noSelection.hint": "宸︿晶鍒楄〃涓偣鍑讳换鎰忎换鍔★紝鍙湪姝ゆ煡鐪嬭棰戦瑙堛€佸弬鏁般€佹彁绀鸿瘝涓庝笅杞?閲嶈瘯鎿嶄綔",
+    "tasks.noPrompt": "(鏃犳彁绀鸿瘝)",
+    "tasks.total": "鍏?{n} 涓换鍔?,
+    "tasks.tag.flex": "Flex鍗婁环",
+    "tasks.tag.draft": "鏍风墖",
+    "tasks.tag.downloaded": "宸蹭笅杞?,
+    "tasks.tag.failed": "澶辫触",
+    "tasks.tag.running": "鐢熸垚涓?,
+    "tasks.tag.done": "瀹屾垚",
+    "tasks.btn.retry": "閲嶈瘯",
+    "tasks.btn.delete": "鍒犻櫎",
+    "tasks.btn.editVideo": "缂栬緫姝よ棰?,
+    "tasks.btn.extendVideo": "寤堕暱姝よ棰?,
+    "tasks.btn.transitionVideo": "鐢熸垚杩囨浮",
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.confirmDelete": "纭畾瑕佸垹闄よ繖涓换鍔″悧锛熸鎿嶄綔涓嶅彲鎭㈠銆?,
+    "tasks.detail.id": "浠诲姟 ID",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.model": "妯″瀷",
+    "tasks.detail.ratio": "鐢婚潰姣斾緥",
+    "tasks.detail.duration": "鏃堕暱",
+    "tasks.detail.resolution": "鍒嗚鲸鐜?,
+    "tasks.detail.tier": "鎺ㄧ悊妯″紡",
+    "tasks.detail.createdAt": "鍒涘缓鏃堕棿",
+    "tasks.detail.prompt": "鎻愮ず璇?,
+    "tasks.detail.errorTitle": "澶辫触鍘熷洜",
+    "tasks.detail.runningHint": "瑙嗛姝ｅ湪浜戠寮傛鐢熸垚锛岄€氬父闇€瑕?1~3 鍒嗛挓銆?,
+    "tasks.detail.downloaded": "鏈湴宸蹭笅杞? {path}",
+    "assets.filter.all": "鍏ㄩ儴",
+    "assets.filter.image": "鍥剧墖",
+    "assets.filter.video": "瑙嗛",
+    "assets.filter.audio": "闊抽",
+    "assets.empty.title": "鏆傛棤绱犳潗",
+    "assets.empty.hint": "鍦ㄥ垱寤洪潰鏉夸笂浼犵礌鏉愬悗浼氳嚜鍔ㄦ樉绀哄湪杩欓噷",
+    "assets.count": "{n} 涓礌鏉?,
+    "assets.intro": "杩欓噷淇濆瓨鍒涘缓椤典笂浼犺繃鐨勭礌鏉愶紝鍙湪鍒涘缓椤靛洖閫夊浘鐗?闊抽绱犳潗銆?,
+    "assets.videoLimit": "鏈湴瑙嗛浠呮敮鎸侀瑙?鍒犻櫎锛涚紪杈戝拰寤堕暱妯″紡浠嶉渶鍏綉瑙嗛 URL銆?,
+    "assets.btn.delete": "鍒犻櫎",
+    "assets.btn.cancel": "鍙栨秷",
+    "assets.confirm.title": "鍒犻櫎绱犳潗",
+    "assets.confirm.body": "灏嗗垹闄ょ礌鏉愬簱涓殑璁板綍锛屽苟鍚屾椂鍒犻櫎鎻掍欢涓婁紶鐩綍閲岀殑鏈湴鏂囦欢銆傚凡鐢熸垚鐨勮棰戜换鍔′笉浼氳鍒犻櫎銆?,
+    "assets.confirm.file": "绱犳潗: {name}",
+    "assets.confirm.confirm": "纭鍒犻櫎",
+    "assets.deleteFail": "鍒犻櫎澶辫触: {msg}",
+    "assets.preview.open": "鎵撳紑棰勮",
+    "assets.preview.close": "鍏抽棴",
+    "assets.preview.noPreview": "鏆傛棤棰勮",
+    "assetPicker.title": "浠庣礌鏉愬簱閫夋嫨",
+    "assetPicker.hint": "閫夋嫨鍚庝細璇诲彇鏈湴鏂囦欢骞惰浆鎴?Ark 闇€瑕佺殑 base64锛岀敤浜庢湰娆″垱寤恒€?,
+    "assetPicker.loading": "姝ｅ湪鍔犺浇绱犳潗鈥?,
+    "assetPicker.empty": "鏆傛棤鍙€夋嫨绱犳潗銆傝鍏堝湪鍒涘缓椤典笂浼犱竴娆°€?,
+    "assetPicker.use": "浣跨敤姝ょ礌鏉?,
+    "assetPicker.videoDisabled": "鏈湴瑙嗛涓嶈兘浣滀负 Ark 鍙傝€冭棰戝鐢紝璇蜂娇鐢ㄥ叕缃?http(s) 瑙嗛 URL銆?,
+    "assetPicker.videoDisabledShort": "浠呴瑙?鍒犻櫎",
+    "assetPicker.loadFail": "璇诲彇绱犳潗澶辫触: {msg}",
+    "assetPicker.cancel": "鍙栨秷",
+    "guide.search.placeholder": "鎼滅储妯℃澘鎴栧叧閿瘝...",
+    "guide.section.templates": "妯℃澘搴擄紙鐐瑰嚮鏌ョ湅 / 濂楃敤锛?,
+    "guide.section.cameras": "闀滃ご璇█閫熸煡",
+    "guide.section.atmosphere": "姘涘洿鍏抽敭璇嶅簱",
+    "guide.section.formulas": "鎻愮ず璇嶅叕寮?,
+    "guide.section.tips": "鎻愮ず璇嶇紪鍐欐妧宸?,
+    "guide.templates.empty": "鏆傛棤妯℃澘鏁版嵁锛堝悗绔湭杩炴帴鎴栨鍦ㄥ姞杞戒腑锛?,
+    "guide.atmosphere.light": "鍏夊奖",
+    "guide.atmosphere.color": "鑹茶皟",
+    "guide.atmosphere.texture": "璐ㄦ劅",
+    "guide.atmosphere.mood": "鎯呯华",
+    "guide.tips.body": "1. 寤鸿 80-200 瀛楋紝涓嶈秴杩?300 瀛楋紙5000瀛楃涓婇檺锛塡n2. 浣跨敤**鏃堕棿杞存牸寮?*璁╅暅澶存湁鑺傚锛氥€?-3s: 鎺ㄩ暅澶? 4-6s: 鐗瑰啓銆峔n3. 鍔犲叆**闀滃ご璇█**锛氭帹/鎷?鎽?绉?璺?鐜粫/鍗囬檷/甯屽尯鏌厠鍙樼劍\n4. 鍔犲叆**澹伴煶璁捐**锛氶厤涔愰鏍?+ 鐜闊虫晥 + 浜哄０\n5. 閬垮厤鍑虹幇**浜鸿劯/鐪熶汉闈㈠瓟**鐩稿叧鎻忚堪锛堝綋鍓嶆ā鍨嬮檺鍒讹級\n6. 鎻忚堪瓒婂叿浣擄紝AI 瓒婅兘绮惧噯鐢熸垚浣犳兂瑕佺殑瑙嗛",
+    "story.section.input": "鏁呬簨杈撳叆",
+    "story.section.usage": "浣跨敤璇存槑",
+    "story.section.params": "鐢熸垚鍙傛暟",
+    "story.workspace.title": "鍒嗛暅宸ヤ綔鍙?,
+    "story.workspace.hint": "鍙嚜鐢辫烦杞换涓€闃舵锛氳緭鍏ユ晠浜嬨€佺紪杈戝垎闀溿€佹煡鐪嬬敓鎴愯繘搴︽垨澶勭悊缁撴灉銆?,
+    "story.step.input": "杈撳叆鏁呬簨",
+    "story.step.edit": "缂栬緫鍒嗛暅",
+    "story.step.generating": "鐢熸垚杩涘害",
+    "story.step.results": "缁撴灉鎷兼帴",
+    "story.empty.edit.title": "杩樻病鏈夊垎闀滄钀?,
+    "story.empty.edit.hint": "浣犲彲浠ュ厛璁?AI 鎷嗚В鏁呬簨锛屼篃鍙互鐩存帴娣诲姞绌虹櫧鍒嗛暅鍚庢墜鍔ㄧ紪鍐欐彁绀鸿瘝銆?,
+    "story.empty.generate.title": "鏆傛棤鍙敓鎴愮殑鍒嗛暅",
+    "story.empty.generate.hint": "杩涘叆缂栬緫鍒嗛暅椤甸潰锛屾坊鍔犳垨鎷嗚В鍑鸿嚦灏?1 娈靛垎闀滃悗鍐嶅紑濮嬬敓鎴愩€?,
+    "story.empty.results.title": "杩樻病鏈夌敓鎴愮粨鏋?,
+    "story.empty.results.hint": "鍒嗛暅鐢熸垚瀹屾垚鍚庯紝浼氬湪杩欓噷棰勮姣忔瑙嗛骞舵嫾鎺ユ垚闀胯棰戙€?,
+    "story.btn.goInput": "鍘昏緭鍏ユ晠浜?,
+    "story.btn.goEdit": "鍘荤紪杈戝垎闀?,
+    "story.progress.overview": "鐢熸垚鎬昏",
+    "story.progress.queue": "鍒嗛暅闃熷垪",
+    "story.progress.previewHint": "鐢熸垚瀹屾垚鍚庯紝鐐瑰嚮宸︿晶鍒嗛暅鍙湪杩欓噷棰勮瑙嗛缁撴灉銆?,
+    "story.progress.waitingId": "姝ｅ湪鎻愪氦浠诲姟骞剁瓑寰呬簯绔换鍔?ID鈥?,
+    "story.progress.percent": "鏁翠綋杩涘害 {percent}%",
+    "story.progress.pending": "寰呮彁浜?,
+    "story.progress.running": "鐢熸垚涓?,
+    "story.progress.other": "鍏朵粬",
+    "story.progress.status.pending": "绛夊緟",
+    "story.progress.status.running": "鐢熸垚涓?,
+    "story.progress.status.succeeded": "瀹屾垚",
+    "story.progress.status.failed": "澶辫触",
+    "story.label.story": "鏁呬簨 / 鑴氭湰鍐呭",
+    "story.label.totalDuration": "鐩爣鎬绘椂闀?(绉?",
+    "story.label.segDuration": "姣忔鏃堕暱 (绉?",
+    "story.label.ratio": "鐢婚潰姣斾緥",
+    "story.label.style": "瑙嗚椋庢牸",
+    "story.label.model": "妯″瀷",
+    "story.label.resolution": "鍒嗚鲸鐜?,
+    "story.label.genMode": "鐢熸垚妯″紡",
+    "story.label.transition": "鎷兼帴杩囨浮",
+    "story.gen.serial": "涓茶锛氭湯甯ф帴涓嬩竴娈?,
+    "story.gen.serialExtend": "浜戠缁啓锛歷ideo_url 寤堕暱",
+    "story.gen.cloudTransition": "浜戠杩囨浮锛欰I 鐢熸垚琛旀帴鐗囨",
+    "story.gen.parallel": "骞惰锛氬悇娈电嫭绔嬬敓鎴?,
+    "story.story.placeholder": "璇疯緭鍏ヤ綘鐨勮棰戞晠浜嬪唴瀹癸紝AI 浼氳嚜鍔ㄦ媶瑙ｄ负澶氭鍒嗛暅鑴氭湰...\n\n绀轰緥锛氫竴鍙皬鐚湪闃冲厜鏄庡獨鐨勮姳鍥噷鎺㈢储锛屽厛濂藉鍦伴椈鑺辨湹锛岀劧鍚庤拷閫愯澊铦讹紝鏈€鍚庡湪鏍戣崼涓嬫墦鐩广€?,
+    "story.estimate": "棰勮灏嗘媶瑙ｄ负 {n} 涓棰戠墖娈碉紝姣忔 {seg} 绉掞紝鎬绘椂闀跨害 {total} 绉?,
+    "story.decompose.idle": "AI 鍒嗛暅鎷嗚В",
+    "story.decompose.busy": "AI 鎷嗚В涓?..",
+    "story.decompose.connect": "姝ｅ湪杩炴帴 AI 妯″瀷...",
+    "story.decompose.analyze": "AI 姝ｅ湪鍒嗘瀽鏁呬簨缁撴瀯锛岀敓鎴愬垎闀滆剼鏈?..",
+    "story.decompose.batch": "姝ｅ湪鐢熸垚 {n} 娈靛垎闀滐紝璇疯€愬績绛夊緟...",
+    "story.decompose.long": "LLM 鎺ㄧ悊涓紝杈冮暱鐨勬晠浜嬪彲鑳介渶瑕?20-40 绉?..",
+    "story.usage.body": "1. 杈撳叆浣犵殑鏁呬簨鎴栬剼鏈紝AI 浼氬皢鍏舵媶瑙ｄ负澶氭 Seedance 鍒嗛暅\n2. 鍙互缂栬緫姣忔鍒嗛暅鐨勬彁绀鸿瘝銆佹椂闀垮拰杩囨浮鏂瑰紡\n3. 涓茶妯″紡涓嬶紝姣忔瑙嗛浼氫娇鐢ㄤ笂涓€娈电殑灏惧抚浣滀负鍙傝€冿紝淇濊瘉鐢婚潰杩炶疮\n4. 鐢熸垚瀹屾垚鍚庡彲鐢?ffmpeg 鎷兼帴涓哄畬鏁撮暱瑙嗛",
+    "story.usage.warn": "**娉ㄦ剰锛?*Seedance 2.0 涓嶆敮鎸佸惈鐪熶汉闈㈤儴鐨勫弬鑰冨浘銆備覆琛岄摼鎺ュ閬囦汉鑴稿鏍革紝绯荤粺浼氳嚜鍔ㄩ檷绾т负绾枃鏈敓鎴愶紝鐢婚潰杩炶疮鎬у彲鑳介檷浣庛€傚缓璁娇鐢ㄨ櫄鎷熶汉鐗┿€佸姩鐗┿€侀鏅瓑涓婚銆?,
+    "story.edit.title": "鍒嗛暅缂栬緫 鈥?{n} 娈?,
+    "story.edit.hint": "鐐瑰嚮娈佃惤灞曞紑缂栬緫锛屾嫋鍔ㄦ帓搴忥紝鑷敱璋冩暣",
+    "story.btn.back": "杩斿洖",
+    "story.btn.addSeg": "娣诲姞娈?,
+    "story.btn.startGen": "寮€濮嬬敓鎴?({mode})",
+    "story.btn.startGenSerial": "涓茶鎺ュ姏",
+    "story.btn.startGenParallel": "骞惰鐙珛",
+    "story.btn.moveUp": "涓婄Щ",
+    "story.btn.moveDown": "涓嬬Щ",
+    "story.btn.delete": "鍒犻櫎",
+    "story.btn.newProject": "鏂板缓椤圭洰",
+    "story.btn.backEdit": "杩斿洖缂栬緫",
+    "story.btn.openFolder": "鎵撳紑鎵€鍦ㄦ枃浠跺す",
+    "story.gen.title": "姝ｅ湪鐢熸垚 {n} 娈佃棰?..",
+    "story.gen.serialDesc": "涓茶妯″紡: 閫愭鐢熸垚锛屾瘡娈典娇鐢ㄤ笂涓€娈电粨鏋滀綔涓哄弬鑰?,
+    "story.gen.parallelDesc": "骞惰妯″紡: 鎵€鏈夋钀藉悓鏃剁敓鎴?,
+    "story.gen.estimate": "棰勮闇€瑕?{min} 鍒嗛挓锛岃鑰愬績绛夊緟",
+    "story.results.done": "闀胯棰戠敓鎴愬畬鎴?,
+    "story.results.title": "鐢熸垚缁撴灉",
+    "story.results.summary": "鎬昏: {total} 娈?路 鎴愬姛 {ok}{fail}",
+    "story.results.failPart": " 路 澶辫触 {n}",
+    "story.concat.title": "鎷兼帴瀹屾垚",
+    "story.concat.tip": "鍙嫾鎺?{n} 涓棰戠墖娈?,
+    "story.ffmpeg.warn.title": "FFmpeg 鏈畨瑁咃紝鏃犳硶鎷兼帴闀胯棰?,
+    "story.ffmpeg.warn.hint": "璇峰墠寰€銆岃缃?> 绯荤粺缁勪欢銆嶄竴閿畨瑁?FFmpeg",
+    "story.ffmpeg.warn.cta": "鍓嶅線瀹夎",
+    "story.concat.idle": "鎷兼帴涓洪暱瑙嗛 ({mode})",
+    "story.concat.busy": "鎷兼帴涓?..",
+    "story.preview.empty": "瑙嗛棰勮鍖?,
+    "story.preview.title": "棰勮",
+    "story.preview.inputHint": "杈撳叆鏁呬簨骞跺垎瑙ｅ悗锛屽彲鍦ㄦ棰勮姣忔鍒嗛暅鍐呭",
+    "story.preview.editHint": "鐐瑰嚮宸︿晶鍒嗛暅娈佃惤锛屽湪姝ゆ煡鐪嬭鎯?,
+    "story.preview.segTitle": "鍒嗛暅 #{n} 棰勮",
+    "story.preview.generating": "瑙嗛鐢熸垚涓€?,
+    "story.preview.selectResult": "鐐瑰嚮宸︿晶鐗囨棰勮瑙嗛",
+    "story.concat.modeCut": "纭垏",
+    "story.concat.modeFade": "浜ゅ弶娣″寲",
+    "story.totalEstimate": "鍏?{n} 娈碉紝棰勮鎬绘椂闀?{sec} 绉?,
+    "story.statTotal": "鎬昏:",
+    "story.statSuccess": "鎴愬姛:",
+    "story.statFail": "澶辫触:",
+    "settings.section.api": "API 閰嶇疆",
+    "settings.section.defaults": "榛樿鍙傛暟",
+    "settings.section.folder": "鏂囦欢澶硅缃?,
+    "settings.section.webhook": "Webhook 璁剧疆",
+    "settings.section.system": "绯荤粺缁勪欢",
+    "settings.system.intro.strong": "FFmpeg 浠呯敤浜庛€屽垎闀滃伐浣滃彴銆嶇殑闀胯棰戞嫾鎺ワ紝浠ュ強銆岀礌鏉愬簱銆嶇殑瑙嗛缂╃暐棰勮銆?,
+    "settings.system.intro.body": "鏂囩敓瑙嗛 / 鍥剧敓瑙嗛 / 浠诲姟鍒楄〃 / 鎻愮ず璇嶆寚鍗楃瓑鏍稿績鍔熻兘涓嶄緷璧?FFmpeg銆傚鏋滀綘涓嶉渶瑕侀暱瑙嗛鎷兼帴锛屽彲浠ユ殏鏃惰烦杩囧畨瑁呫€俓n\nFFmpeg 鏄郴缁熺骇缁勪欢锛堝叡浜?PATH 瀹夎锛夛紝骞堕潪鏈彃浠剁鏈夆€斺€斾换浣曞凡缁忚濂?ffmpeg 鐨勬満鍣ㄩ兘浼氳嚜鍔ㄦ娴嬪埌锛屾棤闇€閲嶅瀹夎锛涘悓鏍凤紝瀹夎/鍗歌浇涔熶細褰卞搷鍏朵粬鐢ㄥ埌 ffmpeg 鐨勬彃浠跺拰绋嬪簭銆?,
+    "settings.system.platform.win": "Windows: 銆屼竴閿畨瑁呫€嶄細璋冪敤 winget 鑷姩瀹夎 Gyan.FFmpeg锛屾棤闇€绠＄悊鍛樻潈闄愩€?,
+    "settings.system.platform.mac": "macOS: 銆屼竴閿畨瑁呫€嶄細璋冪敤 Homebrew 鑷姩瀹夎 ffmpeg銆?,
+    "settings.system.platform.linux": "Linux: apt / dnf 闇€瑕?root 鏉冮檺銆傚鏋?Synapse 浠ユ櫘閫氱敤鎴疯韩浠借繍琛岋紝璇锋寜鎻愮ず鍦ㄧ粓绔墽琛?sudo apt-get install ffmpeg銆?,
+    "settings.system.detecting": "姝ｅ湪妫€娴?..",
+    "settings.system.status.found": "宸插畨瑁?v{ver}",
+    "settings.system.status.foundNoVer": "宸插畨瑁?,
+    "settings.system.status.missing": "鏈畨瑁?,
+    "settings.system.location": "璺緞锛歿path}",
+    "settings.system.btn.install": "涓€閿畨瑁?,
+    "settings.system.btn.installVia": "涓€閿畨瑁?({strategy})",
+    "settings.system.btn.recheck": "閲嶆柊妫€娴?,
+    "settings.system.btn.openHome": "鏌ョ湅瀹樻柟鏂囨。",
+    "settings.system.btn.copyCmd": "澶嶅埗鍛戒护",
+    "settings.system.btn.copied": "宸插鍒?,
+    "settings.system.btn.cancel": "鍙栨秷",
+    "settings.system.btn.uninstall": "鍗歌浇",
+    "settings.system.btn.uninstallVia": "鍗歌浇 ({strategy})",
+    "settings.system.btn.uninstallConfirmBtn": "纭鍗歌浇",
+    "settings.system.installing": "瀹夎涓?.. ({elapsed})",
+    "settings.system.uninstalling": "鍗歌浇涓?.. ({elapsed})",
+    "settings.system.installEstimate": "棰勮鑰楁椂绾?{sec} 绉?,
+    "settings.system.installed": "FFmpeg 瀹夎鎴愬姛",
+    "settings.system.installFailed": "瀹夎澶辫触锛歿msg}",
+    "settings.system.uninstalled": "FFmpeg 宸插嵏杞?,
+    "settings.system.uninstallFailed": "鍗歌浇澶辫触锛歿msg}",
+    "settings.system.uninstallConfirm": "纭畾瑕佸嵏杞?FFmpeg 鍚楋紵\n\n娉ㄦ剰锛欶Fmpeg 鏄郴缁熺骇缁勪欢锛堣鍦?Windows 鐢ㄦ埛 PATH / macOS Homebrew / Linux /usr/bin锛夛紝涓嶆槸 Seedance 鎻掍欢绉佹湁鐨勨€斺€斿嵏杞戒細褰卞搷 Synapse 涓婃墍鏈変緷璧?FFmpeg 鐨勬彃浠讹紙濡傚瓧骞曠敓鎴愩€佽棰戠炕璇戙€侀厤闊崇瓑锛夛紝浠ュ強浣犵郴缁熶笂鍏朵粬鐢ㄥ埌 ffmpeg 鐨勭▼搴忋€俓n\n鏈彃浠朵腑灏嗕笉鍙敤锛氬垎闀滃伐浣滃彴闀胯棰戞嫾鎺ャ€佺礌鏉愬簱瑙嗛缂╃暐棰勮銆?,
+    "settings.system.requiresSudo": "Linux 闇€瑕?root 鏉冮檺銆傝鍦ㄧ粓绔墜鍔ㄦ墽琛岋細",
+    "settings.system.requiresSudoUninstall": "Linux 闇€瑕?root 鏉冮檺銆傝鍦ㄧ粓绔墜鍔ㄦ墽琛岋細",
+    "settings.system.noMethod": "褰撳墠绯荤粺鏆傛棤鑷姩瀹夎鏂规锛岃鍓嶅線瀹樻柟鏂囨。鎵嬪姩涓嬭浇銆?,
+    "settings.system.logTitle": "瀹夎鏃ュ織",
+    "settings.system.logTitleUninstall": "鍗歌浇鏃ュ織",
+    "settings.system.logEmpty": "鏆傛棤杈撳嚭",
+    "settings.section.permissions": "鎻掍欢鏉冮檺",
+    "settings.perms.intro.strong": "鏈彃浠堕渶瑕佷互涓嬮珮绾ф潈闄愭墠鑳藉畬鏁村伐浣溿€?,
+    "settings.perms.intro.body": "棣栨瀹夎鏃舵湭鑷姩鎺堜簣锛涚偣鍑讳笅鏂规寜閽竴閿巿鏉冿紙绛変环浜庡湪銆岃缃腑蹇?鈫?鎻掍欢绠＄悊 鈫?鏉冮檺銆嶅嬀閫変繚瀛橈級銆?,
+    "settings.perms.allOk": "鎵€鏈夋墍闇€鏉冮檺宸叉巿浜堛€?,
+    "settings.perms.btn.grantAll": "涓€閿巿浜堟墍鏈夋潈闄?,
+    "settings.perms.granting": "鎺堜簣涓?..",
+    "settings.perms.granted": "鏉冮檺宸叉巿浜堬紝鎻掍欢宸查噸鏂板姞杞?,
+    "settings.perms.grantFailed": "鎺堟潈澶辫触锛歿msg}",
+    "settings.perms.col.permission": "鏉冮檺",
+    "settings.perms.col.feature": "鐢ㄩ€?,
+    "settings.perms.col.status": "鐘舵€?,
+    "settings.perms.status.ok": "宸叉巿浜?,
+    "settings.perms.status.missing": "鏈巿浜?,
+    "banner.perms.title": "鎻掍欢缂哄皯蹇呰鏉冮檺锛岄儴鍒嗗姛鑳藉皢涓嶅彲鐢?,
+    "banner.perms.desc": "璇峰墠寰€銆岃缃?鈫?鎻掍欢鏉冮檺銆嶄竴閿巿鏉?,
+    "banner.perms.cta": "鍓嶅線鎺堟潈",
     "settings.label.apiKey": "ARK API Key",
-    "settings.api.placeholder": "输入 Volcengine Ark API Key",
-    "settings.label.baseUrl": "Base URL（中转站地址，可选）",
-    "settings.api.baseUrl.placeholder": "默认: https://ark.cn-beijing.volces.com/api/v3",
-    "settings.api.baseUrl.help": "填写兼容火山 Ark API 的中转站根地址；留空则使用官方地址。",
-    "settings.api.show": "显示",
-    "settings.api.hide": "隐藏",
-    "settings.api.save": "保存",
-    "settings.api.saving": "保存中…",
-    "settings.api.required": "必填项",
-    "settings.api.help": "获取方式: 前往 console.volcengine.com/ark 创建 API Key",
-    "settings.label.tier": "默认推理模式",
-    "settings.tier.online": "在线推理",
-    "settings.tier.flex": "离线推理 (半价)",
-    "settings.label.poll": "轮询间隔",
-    "settings.poll.10": "10 秒",
-    "settings.poll.15": "15 秒",
-    "settings.poll.30": "30 秒",
-    "settings.poll.60": "60 秒",
-    "settings.label.optimizeLevel": "优化级别",
-    "settings.optimize.light": "轻度润色",
-    "settings.optimize.professional": "专业重写",
-    "settings.optimize.storyboard": "分镜脚本",
-    "settings.label.outputDir": "视频输出目录",
-    "settings.outputDir.placeholder": "默认: ~/seedance-output/",
-    "settings.btn.browse": "选择",
-    "settings.btn.open": "打开",
-    "settings.label.subdir": "子目录结构",
-    "settings.subdir.date": "按日期",
-    "settings.subdir.project": "按项目",
-    "settings.subdir.flat": "扁平",
-    "settings.label.naming": "文件命名规则",
-    "settings.toggle.autoDownload": "自动下载完成的视频",
-    "settings.label.assetsDir": "素材文件夹",
-    "settings.assetsDir.placeholder": "默认: ~/seedance-assets/",
-    "settings.stats.outputDir": "视频输出",
-    "settings.stats.assetsDir": "素材",
-    "settings.stats.cacheDir": "缓存",
-    "settings.stats.fileCount": "{n} 个文件",
-    "settings.label.callback": "回调 URL（可选）",
+    "settings.api.placeholder": "杈撳叆 Volcengine Ark API Key",
+    "settings.label.baseUrl": "Base URL锛堜腑杞珯鍦板潃锛屽彲閫夛級",
+    "settings.api.baseUrl.placeholder": "榛樿: https://ark.cn-beijing.volces.com/api/v3",
+    "settings.api.baseUrl.help": "濉啓鍏煎鐏北 Ark API 鐨勪腑杞珯鏍瑰湴鍧€锛涚暀绌哄垯浣跨敤瀹樻柟鍦板潃銆?,
+    "settings.api.show": "鏄剧ず",
+    "settings.api.hide": "闅愯棌",
+    "settings.api.save": "淇濆瓨",
+    "settings.api.saving": "淇濆瓨涓€?,
+    "settings.api.required": "蹇呭～椤?,
+    "settings.api.help": "鑾峰彇鏂瑰紡: 鍓嶅線 console.volcengine.com/ark 鍒涘缓 API Key",
+    "settings.label.tier": "榛樿鎺ㄧ悊妯″紡",
+    "settings.tier.online": "鍦ㄧ嚎鎺ㄧ悊",
+    "settings.tier.flex": "绂荤嚎鎺ㄧ悊 (鍗婁环)",
+    "settings.label.poll": "杞闂撮殧",
+    "settings.poll.10": "10 绉?,
+    "settings.poll.15": "15 绉?,
+    "settings.poll.30": "30 绉?,
+    "settings.poll.60": "60 绉?,
+    "settings.label.optimizeLevel": "浼樺寲绾у埆",
+    "settings.optimize.light": "杞诲害娑﹁壊",
+    "settings.optimize.professional": "涓撲笟閲嶅啓",
+    "settings.optimize.storyboard": "鍒嗛暅鑴氭湰",
+    "settings.label.outputDir": "瑙嗛杈撳嚭鐩綍",
+    "settings.outputDir.placeholder": "榛樿: ~/seedance-output/",
+    "settings.btn.browse": "閫夋嫨",
+    "settings.btn.open": "鎵撳紑",
+    "settings.label.subdir": "瀛愮洰褰曠粨鏋?,
+    "settings.subdir.date": "鎸夋棩鏈?,
+    "settings.subdir.project": "鎸夐」鐩?,
+    "settings.subdir.flat": "鎵佸钩",
+    "settings.label.naming": "鏂囦欢鍛藉悕瑙勫垯",
+    "settings.toggle.autoDownload": "鑷姩涓嬭浇瀹屾垚鐨勮棰?,
+    "settings.label.assetsDir": "绱犳潗鏂囦欢澶?,
+    "settings.assetsDir.placeholder": "榛樿: ~/seedance-assets/",
+    "settings.stats.outputDir": "瑙嗛杈撳嚭",
+    "settings.stats.assetsDir": "绱犳潗",
+    "settings.stats.cacheDir": "缂撳瓨",
+    "settings.stats.fileCount": "{n} 涓枃浠?,
+    "settings.label.callback": "鍥炶皟 URL锛堝彲閫夛級",
     "settings.callback.placeholder": "https://...",
-    "settings.callback.help": "配置后任务状态变化时自动通知，减少轮询",
-    "settings.toast.saved": "设置已保存",
-    "settings.toast.keyError": "服务端回读的 API Key 与你填的不一致，可能未保存成功，请检查后端日志或重试",
-    "settings.toast.saveFailed": "保存失败: {msg}",
-    "settings.toast.saveFailedHttp": "保存失败 (HTTP {status})：{detail}",
-    "settings.toast.saveFailedNet": "无法连接后端：{detail} — 请确认 Synapse 服务是否运行",
-    "settings.toast.saveNoConfig": "服务端未返回配置，可能存储异常，请重试或查看后端日志",
-    "settings.toast.keyEmpty": "API Key 不能为空白，请粘贴有效的密钥",
-    "settings.toast.valueMismatch": "保存失败：{key} 服务端回读为 {actual}，与你设置的 {expected} 不一致 — 配置可能未真正落库，请检查后端日志",
-    "settings.pickOutput": "选择视频输出目录",
-    "settings.pickAssets": "选择素材文件夹",
-    "settings.folder.opened": "已在文件管理器中打开 {path}",
-    "settings.folder.openFailed": "打开文件夹失败: {msg}",
-    "settings.folder.pickFailed": "选择文件夹失败，请重试",
-    "settings.folder.pickUnavailable": "文件夹选择器没响应，请重启应用后重试，或直接在左侧输入框粘贴路径再点【打开】",
-    "settings.folder.savedTo": "存储位置已切换到 {path}",
-    "picker.title": "选择文件夹",
-    "picker.shortcut.start": "起始位置",
-    "picker.crumb.root": "起始位置",
-    "picker.empty": "（此目录下无子文件夹）",
-    "picker.loading": "加载中…",
-    "picker.btn.cancel": "取消",
-    "picker.btn.choose": "选择此文件夹",
-    "picker.btn.newFolder": "新建文件夹",
-    "picker.btn.create": "创建",
-    "picker.btn.confirmCreate": "确认",
-    "picker.newFolder.placeholder": "输入文件夹名称",
-    "picker.error.load": "无法读取目录: {msg}",
-    "picker.error.create": "创建文件夹失败: {msg}",
-    "picker.created": "已创建 {name}",
-    "toast.optimizeOk": "提示词优化完成",
-    "toast.optimizeFail": "提示词优化失败: {msg}",
-    "toast.optimizeNoChange": "提示词无需优化或 LLM 返回了相同内容",
-    "toast.optimizeError": "提示词优化请求失败: {msg}",
-    "toast.copyOk": "已复制到剪贴板",
-    "toast.downloadOk": "已保存到: {path}",
-    "toast.downloadFail": "下载失败: {msg}",
-    "toast.downloadStarted": "下载已开始",
-    "toast.networkError": "网络错误: {msg}",
-    "toast.requestFail": "请求失败: {msg}",
-    "toast.decomposeOk": "分镜拆解完成，共 {n} 段",
-    "toast.decomposeFail": "分镜拆解失败: {msg}",
-    "toast.genFail": "生成失败: {msg}",
-    "toast.concatNeed2": "至少需要 2 个成功的视频片段",
-    "toast.concatFail": "拼接失败: {msg}",
-    "toast.unknownErr": "未知错误",
-    "toast.uploadFail": "上传失败",
-    "toast.uploadNoBase64": "服务端未返回 base64 — 无法发送给火山 Ark",
-    "toast.uploadTooBig": "文件 {size}MB 超过上限 50MB，请先压缩或裁剪",
-    "toast.modeNeedFirstFrame": "图生视频模式需要先上传首帧图片",
-    "toast.modeNeedBothFrames": "首尾帧模式需要分别上传首帧和尾帧两张图片",
-    "toast.modeNeedMultimodal": "多模态模式至少上传 1 个参考素材（图片/视频/音频）",
-    "toast.modeNeedSourceVideo": "{label} 模式需要先上传源视频",
-    "toast.modeNeedPublicVideoUrl": "{label} 模式需要公网 http(s) 视频 URL，不能使用本地上传视频。请复制任务详情里的云端视频 URL 后再提交。",
-    "toast.modeNeedValidVideoUrl": "视频 URL 必须以 http:// 或 https:// 开头",
-    "toast.videoReferenceNeedsUrl": "视频参考必须使用公网 http(s) URL，不能使用本地上传视频或 base64",
-    "toast.chainInProgress": "已有相同分镜在生成，正在为你恢复进度…",
-    "toast.dedupedSegments": "AI 输出有 {n} 段重复，已自动合并",
-    "create.upload.ready": "已就绪 {name}（{size}）",
-    "create.upload.remove": "移除",
-    "create.upload.replace": "点击或拖拽以替换",
-    "create.upload.addMore": "继续添加素材",
-    "create.upload.dropAction": "点击选择，或拖拽文件到这里",
-    "create.upload.replaceAction": "点击或拖拽替换当前素材",
-    "create.upload.type.image": "图片",
-    "create.upload.type.video": "视频",
-    "create.upload.type.audio": "音频",
-    "create.upload.type.file": "文件",
-    "story.cancelConfirm": "确定要取消此次生成吗？已提交到火山的分镜会继续在云端跑完，但前端不再轮询。",
-    "story.btn.cancel": "取消生成",
-    "story.progress.submitted": "已提交",
-    "story.progress.succeeded": "已完成",
-    "story.progress.failed": "失败",
-    "story.progress.safe": "可以安全切换 Tab 或刷新页面 — 进度会自动恢复",
-    "err.title": "插件 UI 渲染出错",
-    "err.retry": "重试渲染",
-    "err.stackLabel": "错误堆栈详情",
+    "settings.callback.help": "閰嶇疆鍚庝换鍔＄姸鎬佸彉鍖栨椂鑷姩閫氱煡锛屽噺灏戣疆璇?,
+    "settings.toast.saved": "璁剧疆宸蹭繚瀛?,
+    "settings.toast.keyError": "鏈嶅姟绔洖璇荤殑 API Key 涓庝綘濉殑涓嶄竴鑷达紝鍙兘鏈繚瀛樻垚鍔燂紝璇锋鏌ュ悗绔棩蹇楁垨閲嶈瘯",
+    "settings.toast.saveFailed": "淇濆瓨澶辫触: {msg}",
+    "settings.toast.saveFailedHttp": "淇濆瓨澶辫触 (HTTP {status})锛歿detail}",
+    "settings.toast.saveFailedNet": "鏃犳硶杩炴帴鍚庣锛歿detail} 鈥?璇风‘璁?Synapse 鏈嶅姟鏄惁杩愯",
+    "settings.toast.saveNoConfig": "鏈嶅姟绔湭杩斿洖閰嶇疆锛屽彲鑳藉瓨鍌ㄥ紓甯革紝璇烽噸璇曟垨鏌ョ湅鍚庣鏃ュ織",
+    "settings.toast.keyEmpty": "API Key 涓嶈兘涓虹┖鐧斤紝璇风矘璐存湁鏁堢殑瀵嗛挜",
+    "settings.toast.valueMismatch": "淇濆瓨澶辫触锛歿key} 鏈嶅姟绔洖璇讳负 {actual}锛屼笌浣犺缃殑 {expected} 涓嶄竴鑷?鈥?閰嶇疆鍙兘鏈湡姝ｈ惤搴擄紝璇锋鏌ュ悗绔棩蹇?,
+    "settings.pickOutput": "閫夋嫨瑙嗛杈撳嚭鐩綍",
+    "settings.pickAssets": "閫夋嫨绱犳潗鏂囦欢澶?,
+    "settings.folder.opened": "宸插湪鏂囦欢绠＄悊鍣ㄤ腑鎵撳紑 {path}",
+    "settings.folder.openFailed": "鎵撳紑鏂囦欢澶瑰け璐? {msg}",
+    "settings.folder.pickFailed": "閫夋嫨鏂囦欢澶瑰け璐ワ紝璇烽噸璇?,
+    "settings.folder.pickUnavailable": "鏂囦欢澶归€夋嫨鍣ㄦ病鍝嶅簲锛岃閲嶅惎搴旂敤鍚庨噸璇曪紝鎴栫洿鎺ュ湪宸︿晶杈撳叆妗嗙矘璐磋矾寰勫啀鐐广€愭墦寮€銆?,
+    "settings.folder.savedTo": "瀛樺偍浣嶇疆宸插垏鎹㈠埌 {path}",
+    "picker.title": "閫夋嫨鏂囦欢澶?,
+    "picker.shortcut.start": "璧峰浣嶇疆",
+    "picker.crumb.root": "璧峰浣嶇疆",
+    "picker.empty": "锛堟鐩綍涓嬫棤瀛愭枃浠跺す锛?,
+    "picker.loading": "鍔犺浇涓€?,
+    "picker.btn.cancel": "鍙栨秷",
+    "picker.btn.choose": "閫夋嫨姝ゆ枃浠跺す",
+    "picker.btn.newFolder": "鏂板缓鏂囦欢澶?,
+    "picker.btn.create": "鍒涘缓",
+    "picker.btn.confirmCreate": "纭",
+    "picker.newFolder.placeholder": "杈撳叆鏂囦欢澶瑰悕绉?,
+    "picker.error.load": "鏃犳硶璇诲彇鐩綍: {msg}",
+    "picker.error.create": "鍒涘缓鏂囦欢澶瑰け璐? {msg}",
+    "picker.created": "宸插垱寤?{name}",
+    "toast.optimizeOk": "鎻愮ず璇嶄紭鍖栧畬鎴?,
+    "toast.optimizeFail": "鎻愮ず璇嶄紭鍖栧け璐? {msg}",
+    "toast.optimizeNoChange": "鎻愮ず璇嶆棤闇€浼樺寲鎴?LLM 杩斿洖浜嗙浉鍚屽唴瀹?,
+    "toast.optimizeError": "鎻愮ず璇嶄紭鍖栬姹傚け璐? {msg}",
+    "toast.copyOk": "宸插鍒跺埌鍓创鏉?,
+    "toast.downloadOk": "宸蹭繚瀛樺埌: {path}",
+    "toast.downloadFail": "涓嬭浇澶辫触: {msg}",
+    "toast.downloadStarted": "涓嬭浇宸插紑濮?,
+    "toast.networkError": "缃戠粶閿欒: {msg}",
+    "toast.requestFail": "璇锋眰澶辫触: {msg}",
+    "toast.decomposeOk": "鍒嗛暅鎷嗚В瀹屾垚锛屽叡 {n} 娈?,
+    "toast.decomposeFail": "鍒嗛暅鎷嗚В澶辫触: {msg}",
+    "toast.genFail": "鐢熸垚澶辫触: {msg}",
+    "toast.concatNeed2": "鑷冲皯闇€瑕?2 涓垚鍔熺殑瑙嗛鐗囨",
+    "toast.concatFail": "鎷兼帴澶辫触: {msg}",
+    "toast.unknownErr": "鏈煡閿欒",
+    "toast.uploadFail": "涓婁紶澶辫触",
+    "toast.uploadNoBase64": "鏈嶅姟绔湭杩斿洖 base64 鈥?鏃犳硶鍙戦€佺粰鐏北 Ark",
+    "toast.uploadTooBig": "鏂囦欢 {size}MB 瓒呰繃涓婇檺 50MB锛岃鍏堝帇缂╂垨瑁佸壀",
+    "toast.modeNeedFirstFrame": "鍥剧敓瑙嗛妯″紡闇€瑕佸厛涓婁紶棣栧抚鍥剧墖",
+    "toast.modeNeedBothFrames": "棣栧熬甯фā寮忛渶瑕佸垎鍒笂浼犻甯у拰灏惧抚涓ゅ紶鍥剧墖",
+    "toast.modeNeedMultimodal": "澶氭ā鎬佹ā寮忚嚦灏戜笂浼?1 涓弬鑰冪礌鏉愶紙鍥剧墖/瑙嗛/闊抽锛?,
+    "toast.modeNeedSourceVideo": "{label} 妯″紡闇€瑕佸厛涓婁紶婧愯棰?,
+    "toast.modeNeedPublicVideoUrl": "{label} 妯″紡闇€瑕佸叕缃?http(s) 瑙嗛 URL锛屼笉鑳戒娇鐢ㄦ湰鍦颁笂浼犺棰戙€傝澶嶅埗浠诲姟璇︽儏閲岀殑浜戠瑙嗛 URL 鍚庡啀鎻愪氦銆?,
+    "toast.modeNeedValidVideoUrl": "瑙嗛 URL 蹇呴』浠?http:// 鎴?https:// 寮€澶?,
+    "toast.videoReferenceNeedsUrl": "瑙嗛鍙傝€冨繀椤讳娇鐢ㄥ叕缃?http(s) URL锛屼笉鑳戒娇鐢ㄦ湰鍦颁笂浼犺棰戞垨 base64",
+    "toast.chainInProgress": "宸叉湁鐩稿悓鍒嗛暅鍦ㄧ敓鎴愶紝姝ｅ湪涓轰綘鎭㈠杩涘害鈥?,
+    "toast.dedupedSegments": "AI 杈撳嚭鏈?{n} 娈甸噸澶嶏紝宸茶嚜鍔ㄥ悎骞?,
+    "create.upload.ready": "宸插氨缁?{name}锛坽size}锛?,
+    "create.upload.remove": "绉婚櫎",
+    "create.upload.replace": "鐐瑰嚮鎴栨嫋鎷戒互鏇挎崲",
+    "create.upload.addMore": "缁х画娣诲姞绱犳潗",
+    "create.upload.dropAction": "鐐瑰嚮閫夋嫨锛屾垨鎷栨嫿鏂囦欢鍒拌繖閲?,
+    "create.upload.replaceAction": "鐐瑰嚮鎴栨嫋鎷芥浛鎹㈠綋鍓嶇礌鏉?,
+    "create.upload.type.image": "鍥剧墖",
+    "create.upload.type.video": "瑙嗛",
+    "create.upload.type.audio": "闊抽",
+    "create.upload.type.file": "鏂囦欢",
+    "story.cancelConfirm": "纭畾瑕佸彇娑堟娆＄敓鎴愬悧锛熷凡鎻愪氦鍒扮伀灞辩殑鍒嗛暅浼氱户缁湪浜戠璺戝畬锛屼絾鍓嶇涓嶅啀杞銆?,
+    "story.btn.cancel": "鍙栨秷鐢熸垚",
+    "story.progress.submitted": "宸叉彁浜?,
+    "story.progress.succeeded": "宸插畬鎴?,
+    "story.progress.failed": "澶辫触",
+    "story.progress.safe": "鍙互瀹夊叏鍒囨崲 Tab 鎴栧埛鏂伴〉闈?鈥?杩涘害浼氳嚜鍔ㄦ仮澶?,
+    "err.title": "鎻掍欢 UI 娓叉煋鍑洪敊",
+    "err.retry": "閲嶈瘯娓叉煋",
+    "err.stackLabel": "閿欒鍫嗘爤璇︽儏",
   },
   en: {
     "app.title": "Seedance Studio",
-    "app.subtitle": "Seedance Video Generator · T2V / I2V / Multimodal / Editing / Long Video",
+    "app.subtitle": "Seedance Video Generator 路 T2V / I2V / Multimodal / Editing / Long Video",
     "app.api.label": "API Key",
     "app.api.missing": "Configure API Key first",
     "app.api.tooltip": "Click to open Settings and configure your API Key",
@@ -1424,7 +1424,7 @@ const I18N_DICT = {
     "banner.noKey.title": "ARK API Key not configured",
     "banner.noKey.desc": "All create requests will fail. Open Settings and paste your Volcengine Ark API Key.",
     "banner.noKey.cta": "Open Settings",
-    "modes.t2v": "Text → Video",
+    "modes.t2v": "Text 鈫?Video",
     "modes.i2v": "First Frame",
     "modes.i2v_end": "First+Last Frame",
     "modes.multimodal": "Multimodal",
@@ -1453,7 +1453,7 @@ const I18N_DICT = {
     "create.toggle.lastFrame": "Return last frame",
     "create.toggle.draft": "Draft",
     "create.toggle.webSearch": "Web search",
-    "create.prompt.placeholder": "Describe the video you want to generate…",
+    "create.prompt.placeholder": "Describe the video you want to generate鈥?,
     "create.prompt.counter": "{n}/5000",
     "create.btn.optimize": "AI Optimize",
     "create.btn.optimize.title": "Use an LLM to refine the prompt for richer, more consistent imagery.",
@@ -1461,7 +1461,7 @@ const I18N_DICT = {
     "create.btn.startDraft": "Generate Draft Preview",
     "create.btn.startFlex": "Submit Flex Job",
     "create.upload.firstHint": "Drag or click to upload first-frame image",
-    "create.upload.firstSubHint": "HD image (300–6000px). Match your target aspect ratio.",
+    "create.upload.firstSubHint": "HD image (300鈥?000px). Match your target aspect ratio.",
     "create.upload.startFrame": "First frame",
     "create.upload.startFrameHint": "Starting picture",
     "create.upload.endFrame": "Last frame",
@@ -1484,7 +1484,7 @@ const I18N_DICT = {
     "create.upload.uploading": "Uploading: {name}",
     "create.upload.uploaded": "Uploaded: {name}",
     "create.tip.t2v": "Text-to-video is exploratory. For predictable results, generate an image first then image-to-video.",
-    "create.tip.i2v": "Use HD images (300–6000px). Match the target video aspect ratio to avoid cropping.",
+    "create.tip.i2v": "Use HD images (300鈥?000px). Match the target video aspect ratio to avoid cropping.",
     "create.tip.i2v_end": "AI fills the in-between transition. Larger frame differences create more drama.",
     "create.tip.multimodal": "Reference assets in the prompt as 'image1' / 'video2' / 'audio1' by upload order.",
     "create.tip.edit": "Describe what to replace / add / remove, when, and where. Call out what stays the same.",
@@ -1492,10 +1492,10 @@ const I18N_DICT = {
     "create.tip.transition": "Generate an AI bridge/continuation clip from a previous cloud video_url. This is not local ffmpeg concatenation.",
     "preview.empty.title": "Ready to create",
     "preview.empty.hint": "Fill in parameters and press generate",
-    "preview.running.title": "Generating…",
-    "preview.running.hint": "Usually 1–3 minutes. Hold tight.",
+    "preview.running.title": "Generating鈥?,
+    "preview.running.hint": "Usually 1鈥? minutes. Hold tight.",
     "preview.failed": "Generation failed",
-    "preview.waiting": "Waiting for result…",
+    "preview.waiting": "Waiting for result鈥?,
     "preview.revised": "Revised prompt: {text}",
     "preview.btn.download": "Download",
     "preview.btn.copyVideoUrl": "Copy cloud video URL",
@@ -1504,15 +1504,15 @@ const I18N_DICT = {
     "preview.ctrl.stepFwd": "Step forward",
     "preview.ctrl.loop": "Loop",
     "modal.taskStarted.title": "Task started",
-    "modal.taskStarted.draft": "Draft preview is generating (~30s–1min). Check Tasks for progress.",
-    "modal.taskStarted.flex": "Flex job submitted (~5–30 min, half-price). Check Tasks for progress.",
-    "modal.taskStarted.online": "Video is generating in the cloud (~1–3 min). Check Tasks for progress.",
+    "modal.taskStarted.draft": "Draft preview is generating (~30s鈥?min). Check Tasks for progress.",
+    "modal.taskStarted.flex": "Flex job submitted (~5鈥?0 min, half-price). Check Tasks for progress.",
+    "modal.taskStarted.online": "Video is generating in the cloud (~1鈥? min). Check Tasks for progress.",
     "modal.taskStarted.continue": "Keep creating",
     "modal.taskStarted.goTasks": "Open Tasks",
     "modal.createProgress.title": "Submitting task",
-    "modal.createProgress.validating": "Validating assets and parameters…",
-    "modal.createProgress.submitting": "Submitting to Ark cloud…",
-    "modal.createProgress.waiting": "Waiting for task id…",
+    "modal.createProgress.validating": "Validating assets and parameters鈥?,
+    "modal.createProgress.submitting": "Submitting to Ark cloud鈥?,
+    "modal.createProgress.waiting": "Waiting for task id鈥?,
     "modal.createProgress.detail": "Large images or videos can take longer. Please do not click again; duplicate submissions are guarded.",
     "modal.createProgress.safe": "Tip: this step only submits the job. The actual video is generated asynchronously in Tasks.",
     "tasks.filter.status": "Status",
@@ -1527,7 +1527,7 @@ const I18N_DICT = {
     "tasks.refresh": "Refresh",
     "tasks.empty": "No tasks yet",
     "tasks.empty.title": "No tasks yet",
-    "tasks.empty.hint": "Create your first video task in the Create tab — it will appear here.",
+    "tasks.empty.hint": "Create your first video task in the Create tab 鈥?it will appear here.",
     "tasks.empty.noSelection.title": "Select a task to see details",
     "tasks.empty.noSelection.hint": "Click any task on the left to preview the video, see its parameters and prompt, and access download / retry actions.",
     "tasks.noPrompt": "(no prompt)",
@@ -1555,7 +1555,7 @@ const I18N_DICT = {
     "tasks.detail.createdAt": "Created at",
     "tasks.detail.prompt": "Prompt",
     "tasks.detail.errorTitle": "Failure reason",
-    "tasks.detail.runningHint": "The video is being generated in the cloud — typically 1–3 minutes.",
+    "tasks.detail.runningHint": "The video is being generated in the cloud 鈥?typically 1鈥? minutes.",
     "tasks.detail.downloaded": "Downloaded locally: {path}",
     "assets.filter.all": "All",
     "assets.filter.image": "Images",
@@ -1578,14 +1578,14 @@ const I18N_DICT = {
     "assets.preview.noPreview": "No preview",
     "assetPicker.title": "Choose from Assets",
     "assetPicker.hint": "Selecting an asset reads the local file and converts it to the base64 payload Ark needs.",
-    "assetPicker.loading": "Loading assets…",
+    "assetPicker.loading": "Loading assets鈥?,
     "assetPicker.empty": "No reusable assets yet. Upload one from Create first.",
     "assetPicker.use": "Use this asset",
     "assetPicker.videoDisabled": "Local videos cannot be reused as Ark reference videos. Use a public http(s) video URL.",
     "assetPicker.videoDisabledShort": "Preview/delete only",
     "assetPicker.loadFail": "Could not load asset: {msg}",
     "assetPicker.cancel": "Cancel",
-    "guide.search.placeholder": "Search templates or keywords…",
+    "guide.search.placeholder": "Search templates or keywords鈥?,
     "guide.section.templates": "Templates (click to view / apply)",
     "guide.section.cameras": "Camera language",
     "guide.section.atmosphere": "Atmosphere keywords",
@@ -1596,7 +1596,7 @@ const I18N_DICT = {
     "guide.atmosphere.color": "Color",
     "guide.atmosphere.texture": "Texture",
     "guide.atmosphere.mood": "Mood",
-    "guide.tips.body": "1. 80–200 chars works well; hard cap 5000.\n2. Use a **timeline** for rhythm: '0–3s: push-in, 4–6s: close-up'.\n3. Add **camera language**: push / pull / pan / dolly / orbit / crane / dolly-zoom.\n4. Add **sound design**: music style + ambience + voice.\n5. Avoid **human faces** (current model limit).\n6. The more concrete you are, the closer the video gets to your idea.",
+    "guide.tips.body": "1. 80鈥?00 chars works well; hard cap 5000.\n2. Use a **timeline** for rhythm: '0鈥?s: push-in, 4鈥?s: close-up'.\n3. Add **camera language**: push / pull / pan / dolly / orbit / crane / dolly-zoom.\n4. Add **sound design**: music style + ambience + voice.\n5. Avoid **human faces** (current model limit).\n6. The more concrete you are, the closer the video gets to your idea.",
     "story.section.input": "Story",
     "story.section.usage": "How to use",
     "story.section.params": "Generation parameters",
@@ -1617,7 +1617,7 @@ const I18N_DICT = {
     "story.progress.overview": "Generation overview",
     "story.progress.queue": "Segment queue",
     "story.progress.previewHint": "When a segment completes, click it on the left to preview the result here.",
-    "story.progress.waitingId": "Submitting and waiting for cloud task id…",
+    "story.progress.waitingId": "Submitting and waiting for cloud task id鈥?,
     "story.progress.percent": "{percent}% overall",
     "story.progress.pending": "Pending",
     "story.progress.running": "Running",
@@ -1639,17 +1639,17 @@ const I18N_DICT = {
     "story.gen.serialExtend": "Cloud extend: continue from video_url",
     "story.gen.cloudTransition": "Cloud transition: AI bridge clip",
     "story.gen.parallel": "Parallel: independent shots",
-    "story.story.placeholder": "Type your story; AI will break it into a sequence of storyboard segments…\n\nExample: A kitten explores a sunny garden — first sniffs flowers, then chases a butterfly, finally naps under a tree.",
-    "story.estimate": "Estimated {n} segments × {seg}s ≈ {total}s total",
+    "story.story.placeholder": "Type your story; AI will break it into a sequence of storyboard segments鈥n\nExample: A kitten explores a sunny garden 鈥?first sniffs flowers, then chases a butterfly, finally naps under a tree.",
+    "story.estimate": "Estimated {n} segments 脳 {seg}s 鈮?{total}s total",
     "story.decompose.idle": "AI Storyboard",
-    "story.decompose.busy": "Decomposing…",
-    "story.decompose.connect": "Connecting to the AI model…",
-    "story.decompose.analyze": "AI is analysing the story and drafting segments…",
-    "story.decompose.batch": "Generating {n} segments — hold on…",
-    "story.decompose.long": "LLM still thinking; longer stories may take 20–40s…",
-    "story.usage.body": "1. Type your story; AI breaks it into Seedance segments.\n2. Edit each segment — prompt, duration, transition.\n3. Serial mode reuses each segment's last frame as the next reference for visual continuity.\n4. After generation, ffmpeg concatenates everything into a long video.",
+    "story.decompose.busy": "Decomposing鈥?,
+    "story.decompose.connect": "Connecting to the AI model鈥?,
+    "story.decompose.analyze": "AI is analysing the story and drafting segments鈥?,
+    "story.decompose.batch": "Generating {n} segments 鈥?hold on鈥?,
+    "story.decompose.long": "LLM still thinking; longer stories may take 20鈥?0s鈥?,
+    "story.usage.body": "1. Type your story; AI breaks it into Seedance segments.\n2. Edit each segment 鈥?prompt, duration, transition.\n3. Serial mode reuses each segment's last frame as the next reference for visual continuity.\n4. After generation, ffmpeg concatenates everything into a long video.",
     "story.usage.warn": "**Note:** Seedance 2.0 does not accept reference images with human faces. Serial linking will fall back to text-only generation if the safety check trips, which can reduce continuity. Prefer animated characters, animals, or scenery.",
-    "story.edit.title": "Edit storyboard — {n} segments",
+    "story.edit.title": "Edit storyboard 鈥?{n} segments",
     "story.edit.hint": "Click a segment to expand and edit. Reorder freely.",
     "story.btn.back": "Back",
     "story.btn.addSeg": "Add segment",
@@ -1662,31 +1662,31 @@ const I18N_DICT = {
     "story.btn.newProject": "New project",
     "story.btn.backEdit": "Back to editor",
     "story.btn.openFolder": "Open folder",
-    "story.gen.title": "Generating {n} segments…",
+    "story.gen.title": "Generating {n} segments鈥?,
     "story.gen.serialDesc": "Serial: each segment uses the previous result as reference.",
     "story.gen.parallelDesc": "Parallel: all segments run at the same time.",
-    "story.gen.estimate": "Approx {min} minutes — please be patient.",
+    "story.gen.estimate": "Approx {min} minutes 鈥?please be patient.",
     "story.results.done": "Long video generated",
     "story.results.title": "Results",
-    "story.results.summary": "Total: {total} · Success {ok}{fail}",
-    "story.results.failPart": " · Failed {n}",
+    "story.results.summary": "Total: {total} 路 Success {ok}{fail}",
+    "story.results.failPart": " 路 Failed {n}",
     "story.concat.title": "Concatenated",
     "story.concat.tip": "Ready to concatenate {n} segments",
     "story.ffmpeg.warn.title": "FFmpeg is missing, long-video stitching is unavailable",
     "story.ffmpeg.warn.hint": "Open Settings > System Components to install FFmpeg with one click",
     "story.ffmpeg.warn.cta": "Open Settings",
     "story.concat.idle": "Concatenate ({mode})",
-    "story.concat.busy": "Concatenating…",
+    "story.concat.busy": "Concatenating鈥?,
     "story.preview.empty": "Video Preview",
     "story.preview.title": "Preview",
     "story.preview.inputHint": "Enter a story and decompose it, then preview each segment here",
     "story.preview.editHint": "Click a segment on the left to preview details",
     "story.preview.segTitle": "Segment #{n} Preview",
-    "story.preview.generating": "Generating video…",
+    "story.preview.generating": "Generating video鈥?,
     "story.preview.selectResult": "Click a segment to preview video",
     "story.concat.modeCut": "Hard cut",
     "story.concat.modeFade": "Crossfade",
-    "story.totalEstimate": "{n} segments · ~{sec}s total",
+    "story.totalEstimate": "{n} segments 路 ~{sec}s total",
     "story.statTotal": "Total:",
     "story.statSuccess": "Success:",
     "story.statFail": "Failed:",
@@ -1696,7 +1696,7 @@ const I18N_DICT = {
     "settings.section.webhook": "Webhook",
     "settings.section.system": "System Components",
     "settings.system.intro.strong": "FFmpeg is only used for long-video stitching in the Storyboard tab and video thumbnail previews in Assets.",
-    "settings.system.intro.body": "Text-to-video, image-to-video, the task list and prompt guide do not depend on FFmpeg. If you do not need long-video stitching you may skip this install.\n\nFFmpeg is a system-wide component (shared PATH install), not private to this plugin — any machine that already has ffmpeg will auto-detect it without re-installing; conversely, installing/uninstalling will affect every other plugin and program that uses ffmpeg.",
+    "settings.system.intro.body": "Text-to-video, image-to-video, the task list and prompt guide do not depend on FFmpeg. If you do not need long-video stitching you may skip this install.\n\nFFmpeg is a system-wide component (shared PATH install), not private to this plugin 鈥?any machine that already has ffmpeg will auto-detect it without re-installing; conversely, installing/uninstalling will affect every other plugin and program that uses ffmpeg.",
     "settings.system.platform.win": "Windows: \"One-click install\" calls winget to install Gyan.FFmpeg without admin rights.",
     "settings.system.platform.mac": "macOS: \"One-click install\" uses Homebrew to install ffmpeg.",
     "settings.system.platform.linux": "Linux: apt / dnf require root. If Synapse is running as a normal user, run sudo apt-get install ffmpeg in a terminal as your packaging policy permits.",
@@ -1722,16 +1722,16 @@ const I18N_DICT = {
     "settings.system.installFailed": "Install failed: {msg}",
     "settings.system.uninstalled": "FFmpeg uninstalled",
     "settings.system.uninstallFailed": "Uninstall failed: {msg}",
-    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nNote: FFmpeg is a SYSTEM-WIDE component (Windows user PATH / macOS Homebrew / Linux /usr/bin), not private to the Seedance plugin — uninstalling will affect every Synapse plugin that depends on it (subtitles, video translation, dubbing, etc.) as well as any other software on your system that uses ffmpeg.\n\nIn this plugin, you will lose: long-video stitching (Storyboard tab) and video thumbnail previews (Asset library).",
+    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nNote: FFmpeg is a SYSTEM-WIDE component (Windows user PATH / macOS Homebrew / Linux /usr/bin), not private to the Seedance plugin 鈥?uninstalling will affect every Synapse plugin that depends on it (subtitles, video translation, dubbing, etc.) as well as any other software on your system that uses ffmpeg.\n\nIn this plugin, you will lose: long-video stitching (Storyboard tab) and video thumbnail previews (Asset library).",
     "settings.system.requiresSudo": "Linux requires root. Run this in a terminal:",
     "settings.system.requiresSudoUninstall": "Linux requires root. Run this in a terminal:",
-    "settings.system.noMethod": "No automated installer for this OS — open the homepage to download manually.",
+    "settings.system.noMethod": "No automated installer for this OS 鈥?open the homepage to download manually.",
     "settings.system.logTitle": "Install log",
     "settings.system.logTitleUninstall": "Uninstall log",
     "settings.system.logEmpty": "No output yet",
     "settings.section.permissions": "Plugin permissions",
     "settings.perms.intro.strong": "This plugin needs the following advanced permissions to work fully.",
-    "settings.perms.intro.body": "They were not granted automatically on install. Click below to grant them in one click (equivalent to checking them in Settings Center → Plugin Manager → Permissions).",
+    "settings.perms.intro.body": "They were not granted automatically on install. Click below to grant them in one click (equivalent to checking them in Settings Center 鈫?Plugin Manager 鈫?Permissions).",
     "settings.perms.allOk": "All required permissions are granted.",
     "settings.perms.btn.grantAll": "Grant all permissions",
     "settings.perms.granting": "Granting...",
@@ -1742,8 +1742,8 @@ const I18N_DICT = {
     "settings.perms.col.status": "Status",
     "settings.perms.status.ok": "Granted",
     "settings.perms.status.missing": "Missing",
-    "banner.perms.title": "Plugin missing required permissions — some features will not work",
-    "banner.perms.desc": "Open Settings → Plugin permissions to grant them",
+    "banner.perms.title": "Plugin missing required permissions 鈥?some features will not work",
+    "banner.perms.desc": "Open Settings 鈫?Plugin permissions to grant them",
     "banner.perms.cta": "Grant now",
     "settings.label.apiKey": "ARK API Key",
     "settings.api.placeholder": "Paste your Volcengine Ark API Key",
@@ -1753,7 +1753,7 @@ const I18N_DICT = {
     "settings.api.show": "Show",
     "settings.api.hide": "Hide",
     "settings.api.save": "Save",
-    "settings.api.saving": "Saving…",
+    "settings.api.saving": "Saving鈥?,
     "settings.api.required": "Required",
     "settings.api.help": "Get one at console.volcengine.com/ark",
     "settings.label.tier": "Default inference",
@@ -1785,28 +1785,28 @@ const I18N_DICT = {
     "settings.stats.cacheDir": "Cache",
     "settings.stats.fileCount": "{n} files",
     "settings.label.callback": "Callback URL (optional)",
-    "settings.callback.placeholder": "https://…",
+    "settings.callback.placeholder": "https://鈥?,
     "settings.callback.help": "Push status changes instead of polling.",
     "settings.toast.saved": "Settings saved",
-    "settings.toast.keyError": "Server returned a different key than the one you sent — save likely failed. Check backend logs and retry.",
+    "settings.toast.keyError": "Server returned a different key than the one you sent 鈥?save likely failed. Check backend logs and retry.",
     "settings.toast.saveFailed": "Save failed: {msg}",
     "settings.toast.saveFailedHttp": "Save failed (HTTP {status}): {detail}",
-    "settings.toast.saveFailedNet": "Cannot reach backend: {detail} — make sure Synapse is running.",
-    "settings.toast.saveNoConfig": "Server didn't return the saved config — storage may be broken. Retry or check backend logs.",
-    "settings.toast.keyEmpty": "API Key cannot be blank — paste a valid key.",
-    "settings.toast.valueMismatch": "Save failed: server returned {actual} for {key} but you set {expected} — the value may not have actually been persisted. Check backend logs.",
+    "settings.toast.saveFailedNet": "Cannot reach backend: {detail} 鈥?make sure Synapse is running.",
+    "settings.toast.saveNoConfig": "Server didn't return the saved config 鈥?storage may be broken. Retry or check backend logs.",
+    "settings.toast.keyEmpty": "API Key cannot be blank 鈥?paste a valid key.",
+    "settings.toast.valueMismatch": "Save failed: server returned {actual} for {key} but you set {expected} 鈥?the value may not have actually been persisted. Check backend logs.",
     "settings.pickOutput": "Pick video output folder",
     "settings.pickAssets": "Pick assets folder",
     "settings.folder.opened": "Opened {path} in file manager",
     "settings.folder.openFailed": "Failed to open folder: {msg}",
     "settings.folder.pickFailed": "Could not pick a folder, please retry",
-    "settings.folder.pickUnavailable": "Folder picker not responding — restart the app or paste the path into the box on the left and click Open.",
+    "settings.folder.pickUnavailable": "Folder picker not responding 鈥?restart the app or paste the path into the box on the left and click Open.",
     "settings.folder.savedTo": "Storage path set to {path}",
     "picker.title": "Select a folder",
     "picker.shortcut.start": "Starting points",
     "picker.crumb.root": "Start",
     "picker.empty": "(no subfolders here)",
-    "picker.loading": "Loading…",
+    "picker.loading": "Loading鈥?,
     "picker.btn.cancel": "Cancel",
     "picker.btn.choose": "Choose this folder",
     "picker.btn.newFolder": "New folder",
@@ -1818,7 +1818,7 @@ const I18N_DICT = {
     "picker.created": "Created {name}",
     "toast.optimizeOk": "Prompt optimized",
     "toast.optimizeFail": "Optimization failed: {msg}",
-    "toast.optimizeNoChange": "Prompt unchanged — LLM returned identical text",
+    "toast.optimizeNoChange": "Prompt unchanged 鈥?LLM returned identical text",
     "toast.optimizeError": "Optimization request failed: {msg}",
     "toast.copyOk": "Copied to clipboard",
     "toast.downloadOk": "Saved to: {path}",
@@ -1833,17 +1833,17 @@ const I18N_DICT = {
     "toast.concatFail": "Concat failed: {msg}",
     "toast.unknownErr": "Unknown error",
     "toast.uploadFail": "Upload failed",
-    "toast.uploadNoBase64": "Server returned no base64 — cannot forward to Ark",
-    "toast.uploadTooBig": "File is {size} MB, over the 50 MB limit — compress or trim first",
-    "toast.modeNeedFirstFrame": "Image-to-video mode needs a first-frame image — please upload one",
+    "toast.uploadNoBase64": "Server returned no base64 鈥?cannot forward to Ark",
+    "toast.uploadTooBig": "File is {size} MB, over the 50 MB limit 鈥?compress or trim first",
+    "toast.modeNeedFirstFrame": "Image-to-video mode needs a first-frame image 鈥?please upload one",
     "toast.modeNeedBothFrames": "First+Last frame mode needs both a first and a last frame",
     "toast.modeNeedMultimodal": "Multimodal mode needs at least 1 reference asset (image / video / audio)",
-    "toast.modeNeedSourceVideo": "{label} mode needs a source video — please upload one",
+    "toast.modeNeedSourceVideo": "{label} mode needs a source video 鈥?please upload one",
     "toast.modeNeedPublicVideoUrl": "{label} mode needs a public http(s) video URL, not a local upload. Copy the cloud video URL from task details and retry.",
     "toast.modeNeedValidVideoUrl": "Video URL must start with http:// or https://",
     "toast.videoReferenceNeedsUrl": "Video references must use a public http(s) URL, not a local upload or base64",
-    "toast.chainInProgress": "An identical chain is already running — resuming its progress…",
-    "toast.dedupedSegments": "AI returned {n} duplicate segments — they have been merged",
+    "toast.chainInProgress": "An identical chain is already running 鈥?resuming its progress鈥?,
+    "toast.dedupedSegments": "AI returned {n} duplicate segments 鈥?they have been merged",
     "create.upload.ready": "Ready: {name} ({size})",
     "create.upload.remove": "Remove",
     "create.upload.replace": "Click or drop to replace",
@@ -1859,7 +1859,7 @@ const I18N_DICT = {
     "story.progress.submitted": "Submitted",
     "story.progress.succeeded": "Done",
     "story.progress.failed": "Failed",
-    "story.progress.safe": "Safe to switch tabs or refresh — progress will be restored",
+    "story.progress.safe": "Safe to switch tabs or refresh 鈥?progress will be restored",
     "err.title": "Plugin UI render error",
     "err.retry": "Retry render",
     "err.stackLabel": "Error stack trace",
@@ -1918,10 +1918,10 @@ function _tr(key, vars, fallback) {
   return key;
 }
 
-// SVG Icon system — all sourced from Iconify (Lucide collection)
-// https://icon-sets.iconify.design/lucide/  ·  ISC License
+// SVG Icon system 鈥?all sourced from Iconify (Lucide collection)
+// https://icon-sets.iconify.design/lucide/  路  ISC License
 const I = {
-  // ── App / navigation ──
+  // 鈹€鈹€ App / navigation 鈹€鈹€
   clapperboard: <svg viewBox="0 0 24 24"><path d="m12.3 3.46 3.02 3.96"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="m6.18 5.28 3.1 3.9"/></svg>,
   video: <svg viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 00.777-.416V7.934a.5.5 0 00-.777-.416L16 11"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>,
   play: <svg viewBox="0 0 24 24"><polygon points="6,3 20,12 6,21"/></svg>,
@@ -1931,30 +1931,30 @@ const I = {
   repeat: <svg viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>,
   download: <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
   refresh: <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>,
-  // ── Media types ──
+  // 鈹€鈹€ Media types 鈹€鈹€
   image: <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 00-2.828 0L6 21"/></svg>,
   film: <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>,
   music: <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
   camera: <svg viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>,
-  // ── Folder / file ──
+  // 鈹€鈹€ Folder / file 鈹€鈹€
   folder: <svg viewBox="0 0 24 24"><path d="M20 20a2 2 0 002-2V8a2 2 0 00-2-2h-7.9a2 2 0 01-1.69-.9L9.6 3.9A2 2 0 007.93 3H4a2 2 0 00-2 2v13a2 2 0 002 2z"/></svg>,
   folderOpen: <svg viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 019.24 10H20a2 2 0 011.94 2.5l-1.54 6a2 2 0 01-1.95 1.5H4a2 2 0 01-2-2V5a2 2 0 012-2h3.9a2 2 0 011.69.9l.81 1.2a2 2 0 001.67.9H18a2 2 0 012 2v2"/></svg>,
   fileText: <svg viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7z"/><path d="M14 2v4a2 2 0 002 2h4"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>,
-  // ── AI / sparkle ──
+  // 鈹€鈹€ AI / sparkle 鈹€鈹€
   sparkles: <svg viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.963 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.582a.5.5 0 010 .963L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>,
   wandSparkles: <svg viewBox="0 0 24 24"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 00-1.72 0L2.36 18.64a1.21 1.21 0 000 1.72l1.28 1.28a1.2 1.2 0 001.72 0L21.64 5.36a1.2 1.2 0 000-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>,
   lightbulb: <svg viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 006 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>,
-  // ── Status / feedback ──
+  // 鈹€鈹€ Status / feedback 鈹€鈹€
   warn: <svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 00-3.48 0l-8 14A2 2 0 004 21h16a2 2 0 001.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>,
   check: <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>,
   x: <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
   online: <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>,
   offline: <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>,
-  // ── Settings / config ──
+  // 鈹€鈹€ Settings / config 鈹€鈹€
   settings: <svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
   key: <svg viewBox="0 0 24 24"><path d="m15.5 7.5 2.3-2.3a1 1 0 011.4 0l1.1 1.1a1 1 0 010 1.4L18 10"/><path d="m21 2-5.6 5.6"/><circle cx="7.5" cy="16.5" r="4.5"/></svg>,
   shield: <svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 01-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 01.5-.87l7-4a1 1 0 011 0l7 4A1 1 0 0120 6z"/></svg>,
-  // ── Layout / actions ──
+  // 鈹€鈹€ Layout / actions 鈹€鈹€
   link: <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>,
   book: <svg viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 01-1-1V4a1 1 0 011-1h5a4 4 0 014 4 4 4 0 014-4h5a1 1 0 011 1v13a1 1 0 01-1 1h-6a3 3 0 00-3 3 3 3 0 00-3-3z"/></svg>,
   bot: <svg viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>,
@@ -1966,12 +1966,12 @@ const I = {
   plus: <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
   trash: <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
   copy: <svg viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
-  // ── Decorative / thematic ──
+  // 鈹€鈹€ Decorative / thematic 鈹€鈹€
   palette: <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.77 1.5-1.5 0-.37-.13-.7-.37-.97-.24-.26-.37-.6-.37-.97 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.17-4.36-9.06-10-9.06z"/></svg>,
   ruler: <svg viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 010 3.4l-2.6 2.6a2.4 2.4 0 01-3.4 0L2.7 8.7a2.41 2.41 0 010-3.4l2.6-2.6a2.41 2.41 0 013.4 0z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>,
   home: <svg viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 00-1-1h-4a1 1 0 00-1 1v8"/><path d="M3 10a2 2 0 01.709-1.528l7-5.999a2 2 0 012.582 0l7 5.999A2 2 0 0121 10v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>,
   package: <svg viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>,
-  // ── Tab-specific icons ──
+  // 鈹€鈹€ Tab-specific icons 鈹€鈹€
   squarePlus: <svg viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>,
   listTodo: <svg viewBox="0 0 24 24"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><line x1="13" y1="6" x2="21" y2="6"/><line x1="13" y1="12" x2="21" y2="12"/><line x1="13" y1="18" x2="21" y2="18"/></svg>,
   images: <svg viewBox="0 0 24 24"><path d="M18 22H4a2 2 0 01-2-2V6"/><rect width="16" height="16" x="6" y="2" rx="2"/><circle cx="14" cy="8" r="2"/><path d="m20 15.5-2.318-2.318a1 1 0 00-1.414.05L12.06 17.5"/></svg>,
@@ -1982,7 +1982,7 @@ const I = {
 };
 function Ico({ name, style: s }) { return <span className="ico" style={s}>{I[name]}</span>; }
 
-// ── Task Started Modal ──
+// 鈹€鈹€ Task Started Modal 鈹€鈹€
 function TaskStartedModal({ open, onClose, onGoToTasks, title, desc }) {
   const t = useT();
   if (!open) return null;
@@ -2207,12 +2207,12 @@ function DeleteAssetConfirmModal({ asset, onCancel, onConfirm }) {
   );
 }
 
-// ── In-plugin folder picker ──────────────────────────────────────────
+// 鈹€鈹€ In-plugin folder picker 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Tauri's native folder dialog has been unreliable across capability/
 // version combinations and the host bridge silently swallows failures.
 // To guarantee that "Select" always works, we render our own folder
 // browser modal backed by /storage/list-dir + /storage/mkdir. No bridge,
-// no Tauri dialog plugin — pure plugin backend + React.
+// no Tauri dialog plugin 鈥?pure plugin backend + React.
 function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
   const t = useT();
   const [path, setPath] = useState("");
@@ -2361,7 +2361,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
             {loading && <div className="folder-picker__empty">{t("picker.loading")}</div>}
             {!loading && !isAnchor && parent != null && (
               <div className="folder-picker__item" onClick={() => handleNavigate(parent)}>
-                <span className="folder-picker__item-icon">↰</span>
+                <span className="folder-picker__item-icon">鈫?/span>
                 <span className="folder-picker__item-name">..</span>
               </div>
             )}
@@ -2421,15 +2421,15 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
   );
 }
 
-// ── Constants ──
+// 鈹€鈹€ Constants 鈹€鈹€
 // Mode/Tab labels are i18n keys; resolved via t() at render time so locale
-// changes re-render correctly. Order is part of the UI contract — never sort.
+// changes re-render correctly. Order is part of the UI contract 鈥?never sort.
 const MODE_IDS = ["t2v", "i2v", "i2v_end", "multimodal", "edit", "extend", "transition"];
 const RATIOS = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"];
 const TAB_IDS = ["create", "storyboard", "tasks", "assets", "guide", "settings"];
 const TAB_ICONS = { create: "squarePlus", tasks: "listTodo", assets: "images", guide: "compass", storyboard: "layoutGrid", settings: "sliders" };
 
-// ── Hooks ──
+// 鈹€鈹€ Hooks 鈹€鈹€
 function useModels() {
   const [models, setModels] = useState([]);
   useEffect(() => {
@@ -2460,7 +2460,7 @@ function useTasks() {
   return { tasks, total, reload: load };
 }
 
-// ── Components ──
+// 鈹€鈹€ Components 鈹€鈹€
 
 function _formatSize(n) {
   if (!n && n !== 0) return "";
@@ -2482,12 +2482,12 @@ function _assetKindLabel(kind) {
   return _tr("create.upload.type." + kind, null, kind);
 }
 
-// Sprint 8 / V1 — `value` (single asset summary or array for multiple
+// Sprint 8 / V1 鈥?`value` (single asset summary or array for multiple
 // mode) and `onRemove(index?)` let the parent component own the actual
 // upload state.  Without this, CreateTab couldn't remember WHICH file
 // the user just uploaded, and modes like i2v/edit/extend silently
-// submitted with no `content[].image_url` — the bug report's "其他功能
-// 都用不了".
+// submitted with no `content[].image_url` 鈥?the bug report's "鍏朵粬鍔熻兘
+// 閮界敤涓嶄簡".
 function FileUploadZone({ id, accept, multiple, onUpload, label, hint, value, onRemove, onPickFromLibrary, libraryLabel }) {
   const t = useT();
   const [uploading, setUploading] = useState(false);
@@ -2583,7 +2583,7 @@ function FileUploadZone({ id, accept, multiple, onUpload, label, hint, value, on
           onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} />
         <div className="upload-zone__body">
           <div className="upload-zone__icon">
-            {uploading ? <span className="spinner" style={{width:18,height:18}} /> : <span>{multiple ? "+" : filled ? "↻" : "↑"}</span>}
+            {uploading ? <span className="spinner" style={{width:18,height:18}} /> : <span>{multiple ? "+" : filled ? "鈫? : "鈫?}</span>}
           </div>
           <div className="upload-zone__text">
             <div className="upload-zone__title">{uploadTitle}</div>
@@ -2714,7 +2714,7 @@ function CreateTab({ models, onGoToTasks, action }) {
   const [activeTask, setActiveTask] = useState(null);
   const [optimizing, setOptimizing] = useState(false);
 
-  // Sprint 8 / V1 — uploaded asset state.  Without these, the UI never
+  // Sprint 8 / V1 鈥?uploaded asset state.  Without these, the UI never
   // remembered what the user uploaded and we silently submitted text-
   // only content for i2v / i2v_end / multimodal / edit / extend.  Each
   // entry: {name, base64 (data URI), asset, size, kind}.
@@ -2796,11 +2796,11 @@ function CreateTab({ models, onGoToTasks, action }) {
       return r?.message || r?.error || _tr("toast.uploadFail", null, "Upload failed");
     }
     if (!r.base64) {
-      // Defensive — server omitted base64 but said ok.  Should not
+      // Defensive 鈥?server omitted base64 but said ok.  Should not
       // happen with the new 50 MB-cap upload route, but if it does we
       // refuse rather than submit a useless content array to Ark.
       return _tr("toast.uploadNoBase64", null,
-        "Upload OK but no base64 returned — cannot send to Ark");
+        "Upload OK but no base64 returned 鈥?cannot send to Ark");
     }
     onAsset({
       name: file.name,
@@ -2837,23 +2837,23 @@ function CreateTab({ models, onGoToTasks, action }) {
   };
 
   // Build the Ark `content` array from prompt + uploaded assets, applying
-  // local validation so we surface "请先上传首帧图片" as a red banner
+  // local validation so we surface "璇峰厛涓婁紶棣栧抚鍥剧墖" as a red banner
   // *before* hitting the network instead of after a 400 round trip.
   const buildContent = () => {
     const c = [{ type: "text", text: prompt }];
     const isPublicHttpUrl = (v) => /^https?:\/\//i.test((v || "").trim());
     if (mode === "i2v") {
-      if (!firstFrame) throw new Error(_tr("toast.modeNeedFirstFrame", null, "请先上传首帧图片"));
+      if (!firstFrame) throw new Error(_tr("toast.modeNeedFirstFrame", null, "璇峰厛涓婁紶棣栧抚鍥剧墖"));
       c.push({ type: "image_url", image_url: { url: firstFrame.base64 }, role: "first_frame" });
     } else if (mode === "i2v_end") {
-      if (!firstFrame || !endFrame) throw new Error(_tr("toast.modeNeedBothFrames", null, "请分别上传首帧和尾帧图片"));
+      if (!firstFrame || !endFrame) throw new Error(_tr("toast.modeNeedBothFrames", null, "璇峰垎鍒笂浼犻甯у拰灏惧抚鍥剧墖"));
       c.push({ type: "image_url", image_url: { url: firstFrame.base64 }, role: "first_frame" });
       c.push({ type: "image_url", image_url: { url: endFrame.base64 }, role: "last_frame" });
     } else if (mode === "multimodal") {
-      if (multimodalAssets.length === 0) throw new Error(_tr("toast.modeNeedMultimodal", null, "多模态模式至少上传 1 个参考素材"));
+      if (multimodalAssets.length === 0) throw new Error(_tr("toast.modeNeedMultimodal", null, "澶氭ā鎬佹ā寮忚嚦灏戜笂浼?1 涓弬鑰冪礌鏉?));
       multimodalAssets.forEach(a => {
         if (a.kind === "video") {
-          throw new Error(_tr("toast.videoReferenceNeedsUrl", null, "视频参考必须使用公网 http(s) URL，不能使用本地上传视频或 base64"));
+          throw new Error(_tr("toast.videoReferenceNeedsUrl", null, "瑙嗛鍙傝€冨繀椤讳娇鐢ㄥ叕缃?http(s) URL锛屼笉鑳戒娇鐢ㄦ湰鍦颁笂浼犺棰戞垨 base64"));
         } else if (a.kind === "audio") {
           c.push({ type: "audio_url", audio_url: { url: a.base64 } });
         } else {
@@ -2868,10 +2868,10 @@ function CreateTab({ models, onGoToTasks, action }) {
           : _tr("modes.extend", null, "Extend");
       const publicUrl = sourceVideoUrl.trim();
       if (!publicUrl) {
-        throw new Error(_tr("toast.modeNeedPublicVideoUrl", { label: lbl }, "{label} 模式需要公网 http(s) 视频 URL"));
+        throw new Error(_tr("toast.modeNeedPublicVideoUrl", { label: lbl }, "{label} 妯″紡闇€瑕佸叕缃?http(s) 瑙嗛 URL"));
       }
       if (!isPublicHttpUrl(publicUrl)) {
-        throw new Error(_tr("toast.modeNeedValidVideoUrl", null, "视频 URL 必须以 http:// 或 https:// 开头"));
+        throw new Error(_tr("toast.modeNeedValidVideoUrl", null, "瑙嗛 URL 蹇呴』浠?http:// 鎴?https:// 寮€澶?));
       }
       c.push({ type: "video_url", video_url: { url: publicUrl }, role: "reference_video" });
     }
@@ -2955,7 +2955,7 @@ function CreateTab({ models, onGoToTasks, action }) {
         setPrompt(r.body.result);
         showToast(_tr("toast.optimizeOk", null, "Prompt optimized"), "success");
       } else if (!r.body?.ok) {
-        // Backend now returns structured error codes — surface the human
+        // Backend now returns structured error codes 鈥?surface the human
         // message when present so the user sees "missing brain.access"
         // (fixable in Settings) instead of a misleading "LLM unavailable".
         const msg = r.body?.message || r.body?.error || r.body?.detail || "LLM unavailable";
@@ -3101,7 +3101,7 @@ function CreateTab({ models, onGoToTasks, action }) {
           <div className="form-row">
             <label className="label">{t("create.label.model")}</label>
             <select className="input select" value={model} onChange={e => setModel(e.target.value)}>
-              {models.map(m => <option key={m.id} value={m.id}>{m.name} · RPM {m.rpm}</option>)}
+              {models.map(m => <option key={m.id} value={m.id}>{m.name} 路 RPM {m.rpm}</option>)}
             </select>
           </div>
           <div className="form-row">
@@ -3246,8 +3246,8 @@ function TaskListTab({ isActive = true, onUseVideo }) {
     return true;
   });
 
-  // Keep `selected` in sync with the live task list — when polling refreshes
-  // a task (e.g. running → succeeded) the selected reference would otherwise
+  // Keep `selected` in sync with the live task list 鈥?when polling refreshes
+  // a task (e.g. running 鈫?succeeded) the selected reference would otherwise
   // stay frozen on the stale snapshot and the right pane would never update.
   useEffect(() => {
     if (!selected) return;
@@ -3345,7 +3345,7 @@ function TaskListTab({ isActive = true, onUseVideo }) {
                    onClick={() => setSelected(it)}>
                 <div className={`task-thumb ${it.status==="failed" ? "task-thumb--failed" : ""}`}>
                   {it.status === "succeeded" ? (
-                    // First frame as poster — preload="metadata" gives us
+                    // First frame as poster 鈥?preload="metadata" gives us
                     // the cover image without buffering the whole file.
                     <video src={videoSrcFor(it.id)} preload="metadata" muted playsInline />
                   ) : isRunning ? (
@@ -3435,7 +3435,7 @@ function TaskListTab({ isActive = true, onUseVideo }) {
                 <div style={{marginTop:12, padding:"10px 12px",
                              background:"rgba(239,68,68,.08)", border:"1px solid rgba(239,68,68,.25)",
                              borderRadius:6, color:"var(--danger)", fontSize:12}}>
-                  <strong>{t("tasks.detail.errorTitle")}：</strong>
+                  <strong>{t("tasks.detail.errorTitle")}锛?/strong>
                   {selected.error_message || t("preview.failed")}
                 </div>
               )}
@@ -3455,11 +3455,11 @@ function TaskListTab({ isActive = true, onUseVideo }) {
                 </div>
                 <div>
                   <span className="text-xs text-dim">{t("tasks.detail.mode")}</span>
-                  <div className="text-sm">{selected.mode || "—"}</div>
+                  <div className="text-sm">{selected.mode || "鈥?}</div>
                 </div>
                 <div>
                   <span className="text-xs text-dim">{t("tasks.detail.model")}</span>
-                  <div className="text-sm">{selected.model || "—"}</div>
+                  <div className="text-sm">{selected.model || "鈥?}</div>
                 </div>
                 <div>
                   <span className="text-xs text-dim">{t("tasks.detail.ratio")}</span>
@@ -3479,7 +3479,7 @@ function TaskListTab({ isActive = true, onUseVideo }) {
                 </div>
                 <div>
                   <span className="text-xs text-dim">{t("tasks.detail.createdAt")}</span>
-                  <div className="text-sm">{selected.created_at || "—"}</div>
+                  <div className="text-sm">{selected.created_at || "鈥?}</div>
                 </div>
               </div>
               {selected.prompt && (
@@ -3626,25 +3626,25 @@ function PromptGuideTab() {
   const t = useT();
   const locale = useLocale();
   const FALLBACK_CAMERAS = [
-    {zh:"推镜头",en:"Push in",desc:"向前靠近主体"},{zh:"拉镜头",en:"Pull out",desc:"向后远离主体"},
-    {zh:"摇镜头",en:"Pan",desc:"水平旋转拍摄"},{zh:"移镜头",en:"Dolly/Tracking",desc:"平移跟随"},
-    {zh:"跟镜头",en:"Follow",desc:"追踪主体运动"},{zh:"环绕镜头",en:"Orbit",desc:"绕主体旋转"},
-    {zh:"升降镜头",en:"Crane/Jib",desc:"垂直升降"},{zh:"希区柯克变焦",en:"Dolly Zoom",desc:"同时推拉+变焦，恐惧/不安感"},
-    {zh:"一镜到底",en:"One-take",desc:"长镜头无剪辑"},{zh:"手持晃动",en:"Handheld",desc:"手持相机的真实质感"},
+    {zh:"鎺ㄩ暅澶?,en:"Push in",desc:"鍚戝墠闈犺繎涓讳綋"},{zh:"鎷夐暅澶?,en:"Pull out",desc:"鍚戝悗杩滅涓讳綋"},
+    {zh:"鎽囬暅澶?,en:"Pan",desc:"姘村钩鏃嬭浆鎷嶆憚"},{zh:"绉婚暅澶?,en:"Dolly/Tracking",desc:"骞崇Щ璺熼殢"},
+    {zh:"璺熼暅澶?,en:"Follow",desc:"杩借釜涓讳綋杩愬姩"},{zh:"鐜粫闀滃ご",en:"Orbit",desc:"缁曚富浣撴棆杞?},
+    {zh:"鍗囬檷闀滃ご",en:"Crane/Jib",desc:"鍨傜洿鍗囬檷"},{zh:"甯屽尯鏌厠鍙樼劍",en:"Dolly Zoom",desc:"鍚屾椂鎺ㄦ媺+鍙樼劍锛屾亹鎯?涓嶅畨鎰?},
+    {zh:"涓€闀滃埌搴?,en:"One-take",desc:"闀块暅澶存棤鍓緫"},{zh:"鎵嬫寔鏅冨姩",en:"Handheld",desc:"鎵嬫寔鐩告満鐨勭湡瀹炶川鎰?},
   ];
   const FALLBACK_ATMOSPHERE = {
-    light:["逆光","侧光","丁达尔效应","伦勃朗光","体积光","柔光","硬光"],
-    color:["暖色调","冷色调","赛博朋克","复古胶片","黑白","霓虹","日落色调"],
-    texture:["电影级","纪录片风格","油画感","水墨感","CG质感","像素风","写实"],
-    mood:["温馨","紧张","悬疑","欢快","忧伤","史诗","治愈","恐怖","浪漫"],
+    light:["閫嗗厜","渚у厜","涓佽揪灏旀晥搴?,"浼﹀媰鏈楀厜","浣撶Н鍏?,"鏌斿厜","纭厜"],
+    color:["鏆栬壊璋?,"鍐疯壊璋?,"璧涘崥鏈嬪厠","澶嶅彜鑳剁墖","榛戠櫧","闇撹櫣","鏃ヨ惤鑹茶皟"],
+    texture:["鐢靛奖绾?,"绾綍鐗囬鏍?,"娌圭敾鎰?,"姘村ⅷ鎰?,"CG璐ㄦ劅","鍍忕礌椋?,"鍐欏疄"],
+    mood:["娓╅Θ","绱у紶","鎮枒","娆㈠揩","蹇т激","鍙茶瘲","娌绘剤","鎭愭€?,"娴极"],
   };
   const FALLBACK_FORMULAS = {
-    t2v:"主体+运动 / 背景+运动 / 镜头+运动",
-    i2v:"参考图片特征 + 画面变化描述 + 镜头运动",
-    i2v_end:"首帧到尾帧的过渡描述 + 中间画面变化 + 镜头运动",
-    multimodal:"参考「图片N」中的特征 + 参考「视频N」的运镜 + 音色→角色说:台词",
-    edit:"保持不变的部分 + 替换/增加/删除的元素 + 时机和位置",
-    extend:"延续描述 + 新内容方向 + 过渡方式",
+    t2v:"涓讳綋+杩愬姩 / 鑳屾櫙+杩愬姩 / 闀滃ご+杩愬姩",
+    i2v:"鍙傝€冨浘鐗囩壒寰?+ 鐢婚潰鍙樺寲鎻忚堪 + 闀滃ご杩愬姩",
+    i2v_end:"棣栧抚鍒板熬甯х殑杩囨浮鎻忚堪 + 涓棿鐢婚潰鍙樺寲 + 闀滃ご杩愬姩",
+    multimodal:"鍙傝€冦€屽浘鐗嘚銆嶄腑鐨勭壒寰?+ 鍙傝€冦€岃棰慛銆嶇殑杩愰暅 + 闊宠壊鈫掕鑹茶:鍙拌瘝",
+    edit:"淇濇寔涓嶅彉鐨勯儴鍒?+ 鏇挎崲/澧炲姞/鍒犻櫎鐨勫厓绱?+ 鏃舵満鍜屼綅缃?,
+    extend:"寤剁画鎻忚堪 + 鏂板唴瀹规柟鍚?+ 杩囨浮鏂瑰紡",
   };
 
   const [guide, setGuide] = useState({ cameras: FALLBACK_CAMERAS, atmosphere: FALLBACK_ATMOSPHERE, formulas: FALLBACK_FORMULAS });
@@ -3682,7 +3682,7 @@ function PromptGuideTab() {
         <div className="card" style={{cursor:"pointer"}} onClick={() => toggleSection("templates")}>
           <div className="oa-section-label oa-section-label--inline" style={{justifyContent:"space-between"}}>
             <span><Ico name="fileText"/> {t("guide.section.templates")}</span>
-            <span className="text-dim">{expanded.templates ? "▲" : "▼"}</span>
+            <span className="text-dim">{expanded.templates ? "鈻? : "鈻?}</span>
           </div>
           {expanded.templates && (
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:8,marginTop:8}} onClick={e => e.stopPropagation()}>
@@ -3708,7 +3708,7 @@ function PromptGuideTab() {
         <div className="card" style={{cursor:"pointer"}} onClick={() => toggleSection("cameras")}>
           <div className="oa-section-label oa-section-label--inline" style={{justifyContent:"space-between"}}>
             <span><Ico name="camera"/> {t("guide.section.cameras")}</span>
-            <span className="text-dim">{expanded.cameras ? "▲" : "▼"}</span>
+            <span className="text-dim">{expanded.cameras ? "鈻? : "鈻?}</span>
           </div>
           {expanded.cameras && (
             <div className="flex gap-2 flex-wrap" style={{marginTop:8}} onClick={e => e.stopPropagation()}>
@@ -3725,7 +3725,7 @@ function PromptGuideTab() {
         <div className="card" style={{cursor:"pointer"}} onClick={() => toggleSection("atmosphere")}>
           <div className="oa-section-label oa-section-label--inline" style={{justifyContent:"space-between"}}>
             <span><Ico name="palette"/> {t("guide.section.atmosphere")}</span>
-            <span className="text-dim">{expanded.atmosphere ? "▲" : "▼"}</span>
+            <span className="text-dim">{expanded.atmosphere ? "鈻? : "鈻?}</span>
           </div>
           {expanded.atmosphere && (
             <div style={{marginTop:8}} onClick={e => e.stopPropagation()}>
@@ -3744,7 +3744,7 @@ function PromptGuideTab() {
         <div className="card" style={{cursor:"pointer"}} onClick={() => toggleSection("formulas")}>
           <div className="oa-section-label oa-section-label--inline" style={{justifyContent:"space-between"}}>
             <span><Ico name="ruler"/> {t("guide.section.formulas")}</span>
-            <span className="text-dim">{expanded.formulas ? "▲" : "▼"}</span>
+            <span className="text-dim">{expanded.formulas ? "鈻? : "鈻?}</span>
           </div>
           {expanded.formulas && (
             <div style={{marginTop:8}} onClick={e => e.stopPropagation()}>
@@ -3775,7 +3775,7 @@ function StoryboardTab({ onGoToSettings }) {
   const [totalDuration, setTotalDuration] = useState(60);
   const [segDuration, setSegDuration] = useState(10);
   const [ratio, setRatio] = useState("16:9");
-  const [style, setStyle] = useState("电影级画质");
+  const [style, setStyle] = useState("鐢靛奖绾х敾璐?);
   const [model, setModel] = useState("2.0");
   const [resolution, setResolution] = useState("720p");
   const [genMode, setGenMode] = useState("serial");
@@ -3792,10 +3792,10 @@ function StoryboardTab({ onGoToSettings }) {
   const [editIdx, setEditIdx] = useState(-1);
   const [previewIdx, setPreviewIdx] = useState(-1);
 
-  // Sprint 8 / V2 — chain_group state.  We persist the most recent
+  // Sprint 8 / V2 鈥?chain_group state.  We persist the most recent
   // group_id in localStorage so a tab refresh / window close mid-chain
-  // can be recovered automatically: the user reported "分镜出现两次 /
-  // 生成两次" precisely because they were forced to re-click 开始生成
+  // can be recovered automatically: the user reported "鍒嗛暅鍑虹幇涓ゆ /
+  // 鐢熸垚涓ゆ" precisely because they were forced to re-click 寮€濮嬬敓鎴?
   // after losing the in-memory React state, doubling the DB rows.
   const LS_KEY = "seedance.chainGroupId";
   const [chainGroupId, setChainGroupId] = useState(() => {
@@ -3811,7 +3811,7 @@ function StoryboardTab({ onGoToSettings }) {
     }).catch(() => setFfmpegOk(false));
   }, []);
 
-  // Recovery on mount — if a previous session left a chainGroupId in
+  // Recovery on mount 鈥?if a previous session left a chainGroupId in
   // localStorage, query the backend to see if it's still progressing or
   // has results to display.  We do NOT touch step/segments if there's
   // no recoverable group; the user just sees the normal `input` view.
@@ -3825,7 +3825,7 @@ function StoryboardTab({ onGoToSettings }) {
         const tasks = r.body?.tasks || [];
         const progress = r.body?.progress || {};
         if (!tasks.length && !r.body?.chain_active) {
-          // Stale localStorage entry — chain finished long ago and
+          // Stale localStorage entry 鈥?chain finished long ago and
           // its tasks may have been deleted.  Drop it silently.
           try { localStorage.removeItem(LS_KEY); } catch {}
           setChainGroupId("");
@@ -3850,7 +3850,7 @@ function StoryboardTab({ onGoToSettings }) {
           setGenerating(true);
         }
       } catch (e) {
-        // Backend unreachable — keep the LS entry, the next mount will
+        // Backend unreachable 鈥?keep the LS entry, the next mount will
         // try again.  Don't bother the user.
         console.warn("[seedance] chain recovery failed:", e);
       }
@@ -3859,7 +3859,7 @@ function StoryboardTab({ onGoToSettings }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Polling effect — runs while we know about an active chain.  Fires
+  // Polling effect 鈥?runs while we know about an active chain.  Fires
   // every 5 s, stops when progress.{pending,running} both hit zero.
   useEffect(() => {
     if (!chainGroupId) return;
@@ -3881,7 +3881,7 @@ function StoryboardTab({ onGoToSettings }) {
         });
         const remaining = (progress.pending || 0) + (progress.running || 0);
         if (remaining === 0 && !r.body?.chain_active) {
-          // Done — flip to results, clear the LS so the next chain run
+          // Done 鈥?flip to results, clear the LS so the next chain run
           // starts cleanly.
           try { localStorage.removeItem(LS_KEY); } catch {}
           setChainGroupId("");
@@ -3911,9 +3911,9 @@ function StoryboardTab({ onGoToSettings }) {
         story, total_duration: totalDuration, segment_duration: segDuration, ratio, style,
       });
       if (r.body?.ok && r.body.storyboard?.segments) {
-        // Sprint 8 / V2 — LLM occasionally returns identical segments
+        // Sprint 8 / V2 鈥?LLM occasionally returns identical segments
         // (especially for short stories asked to be split into many
-        // shots).  The bug report's "出现一个分镜头出现两次" matched
+        // shots).  The bug report's "鍑虹幇涓€涓垎闀滃ご鍑虹幇涓ゆ" matched
         // exactly this pattern, so we deduplicate by trimmed prompt
         // before the user can submit them for generation.
         const raw = r.body.storyboard.segments;
@@ -3932,7 +3932,7 @@ function StoryboardTab({ onGoToSettings }) {
         if (merged.length < raw.length) {
           showToast(_tr("toast.dedupedSegments",
             { n: raw.length - merged.length },
-            "AI 输出有 {n} 段重复，已自动合并"), "warning");
+            "AI 杈撳嚭鏈?{n} 娈甸噸澶嶏紝宸茶嚜鍔ㄥ悎骞?), "warning");
         }
         showToast(_tr("toast.decomposeOk", { n: merged.length }));
       } else {
@@ -3992,7 +3992,7 @@ function StoryboardTab({ onGoToSettings }) {
         setChainGroupId(r.body.group_id);
         showToast(r.body.message
           || _tr("toast.chainInProgress", null,
-            "已有相同分镜在生成，正在为你恢复进度…"), "warning");
+            "宸叉湁鐩稿悓鍒嗛暅鍦ㄧ敓鎴愶紝姝ｅ湪涓轰綘鎭㈠杩涘害鈥?), "warning");
       } else {
         const detail = r.body?.detail || r.body?.error || "";
         showToast(_tr("toast.genFail", { msg: detail }), "error");
@@ -4247,7 +4247,7 @@ function StoryboardTab({ onGoToSettings }) {
                 <div className="flex gap-2 items-center">
                   <span className="text-xs text-dim">{seg.duration || segDuration}s</span>
                   <span className="text-xs text-dim">{seg.transition_to_next || "cut"}</span>
-                  <span style={{fontSize:11,color:"var(--text-dim)"}}>{editIdx === idx ? "▲" : "▼"}</span>
+                  <span style={{fontSize:11,color:"var(--text-dim)"}}>{editIdx === idx ? "鈻? : "鈻?}</span>
                 </div>
               </div>
 
@@ -4381,7 +4381,7 @@ function StoryboardTab({ onGoToSettings }) {
     const handleCancel = async () => {
       if (!chainGroupId) return;
       if (!confirm(_tr("story.cancelConfirm", null,
-        "确定要取消此次生成吗？已提交的分镜会继续在火山服务端跑完，但不再接受新的轮询。"))) return;
+        "纭畾瑕佸彇娑堟娆＄敓鎴愬悧锛熷凡鎻愪氦鐨勫垎闀滀細缁х画鍦ㄧ伀灞辨湇鍔＄璺戝畬锛屼絾涓嶅啀鎺ュ彈鏂扮殑杞銆?))) return;
       try {
         await pluginApi("POST", `/long-video/cancel/${chainGroupId}`);
       } catch (e) { console.warn("cancel failed", e); }
@@ -4426,26 +4426,26 @@ function StoryboardTab({ onGoToSettings }) {
                 </div>
                 <div className="story-progress-stat">
                   <div className="story-progress-stat__num">{submitted}/{totalEst}</div>
-                  <div className="story-progress-stat__label">{_tr("story.progress.submitted", null, "已提交")}</div>
+                  <div className="story-progress-stat__label">{_tr("story.progress.submitted", null, "宸叉彁浜?)}</div>
                 </div>
                 <div className="story-progress-stat">
                   <div className="story-progress-stat__num">{chainProgress.succeeded}</div>
-                  <div className="story-progress-stat__label">{_tr("story.progress.succeeded", null, "已完成")}</div>
+                  <div className="story-progress-stat__label">{_tr("story.progress.succeeded", null, "宸插畬鎴?)}</div>
                 </div>
                 <div className="story-progress-stat">
                   <div className="story-progress-stat__num">{chainProgress.failed}</div>
-                  <div className="story-progress-stat__label">{_tr("story.progress.failed", null, "失败")}</div>
+                  <div className="story-progress-stat__label">{_tr("story.progress.failed", null, "澶辫触")}</div>
                 </div>
               </div>
               <div className="story-progress-actions">
                 <div className="story-progress-safe">
-                  <Ico name="check"/> {_tr("story.progress.safe", null, "可以安全切换 Tab 或刷新页面 — 进度会自动恢复")}
+                  <Ico name="check"/> {_tr("story.progress.safe", null, "鍙互瀹夊叏鍒囨崲 Tab 鎴栧埛鏂伴〉闈?鈥?杩涘害浼氳嚜鍔ㄦ仮澶?)}
                 </div>
                 <div className="flex gap-2">
                   <button className="btn btn-sm" onClick={() => setStep("edit")}>{t("story.btn.backEdit")}</button>
                   {chainGroupId && (
                     <button className="btn btn-sm" onClick={handleCancel}>
-                      {_tr("story.btn.cancel", null, "取消生成")}
+                      {_tr("story.btn.cancel", null, "鍙栨秷鐢熸垚")}
                     </button>
                   )}
                 </div>
@@ -4461,7 +4461,7 @@ function StoryboardTab({ onGoToSettings }) {
                   <div className="story-queue-index">{row.idx + 1}</div>
                   <div style={{minWidth:0}}>
                     <div className="story-queue-title">{row.promptText || t("tasks.noPrompt")}</div>
-                    <div className="story-queue-meta">{row.duration}s · {row.task.id || _tr("story.progress.status.pending", null, "等待")}</div>
+                    <div className="story-queue-meta">{row.duration}s 路 {row.task.id || _tr("story.progress.status.pending", null, "绛夊緟")}</div>
                   </div>
                   <span className={`story-queue-status ${row.status}`}>{statusText(row.status)}</span>
                 </div>
@@ -4631,7 +4631,7 @@ function StoryboardTab({ onGoToSettings }) {
   return null;
 }
 
-// ── FfmpegInstaller ─────────────────────────────────────────────────────
+// 鈹€鈹€ FfmpegInstaller 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 // Self-contained replacement for the retired SDK 0.6.x dep-gate.js widget.
 // Talks to the in-plugin /system/* routes (see seedance_inline/system_deps.py)
 // using a fire-and-poll cycle: POST .../install kicks off a background
@@ -4640,7 +4640,7 @@ function PermissionsPanel({ status, onChanged }) {
   // ``status`` is the latest /permissions/check payload; ``onChanged``
   // bubbles up to the App so the top banner can re-evaluate after a
   // successful grant. The grant call hits the HOST admin endpoint
-  // (/api/plugins/{id}/_admin/permissions/grant) — pluginApi prefixes
+  // (/api/plugins/{id}/_admin/permissions/grant) 鈥?pluginApi prefixes
   // /api/plugins/{pluginId} so we just pass the suffix.
   const t = useT();
   const [granting, setGranting] = useState(false);
@@ -4764,7 +4764,7 @@ function FfmpegInstaller({ onInstalled, onUninstalled }) {
         setSnap(item);
         if (item.busy) {
           // server says an op is still running (e.g. user re-opened the
-          // tab mid-install / mid-uninstall) — pick polling back up using
+          // tab mid-install / mid-uninstall) 鈥?pick polling back up using
           // whichever op_kind the server reports.
           setBusyOp(item.last_install?.op_kind || "install");
         }
@@ -4822,7 +4822,7 @@ function FfmpegInstaller({ onInstalled, onUninstalled }) {
           }
         }
       } catch (e) {
-        // network blip — try again next tick instead of bailing
+        // network blip 鈥?try again next tick instead of bailing
       }
     };
     tick();
@@ -4920,7 +4920,7 @@ function FfmpegInstaller({ onInstalled, onUninstalled }) {
   const lastOpKind = liveStatus?.op_kind || "install";
 
   // Pick a "primary" install method: the first executable method whose
-  // requires_sudo is satisfied — falls back to the first one regardless.
+  // requires_sudo is satisfied 鈥?falls back to the first one regardless.
   const primaryIdx = (() => {
     for (let i = 0; i < methods.length; i++) {
       const m = methods[i];
@@ -5093,7 +5093,7 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
     try {
       var r = await pluginApi("PUT", "/settings", { updates });
 
-      // ── Step 1: HTTP-level failure (4xx / 5xx / network) ────────────
+      // 鈹€鈹€ Step 1: HTTP-level failure (4xx / 5xx / network) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
       // The bridge layer always returns { ok, status, body? }. On HTTP
       // failure, `body` may be FastAPI's {detail: "..."} or absent
       // entirely (network error). Surface both clearly instead of
@@ -5118,7 +5118,7 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
         return;
       }
 
-      // ── Step 2: Server returned 200 but missing config payload ──────
+      // 鈹€鈹€ Step 2: Server returned 200 but missing config payload 鈹€鈹€鈹€鈹€鈹€鈹€
       if (!r.body || !r.body.config) {
         showToast(_tr("settings.toast.saveNoConfig"), "error");
         setSaving(false);
@@ -5128,9 +5128,9 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
       var serverConfig = r.body.config;
       setConfig(serverConfig);
 
-      // ── Step 3: Round-trip verify EVERY key the user just sent ──────
-      // Not only ark_api_key — the user reported ALL settings showed
-      // "saved" but values reverted (e.g. they switched 默认推理模式 to
+      // 鈹€鈹€ Step 3: Round-trip verify EVERY key the user just sent 鈹€鈹€鈹€鈹€鈹€鈹€
+      // Not only ark_api_key 鈥?the user reported ALL settings showed
+      // "saved" but values reverted (e.g. they switched 榛樿鎺ㄧ悊妯″紡 to
       // flex but the dropdown stayed on "default"). That means the
       // server-side persistence quietly dropped non-key updates too.
       // We compare each sent value against the server's read-back so a
@@ -5146,8 +5146,8 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
         }
       }
       if (mismatches.length > 0) {
-        // Special-case ark_api_key so the dedicated "回读不一致" toast
-        // and "保留输入框内容" UX still apply.
+        // Special-case ark_api_key so the dedicated "鍥炶涓嶄竴鑷? toast
+        // and "淇濈暀杈撳叆妗嗗唴瀹? UX still apply.
         if (updates.ark_api_key && mismatches.some(function(m) { return m.key === "ark_api_key"; })) {
           showToast(_tr("settings.toast.keyError"), "error");
         } else {
@@ -5156,7 +5156,7 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
             _tr("settings.toast.valueMismatch", {
               key: first.key,
               expected: first.expected,
-              actual: first.actual || "(空)",
+              actual: first.actual || "(绌?",
             }),
             "error"
           );
@@ -5165,7 +5165,7 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
         return;
       }
 
-      // ── Step 4: All keys round-tripped → safe to do the post-save UX ─
+      // 鈹€鈹€ Step 4: All keys round-tripped 鈫?safe to do the post-save UX 鈹€
       if (updates.ark_api_key) {
         setApiKey("");
         if (onKeyChange) onKeyChange(serverConfig.ark_api_key || "");
@@ -5185,11 +5185,11 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
 
   const statKeyMap = {output_dir:"settings.stats.outputDir", assets_dir:"settings.stats.assetsDir", cache_dir:"settings.stats.cacheDir"};
 
-  // ── Folder helpers ────────────────────────────────────────────────
+  // 鈹€鈹€ Folder helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   // "Open" goes through the plugin backend (mkdir -p + spawn explorer/
   // open/xdg-open). This works even when the user has NOT customized
-  // the folder yet — the backend resolves `key` to the same default
-  // that /storage/stats uses, so "默认: ~/seedance-output/" is openable.
+  // the folder yet 鈥?the backend resolves `key` to the same default
+  // that /storage/stats uses, so "榛樿: ~/seedance-output/" is openable.
   const openFolderByKey = async (key) => {
     try {
       const r = await pluginApi("POST", "/storage/open-folder", { key });
@@ -5264,20 +5264,20 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <label className="label">共享中转站名称（可选）</label>
+            <label className="label">鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</label>
             <input className="input" type="text"
               value={config.ark_relay_endpoint || ""}
               onChange={e => setConfig({...config, ark_relay_endpoint: e.target.value})}
               onBlur={e => save({ark_relay_endpoint: e.target.value.trim()})}
-              placeholder="例如: yunwu-video" />
-            <p className="text-xs text-dim" style={{marginTop:4}}>来自 LLM 配置页 relay_endpoints；填写后优先使用共享中转站。</p>
+              placeholder="渚嬪: yunwu-video" />
+            <p className="text-xs text-dim" style={{marginTop:4}}>鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涘～鍐欏悗浼樺厛浣跨敤鍏变韩涓浆绔欍€?/p>
           </div>
           <div className="form-row">
-            <label className="label">中转站失败策略</label>
+            <label className="label">涓浆绔欏け璐ョ瓥鐣?/label>
             <select className="input select" value={config.ark_relay_fallback_policy || "official"}
               onChange={e => save({ark_relay_fallback_policy: e.target.value})}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
@@ -5420,7 +5420,7 @@ function SettingsTab({ onKeyChange, onFfmpegChanged, permsStatus, onPermsRefresh
   );
 }
 
-// ── Main App ──
+// 鈹€鈹€ Main App 鈹€鈹€
 function App() {
   const t = useT();
   const [activeTab, setActiveTab] = useState(0);

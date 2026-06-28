@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Subtitle Craft · 字幕工坊</title>
+  <title>Subtitle Craft 路 瀛楀箷宸ュ潑</title>
   <!--
     Phase 5 full UI for the subtitle-craft plugin (v1.0.0).
 
@@ -14,13 +14,13 @@
       4. Tab-as-iframe-page layout: 4 tabs, each lazy-mounted on first visit
       5. Bridge SDK identical (api/upload/download/show-in-folder/i18n)
       6. Theme + locale follow host bridge events
-      7. Right-side preview area (oa-preview-area) — inline split layout,
+      7. Right-side preview area (oa-preview-area) 鈥?inline split layout,
          NOT a slide-in panel
       8. Toast + modal patterns: oa-modal, showToast, lightbox
 
-    No cross-plugin dispatch surface in v1.0 — schema reservation only
+    No cross-plugin dispatch surface in v1.0 鈥?schema reservation only
     (assets_bus table + tasks.origin_* columns) and the UI is completely
-    silent about it. v2.0 will add a "send to …" button row without any
+    silent about it. v2.0 will add a "send to 鈥? button row without any
     data migration.
   -->
   <script src="_assets/bootstrap.js"></script>
@@ -28,9 +28,9 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/markdown-mini.js"></script>
   <script src="_assets/i18n.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
@@ -139,7 +139,7 @@
     @media (max-width: 860px) { .split-layout { flex-direction: column; } .split-left { width: 100%; min-width: unset; } }
     /* tongyi-image alignment classes (oa-*).
        NOTE: oa-hero-title{,__icon,__text,__sub} live in the shared
-       _assets/styles.css — do NOT redeclare them here. The previous
+       _assets/styles.css 鈥?do NOT redeclare them here. The previous
        local override broke the icon (no svg sizing rule), making the
        hero render as a tiny purple dot. We let the shared gradient
        chip (36x36, svg 22x22) win. */
@@ -170,7 +170,7 @@
     .cost-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); }
     .cost-table tr:last-child td { border-bottom: none; font-weight: 600; }
     .cost-table td.right { text-align: right; }
-    /* ── mode tiles (uniform 2x2 grid, purple accent bar, sync tag) ── */
+    /* 鈹€鈹€ mode tiles (uniform 2x2 grid, purple accent bar, sync tag) 鈹€鈹€ */
     .oa-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .oa-mode-tile {
       position: relative; padding: 12px 14px 12px 18px;
@@ -202,7 +202,7 @@
     .oa-mode-tile.active .oa-mode-tile__chip {
       background: var(--primary); color: #fff; border-color: var(--primary);
     }
-    /* hook_picker (v1.1) — gold chip + small "NEW" badge in the corner.
+    /* hook_picker (v1.1) 鈥?gold chip + small "NEW" badge in the corner.
        Reuses the same .oa-mode-tile* dimensions / spacing as the four
        v1.0 tiles so the 5-tile grid stays visually uniform. */
     .oa-mode-tile__chip[data-mode="hook_picker"] {
@@ -222,7 +222,7 @@
       pointer-events: none;
     }
     .oa-mode-tile__desc { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
-    /* hook_picker result panel — quoted dialogue + headline.
+    /* hook_picker result panel 鈥?quoted dialogue + headline.
        New ``oa-hook-*`` namespace inherits the existing CSS variables so
        no new design language is introduced. */
     .oa-hook-headline {
@@ -257,12 +257,12 @@
     }
     .oa-collapsible > summary::-webkit-details-marker { display: none; }
     .oa-collapsible > summary::before {
-      content: "▸ "; color: var(--primary);
+      content: "鈻?"; color: var(--primary);
       transition: transform .15s;
       display: inline-block;
     }
-    .oa-collapsible[open] > summary::before { content: "▾ "; }
-    /* ── feature cards rendered in the empty preview state ── */
+    .oa-collapsible[open] > summary::before { content: "鈻?"; }
+    /* 鈹€鈹€ feature cards rendered in the empty preview state 鈹€鈹€ */
     .oa-feature-strip {
       display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
       width: 100%; max-width: 360px; margin-top: 18px;
@@ -280,7 +280,7 @@
     .oa-feature-card__icon > svg { width: 16px; height: 16px; }
     .oa-feature-card__title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
     .oa-feature-card__desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
-    /* ── config summary card on the right pane (above the cost table) ── */
+    /* 鈹€鈹€ config summary card on the right pane (above the cost table) 鈹€鈹€ */
     .oa-config-summary {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
       gap: 8px; margin-bottom: 14px;
@@ -291,7 +291,7 @@
     }
     .oa-summary-pill__label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
     .oa-summary-pill__value { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
-    /* ── unified preview-template (right pane: same skeleton across all 4 modes) ── */
+    /* 鈹€鈹€ unified preview-template (right pane: same skeleton across all 4 modes) 鈹€鈹€ */
     .oa-preview-card {
       width: 100%;
       background: var(--bg-card);
@@ -370,8 +370,8 @@
       font-size: 11.5px; color: var(--text-dim); line-height: 1.7;
     }
     .oa-cost-notes div { display: flex; gap: 6px; }
-    .oa-cost-notes div::before { content: "·"; color: var(--primary); }
-    /* ── stat chip (status + filter row) ── */
+    .oa-cost-notes div::before { content: "路"; color: var(--primary); }
+    /* 鈹€鈹€ stat chip (status + filter row) 鈹€鈹€ */
     .oa-stat-chip {
       padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--bg-card); color: var(--text); font-size: 12px;
@@ -383,7 +383,7 @@
     .oa-stat-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
     .oa-stat-chip__count { font-size: 10px; padding: 0 6px; background: rgba(255,255,255,.18); border-radius: 999px; }
     .oa-stat-chip:not(.active) .oa-stat-chip__count { background: var(--bg-hover); color: var(--text-muted); }
-    /* ── style preset visual swatch ── */
+    /* 鈹€鈹€ style preset visual swatch 鈹€鈹€ */
     .oa-style-card {
       padding: 10px; border: 1px solid var(--border); border-radius: 8px;
       background: var(--bg-card); display: flex; flex-direction: column; gap: 6px;
@@ -402,7 +402,7 @@
     .oa-style-swatch--tv       { background: linear-gradient(135deg, #f59e0b, #ef4444); }
     .oa-style-card__name { font-size: 13px; font-weight: 600; }
     .oa-style-card__meta { font-size: 11px; color: var(--text-muted); }
-    /* ── system deps card (verbatim from seedance-video) ── */
+    /* 鈹€鈹€ system deps card (verbatim from seedance-video) 鈹€鈹€ */
     .sysdep-card {
       border: 1px solid var(--border); border-radius: 8px;
       padding: 12px; margin-top: 8px; background: var(--bg-card);
@@ -482,10 +482,10 @@
   </style>
 </head>
 <body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__sc_loading">正在加载插件...</div></div>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--text-muted,#64748b);font-size:13px" id="__sc_loading">姝ｅ湪鍔犺浇鎻掍欢...</div></div>
 <script>
 /* =================================================================
- * In-page diagnostics — mirrors the clip-sense fix
+ * In-page diagnostics 鈥?mirrors the clip-sense fix
  *   (commit 1cadcacd: "unblock UI rendering blocked by ... Babel
  *    cross-origin Script error swallow").
  *
@@ -515,12 +515,12 @@ setTimeout(function() {
   el.style.flexDirection = "column";
   el.style.textAlign = "center";
   el.style.lineHeight = "1.8";
-  el.innerHTML = '<b>插件初始化超时</b><br/>可能原因：<br/>1. CDN 脚本加载失败 (unpkg.com)<br/>2. Babel 编译错误<br/>3. React 渲染失败<br/><br/><span style="font-size:11px;color:#94a3b8">请按 F12 打开开发者工具查看控制台错误</span>';
+  el.innerHTML = '<b>鎻掍欢鍒濆鍖栬秴鏃?/b><br/>鍙兘鍘熷洜锛?br/>1. CDN 鑴氭湰鍔犺浇澶辫触 (unpkg.com)<br/>2. Babel 缂栬瘧閿欒<br/>3. React 娓叉煋澶辫触<br/><br/><span style="font-size:11px;color:#94a3b8">璇锋寜 F12 鎵撳紑寮€鍙戣€呭伐鍏锋煡鐪嬫帶鍒跺彴閿欒</span>';
 }, 10000);
 </script>
 <script>
 /* =================================================================
- * Bridge SDK — verbatim from tongyi-image (only pluginId fallback
+ * Bridge SDK 鈥?verbatim from tongyi-image (only pluginId fallback
  * differs). Provides apiCall / pluginApi / uploadFile / showToast /
  * downloadFile / bridgeShowInFolder / onEvent / theme & locale sync.
  * ================================================================= */
@@ -691,11 +691,11 @@ function copyToClipboard(text) {
 }
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] React failed to load. Check network.</div>'"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] ReactDOM failed to load. Check network.</div>'"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"
         onerror="document.getElementById('root').innerHTML='<div style=padding:24px;color:#ef4444>[CDN Error] Babel failed to load. Check network.</div>'"></script>
 <script>
 console.log("[subtitle-craft] CDN loaded: React=" + typeof React + ", ReactDOM=" + typeof ReactDOM + ", Babel=" + (typeof Babel !== "undefined"));
@@ -705,7 +705,7 @@ console.log("[subtitle-craft] CDN loaded: React=" + typeof React + ", ReactDOM="
 console.log("[subtitle-craft] Babel script executing...");
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// Plugin-local SVG icon set — extends the shared SynapseIcons registry
+// Plugin-local SVG icon set 鈥?extends the shared SynapseIcons registry
 // (icons.js, byte-identical across plugins) with a small handful of icons
 // the shared kit does not include yet. We add them via in-place patch so
 // `SynapseIcons.subtitles()` etc. work the same as any other icon and
@@ -715,7 +715,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
   function svg(inner) {
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
   }
-  // Subtitle / closed-caption frame icon — a rounded rectangle with two
+  // Subtitle / closed-caption frame icon 鈥?a rounded rectangle with two
   // caption text bars inside. More representative of a subtitle tool
   // than the generic "mic" icon (which signals ASR only and misses the
   // translate / repair / burn modes).
@@ -730,7 +730,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Wrench / build — used in the "repair" mode tile
+  // Wrench / build 鈥?used in the "repair" mode tile
   if (!window.SynapseIcons.wrench) {
     window.SynapseIcons.wrench = function () {
       return svg(
@@ -738,7 +738,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Translate / language — used in the "translate" mode tile
+  // Translate / language 鈥?used in the "translate" mode tile
   if (!window.SynapseIcons.translate) {
     window.SynapseIcons.translate = function () {
       return svg(
@@ -750,7 +750,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Flame / burn — used in the "burn" mode tile
+  // Flame / burn 鈥?used in the "burn" mode tile
   if (!window.SynapseIcons.flame) {
     window.SynapseIcons.flame = function () {
       return svg(
@@ -758,7 +758,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Package — system component card icon (mirror of seedance's I.package)
+  // Package 鈥?system component card icon (mirror of seedance's I.package)
   if (!window.SynapseIcons.package) {
     window.SynapseIcons.package = function () {
       return svg(
@@ -769,7 +769,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Trash — uninstall button on system component card
+  // Trash 鈥?uninstall button on system component card
   if (!window.SynapseIcons.trash) {
     window.SynapseIcons.trash = function () {
       return svg(
@@ -778,7 +778,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // Link — "open homepage" external link
+  // Link 鈥?"open homepage" external link
   if (!window.SynapseIcons.link) {
     window.SynapseIcons.link = function () {
       return svg(
@@ -787,12 +787,12 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
       );
     };
   }
-  // subtitleCraft — dedicated brand mark for the plugin's hero title.
+  // subtitleCraft 鈥?dedicated brand mark for the plugin's hero title.
   // Composition (read-as-a-glyph): a rounded subtitle/CC frame with two
   // caption rows + a 4-point sparkle escaping the top-right corner +
   // a tiny diamond accent at mid-right.  The sparkle visually says
-  // "AI / 工坊" (workshop, craft) so the icon reads as "subtitle + AI"
-  // at a single glance — distinct from the plain ``subtitles`` icon
+  // "AI / 宸ュ潑" (workshop, craft) so the icon reads as "subtitle + AI"
+  // at a single glance 鈥?distinct from the plain ``subtitles`` icon
   // that mode tiles / pills already use elsewhere.  Force-overwrites
   // (not guarded by `if (!...)`) so the hero always uses our mark even
   // if the host registry preloads a different ``subtitleCraft`` later.
@@ -812,12 +812,12 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
         // pattern as the plain subtitles icon).
         '<line x1="5.5" y1="14.6" x2="11.5" y2="14.6"/>' +
         '<line x1="13" y1="14.6" x2="14.5" y2="14.6"/>' +
-        // Sparkle escaping the top-right corner — the "craft / AI" mark.
+        // Sparkle escaping the top-right corner 鈥?the "craft / AI" mark.
         // Filled 4-point star drawn as a diamond path so it stays crisp
         // at 16-px hero size and inherits currentColor.
         '<path d="M20 2.5 L21 5 L23.5 6 L21 7 L20 9.5 L19 7 L16.5 6 L19 5 Z" ' +
           'fill="currentColor" stroke="currentColor" stroke-width="0.6"/>' +
-        // Mini diamond accent — adds depth without dominating the glyph.
+        // Mini diamond accent 鈥?adds depth without dominating the glyph.
         '<path d="M22 11 L22.7 11.7 L22 12.4 L21.3 11.7 Z" ' +
           'fill="currentColor" stroke="none"/>' +
       '</svg>'
@@ -825,7 +825,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
   };
 })();
 
-// Tiny inline icon helper — wraps SynapseIcons in an `oa-icon` span so
+// Tiny inline icon helper 鈥?wraps SynapseIcons in an `oa-icon` span so
 // every icon usage stays consistent (16x16, currentColor). Falls back to
 // a no-op span if the icon name isn't registered, so a typo never breaks
 // the whole React tree.
@@ -838,359 +838,359 @@ function OAIcon({ name, size }) {
 }
 
 /* =================================================================
- * i18n dictionary (zh-CN + en) — single source of truth for every
+ * i18n dictionary (zh-CN + en) 鈥?single source of truth for every
  * user-visible string. Keys are dot-notation; values are localized.
  * Conventions match tongyi-image.
  * ================================================================= */
 const I18N_DICT = {
   zh: {
     // app shell
-    "app.title": "字幕工坊",
-    "app.subtitle": "DashScope · 自动字幕 / 翻译 / 修复 / 烧制",
-    "tabs.create": "创建任务",
-    "tabs.tasks": "任务列表",
-    "tabs.library": "素材库",
-    "tabs.settings": "设置",
+    "app.title": "瀛楀箷宸ュ潑",
+    "app.subtitle": "DashScope 路 鑷姩瀛楀箷 / 缈昏瘧 / 淇 / 鐑у埗",
+    "tabs.create": "鍒涘缓浠诲姟",
+    "tabs.tasks": "浠诲姟鍒楄〃",
+    "tabs.library": "绱犳潗搴?,
+    "tabs.settings": "璁剧疆",
     // banner (no API key)
-    "banner.noKey.title": "尚未配置 DashScope API Key",
-    "banner.noKey.desc": "Paraformer 听写 与 Qwen-MT 翻译均会失败。请前往设置页填入阿里云百炼 DashScope API Key。",
-    "banner.noKey.cta": "前往配置",
+    "banner.noKey.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "banner.noKey.desc": "Paraformer 鍚啓 涓?Qwen-MT 缈昏瘧鍧囦細澶辫触銆傝鍓嶅線璁剧疆椤靛～鍏ラ樋閲屼簯鐧剧偧 DashScope API Key銆?,
+    "banner.noKey.cta": "鍓嶅線閰嶇疆",
     // modes
-    "modes.auto_subtitle": "自动字幕",
-    "modes.auto_subtitle.desc": "视频/音频 → Paraformer-v2 词级听写 → SRT/VTT,可选烧制",
-    "modes.translate": "字幕翻译",
-    "modes.translate.desc": "现有 SRT → Qwen-MT 多语言翻译,支持双语字幕",
-    "modes.repair": "字幕修复",
-    "modes.repair.desc": "时间轴对齐、断行重排、消除重叠",
-    "modes.burn": "字幕烧制",
-    "modes.burn.desc": "已有 SRT + 视频 → 软字幕(sidecar) 或 硬烧(in-stream)",
+    "modes.auto_subtitle": "鑷姩瀛楀箷",
+    "modes.auto_subtitle.desc": "瑙嗛/闊抽 鈫?Paraformer-v2 璇嶇骇鍚啓 鈫?SRT/VTT,鍙€夌儳鍒?,
+    "modes.translate": "瀛楀箷缈昏瘧",
+    "modes.translate.desc": "鐜版湁 SRT 鈫?Qwen-MT 澶氳瑷€缈昏瘧,鏀寔鍙岃瀛楀箷",
+    "modes.repair": "瀛楀箷淇",
+    "modes.repair.desc": "鏃堕棿杞村榻愩€佹柇琛岄噸鎺掋€佹秷闄ら噸鍙?,
+    "modes.burn": "瀛楀箷鐑у埗",
+    "modes.burn.desc": "宸叉湁 SRT + 瑙嗛 鈫?杞瓧骞?sidecar) 鎴?纭儳(in-stream)",
     // status
-    "status.pending": "等待中",
-    "status.running": "进行中",
-    "status.succeeded": "已完成",
-    "status.failed": "失败",
-    "status.canceled": "已取消",
+    "status.pending": "绛夊緟涓?,
+    "status.running": "杩涜涓?,
+    "status.succeeded": "宸插畬鎴?,
+    "status.failed": "澶辫触",
+    "status.canceled": "宸插彇娑?,
     // pipeline steps
-    "steps.setup_environment": "1. 准备环境",
-    "steps.estimate_cost": "2. 估算成本",
-    "steps.prepare_assets": "3. 准备素材",
-    "steps.asr_or_load": "4. 听写/加载字幕",
-    "steps.identify_characters": "4.5. 角色识别",
-    "steps.translate_or_repair": "5. 翻译/修复",
-    "steps.render_output": "6. 输出渲染",
-    "steps.burn_or_finalize": "7. 烧制/收尾",
+    "steps.setup_environment": "1. 鍑嗗鐜",
+    "steps.estimate_cost": "2. 浼扮畻鎴愭湰",
+    "steps.prepare_assets": "3. 鍑嗗绱犳潗",
+    "steps.asr_or_load": "4. 鍚啓/鍔犺浇瀛楀箷",
+    "steps.identify_characters": "4.5. 瑙掕壊璇嗗埆",
+    "steps.translate_or_repair": "5. 缈昏瘧/淇",
+    "steps.render_output": "6. 杈撳嚭娓叉煋",
+    "steps.burn_or_finalize": "7. 鐑у埗/鏀跺熬",
     // create tab
-    "create.modeLabel": "选择模式",
-    "create.source.label": "源文件",
-    "create.source.video": "视频/音频",
-    "create.source.srt": "SRT 字幕文件",
-    "create.source.dropHint": "拖拽或点击上传文件",
-    "create.source.maxHint": "支持 MP4/MKV/MOV/MP3/WAV/SRT,单文件 ≤ 2GB",
-    "create.lang.source": "源语言",
-    "create.lang.target": "目标语言",
-    "create.lang.auto": "自动识别",
-    "create.lang.zh": "中文 (zh)",
-    "create.lang.en": "英文 (en)",
-    "create.lang.ja": "日文 (ja)",
-    "create.lang.ko": "韩文 (ko)",
-    "create.lang.es": "西班牙文 (es)",
-    "create.lang.fr": "法文 (fr)",
-    "create.lang.de": "德文 (de)",
-    "create.lang.ru": "俄文 (ru)",
-    "create.lang.ar": "阿拉伯文 (ar)",
-    "create.lang.pt": "葡萄牙文 (pt)",
-    "create.diarization.label": "角色分离 (Diarization)",
-    "create.diarization.desc": "区分多说话人 SPEAKER_00 / SPEAKER_01 …",
-    "create.speakerCount.label": "说话人数 (留空自动)",
-    "create.charIdentify.label": "角色识别 (Qwen-VL,需先开启角色分离)",
-    "create.charIdentify.desc": "用 LLM 把 SPEAKER_xx 映射为角色名;失败保留原标签,不阻塞流程",
-    "create.charIdentify.requireDiarization": "需先开启角色分离",
-    "create.disfluency.label": "去除语气词 (嗯/啊/呃)",
-    "create.bilingual.label": "双语字幕",
-    "create.bilingual.desc": "保留原文行,翻译追加在下方",
-    "create.translation.model": "翻译模型",
-    "create.translation.flash": "Qwen-MT Flash · 性价比首选",
-    "create.translation.plus": "Qwen-MT Plus · 高质量",
-    "create.translation.lite": "Qwen-MT Lite · 极速廉价",
-    "create.repair.label": "修复选项",
-    "create.repair.fixOverlap": "消除时间重叠",
-    "create.repair.maxLineLen": "限制单行 ≤ {n} 字符 (重新断行)",
-    "create.repair.minDuration": "最短 cue 持续 ≥ {n} 秒",
-    "create.repair.mergeShort": "合并相邻短 cue (< {n} 秒间隙)",
-    "create.style.label": "字幕样式",
-    "create.style.default": "默认",
-    "create.style.cinema": "影院风",
-    "create.style.youtube": "YouTube 风",
-    "create.style.tiktok": "短视频抖音风",
-    "create.style.tv": "电视台综艺风",
-    "create.burn.engine": "烧制引擎",
-    "create.burn.engine.ass": "ASS · ffmpeg 原生 (推荐)",
-    "create.burn.engine.html": "HTML · Playwright 渲染 (高自定义)",
-    "create.burn.mode": "输出方式",
-    "create.burn.mode.soft": "软字幕 (mp4 sidecar,可关闭)",
-    "create.burn.mode.hard": "硬字幕 (烧入画面,通用)",
-    "create.cost.preview": "成本预估",
-    "create.cost.refresh": "刷新预估",
-    "create.cost.total": "合计",
-    "create.cost.itemAsr": "Paraformer-v2 听写",
-    "create.cost.itemMt": "Qwen-MT 翻译",
-    "create.cost.itemVl": "Qwen-VL 角色识别",
-    "create.cost.itemBurn": "本地烧制 (无 API 费用)",
-    "create.cost.unitMin": "{n} 分钟",
-    "create.cost.unitChar": "{n} 字符",
-    "create.cost.unitFree": "—",
-    "create.cost.col.item": "项目",
-    "create.cost.col.qty": "用量",
-    "create.cost.col.amount": "金额",
-    "create.cost.free": "免费",
-    "create.btn.start": "开始任务",
-    "create.btn.starting": "提交中…",
-    "create.btn.estimate": "需先选择源文件",
-    "create.advanced": "高级选项",
-    "create.modal.continue": "继续创建",
-    "create.preview.title": "预估与进度",
-    "create.preview.empty.title": "选择源文件后,这里会显示费用预估与任务进度",
-    "create.preview.empty.hint": "支持 视频/音频/SRT,最大 2GB",
-    "create.preview.section.config": "配置摘要",
-    "create.preview.section.cost": "费用明细",
-    "create.preview.section.notes": "计费说明",
-    "create.cost.note.asr": "Paraformer-v2 听写: ¥0.0008 / 秒(按音频时长)",
-    "create.cost.note.mt": "Qwen-MT Flash / Plus / Lite: 按 Token 计费(中文 ≈ 0.7 token/字)",
-    "create.cost.note.vl": "Qwen-VL Max 角色识别: 仅在角色分离 + 角色识别同时开启时计费",
-    "create.cost.note.burn": "本地烧制(FFmpeg / Playwright HTML): 不消耗 API,免费",
+    "create.modeLabel": "閫夋嫨妯″紡",
+    "create.source.label": "婧愭枃浠?,
+    "create.source.video": "瑙嗛/闊抽",
+    "create.source.srt": "SRT 瀛楀箷鏂囦欢",
+    "create.source.dropHint": "鎷栨嫿鎴栫偣鍑讳笂浼犳枃浠?,
+    "create.source.maxHint": "鏀寔 MP4/MKV/MOV/MP3/WAV/SRT,鍗曟枃浠?鈮?2GB",
+    "create.lang.source": "婧愯瑷€",
+    "create.lang.target": "鐩爣璇█",
+    "create.lang.auto": "鑷姩璇嗗埆",
+    "create.lang.zh": "涓枃 (zh)",
+    "create.lang.en": "鑻辨枃 (en)",
+    "create.lang.ja": "鏃ユ枃 (ja)",
+    "create.lang.ko": "闊╂枃 (ko)",
+    "create.lang.es": "瑗跨彮鐗欐枃 (es)",
+    "create.lang.fr": "娉曟枃 (fr)",
+    "create.lang.de": "寰锋枃 (de)",
+    "create.lang.ru": "淇勬枃 (ru)",
+    "create.lang.ar": "闃挎媺浼枃 (ar)",
+    "create.lang.pt": "钁¤悇鐗欐枃 (pt)",
+    "create.diarization.label": "瑙掕壊鍒嗙 (Diarization)",
+    "create.diarization.desc": "鍖哄垎澶氳璇濅汉 SPEAKER_00 / SPEAKER_01 鈥?,
+    "create.speakerCount.label": "璇磋瘽浜烘暟 (鐣欑┖鑷姩)",
+    "create.charIdentify.label": "瑙掕壊璇嗗埆 (Qwen-VL,闇€鍏堝紑鍚鑹插垎绂?",
+    "create.charIdentify.desc": "鐢?LLM 鎶?SPEAKER_xx 鏄犲皠涓鸿鑹插悕;澶辫触淇濈暀鍘熸爣绛?涓嶉樆濉炴祦绋?,
+    "create.charIdentify.requireDiarization": "闇€鍏堝紑鍚鑹插垎绂?,
+    "create.disfluency.label": "鍘婚櫎璇皵璇?(鍡?鍟?鍛?",
+    "create.bilingual.label": "鍙岃瀛楀箷",
+    "create.bilingual.desc": "淇濈暀鍘熸枃琛?缈昏瘧杩藉姞鍦ㄤ笅鏂?,
+    "create.translation.model": "缈昏瘧妯″瀷",
+    "create.translation.flash": "Qwen-MT Flash 路 鎬т环姣旈閫?,
+    "create.translation.plus": "Qwen-MT Plus 路 楂樿川閲?,
+    "create.translation.lite": "Qwen-MT Lite 路 鏋侀€熷粔浠?,
+    "create.repair.label": "淇閫夐」",
+    "create.repair.fixOverlap": "娑堥櫎鏃堕棿閲嶅彔",
+    "create.repair.maxLineLen": "闄愬埗鍗曡 鈮?{n} 瀛楃 (閲嶆柊鏂)",
+    "create.repair.minDuration": "鏈€鐭?cue 鎸佺画 鈮?{n} 绉?,
+    "create.repair.mergeShort": "鍚堝苟鐩搁偦鐭?cue (< {n} 绉掗棿闅?",
+    "create.style.label": "瀛楀箷鏍峰紡",
+    "create.style.default": "榛樿",
+    "create.style.cinema": "褰遍櫌椋?,
+    "create.style.youtube": "YouTube 椋?,
+    "create.style.tiktok": "鐭棰戞姈闊抽",
+    "create.style.tv": "鐢佃鍙扮患鑹洪",
+    "create.burn.engine": "鐑у埗寮曟搸",
+    "create.burn.engine.ass": "ASS 路 ffmpeg 鍘熺敓 (鎺ㄨ崘)",
+    "create.burn.engine.html": "HTML 路 Playwright 娓叉煋 (楂樿嚜瀹氫箟)",
+    "create.burn.mode": "杈撳嚭鏂瑰紡",
+    "create.burn.mode.soft": "杞瓧骞?(mp4 sidecar,鍙叧闂?",
+    "create.burn.mode.hard": "纭瓧骞?(鐑у叆鐢婚潰,閫氱敤)",
+    "create.cost.preview": "鎴愭湰棰勪及",
+    "create.cost.refresh": "鍒锋柊棰勪及",
+    "create.cost.total": "鍚堣",
+    "create.cost.itemAsr": "Paraformer-v2 鍚啓",
+    "create.cost.itemMt": "Qwen-MT 缈昏瘧",
+    "create.cost.itemVl": "Qwen-VL 瑙掕壊璇嗗埆",
+    "create.cost.itemBurn": "鏈湴鐑у埗 (鏃?API 璐圭敤)",
+    "create.cost.unitMin": "{n} 鍒嗛挓",
+    "create.cost.unitChar": "{n} 瀛楃",
+    "create.cost.unitFree": "鈥?,
+    "create.cost.col.item": "椤圭洰",
+    "create.cost.col.qty": "鐢ㄩ噺",
+    "create.cost.col.amount": "閲戦",
+    "create.cost.free": "鍏嶈垂",
+    "create.btn.start": "寮€濮嬩换鍔?,
+    "create.btn.starting": "鎻愪氦涓€?,
+    "create.btn.estimate": "闇€鍏堥€夋嫨婧愭枃浠?,
+    "create.advanced": "楂樼骇閫夐」",
+    "create.modal.continue": "缁х画鍒涘缓",
+    "create.preview.title": "棰勪及涓庤繘搴?,
+    "create.preview.empty.title": "閫夋嫨婧愭枃浠跺悗,杩欓噷浼氭樉绀鸿垂鐢ㄩ浼颁笌浠诲姟杩涘害",
+    "create.preview.empty.hint": "鏀寔 瑙嗛/闊抽/SRT,鏈€澶?2GB",
+    "create.preview.section.config": "閰嶇疆鎽樿",
+    "create.preview.section.cost": "璐圭敤鏄庣粏",
+    "create.preview.section.notes": "璁¤垂璇存槑",
+    "create.cost.note.asr": "Paraformer-v2 鍚啓: 楼0.0008 / 绉?鎸夐煶棰戞椂闀?",
+    "create.cost.note.mt": "Qwen-MT Flash / Plus / Lite: 鎸?Token 璁¤垂(涓枃 鈮?0.7 token/瀛?",
+    "create.cost.note.vl": "Qwen-VL Max 瑙掕壊璇嗗埆: 浠呭湪瑙掕壊鍒嗙 + 瑙掕壊璇嗗埆鍚屾椂寮€鍚椂璁¤垂",
+    "create.cost.note.burn": "鏈湴鐑у埗(FFmpeg / Playwright HTML): 涓嶆秷鑰?API,鍏嶈垂",
     // tasks tab
-    "tasks.filter.status": "状态",
-    "tasks.filter.mode": "模式",
-    "tasks.filter.all": "全部",
-    "tasks.filter.allModes": "全部模式",
-    "tasks.empty.title": "暂无任务",
-    "tasks.empty.hint": "在「创建任务」页发起一次任务后,会出现在这里",
-    "tasks.totalCount": "共 {n} 个任务",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.cancel": "取消",
-    "tasks.detail.retry": "重试",
-    "tasks.detail.delete": "删除",
-    "tasks.detail.confirmDelete": "确定删除该任务及其产物?",
-    "tasks.detail.runningHint": "处理中…",
-    "tasks.detail.id": "任务 ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.created": "创建时间",
-    "tasks.detail.duration": "耗时",
-    "tasks.detail.cost": "实际花费",
-    "tasks.detail.errorPanel": "错误详情",
-    "tasks.detail.outputs": "输出文件",
-    "tasks.detail.downloadSrt": "下载 SRT",
-    "tasks.detail.downloadVtt": "下载 VTT",
-    "tasks.detail.downloadVideo": "下载视频",
-    "tasks.detail.previewSrt": "预览字幕",
-    "tasks.empty.noSelection.title": "未选择任务",
-    "tasks.empty.noSelection.hint": "从左侧列表选择一个任务查看详情",
-    "tasks.detail.idCopy": "复制 ID",
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.mode": "妯″紡",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.allModes": "鍏ㄩ儴妯″紡",
+    "tasks.empty.title": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": "鍦ㄣ€屽垱寤轰换鍔°€嶉〉鍙戣捣涓€娆′换鍔″悗,浼氬嚭鐜板湪杩欓噷",
+    "tasks.totalCount": "鍏?{n} 涓换鍔?,
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.cancel": "鍙栨秷",
+    "tasks.detail.retry": "閲嶈瘯",
+    "tasks.detail.delete": "鍒犻櫎",
+    "tasks.detail.confirmDelete": "纭畾鍒犻櫎璇ヤ换鍔″強鍏朵骇鐗?",
+    "tasks.detail.runningHint": "澶勭悊涓€?,
+    "tasks.detail.id": "浠诲姟 ID",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.created": "鍒涘缓鏃堕棿",
+    "tasks.detail.duration": "鑰楁椂",
+    "tasks.detail.cost": "瀹為檯鑺辫垂",
+    "tasks.detail.errorPanel": "閿欒璇︽儏",
+    "tasks.detail.outputs": "杈撳嚭鏂囦欢",
+    "tasks.detail.downloadSrt": "涓嬭浇 SRT",
+    "tasks.detail.downloadVtt": "涓嬭浇 VTT",
+    "tasks.detail.downloadVideo": "涓嬭浇瑙嗛",
+    "tasks.detail.previewSrt": "棰勮瀛楀箷",
+    "tasks.empty.noSelection.title": "鏈€夋嫨浠诲姟",
+    "tasks.empty.noSelection.hint": "浠庡乏渚у垪琛ㄩ€夋嫨涓€涓换鍔℃煡鐪嬭鎯?,
+    "tasks.detail.idCopy": "澶嶅埗 ID",
     // mode chips (small tag shown in mode tile head + task list)
-    "modes.tag.auto_subtitle": "听写",
-    "modes.tag.translate": "翻译",
-    "modes.tag.repair": "修复",
-    "modes.tag.burn": "烧制",
+    "modes.tag.auto_subtitle": "鍚啓",
+    "modes.tag.translate": "缈昏瘧",
+    "modes.tag.repair": "淇",
+    "modes.tag.burn": "鐑у埗",
     // create tab features (rendered as feature cards in the empty preview)
-    "create.feature.asr.title": "Paraformer-v2 词级听写",
-    "create.feature.asr.desc": "中英日韩等 11 种语言,自动断句 + 时间戳",
-    "create.feature.mt.title": "Qwen-MT 多语言翻译",
-    "create.feature.mt.desc": "Flash / Plus / Lite 三档,支持双语字幕",
-    "create.feature.repair.title": "时间轴修复",
-    "create.feature.repair.desc": "重叠剔除、断行重排、短 cue 合并",
-    "create.feature.burn.title": "FFmpeg / HTML 烧制",
-    "create.feature.burn.desc": "本地烧制,无 API 费用,支持 5 套样式预设",
+    "create.feature.asr.title": "Paraformer-v2 璇嶇骇鍚啓",
+    "create.feature.asr.desc": "涓嫳鏃ラ煩绛?11 绉嶈瑷€,鑷姩鏂彞 + 鏃堕棿鎴?,
+    "create.feature.mt.title": "Qwen-MT 澶氳瑷€缈昏瘧",
+    "create.feature.mt.desc": "Flash / Plus / Lite 涓夋。,鏀寔鍙岃瀛楀箷",
+    "create.feature.repair.title": "鏃堕棿杞翠慨澶?,
+    "create.feature.repair.desc": "閲嶅彔鍓旈櫎銆佹柇琛岄噸鎺掋€佺煭 cue 鍚堝苟",
+    "create.feature.burn.title": "FFmpeg / HTML 鐑у埗",
+    "create.feature.burn.desc": "鏈湴鐑у埗,鏃?API 璐圭敤,鏀寔 5 濂楁牱寮忛璁?,
     // create tab right-pane summary card
-    "create.summary.title": "本次任务一览",
-    "create.summary.mode": "模式",
-    "create.summary.duration": "音频时长",
-    "create.summary.duration.unknown": "未知",
-    "create.summary.style": "字幕样式",
-    "create.summary.engine": "烧制引擎",
-    "create.summary.translate.target": "目标语言",
-    "create.summary.translate.model": "翻译模型",
-    "create.summary.repair.options": "修复选项",
+    "create.summary.title": "鏈浠诲姟涓€瑙?,
+    "create.summary.mode": "妯″紡",
+    "create.summary.duration": "闊抽鏃堕暱",
+    "create.summary.duration.unknown": "鏈煡",
+    "create.summary.style": "瀛楀箷鏍峰紡",
+    "create.summary.engine": "鐑у埗寮曟搸",
+    "create.summary.translate.target": "鐩爣璇█",
+    "create.summary.translate.model": "缈昏瘧妯″瀷",
+    "create.summary.repair.options": "淇閫夐」",
     // library tab
-    "library.tabs.transcripts": "听写记录",
-    "library.tabs.srts": "字幕成品",
-    "library.tabs.styles": "样式预设",
-    "library.intro.transcripts": "听写记录:每次「自动字幕」任务都会将 Paraformer 的原始词级转录缓存至此,翻译 / 修复 / 烧制时可二次使用,无需重新听写。",
-    "library.intro.srts": "字幕成品:任务完成后产生的 SRT / VTT 文件归档列表,点击即可导出到本机或在「创建任务 > 翻译 / 烧制」中复用。",
-    "library.intro.styles": "样式预设:内置 5 套常用样式(默认 / 影院 / YouTube / 短视频抖音 / 电视台综艺),与「创建任务 > 字幕样式」选项一一对应,选哪一套此处看到的就是它最终的字体 / 颜色;自定义样式同样会出现在创建页的样式列表中。",
-    "library.transcripts.empty": "暂无听写记录。完成一次「自动字幕」任务后,Paraformer 转录会缓存于此供二次使用。",
-    "library.srts.empty": "暂无字幕成品。完成任务后,SRT/VTT 文件会出现在这里。",
-    "library.styles.builtin": "内置样式",
-    "library.styles.custom": "自定义样式",
-    "library.styles.add": "新建样式",
-    "library.styles.editLabel": "样式名称",
-    "library.styles.editFontSize": "字号 (px)",
-    "library.styles.editFontName": "字体",
-    "library.styles.editPrimary": "主色 (ASS 格式)",
-    "library.styles.editOutline": "描边色",
-    "library.styles.save": "保存",
-    "library.styles.delete": "删除样式",
-    "library.styles.deleteConfirm": "确定删除该自定义样式?",
+    "library.tabs.transcripts": "鍚啓璁板綍",
+    "library.tabs.srts": "瀛楀箷鎴愬搧",
+    "library.tabs.styles": "鏍峰紡棰勮",
+    "library.intro.transcripts": "鍚啓璁板綍:姣忔銆岃嚜鍔ㄥ瓧骞曘€嶄换鍔￠兘浼氬皢 Paraformer 鐨勫師濮嬭瘝绾ц浆褰曠紦瀛樿嚦姝?缈昏瘧 / 淇 / 鐑у埗鏃跺彲浜屾浣跨敤,鏃犻渶閲嶆柊鍚啓銆?,
+    "library.intro.srts": "瀛楀箷鎴愬搧:浠诲姟瀹屾垚鍚庝骇鐢熺殑 SRT / VTT 鏂囦欢褰掓。鍒楄〃,鐐瑰嚮鍗冲彲瀵煎嚭鍒版湰鏈烘垨鍦ㄣ€屽垱寤轰换鍔?> 缈昏瘧 / 鐑у埗銆嶄腑澶嶇敤銆?,
+    "library.intro.styles": "鏍峰紡棰勮:鍐呯疆 5 濂楀父鐢ㄦ牱寮?榛樿 / 褰遍櫌 / YouTube / 鐭棰戞姈闊?/ 鐢佃鍙扮患鑹?,涓庛€屽垱寤轰换鍔?> 瀛楀箷鏍峰紡銆嶉€夐」涓€涓€瀵瑰簲,閫夊摢涓€濂楁澶勭湅鍒扮殑灏辨槸瀹冩渶缁堢殑瀛椾綋 / 棰滆壊;鑷畾涔夋牱寮忓悓鏍蜂細鍑虹幇鍦ㄥ垱寤洪〉鐨勬牱寮忓垪琛ㄤ腑銆?,
+    "library.transcripts.empty": "鏆傛棤鍚啓璁板綍銆傚畬鎴愪竴娆°€岃嚜鍔ㄥ瓧骞曘€嶄换鍔″悗,Paraformer 杞綍浼氱紦瀛樹簬姝や緵浜屾浣跨敤銆?,
+    "library.srts.empty": "鏆傛棤瀛楀箷鎴愬搧銆傚畬鎴愪换鍔″悗,SRT/VTT 鏂囦欢浼氬嚭鐜板湪杩欓噷銆?,
+    "library.styles.builtin": "鍐呯疆鏍峰紡",
+    "library.styles.custom": "鑷畾涔夋牱寮?,
+    "library.styles.add": "鏂板缓鏍峰紡",
+    "library.styles.editLabel": "鏍峰紡鍚嶇О",
+    "library.styles.editFontSize": "瀛楀彿 (px)",
+    "library.styles.editFontName": "瀛椾綋",
+    "library.styles.editPrimary": "涓昏壊 (ASS 鏍煎紡)",
+    "library.styles.editOutline": "鎻忚竟鑹?,
+    "library.styles.save": "淇濆瓨",
+    "library.styles.delete": "鍒犻櫎鏍峰紡",
+    "library.styles.deleteConfirm": "纭畾鍒犻櫎璇ヨ嚜瀹氫箟鏍峰紡?",
     // settings
     "settings.section.api": "DashScope API",
-    "settings.section.system": "系统组件",
-    "settings.section.runtime": "默认参数",
-    "settings.section.storage": "存储统计",
+    "settings.section.system": "绯荤粺缁勪欢",
+    "settings.section.runtime": "榛樿鍙傛暟",
+    "settings.section.storage": "瀛樺偍缁熻",
     "settings.api.title": "DashScope API",
     "settings.api.key": "API Key",
-    "settings.api.key.show": "显示",
-    "settings.api.key.hide": "隐藏",
-    "settings.api.key.save": "保存",
-    "settings.api.key.helpPrefix": "未注册?前往 ",
-    "settings.api.key.helpLink": "阿里云百炼控制台",
-    "settings.api.key.helpSuffix": " 获取(免费有额度)。",
-    "settings.api.callout": "缺少此项,所有 ASR/翻译任务都会失败",
-    "settings.runtime.title": "运行参数",
-    "settings.runtime.timeout": "Paraformer 单任务超时 (秒)",
-    "settings.runtime.maxParallel": "翻译并发分片数",
-    "settings.runtime.help": "翻译并发越大越省时,但 DashScope 会根据账户等级限速;建议保持 2~4。",
-    "settings.system.intro.strong": "FFmpeg 与 Chromium 浏览器是字幕烧制 / HTML 渲染必需的系统级组件。",
-    "settings.system.intro.body": "自动字幕 / 翻译 / 修复 三个模式不依赖 FFmpeg;只有「字幕烧制」与基于 HTML+Playwright 的高级渲染需要它。FFmpeg 安装在系统 PATH(Windows 用户目录 / macOS Homebrew / Linux /usr/bin),不是本插件私有,会被任何已安装它的机器自动检测到。Chromium 由 Playwright 单独管理,首次安装运行 `python -m playwright install chromium` 即可。",
-    "settings.system.platform.win": "Windows: 「一键安装」会调用 winget 自动安装 Gyan.FFmpeg,无需管理员权限。",
-    "settings.system.platform.mac": "macOS: 「一键安装」会调用 Homebrew 自动安装 ffmpeg。",
-    "settings.system.platform.linux": "Linux: apt / dnf 需要 root 权限。如果 Synapse 以普通用户身份运行,请按提示在终端执行 sudo apt-get install ffmpeg。",
-    "settings.system.detecting": "正在检测...",
-    "settings.system.status.found": "已安装 v{ver}",
-    "settings.system.status.foundNoVer": "已安装",
-    "settings.system.status.missing": "未安装",
-    "settings.system.location": "路径:{path}",
-    "settings.system.btn.install": "一键安装",
-    "settings.system.btn.installVia": "一键安装 ({strategy})",
-    "settings.system.btn.recheck": "重新检测",
-    "settings.system.btn.openHome": "查看官方文档",
-    "settings.system.btn.copyCmd": "复制命令",
-    "settings.system.btn.copied": "已复制",
-    "settings.system.btn.cancel": "取消",
-    "settings.system.btn.uninstall": "卸载",
-    "settings.system.btn.uninstallConfirmBtn": "确认卸载",
-    "settings.system.installing": "安装中... ({elapsed})",
-    "settings.system.uninstalling": "卸载中... ({elapsed})",
-    "settings.system.installed": "FFmpeg 安装成功",
-    "settings.system.installFailed": "安装失败:{msg}",
-    "settings.system.uninstalled": "FFmpeg 已卸载",
-    "settings.system.uninstallFailed": "卸载失败:{msg}",
-    "settings.system.uninstallConfirm": "确定要卸载 FFmpeg 吗?\n\n注意:FFmpeg 是系统级组件,不是字幕工坊插件私有的——卸载会影响所有依赖 FFmpeg 的插件(如 seedance-video / clip-sense / 通义生图视频缩略),以及你系统上其他用到 ffmpeg 的程序。\n\n本插件中将不可用:字幕烧制、HTML 字幕渲染。",
-    "settings.system.requiresSudo": "Linux 需要 root 权限。请在终端手动执行:",
-    "settings.system.noMethod": "当前系统暂无自动安装方案,请前往官方文档手动下载。",
-    "settings.system.logTitle": "安装日志",
-    "settings.system.logTitleUninstall": "卸载日志",
-    "settings.system.logEmpty": "暂无输出",
-    "settings.system.healthTitle": "其他依赖",
-    "settings.system.health.playwright": "Playwright 包",
-    "settings.system.health.playwrightBrowser": "Chromium 浏览器",
+    "settings.api.key.show": "鏄剧ず",
+    "settings.api.key.hide": "闅愯棌",
+    "settings.api.key.save": "淇濆瓨",
+    "settings.api.key.helpPrefix": "鏈敞鍐?鍓嶅線 ",
+    "settings.api.key.helpLink": "闃块噷浜戠櫨鐐兼帶鍒跺彴",
+    "settings.api.key.helpSuffix": " 鑾峰彇(鍏嶈垂鏈夐搴?銆?,
+    "settings.api.callout": "缂哄皯姝ら」,鎵€鏈?ASR/缈昏瘧浠诲姟閮戒細澶辫触",
+    "settings.runtime.title": "杩愯鍙傛暟",
+    "settings.runtime.timeout": "Paraformer 鍗曚换鍔¤秴鏃?(绉?",
+    "settings.runtime.maxParallel": "缈昏瘧骞跺彂鍒嗙墖鏁?,
+    "settings.runtime.help": "缈昏瘧骞跺彂瓒婂ぇ瓒婄渷鏃?浣?DashScope 浼氭牴鎹处鎴风瓑绾ч檺閫?寤鸿淇濇寔 2~4銆?,
+    "settings.system.intro.strong": "FFmpeg 涓?Chromium 娴忚鍣ㄦ槸瀛楀箷鐑у埗 / HTML 娓叉煋蹇呴渶鐨勭郴缁熺骇缁勪欢銆?,
+    "settings.system.intro.body": "鑷姩瀛楀箷 / 缈昏瘧 / 淇 涓変釜妯″紡涓嶄緷璧?FFmpeg;鍙湁銆屽瓧骞曠儳鍒躲€嶄笌鍩轰簬 HTML+Playwright 鐨勯珮绾ф覆鏌撻渶瑕佸畠銆侳Fmpeg 瀹夎鍦ㄧ郴缁?PATH(Windows 鐢ㄦ埛鐩綍 / macOS Homebrew / Linux /usr/bin),涓嶆槸鏈彃浠剁鏈?浼氳浠讳綍宸插畨瑁呭畠鐨勬満鍣ㄨ嚜鍔ㄦ娴嬪埌銆侰hromium 鐢?Playwright 鍗曠嫭绠＄悊,棣栨瀹夎杩愯 `python -m playwright install chromium` 鍗冲彲銆?,
+    "settings.system.platform.win": "Windows: 銆屼竴閿畨瑁呫€嶄細璋冪敤 winget 鑷姩瀹夎 Gyan.FFmpeg,鏃犻渶绠＄悊鍛樻潈闄愩€?,
+    "settings.system.platform.mac": "macOS: 銆屼竴閿畨瑁呫€嶄細璋冪敤 Homebrew 鑷姩瀹夎 ffmpeg銆?,
+    "settings.system.platform.linux": "Linux: apt / dnf 闇€瑕?root 鏉冮檺銆傚鏋?Synapse 浠ユ櫘閫氱敤鎴疯韩浠借繍琛?璇锋寜鎻愮ず鍦ㄧ粓绔墽琛?sudo apt-get install ffmpeg銆?,
+    "settings.system.detecting": "姝ｅ湪妫€娴?..",
+    "settings.system.status.found": "宸插畨瑁?v{ver}",
+    "settings.system.status.foundNoVer": "宸插畨瑁?,
+    "settings.system.status.missing": "鏈畨瑁?,
+    "settings.system.location": "璺緞:{path}",
+    "settings.system.btn.install": "涓€閿畨瑁?,
+    "settings.system.btn.installVia": "涓€閿畨瑁?({strategy})",
+    "settings.system.btn.recheck": "閲嶆柊妫€娴?,
+    "settings.system.btn.openHome": "鏌ョ湅瀹樻柟鏂囨。",
+    "settings.system.btn.copyCmd": "澶嶅埗鍛戒护",
+    "settings.system.btn.copied": "宸插鍒?,
+    "settings.system.btn.cancel": "鍙栨秷",
+    "settings.system.btn.uninstall": "鍗歌浇",
+    "settings.system.btn.uninstallConfirmBtn": "纭鍗歌浇",
+    "settings.system.installing": "瀹夎涓?.. ({elapsed})",
+    "settings.system.uninstalling": "鍗歌浇涓?.. ({elapsed})",
+    "settings.system.installed": "FFmpeg 瀹夎鎴愬姛",
+    "settings.system.installFailed": "瀹夎澶辫触:{msg}",
+    "settings.system.uninstalled": "FFmpeg 宸插嵏杞?,
+    "settings.system.uninstallFailed": "鍗歌浇澶辫触:{msg}",
+    "settings.system.uninstallConfirm": "纭畾瑕佸嵏杞?FFmpeg 鍚?\n\n娉ㄦ剰:FFmpeg 鏄郴缁熺骇缁勪欢,涓嶆槸瀛楀箷宸ュ潑鎻掍欢绉佹湁鐨勨€斺€斿嵏杞戒細褰卞搷鎵€鏈変緷璧?FFmpeg 鐨勬彃浠?濡?seedance-video / clip-sense / 閫氫箟鐢熷浘瑙嗛缂╃暐),浠ュ強浣犵郴缁熶笂鍏朵粬鐢ㄥ埌 ffmpeg 鐨勭▼搴忋€俓n\n鏈彃浠朵腑灏嗕笉鍙敤:瀛楀箷鐑у埗銆丠TML 瀛楀箷娓叉煋銆?,
+    "settings.system.requiresSudo": "Linux 闇€瑕?root 鏉冮檺銆傝鍦ㄧ粓绔墜鍔ㄦ墽琛?",
+    "settings.system.noMethod": "褰撳墠绯荤粺鏆傛棤鑷姩瀹夎鏂规,璇峰墠寰€瀹樻柟鏂囨。鎵嬪姩涓嬭浇銆?,
+    "settings.system.logTitle": "瀹夎鏃ュ織",
+    "settings.system.logTitleUninstall": "鍗歌浇鏃ュ織",
+    "settings.system.logEmpty": "鏆傛棤杈撳嚭",
+    "settings.system.healthTitle": "鍏朵粬渚濊禆",
+    "settings.system.health.playwright": "Playwright 鍖?,
+    "settings.system.health.playwrightBrowser": "Chromium 娴忚鍣?,
     "settings.system.health.apiKey": "DashScope API Key",
-    "settings.system.health.refresh": "重新检测",
-    "settings.system.health.ok": "可用",
-    "settings.system.health.missing": "缺失",
-    "settings.system.health.intro": "Playwright + Chromium 用于 HTML 字幕渲染(高级模式);DashScope API Key 用于 ASR 与翻译。下面 3 项任意缺失,对应功能会自动降级或拒绝执行。",
-    "settings.storage.title": "存储统计",
-    "settings.storage.totalFiles": "文件总数",
-    "settings.storage.totalSize": "总大小",
+    "settings.system.health.refresh": "閲嶆柊妫€娴?,
+    "settings.system.health.ok": "鍙敤",
+    "settings.system.health.missing": "缂哄け",
+    "settings.system.health.intro": "Playwright + Chromium 鐢ㄤ簬 HTML 瀛楀箷娓叉煋(楂樼骇妯″紡);DashScope API Key 鐢ㄤ簬 ASR 涓庣炕璇戙€備笅闈?3 椤逛换鎰忕己澶?瀵瑰簲鍔熻兘浼氳嚜鍔ㄩ檷绾ф垨鎷掔粷鎵ц銆?,
+    "settings.storage.title": "瀛樺偍缁熻",
+    "settings.storage.totalFiles": "鏂囦欢鎬绘暟",
+    "settings.storage.totalSize": "鎬诲ぇ灏?,
     // toasts
-    "toast.savedSettings": "设置已保存",
-    "toast.saveFailed": "保存失败",
-    "toast.taskCreated": "任务已创建",
-    "toast.taskFailed": "任务创建失败:{msg}",
-    "toast.canceled": "已取消任务",
-    "toast.deleted": "已删除任务",
-    "toast.uploadFailed": "上传失败",
-    "toast.copied": "已复制",
-    "toast.downloading": "下载中…",
-    "toast.downloadedTo": "已保存至:{path}",
-    "toast.downloadedBrowser": "已下载 {name}",
-    "toast.downloadFailed": "下载失败:{msg}",
+    "toast.savedSettings": "璁剧疆宸蹭繚瀛?,
+    "toast.saveFailed": "淇濆瓨澶辫触",
+    "toast.taskCreated": "浠诲姟宸插垱寤?,
+    "toast.taskFailed": "浠诲姟鍒涘缓澶辫触:{msg}",
+    "toast.canceled": "宸插彇娑堜换鍔?,
+    "toast.deleted": "宸插垹闄や换鍔?,
+    "toast.uploadFailed": "涓婁紶澶辫触",
+    "toast.copied": "宸插鍒?,
+    "toast.downloading": "涓嬭浇涓€?,
+    "toast.downloadedTo": "宸蹭繚瀛樿嚦:{path}",
+    "toast.downloadedBrowser": "宸蹭笅杞?{name}",
+    "toast.downloadFailed": "涓嬭浇澶辫触:{msg}",
     // error_kind localized hints (mirror ERROR_HINTS in subtitle_models.py)
-    "errorKind.network": "网络异常",
-    "errorKind.timeout": "操作超时",
-    "errorKind.auth": "认证失败",
-    "errorKind.quota": "配额/余额不足",
-    "errorKind.moderation": "内容审核未通过",
-    "errorKind.dependency": "运行依赖缺失",
-    "errorKind.format": "文件格式错误",
-    "errorKind.duration": "媒体时长超限",
-    "errorKind.unknown": "未知错误",
+    "errorKind.network": "缃戠粶寮傚父",
+    "errorKind.timeout": "鎿嶄綔瓒呮椂",
+    "errorKind.auth": "璁よ瘉澶辫触",
+    "errorKind.quota": "閰嶉/浣欓涓嶈冻",
+    "errorKind.moderation": "鍐呭瀹℃牳鏈€氳繃",
+    "errorKind.dependency": "杩愯渚濊禆缂哄け",
+    "errorKind.format": "鏂囦欢鏍煎紡閿欒",
+    "errorKind.duration": "濯掍綋鏃堕暱瓒呴檺",
+    "errorKind.unknown": "鏈煡閿欒",
     // misc
-    "common.optional": "(可选)",
-    "common.cancel": "取消",
-    "common.confirm": "确认",
-    "common.loading": "加载中…",
-    "common.minutes": "{n} 分钟",
-    "common.seconds": "{n} 秒",
-    "common.copy": "复制",
-    "common.refresh": "刷新",
-    // hook_picker (v1.1) — mode tile + tag
-    "modes.hook_picker": "AI 选 Hook",
-    "modes.hook_picker.desc": "Qwen-Plus 智能挑选短视频开场金句,输出 hook.srt + 时间码",
-    "modes.tag.hook_picker": "AI 选段",
-    // hook_picker — left pane source picker
-    "hook.source.label": "字幕来源",
-    "hook.source.upload": "上传 SRT",
-    "hook.source.upload.desc": "本地选择 .srt / .vtt 文件,直接 AI 选段",
-    "hook.source.from_task": "已有任务",
-    "hook.source.from_task.desc": "从「自动字幕 / 翻译 / 修复」成功的任务中复用",
-    "hook.fromTask.placeholder": "选择已生成 SRT 的任务…",
-    "hook.fromTask.empty": "暂无可复用的任务,先去「自动字幕」生成 SRT 吧。",
-    // hook_picker — instruction & duration
-    "hook.instruction.label": "选段方向 (Instruction)",
-    "hook.instruction.placeholder": "例:挑一段男主角承诺反击的转折点,要有戏剧张力",
-    "hook.instruction.hint": "选填,留空则交由 AI 自由发挥",
-    "hook.mainChar.label": "主角名 (可选)",
-    "hook.mainChar.placeholder": "例:周牧,留空则不限定",
-    "hook.duration.label": "目标时长 ≈ {n}s",
-    "hook.duration.range": "实际命中区间 {min}–{max}s",
-    // hook_picker — advanced options
-    "hook.advanced": "高级选项",
-    "hook.window.label": "窗口策略",
-    "hook.window.tail_then_head": "结尾→开头→随机 (推荐)",
-    "hook.window.random_window": "纯随机窗口",
-    "hook.attempts.label": "随机窗口次数 = {n}",
-    "hook.model.label": "AI 模型",
-    // hook_picker — right preview pills
-    "create.summary.hook.source": "字幕源",
-    "create.summary.hook.source.empty": "未选择",
-    "create.summary.hook.source.pickTask": "未指定任务",
-    "create.summary.hook.duration": "目标时长",
-    "create.summary.hook.window": "窗口策略",
-    "create.summary.hook.model": "AI 模型",
-    "create.preview.hook.empty.title": "AI 选 Hook 等待启动",
-    "create.preview.hook.empty.hint": "上传或挑选已有 SRT 后,Qwen-Plus 会用三轮窗口策略锁定最佳开场金句。",
-    "create.hookFeature.load.title": "加载 SRT",
-    "create.hookFeature.load.desc": "支持新上传或复用已有任务的字幕",
-    "create.hookFeature.ai.title": "AI 选段",
-    "create.hookFeature.ai.desc": "Qwen-Plus 三轮窗口策略,带模糊匹配回退",
-    "create.hookFeature.duration.title": "时长校验",
-    "create.hookFeature.duration.desc": "自动落入目标 ±5s 区间,不达标自动重选",
-    "create.hookFeature.timecode.title": "导出时间码",
-    "create.hookFeature.timecode.desc": "生成 hook.srt + JSON,后续剪辑器一键定位",
-    // hook_picker — task detail right-pane result
-    "hook.result.title": "AI 选中的 Hook",
-    "hook.result.window": "命中窗口",
-    "hook.result.source_range": "原始时间码",
-    "hook.result.duration": "Hook 时长",
-    "hook.result.lines": "对白行数",
-    "hook.result.ai_reason": "AI 选段理由",
-    "hook.result.details": "查看 hook.json + 遥测",
-    "hook.result.copy_timecode": "复制时间码",
-    "hook.result.pending_v2": "插件互联功能将在 v2.0 启用",
-    "hook.result.next.clip_sense": "Clip Sense 切片 (v2.0)",
-    "hook.result.next.post_kit": "Post Kit 配音 (v2.0)",
-    "hook.result.noLines": "(对白行为空,请查看 hook.json 排查)",
+    "common.optional": "(鍙€?",
+    "common.cancel": "鍙栨秷",
+    "common.confirm": "纭",
+    "common.loading": "鍔犺浇涓€?,
+    "common.minutes": "{n} 鍒嗛挓",
+    "common.seconds": "{n} 绉?,
+    "common.copy": "澶嶅埗",
+    "common.refresh": "鍒锋柊",
+    // hook_picker (v1.1) 鈥?mode tile + tag
+    "modes.hook_picker": "AI 閫?Hook",
+    "modes.hook_picker.desc": "Qwen-Plus 鏅鸿兘鎸戦€夌煭瑙嗛寮€鍦洪噾鍙?杈撳嚭 hook.srt + 鏃堕棿鐮?,
+    "modes.tag.hook_picker": "AI 閫夋",
+    // hook_picker 鈥?left pane source picker
+    "hook.source.label": "瀛楀箷鏉ユ簮",
+    "hook.source.upload": "涓婁紶 SRT",
+    "hook.source.upload.desc": "鏈湴閫夋嫨 .srt / .vtt 鏂囦欢,鐩存帴 AI 閫夋",
+    "hook.source.from_task": "宸叉湁浠诲姟",
+    "hook.source.from_task.desc": "浠庛€岃嚜鍔ㄥ瓧骞?/ 缈昏瘧 / 淇銆嶆垚鍔熺殑浠诲姟涓鐢?,
+    "hook.fromTask.placeholder": "閫夋嫨宸茬敓鎴?SRT 鐨勪换鍔♀€?,
+    "hook.fromTask.empty": "鏆傛棤鍙鐢ㄧ殑浠诲姟,鍏堝幓銆岃嚜鍔ㄥ瓧骞曘€嶇敓鎴?SRT 鍚с€?,
+    // hook_picker 鈥?instruction & duration
+    "hook.instruction.label": "閫夋鏂瑰悜 (Instruction)",
+    "hook.instruction.placeholder": "渚?鎸戜竴娈电敺涓昏鎵胯鍙嶅嚮鐨勮浆鎶樼偣,瑕佹湁鎴忓墽寮犲姏",
+    "hook.instruction.hint": "閫夊～,鐣欑┖鍒欎氦鐢?AI 鑷敱鍙戞尌",
+    "hook.mainChar.label": "涓昏鍚?(鍙€?",
+    "hook.mainChar.placeholder": "渚?鍛ㄧ墽,鐣欑┖鍒欎笉闄愬畾",
+    "hook.duration.label": "鐩爣鏃堕暱 鈮?{n}s",
+    "hook.duration.range": "瀹為檯鍛戒腑鍖洪棿 {min}鈥搟max}s",
+    // hook_picker 鈥?advanced options
+    "hook.advanced": "楂樼骇閫夐」",
+    "hook.window.label": "绐楀彛绛栫暐",
+    "hook.window.tail_then_head": "缁撳熬鈫掑紑澶粹啋闅忔満 (鎺ㄨ崘)",
+    "hook.window.random_window": "绾殢鏈虹獥鍙?,
+    "hook.attempts.label": "闅忔満绐楀彛娆℃暟 = {n}",
+    "hook.model.label": "AI 妯″瀷",
+    // hook_picker 鈥?right preview pills
+    "create.summary.hook.source": "瀛楀箷婧?,
+    "create.summary.hook.source.empty": "鏈€夋嫨",
+    "create.summary.hook.source.pickTask": "鏈寚瀹氫换鍔?,
+    "create.summary.hook.duration": "鐩爣鏃堕暱",
+    "create.summary.hook.window": "绐楀彛绛栫暐",
+    "create.summary.hook.model": "AI 妯″瀷",
+    "create.preview.hook.empty.title": "AI 閫?Hook 绛夊緟鍚姩",
+    "create.preview.hook.empty.hint": "涓婁紶鎴栨寫閫夊凡鏈?SRT 鍚?Qwen-Plus 浼氱敤涓夎疆绐楀彛绛栫暐閿佸畾鏈€浣冲紑鍦洪噾鍙ャ€?,
+    "create.hookFeature.load.title": "鍔犺浇 SRT",
+    "create.hookFeature.load.desc": "鏀寔鏂颁笂浼犳垨澶嶇敤宸叉湁浠诲姟鐨勫瓧骞?,
+    "create.hookFeature.ai.title": "AI 閫夋",
+    "create.hookFeature.ai.desc": "Qwen-Plus 涓夎疆绐楀彛绛栫暐,甯︽ā绯婂尮閰嶅洖閫€",
+    "create.hookFeature.duration.title": "鏃堕暱鏍￠獙",
+    "create.hookFeature.duration.desc": "鑷姩钀藉叆鐩爣 卤5s 鍖洪棿,涓嶈揪鏍囪嚜鍔ㄩ噸閫?,
+    "create.hookFeature.timecode.title": "瀵煎嚭鏃堕棿鐮?,
+    "create.hookFeature.timecode.desc": "鐢熸垚 hook.srt + JSON,鍚庣画鍓緫鍣ㄤ竴閿畾浣?,
+    // hook_picker 鈥?task detail right-pane result
+    "hook.result.title": "AI 閫変腑鐨?Hook",
+    "hook.result.window": "鍛戒腑绐楀彛",
+    "hook.result.source_range": "鍘熷鏃堕棿鐮?,
+    "hook.result.duration": "Hook 鏃堕暱",
+    "hook.result.lines": "瀵圭櫧琛屾暟",
+    "hook.result.ai_reason": "AI 閫夋鐞嗙敱",
+    "hook.result.details": "鏌ョ湅 hook.json + 閬ユ祴",
+    "hook.result.copy_timecode": "澶嶅埗鏃堕棿鐮?,
+    "hook.result.pending_v2": "鎻掍欢浜掕仈鍔熻兘灏嗗湪 v2.0 鍚敤",
+    "hook.result.next.clip_sense": "Clip Sense 鍒囩墖 (v2.0)",
+    "hook.result.next.post_kit": "Post Kit 閰嶉煶 (v2.0)",
+    "hook.result.noLines": "(瀵圭櫧琛屼负绌?璇锋煡鐪?hook.json 鎺掓煡)",
     // library hooks sub-tab
     "library.tabs.hooks": "AI Hooks",
-    "library.intro.hooks": "AI Hooks:历次「AI 选 Hook」任务命中的开场金句归档,支持复制原始时间码或一键删除任务。",
-    "library.hooks.empty": "暂无 AI Hook 记录",
-    "library.hooks.empty.hint": "运行「AI 选 Hook」模式后,命中结果会缓存于此供二次复用。",
-    "library.hooks.copy": "复制时间码",
-    "library.hooks.deleteConfirm": "确定删除该 Hook 任务?",
-    "library.hooks.noPreview": "对白行为空",
+    "library.intro.hooks": "AI Hooks:鍘嗘銆孉I 閫?Hook銆嶄换鍔″懡涓殑寮€鍦洪噾鍙ュ綊妗?鏀寔澶嶅埗鍘熷鏃堕棿鐮佹垨涓€閿垹闄や换鍔°€?,
+    "library.hooks.empty": "鏆傛棤 AI Hook 璁板綍",
+    "library.hooks.empty.hint": "杩愯銆孉I 閫?Hook銆嶆ā寮忓悗,鍛戒腑缁撴灉浼氱紦瀛樹簬姝や緵浜屾澶嶇敤銆?,
+    "library.hooks.copy": "澶嶅埗鏃堕棿鐮?,
+    "library.hooks.deleteConfirm": "纭畾鍒犻櫎璇?Hook 浠诲姟?",
+    "library.hooks.noPreview": "瀵圭櫧琛屼负绌?,
   },
   en: {
     "app.title": "Subtitle Craft",
-    "app.subtitle": "DashScope · Auto-subtitle / Translate / Repair / Burn",
+    "app.subtitle": "DashScope 路 Auto-subtitle / Translate / Repair / Burn",
     "tabs.create": "Create",
     "tabs.tasks": "Tasks",
     "tabs.library": "Library",
@@ -1199,13 +1199,13 @@ const I18N_DICT = {
     "banner.noKey.desc": "Paraformer ASR and Qwen-MT translation will both fail. Please configure your DashScope API key in Settings.",
     "banner.noKey.cta": "Open Settings",
     "modes.auto_subtitle": "Auto Subtitle",
-    "modes.auto_subtitle.desc": "Video/audio → Paraformer-v2 word-level ASR → SRT/VTT, optional burn",
+    "modes.auto_subtitle.desc": "Video/audio 鈫?Paraformer-v2 word-level ASR 鈫?SRT/VTT, optional burn",
     "modes.translate": "Translate",
-    "modes.translate.desc": "Existing SRT → Qwen-MT multilingual translation, optional bilingual",
+    "modes.translate.desc": "Existing SRT 鈫?Qwen-MT multilingual translation, optional bilingual",
     "modes.repair": "Repair",
     "modes.repair.desc": "Timeline alignment, line wrapping, overlap removal",
     "modes.burn": "Burn",
-    "modes.burn.desc": "Existing SRT + video → soft subtitle (sidecar) or hard burn (in-stream)",
+    "modes.burn.desc": "Existing SRT + video 鈫?soft subtitle (sidecar) or hard burn (in-stream)",
     "status.pending": "Pending",
     "status.running": "Running",
     "status.succeeded": "Done",
@@ -1224,7 +1224,7 @@ const I18N_DICT = {
     "create.source.video": "Video / audio",
     "create.source.srt": "SRT subtitle file",
     "create.source.dropHint": "Drop or click to upload",
-    "create.source.maxHint": "MP4/MKV/MOV/MP3/WAV/SRT, ≤ 2GB",
+    "create.source.maxHint": "MP4/MKV/MOV/MP3/WAV/SRT, 鈮?2GB",
     "create.lang.source": "Source language",
     "create.lang.target": "Target language",
     "create.lang.auto": "Auto-detect",
@@ -1239,7 +1239,7 @@ const I18N_DICT = {
     "create.lang.ar": "Arabic (ar)",
     "create.lang.pt": "Portuguese (pt)",
     "create.diarization.label": "Speaker diarization",
-    "create.diarization.desc": "Distinguish speakers as SPEAKER_00 / SPEAKER_01 …",
+    "create.diarization.desc": "Distinguish speakers as SPEAKER_00 / SPEAKER_01 鈥?,
     "create.speakerCount.label": "Speaker count (blank = auto)",
     "create.charIdentify.label": "Character identification (Qwen-VL, requires diarization)",
     "create.charIdentify.desc": "Map SPEAKER_xx labels to character names via LLM; failure keeps the originals (non-fatal)",
@@ -1248,13 +1248,13 @@ const I18N_DICT = {
     "create.bilingual.label": "Bilingual subtitles",
     "create.bilingual.desc": "Keep the original line and append the translation below",
     "create.translation.model": "Translation model",
-    "create.translation.flash": "Qwen-MT Flash · best value",
-    "create.translation.plus": "Qwen-MT Plus · best quality",
-    "create.translation.lite": "Qwen-MT Lite · cheapest",
+    "create.translation.flash": "Qwen-MT Flash 路 best value",
+    "create.translation.plus": "Qwen-MT Plus 路 best quality",
+    "create.translation.lite": "Qwen-MT Lite 路 cheapest",
     "create.repair.label": "Repair options",
     "create.repair.fixOverlap": "Resolve time overlaps",
-    "create.repair.maxLineLen": "Wrap lines ≤ {n} chars",
-    "create.repair.minDuration": "Min cue duration ≥ {n} s",
+    "create.repair.maxLineLen": "Wrap lines 鈮?{n} chars",
+    "create.repair.minDuration": "Min cue duration 鈮?{n} s",
     "create.repair.mergeShort": "Merge adjacent cues (gap < {n} s)",
     "create.style.label": "Subtitle style",
     "create.style.default": "Default",
@@ -1263,8 +1263,8 @@ const I18N_DICT = {
     "create.style.tiktok": "Short-form / TikTok",
     "create.style.tv": "TV / variety",
     "create.burn.engine": "Burn engine",
-    "create.burn.engine.ass": "ASS · ffmpeg native (recommended)",
-    "create.burn.engine.html": "HTML · Playwright (full custom)",
+    "create.burn.engine.ass": "ASS 路 ffmpeg native (recommended)",
+    "create.burn.engine.html": "HTML 路 Playwright (full custom)",
     "create.burn.mode": "Output mode",
     "create.burn.mode.soft": "Soft (mp4 sidecar)",
     "create.burn.mode.hard": "Hard (in-stream)",
@@ -1277,13 +1277,13 @@ const I18N_DICT = {
     "create.cost.itemBurn": "Local burn (no API cost)",
     "create.cost.unitMin": "{n} min",
     "create.cost.unitChar": "{n} chars",
-    "create.cost.unitFree": "—",
+    "create.cost.unitFree": "鈥?,
     "create.cost.col.item": "Item",
     "create.cost.col.qty": "Qty",
     "create.cost.col.amount": "Amount",
     "create.cost.free": "Free",
     "create.btn.start": "Start task",
-    "create.btn.starting": "Submitting…",
+    "create.btn.starting": "Submitting鈥?,
     "create.btn.estimate": "Pick a source file first",
     "create.advanced": "Advanced",
     "create.modal.continue": "Keep creating",
@@ -1293,7 +1293,7 @@ const I18N_DICT = {
     "create.preview.section.config": "Configuration",
     "create.preview.section.cost": "Cost breakdown",
     "create.preview.section.notes": "Pricing notes",
-    "create.cost.note.asr": "Paraformer-v2 ASR: ¥0.0008 / sec of audio",
+    "create.cost.note.asr": "Paraformer-v2 ASR: 楼0.0008 / sec of audio",
     "create.cost.note.mt": "Qwen-MT Flash / Plus / Lite: per input token (~0.7 token / Chinese char)",
     "create.cost.note.vl": "Qwen-VL Max character ID: charged only when diarization AND character-ID are both on",
     "create.cost.note.burn": "Local burn (FFmpeg / Playwright HTML): no API cost",
@@ -1309,7 +1309,7 @@ const I18N_DICT = {
     "tasks.detail.retry": "Retry",
     "tasks.detail.delete": "Delete",
     "tasks.detail.confirmDelete": "Delete this task and all its outputs?",
-    "tasks.detail.runningHint": "Running…",
+    "tasks.detail.runningHint": "Running鈥?,
     "tasks.detail.id": "Task ID",
     "tasks.detail.mode": "Mode",
     "tasks.detail.created": "Created",
@@ -1350,7 +1350,7 @@ const I18N_DICT = {
     "library.tabs.styles": "Style presets",
     "library.intro.transcripts": "Transcripts: every Auto-subtitle task caches the raw Paraformer word-level transcript here so Translate / Repair / Burn can re-use it without re-transcribing.",
     "library.intro.srts": "SRT outputs: archived list of SRT/VTT files produced by completed tasks. Click to download or feed back into Translate / Burn modes.",
-    "library.intro.styles": "Style presets: 5 built-in presets (Default / Cinema / YouTube / TikTok / TV) shown here are exactly the same styles that appear in Create > Subtitle style — pick one there and the look you preview here is what you get. Custom styles created here also show up in the Create page.",
+    "library.intro.styles": "Style presets: 5 built-in presets (Default / Cinema / YouTube / TikTok / TV) shown here are exactly the same styles that appear in Create > Subtitle style 鈥?pick one there and the look you preview here is what you get. Custom styles created here also show up in the Create page.",
     "library.transcripts.empty": "No transcripts yet. Once an Auto-subtitle task succeeds, the Paraformer transcript is cached here for re-use.",
     "library.srts.empty": "No subtitle outputs yet. Completed task SRT/VTT files appear here.",
     "library.styles.builtin": "Built-in",
@@ -1382,7 +1382,7 @@ const I18N_DICT = {
     "settings.runtime.maxParallel": "Translation chunk parallelism",
     "settings.runtime.help": "Higher parallelism = shorter wall time, but DashScope rate-limits per account tier; 2~4 is the sweet spot.",
     "settings.system.intro.strong": "FFmpeg and the Chromium browser are system-level components required for subtitle burning and HTML rendering.",
-    "settings.system.intro.body": "Auto-subtitle / Translate / Repair do NOT need FFmpeg — only the Burn mode and the HTML+Playwright high-end renderer do. FFmpeg lives in the system PATH (Windows user dir / macOS Homebrew / Linux /usr/bin), is not plugin-private, and any machine that already has it will be auto-detected. Chromium is managed separately by Playwright; install once with `python -m playwright install chromium`.",
+    "settings.system.intro.body": "Auto-subtitle / Translate / Repair do NOT need FFmpeg 鈥?only the Burn mode and the HTML+Playwright high-end renderer do. FFmpeg lives in the system PATH (Windows user dir / macOS Homebrew / Linux /usr/bin), is not plugin-private, and any machine that already has it will be auto-detected. Chromium is managed separately by Playwright; install once with `python -m playwright install chromium`.",
     "settings.system.platform.win": "Windows: \"One-click install\" calls winget to install Gyan.FFmpeg without admin rights.",
     "settings.system.platform.mac": "macOS: \"One-click install\" calls Homebrew to install ffmpeg.",
     "settings.system.platform.linux": "Linux: apt / dnf needs root. If Synapse runs as a normal user, follow the prompt and run `sudo apt-get install ffmpeg` in a terminal.",
@@ -1406,7 +1406,7 @@ const I18N_DICT = {
     "settings.system.installFailed": "Install failed: {msg}",
     "settings.system.uninstalled": "FFmpeg uninstalled",
     "settings.system.uninstallFailed": "Uninstall failed: {msg}",
-    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nNote: FFmpeg is a system-level component, not private to subtitle-craft — uninstalling will affect every plugin that uses it (seedance-video, clip-sense, tongyi-image thumbnails, etc.) and any other ffmpeg-using program on your system.\n\nThis plugin will lose: subtitle burn, HTML subtitle rendering.",
+    "settings.system.uninstallConfirm": "Uninstall FFmpeg?\n\nNote: FFmpeg is a system-level component, not private to subtitle-craft 鈥?uninstalling will affect every plugin that uses it (seedance-video, clip-sense, tongyi-image thumbnails, etc.) and any other ffmpeg-using program on your system.\n\nThis plugin will lose: subtitle burn, HTML subtitle rendering.",
     "settings.system.requiresSudo": "Linux requires root. Run this in a terminal:",
     "settings.system.noMethod": "No automatic install recipe for this OS. Please install manually from the docs.",
     "settings.system.logTitle": "Install log",
@@ -1431,7 +1431,7 @@ const I18N_DICT = {
     "toast.deleted": "Task deleted",
     "toast.uploadFailed": "Upload failed",
     "toast.copied": "Copied",
-    "toast.downloading": "Downloading…",
+    "toast.downloading": "Downloading鈥?,
     "toast.downloadedTo": "Saved to: {path}",
     "toast.downloadedBrowser": "Downloaded {name}",
     "toast.downloadFailed": "Download failed: {msg}",
@@ -1447,39 +1447,39 @@ const I18N_DICT = {
     "common.optional": "(optional)",
     "common.cancel": "Cancel",
     "common.confirm": "Confirm",
-    "common.loading": "Loading…",
+    "common.loading": "Loading鈥?,
     "common.minutes": "{n} min",
     "common.seconds": "{n} s",
     "common.copy": "Copy",
     "common.refresh": "Refresh",
-    // hook_picker (v1.1) — mode tile + tag
+    // hook_picker (v1.1) 鈥?mode tile + tag
     "modes.hook_picker": "AI Hook Picker",
     "modes.hook_picker.desc": "Qwen-Plus selects the strongest opening dialogue, returns hook.srt + timecode",
     "modes.tag.hook_picker": "AI Hook",
-    // hook_picker — left pane source picker
+    // hook_picker 鈥?left pane source picker
     "hook.source.label": "Subtitle source",
     "hook.source.upload": "Upload SRT",
     "hook.source.upload.desc": "Pick a local .srt / .vtt file and run AI selection",
     "hook.source.from_task": "From task",
     "hook.source.from_task.desc": "Reuse SRT from a finished Auto-subtitle / Translate / Repair task",
-    "hook.fromTask.placeholder": "Pick a task that produced an SRT…",
-    "hook.fromTask.empty": "No reusable tasks yet — run an Auto-subtitle task first.",
-    // hook_picker — instruction & duration
+    "hook.fromTask.placeholder": "Pick a task that produced an SRT鈥?,
+    "hook.fromTask.empty": "No reusable tasks yet 鈥?run an Auto-subtitle task first.",
+    // hook_picker 鈥?instruction & duration
     "hook.instruction.label": "Instruction",
     "hook.instruction.placeholder": "e.g. find the moment the protagonist promises revenge with high stakes",
-    "hook.instruction.hint": "Optional — leave blank to let the AI pick freely",
+    "hook.instruction.hint": "Optional 鈥?leave blank to let the AI pick freely",
     "hook.mainChar.label": "Main character (optional)",
-    "hook.mainChar.placeholder": "e.g. Mu Zhou — leave blank for no constraint",
-    "hook.duration.label": "Target duration ≈ {n}s",
-    "hook.duration.range": "Actual hit window {min}–{max}s",
-    // hook_picker — advanced options
+    "hook.mainChar.placeholder": "e.g. Mu Zhou 鈥?leave blank for no constraint",
+    "hook.duration.label": "Target duration 鈮?{n}s",
+    "hook.duration.range": "Actual hit window {min}鈥搟max}s",
+    // hook_picker 鈥?advanced options
     "hook.advanced": "Advanced options",
     "hook.window.label": "Window strategy",
-    "hook.window.tail_then_head": "Tail → Head → Random (recommended)",
+    "hook.window.tail_then_head": "Tail 鈫?Head 鈫?Random (recommended)",
     "hook.window.random_window": "Pure random windows",
     "hook.attempts.label": "Random window attempts = {n}",
     "hook.model.label": "AI model",
-    // hook_picker — right preview pills
+    // hook_picker 鈥?right preview pills
     "create.summary.hook.source": "SRT source",
     "create.summary.hook.source.empty": "Not selected",
     "create.summary.hook.source.pickTask": "No task picked",
@@ -1487,16 +1487,16 @@ const I18N_DICT = {
     "create.summary.hook.window": "Window strategy",
     "create.summary.hook.model": "AI model",
     "create.preview.hook.empty.title": "AI Hook Picker is ready",
-    "create.preview.hook.empty.hint": "Upload or pick an existing SRT — Qwen-Plus will run a 3-window strategy to find the strongest opener.",
+    "create.preview.hook.empty.hint": "Upload or pick an existing SRT 鈥?Qwen-Plus will run a 3-window strategy to find the strongest opener.",
     "create.hookFeature.load.title": "Load SRT",
     "create.hookFeature.load.desc": "Upload new file or reuse an existing task's subtitle",
     "create.hookFeature.ai.title": "AI selection",
     "create.hookFeature.ai.desc": "Qwen-Plus 3-window strategy with fuzzy-match fallback",
     "create.hookFeature.duration.title": "Duration check",
-    "create.hookFeature.duration.desc": "Auto-rejects clips outside target ±5s and retries",
+    "create.hookFeature.duration.desc": "Auto-rejects clips outside target 卤5s and retries",
     "create.hookFeature.timecode.title": "Export timecode",
     "create.hookFeature.timecode.desc": "Outputs hook.srt + JSON for one-click jump in your editor",
-    // hook_picker — task detail right-pane result
+    // hook_picker 鈥?task detail right-pane result
     "hook.result.title": "AI-selected hook",
     "hook.result.window": "Window",
     "hook.result.source_range": "Source range",
@@ -1508,10 +1508,10 @@ const I18N_DICT = {
     "hook.result.pending_v2": "Cross-plugin dispatch arrives in v2.0",
     "hook.result.next.clip_sense": "Clip Sense (v2.0)",
     "hook.result.next.post_kit": "Post Kit (v2.0)",
-    "hook.result.noLines": "(no dialogue lines — inspect hook.json)",
+    "hook.result.noLines": "(no dialogue lines 鈥?inspect hook.json)",
     // library hooks sub-tab
     "library.tabs.hooks": "AI Hooks",
-    "library.intro.hooks": "AI Hooks: archive of every successful AI Hook Picker run — copy the source timecode or delete the task in one click.",
+    "library.intro.hooks": "AI Hooks: archive of every successful AI Hook Picker run 鈥?copy the source timecode or delete the task in one click.",
     "library.hooks.empty": "No AI Hooks yet",
     "library.hooks.empty.hint": "Run the AI Hook Picker mode and successful results will be cached here for reuse.",
     "library.hooks.copy": "Copy timecode",
@@ -1521,7 +1521,7 @@ const I18N_DICT = {
 };
 
 // Register the dictionary with the shared ui-kit i18n helper
-// (_assets/i18n.js exposes `register` / `t` / `locale` / `onChange` —
+// (_assets/i18n.js exposes `register` / `t` / `locale` / `onChange` 鈥?
 // NOT `registerDict` / `getLocale`, which were the original typos that
 // caused every visible label to render as the raw dot-notation key).
 if (window.SynapseI18n && typeof window.SynapseI18n.register === "function") {
@@ -1592,7 +1592,7 @@ function ErrorPanel({ kind, message, hints }) {
 
 function CostTable({ preview, t }) {
   if (!preview || !preview.items || preview.items.length === 0) {
-    return <div className="text-sm text-dim">—</div>;
+    return <div className="text-sm text-dim">鈥?/div>;
   }
   return (
     <table className="cost-table cost-table--styled">
@@ -1613,15 +1613,15 @@ function CostTable({ preview, t }) {
                 {it.label || it.api}
                 {isFree && <span className="free-tag">{t("create.cost.free")}</span>}
               </td>
-              <td className="right text-dim">{it.quantity || "—"}</td>
-              <td className="right">¥ {amount.toFixed(4)}</td>
+              <td className="right text-dim">{it.quantity || "鈥?}</td>
+              <td className="right">楼 {amount.toFixed(4)}</td>
             </tr>
           );
         })}
         <tr className="total-row">
           <td>{t("create.cost.total")}</td>
           <td></td>
-          <td className="right">¥ {Number(preview.total_cny || 0).toFixed(4)}</td>
+          <td className="right">楼 {Number(preview.total_cny || 0).toFixed(4)}</td>
         </tr>
       </tbody>
     </table>
@@ -1652,7 +1652,7 @@ function StepList({ currentStep, status, errorStep }) {
         return (
           <div key={step} className={"step-row " + cls}>
             <span style={{width: 14, display:"inline-block"}}>
-              {cls === "done" ? "✓" : cls === "active" ? "•" : cls === "error" ? "✗" : "·"}
+              {cls === "done" ? "鉁? : cls === "active" ? "鈥? : cls === "error" ? "鉁? : "路"}
             </span>
             <span>{t("steps." + step)}</span>
           </div>
@@ -1663,7 +1663,7 @@ function StepList({ currentStep, status, errorStep }) {
 }
 
 function fmtDuration(sec) {
-  if (!sec || sec < 0) return "—";
+  if (!sec || sec < 0) return "鈥?;
   const s = Math.floor(sec);
   if (s < 60) return s + "s";
   const m = Math.floor(s / 60);
@@ -1681,7 +1681,7 @@ function fmtSize(bytes) {
 }
 
 function fmtTime(ts) {
-  if (!ts) return "—";
+  if (!ts) return "鈥?;
   try {
     const d = typeof ts === "number" ? new Date(ts * 1000) : new Date(ts);
     return d.toLocaleString();
@@ -1689,7 +1689,7 @@ function fmtTime(ts) {
 }
 
 /* =================================================================
- * App shell — header / banner / 4-tab nav / lazy-mount tabs
+ * App shell 鈥?header / banner / 4-tab nav / lazy-mount tabs
  * ================================================================= */
 
 function App() {
@@ -1790,11 +1790,11 @@ function App() {
 }
 
 /* =================================================================
- * CreateTab — split layout: form on the left, preview/cost on the
+ * CreateTab 鈥?split layout: form on the left, preview/cost on the
  * right (oa-preview-area). 4 modes share a common form; per-mode
  * fields are conditionally shown so the user always sees only what
  * applies. character_identify_enabled is a TOGGLE under
- * auto_subtitle (NOT a standalone mode) per docs §3.2.
+ * auto_subtitle (NOT a standalone mode) per docs 搂3.2.
  * ================================================================= */
 
 const SUBTITLE_STYLE_PRESETS = [
@@ -1832,9 +1832,9 @@ function CreateTab({ apiReady, goToTasks }) {
   const [srtFile, setSrtFile] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  // hook_picker mode (v1.1) state — kept here so cost-preview / submit
+  // hook_picker mode (v1.1) state 鈥?kept here so cost-preview / submit
   // can read them without prop drilling.  All defaults mirror the plan
-  // §3.2 server-side defaults so a "blank" form still produces a valid
+  // 搂3.2 server-side defaults so a "blank" form still produces a valid
   // payload (avoids 422 surprises when the user just clicks Start).
   const [hookSource, setHookSource] = useState("upload");        // "upload" | "from_task"
   const [fromTaskId, setFromTaskId] = useState("");
@@ -1910,8 +1910,8 @@ function CreateTab({ apiReady, goToTasks }) {
       if (mode === "translate" || mode === "repair") {
         charCount = (srtFile && srtFile.size_bytes) ? Math.floor(srtFile.size_bytes / 2) : 0;
       }
-      // hook_picker: cost is independent of source duration — server uses a
-      // fixed Qwen-Plus rate × number of window attempts (1 + 1 + N random).
+      // hook_picker: cost is independent of source duration 鈥?server uses a
+      // fixed Qwen-Plus rate 脳 number of window attempts (1 + 1 + N random).
       // Always show a preview so the user sees the rate before submitting,
       // even if no source is uploaded yet.
       if (mode !== "hook_picker" && !dur && !charCount) { setCostPreview(null); return; }
@@ -1966,7 +1966,7 @@ function CreateTab({ apiReady, goToTasks }) {
       };
       // burn always needs a video too
       if (mode === "burn" && videoFile) body.source_path = videoFile.path;
-      // hook_picker (v1.1) — extra fields, all server-side defaulted so
+      // hook_picker (v1.1) 鈥?extra fields, all server-side defaulted so
       // omitting them simply uses the defaults.
       if (mode === "hook_picker") {
         body.instruction = instruction;
@@ -2006,7 +2006,7 @@ function CreateTab({ apiReady, goToTasks }) {
   return (
     <div className="split-layout">
       <div className="split-left">
-        {/* Mode selector — uniform tiles with purple accent bar + sync chip */}
+        {/* Mode selector 鈥?uniform tiles with purple accent bar + sync chip */}
         <div className="card">
           <div className="oa-section-label" style={{marginBottom: 10}}>{t("create.modeLabel")}</div>
           <div className="oa-mode-grid">
@@ -2210,7 +2210,7 @@ function CreateTab({ apiReady, goToTasks }) {
           </div>
         )}
 
-        {/* hook_picker (v1.1) — source picker + instruction + advanced.
+        {/* hook_picker (v1.1) 鈥?source picker + instruction + advanced.
             Full-width card stack, identical visual rhythm as the existing
             mode-specific blocks (translate / repair / burn). */}
         {mode === "hook_picker" && (
@@ -2256,7 +2256,7 @@ function CreateTab({ apiReady, goToTasks }) {
                     <option value="">{t("hook.fromTask.placeholder")}</option>
                     {transcribedTasks.map(tk => (
                       <option key={tk.id} value={tk.id}>
-                        {tk.id.slice(0, 8)} · {t("modes." + tk.mode)} · {fmtTime(tk.created_at)}
+                        {tk.id.slice(0, 8)} 路 {t("modes." + tk.mode)} 路 {fmtTime(tk.created_at)}
                       </option>
                     ))}
                   </select>
@@ -2323,9 +2323,9 @@ function CreateTab({ apiReady, goToTasks }) {
                   <div className="label">{t("hook.model.label")}</div>
                   <select className="input select" value={hookModel}
                           onChange={e => setHookModel(e.target.value)}>
-                    <option value="qwen-plus">Qwen-Plus (¥0.005/次)</option>
+                    <option value="qwen-plus">Qwen-Plus (楼0.005/娆?</option>
                     <option value="qwen-plus-2025-09-11">Qwen-Plus snapshot</option>
-                    <option value="qwen-max">Qwen-Max (¥0.13/次)</option>
+                    <option value="qwen-max">Qwen-Max (楼0.13/娆?</option>
                   </select>
                 </div>
               </details>
@@ -2333,7 +2333,7 @@ function CreateTab({ apiReady, goToTasks }) {
           </>
         )}
 
-        {/* Submit — text centered, full-width primary action */}
+        {/* Submit 鈥?text centered, full-width primary action */}
         <div className="flex gap-2" style={{marginTop: 4}}>
           <button className="btn btn-primary flex-1"
                   disabled={!canSubmit}
@@ -2345,7 +2345,7 @@ function CreateTab({ apiReady, goToTasks }) {
         </div>
       </div>
 
-      {/* Right preview area — costPreview drives the empty-state.
+      {/* Right preview area 鈥?costPreview drives the empty-state.
           When no source is picked yet, costPreview is null and we
           render the oa-preview-empty pattern (mirrors tongyi-image)
           with a strip of feature cards so the area never feels empty.
@@ -2369,7 +2369,7 @@ function CreateTab({ apiReady, goToTasks }) {
               </button>
             </div>
 
-            {/* Section 1: Configuration summary — purple-bar label + pills.
+            {/* Section 1: Configuration summary 鈥?purple-bar label + pills.
                 Same layout for every mode; only the pill set varies. */}
             <div className="oa-preview-section">{t("create.preview.section.config")}</div>
             <div className="oa-config-summary">
@@ -2458,12 +2458,12 @@ function CreateTab({ apiReady, goToTasks }) {
               )}
             </div>
 
-            {/* Section 2: Cost breakdown — same styled table for all modes.
-                Free items get a green "免费" tag so users know what's local. */}
+            {/* Section 2: Cost breakdown 鈥?same styled table for all modes.
+                Free items get a green "鍏嶈垂" tag so users know what's local. */}
             <div className="oa-preview-section" style={{marginTop: 18}}>{t("create.preview.section.cost")}</div>
             <CostTable preview={costPreview} t={t} />
 
-            {/* Section 3: Pricing notes — bulleted, dimmed, easy to skim. */}
+            {/* Section 3: Pricing notes 鈥?bulleted, dimmed, easy to skim. */}
             <div className="oa-preview-section" style={{marginTop: 18}}>{t("create.preview.section.notes")}</div>
             <div className="oa-cost-notes">
               <div>{t("create.cost.note.asr")}</div>
@@ -2557,7 +2557,7 @@ function CreateTab({ apiReady, goToTasks }) {
       {createdModal && (
         <div className="modal-mask" onClick={() => setCreatedModal(null)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-icon">✓</div>
+            <div className="modal-icon">鉁?/div>
             <div className="modal-title">{t("toast.taskCreated")}</div>
             <div className="modal-desc">
               {t("tasks.detail.id")}: <code>{createdModal.id}</code>
@@ -2591,16 +2591,16 @@ function UploadZone({ file, accept, uploading, onPick, onClear }) {
     return (
       <div className="upload-zone has-file">
         <div className="flex items-center gap-3">
-          <div className="task-thumb">📄</div>
+          <div className="task-thumb">馃搫</div>
           <div className="flex-1" style={{minWidth: 0}}>
             <div className="text-sm" style={{fontWeight: 600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
               {file.filename}
             </div>
             <div className="text-xs text-dim">
-              {fmtSize(file.size_bytes)} · {file.duration_sec ? fmtDuration(file.duration_sec) : "—"}
+              {fmtSize(file.size_bytes)} 路 {file.duration_sec ? fmtDuration(file.duration_sec) : "鈥?}
             </div>
           </div>
-          <button className="btn btn-sm btn-danger" onClick={onClear}>×</button>
+          <button className="btn btn-sm btn-danger" onClick={onClear}>脳</button>
         </div>
       </div>
     );
@@ -2618,7 +2618,7 @@ function UploadZone({ file, accept, uploading, onPick, onClear }) {
         </div>
       ) : (
         <>
-          <div style={{fontSize: 24, marginBottom: 8}}>📁</div>
+          <div style={{fontSize: 24, marginBottom: 8}}>馃搧</div>
           <div className="text-sm">{t("create.source.dropHint")}</div>
           <div className="text-xs text-dim" style={{marginTop: 4}}>{t("create.source.maxHint")}</div>
         </>
@@ -2630,7 +2630,7 @@ function UploadZone({ file, accept, uploading, onPick, onClear }) {
 }
 
 /* =================================================================
- * TasksTab — split layout: list left, detail right (oa-preview-area).
+ * TasksTab 鈥?split layout: list left, detail right (oa-preview-area).
  * Live updates via SSE bridge (event "task_update"). 15-second
  * polling fallback when SSE drops.
  * ================================================================= */
@@ -2688,12 +2688,12 @@ function TasksTab({ refreshSignal }) {
       setSelected(prev => prev && prev.id === data.task_id ? { ...prev, ...data } : prev);
     };
     onEvent("task_update", fn);
-    // No off() exposed by tongyi-image SDK — accept as design.
+    // No off() exposed by tongyi-image SDK 鈥?accept as design.
   }, [refresh]);
 
   // Pre-compute per-status / per-mode counts so the filter chips can
-  // surface them inline (mirrors tongyi-image's "全部 (N)" pattern).
-  // Counts come from the currently fetched window — mirroring how the
+  // surface them inline (mirrors tongyi-image's "鍏ㄩ儴 (N)" pattern).
+  // Counts come from the currently fetched window 鈥?mirroring how the
   // tongyi-image plugin treats them as "what's currently visible" rather
   // than a global aggregate.
   const STATUSES = ["", "pending", "running", "succeeded", "failed", "canceled"];
@@ -2754,7 +2754,7 @@ function TasksTab({ refreshSignal }) {
                   <OAIcon name={MODE_ICONS[task.mode] || "subtitles"} size={26} />
                 </div>
                 <div className="task-info">
-                  <h4>{t("modes." + task.mode)} · {task.id.slice(0, 8)}</h4>
+                  <h4>{t("modes." + task.mode)} 路 {task.id.slice(0, 8)}</h4>
                   <div className="task-meta">
                     <StatusBadge status={task.status} />
                     <span className="tag tag-blue" style={{padding:"1px 6px"}}>
@@ -2847,7 +2847,7 @@ function TaskDetail({ task: initialTask, onChange }) {
 
   return (
     <div style={{width: "100%"}}>
-      {/* Header — title, copyable ID, action buttons */}
+      {/* Header 鈥?title, copyable ID, action buttons */}
       <div className="flex items-center justify-between" style={{marginBottom: 14, gap: 12, flexWrap: "wrap"}}>
         <div style={{minWidth: 0, flex: 1}}>
           <div className="card-title" style={{marginBottom: 4, display: "inline-flex", alignItems: "center", gap: 8}}>
@@ -2879,7 +2879,7 @@ function TaskDetail({ task: initialTask, onChange }) {
         </div>
       </div>
 
-      {/* Summary pills — same visual language as the create-tab summary */}
+      {/* Summary pills 鈥?same visual language as the create-tab summary */}
       <div className="oa-config-summary">
         <div className="oa-summary-pill">
           <div className="oa-summary-pill__label">{t("status." + task.status)}</div>
@@ -2894,7 +2894,7 @@ function TaskDetail({ task: initialTask, onChange }) {
           <div className="oa-summary-pill__value" style={{fontSize: 12}}>{
             task.completed_at && task.created_at
               ? fmtDuration((new Date(task.completed_at) - new Date(task.created_at)) / 1000)
-              : task.status === "running" ? t("tasks.detail.runningHint") : "—"
+              : task.status === "running" ? t("tasks.detail.runningHint") : "鈥?
           }</div>
         </div>
       </div>
@@ -2946,7 +2946,7 @@ function TaskDetail({ task: initialTask, onChange }) {
           {previewSrt && (
             <div className="card">
               <div className="label">{t("tasks.detail.previewSrt")}</div>
-              <div className="srt-preview">{previewSrt.slice(0, 2000)}{previewSrt.length > 2000 ? "\n…" : ""}</div>
+              <div className="srt-preview">{previewSrt.slice(0, 2000)}{previewSrt.length > 2000 ? "\n鈥? : ""}</div>
             </div>
           )}
         </>
@@ -2956,7 +2956,7 @@ function TaskDetail({ task: initialTask, onChange }) {
 }
 
 /* =================================================================
- * HookResultPanel — shown at the top of TaskDetail when a hook_picker
+ * HookResultPanel 鈥?shown at the top of TaskDetail when a hook_picker
  * task succeeds.  Renders the AI-selected dialogue as an italic block
  * quote, exposes the source timecode for one-click copy, and disables
  * the "next-step" buttons (cross-plugin dispatch is reserved for v2.0).
@@ -2967,8 +2967,8 @@ function HookResultPanel({ task }) {
   const t = useT();
   const hook = task.hook || {};
   const lines = hook.lines || [];
-  const srcStart = hook.source_start || "—";
-  const srcEnd = hook.source_end || "—";
+  const srcStart = hook.source_start || "鈥?;
+  const srcEnd = hook.source_end || "鈥?;
   const dur = hook.duration_seconds || 0;
   return (
     <div className="card oa-hook-result">
@@ -2984,13 +2984,13 @@ function HookResultPanel({ task }) {
       <div className="oa-hook-quote">
         {lines.length === 0
           ? <p>{t("hook.result.noLines")}</p>
-          : lines.map((l, i) => <p key={i}>“{l}”</p>)}
+          : lines.map((l, i) => <p key={i}>鈥渰l}鈥?/p>)}
       </div>
       <div className="oa-config-summary">
         <div className="oa-summary-pill">
           <div className="oa-summary-pill__label">{t("hook.result.source_range")}</div>
           <div className="oa-summary-pill__value" style={{fontSize: 12}}>
-            {srcStart} → {srcEnd}
+            {srcStart} 鈫?{srcEnd}
           </div>
         </div>
         <div className="oa-summary-pill">
@@ -3038,7 +3038,7 @@ function HookResultPanel({ task }) {
 }
 
 /* =================================================================
- * HooksList — Library > Hooks sub-tab.  Lists every succeeded
+ * HooksList 鈥?Library > Hooks sub-tab.  Lists every succeeded
  * hook_picker task with a 2-line preview + copy/delete shortcuts.
  * ================================================================= */
 
@@ -3080,7 +3080,7 @@ function HooksList() {
             <div className="flex items-center justify-between" style={{marginBottom: 6}}>
               <div className="oa-feature-card__title" style={{display: "inline-flex", alignItems: "center", gap: 6}}>
                 <OAIcon name="sparkles" />
-                {hook.duration_seconds ? hook.duration_seconds.toFixed(1) + "s" : "—"}
+                {hook.duration_seconds ? hook.duration_seconds.toFixed(1) + "s" : "鈥?}
                 {hook.selected_window && (
                   <span className="oa-mode-tile__chip" data-mode="hook_picker"
                         style={{marginLeft: 4}}>
@@ -3093,10 +3093,10 @@ function HooksList() {
             <div className="oa-hook-quote" style={{marginTop: 4, marginBottom: 8}}>
               {previewLines.length === 0
                 ? <p style={{fontStyle: "normal", color: "var(--text-dim)"}}>{t("library.hooks.noPreview")}</p>
-                : previewLines.map((l, i) => <p key={i}>“{l}”</p>)}
+                : previewLines.map((l, i) => <p key={i}>鈥渰l}鈥?/p>)}
             </div>
             <div className="text-xs text-dim" style={{marginBottom: 10}}>
-              {hook.source_start || "—"} → {hook.source_end || "—"}
+              {hook.source_start || "鈥?} 鈫?{hook.source_end || "鈥?}
             </div>
             <div className="flex gap-2" style={{flexWrap: "wrap"}}>
               <button className="btn btn-sm"
@@ -3116,7 +3116,7 @@ function HooksList() {
 }
 
 /* =================================================================
- * LibraryTab — four sub-tabs: transcripts, srts, styles, hooks
+ * LibraryTab 鈥?four sub-tabs: transcripts, srts, styles, hooks
  * ================================================================= */
 
 function LibraryTab() {
@@ -3172,7 +3172,7 @@ function TranscriptsList() {
               </span>
               <div style={{minWidth: 0}}>
                 <div className="text-sm" style={{fontWeight: 600}}>{it.id.slice(0, 12)}</div>
-                <div className="text-xs text-dim">{fmtTime(it.created_at)} · {it.source_lang || "—"} · {(it.word_count || 0)} words</div>
+                <div className="text-xs text-dim">{fmtTime(it.created_at)} 路 {it.source_lang || "鈥?} 路 {(it.word_count || 0)} words</div>
               </div>
             </div>
             <span className="tag tag-blue">{it.engine || "paraformer-v2"}</span>
@@ -3215,14 +3215,14 @@ function SrtsList() {
                   {it.filename}
                 </div>
                 <div className="text-xs text-dim">
-                  {t("modes." + it.mode)} · {fmtSize(it.size_bytes)} · {fmtTime(it.created_at)}
-                  {it.target_lang ? " · → " + it.target_lang : ""}
+                  {t("modes." + it.mode)} 路 {fmtSize(it.size_bytes)} 路 {fmtTime(it.created_at)}
+                  {it.target_lang ? " 路 鈫?" + it.target_lang : ""}
                 </div>
               </div>
             </div>
             <button className="btn btn-sm"
                     onClick={() => downloadFile("/api/plugins/subtitle-craft/tasks/" + it.task_id + "/download", it.filename)}>
-              ⬇
+              猬?
             </button>
           </div>
         </div>
@@ -3262,7 +3262,7 @@ function StylesManager() {
 
   // Map preset id -> swatch modifier so the preview tile shows the rough
   // look-and-feel of the burnt-in subtitle (mirrors what the user picks
-  // in CreateTab > 字幕样式 — these two surfaces are the SAME preset list).
+  // in CreateTab > 瀛楀箷鏍峰紡 鈥?these two surfaces are the SAME preset list).
   const swatchClass = (id) => "oa-style-swatch oa-style-swatch--" + id;
 
   return (
@@ -3273,10 +3273,10 @@ function StylesManager() {
           {(data.builtin || []).map(s => (
             <div key={s.id} className="oa-style-card">
               <div className={swatchClass(s.id)}>
-                {s.id === "tiktok" ? "字幕Aa" : s.id === "youtube" ? "字幕 Aa" : "字幕"}
+                {s.id === "tiktok" ? "瀛楀箷Aa" : s.id === "youtube" ? "瀛楀箷 Aa" : "瀛楀箷"}
               </div>
               <div className="oa-style-card__name">{s.label_zh || s.id}</div>
-              <div className="oa-style-card__meta">{s.font_name} · {s.font_size}px</div>
+              <div className="oa-style-card__meta">{s.font_name} 路 {s.font_size}px</div>
             </div>
           ))}
         </div>
@@ -3319,17 +3319,17 @@ function StylesManager() {
           </div>
         )}
         {(data.custom || []).length === 0 ? (
-          <div className="text-xs text-dim">—</div>
+          <div className="text-xs text-dim">鈥?/div>
         ) : (
           <div className="style-grid">
             {(data.custom || []).map(s => (
               <div key={s.id} className="oa-style-card">
-                <div className="oa-style-swatch">字幕</div>
+                <div className="oa-style-swatch">瀛楀箷</div>
                 <div className="flex items-center justify-between">
                   <div className="oa-style-card__name">{s.label}</div>
-                  <button className="btn btn-sm btn-danger" style={{padding:"2px 6px"}} onClick={() => remove(s.id)}>×</button>
+                  <button className="btn btn-sm btn-danger" style={{padding:"2px 6px"}} onClick={() => remove(s.id)}>脳</button>
                 </div>
-                <div className="oa-style-card__meta">{s.font_name} · {s.font_size}px</div>
+                <div className="oa-style-card__meta">{s.font_name} 路 {s.font_size}px</div>
               </div>
             ))}
           </div>
@@ -3340,13 +3340,13 @@ function StylesManager() {
 }
 
 /* =================================================================
- * FfmpegInstaller — vendored from seedance-video.
+ * FfmpegInstaller 鈥?vendored from seedance-video.
  *
  * Talks to the in-plugin /system/* routes (see subtitle_craft_inline/
  * system_deps.py) using a fire-and-poll cycle: POST .../install kicks
  * off a background subprocess, then we GET .../status every 3s until
- * busy:false. The component is fully self-contained — no external
- * state, no SDK widget — so the plugin keeps working when the host
+ * busy:false. The component is fully self-contained 鈥?no external
+ * state, no SDK widget 鈥?so the plugin keeps working when the host
  * SDK ships without dep-gate.js.
  * ================================================================= */
 function FfmpegInstaller({ onChanged }) {
@@ -3357,7 +3357,7 @@ function FfmpegInstaller({ onChanged }) {
   const [status, setStatus] = useState(null);
   const [copied, setCopied] = useState(false);
   // window.confirm() is silently blocked because the host iframe sandbox
-  // does NOT include allow-modals — render an inline confirmation card.
+  // does NOT include allow-modals 鈥?render an inline confirmation card.
   const [confirmingUninstall, setConfirmingUninstall] = useState(false);
   const [rechecking, setRechecking] = useState(false);
   const pollRef = useRef(null);
@@ -3414,7 +3414,7 @@ function FfmpegInstaller({ onChanged }) {
             else showToast(_tr("settings.system.installFailed", { msg: st.error || "?" }), "error");
           }
         }
-      } catch (e) { /* network blip — try again next tick */ }
+      } catch (e) { /* network blip 鈥?try again next tick */ }
     };
     tick();
     pollRef.current = setInterval(tick, 3000);
@@ -3648,10 +3648,10 @@ function FfmpegInstaller({ onChanged }) {
 }
 
 /* =================================================================
- * SettingsTab — DashScope key, system components (FFmpeg + health),
+ * SettingsTab 鈥?DashScope key, system components (FFmpeg + health),
  * default runtime parameters, storage stats. The old standalone
- * "FFmpeg path" form-row and "健康检查" section have been merged
- * into the single 系统组件 section to match seedance-video and to
+ * "FFmpeg path" form-row and "鍋ュ悍妫€鏌? section have been merged
+ * into the single 绯荤粺缁勪欢 section to match seedance-video and to
  * stop confusing users who didn't realise editing the path required
  * a service restart.
  * ================================================================= */
@@ -3710,7 +3710,7 @@ function SettingsTab({ health, onApiKeyChange }) {
                    type={keyVisible ? "text" : "password"}
                    value={keyDraft}
                    onChange={e => setKeyDraft(e.target.value)}
-                   placeholder={keyPresent ? (config.dashscope_api_key_masked || "·····") : "sk-..."} />
+                   placeholder={keyPresent ? (config.dashscope_api_key_masked || "路路路路路") : "sk-..."} />
             <button className="btn btn-sm" onClick={() => setKeyVisible(!keyVisible)}>
               {keyVisible ? t("settings.api.key.hide") : t("settings.api.key.show")}
             </button>
@@ -3730,31 +3730,31 @@ function SettingsTab({ health, onApiKeyChange }) {
         </div>
         <div className="grid-2">
           <div className="form-row">
-            <div className="label">共享中转站名称（可选）</div>
+            <div className="label">鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</div>
             <input className="input" type="text"
                    value={config.dashscope_relay_endpoint || ""}
                    onChange={e => setConfig(prev => ({ ...prev, dashscope_relay_endpoint: e.target.value }))}
                    onBlur={e => save({ dashscope_relay_endpoint: e.target.value.trim() })}
-                   placeholder="例如: yunwu-audio" />
+                   placeholder="渚嬪: yunwu-audio" />
             <div className="text-xs text-dim" style={{marginTop: 4}}>
-              来自 LLM 配置页 relay_endpoints；填写后 ASR 请求优先走该中转站。
+              鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涘～鍐欏悗 ASR 璇锋眰浼樺厛璧拌涓浆绔欍€?
             </div>
           </div>
           <div className="form-row">
-            <div className="label">中转站失败策略</div>
+            <div className="label">涓浆绔欏け璐ョ瓥鐣?/div>
             <select className="input select"
                     value={config.dashscope_relay_fallback_policy || "official"}
                     onChange={e => save({ dashscope_relay_fallback_policy: e.target.value })}>
-              <option value="official">official：失败时回官方/插件配置</option>
-              <option value="strict">strict：失败时阻止提交</option>
+              <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+              <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* System components — FfmpegInstaller + the rest of the health
+      {/* System components 鈥?FfmpegInstaller + the rest of the health
           checks rolled into one section. Replaces the old separate
-          "FFmpeg path" form-row + "健康检查" panel which used to give
+          "FFmpeg path" form-row + "鍋ュ悍妫€鏌? panel which used to give
           contradictory signals (one was a free-form path; the other
           was a snapshot that didn't react to the path change). */}
       <div className="oa-settings-section">
@@ -3773,7 +3773,7 @@ function SettingsTab({ health, onApiKeyChange }) {
         </div>
         <FfmpegInstaller onChanged={refresh} />
 
-        {/* Other dependencies — Playwright (browser), DashScope key.
+        {/* Other dependencies 鈥?Playwright (browser), DashScope key.
             Kept in the SAME section as FFmpeg so users see their
             entire system-readiness story in one place. The recheck
             button shows a spinner while polling all three endpoints
@@ -3799,7 +3799,7 @@ function SettingsTab({ health, onApiKeyChange }) {
         </div>
       </div>
 
-      {/* Default runtime parameters (no FFmpeg path here anymore — the
+      {/* Default runtime parameters (no FFmpeg path here anymore 鈥?the
           installer above already handles that holistically). */}
       <div className="oa-settings-section">
         <h3 className="oa-settings-section__title">

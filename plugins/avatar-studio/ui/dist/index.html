@@ -1,12 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Avatar Studio · 数字人工作室</title>
+  <title>Avatar Studio 路 鏁板瓧浜哄伐浣滃</title>
   <!--
     Self-contained plugin UI: bootstrap + UI Kit are inlined under _assets/.
-    avatar-studio MUST NOT depend on host-mounted /api/plugins/_sdk/* — those
+    avatar-studio MUST NOT depend on host-mounted /api/plugins/_sdk/* 鈥?those
     were retired in SDK 0.7.0. Every byte you see here is owned by this
     plugin (see plugins-archive/_shared/web-uikit/ for the canonical
     reference copy of the _assets/ files). React/ReactDOM/Babel are loaded
@@ -17,11 +17,11 @@
   <script src="_assets/icons.js"></script>
   <script src="_assets/i18n.js"></script>
   <script src="_assets/markdown-mini.js"></script>
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18/umd/react.production.min.js" />
-  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" />
-  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone/babel.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react@18.3.1/umd/react.production.min.js" />
+  <link rel="preload" as="script" crossorigin href="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" />
+  <link rel="preload" as="script" href="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js" />
   <style>
-    /* ── Theme tokens ── */
+    /* 鈹€鈹€ Theme tokens 鈹€鈹€ */
     :root {
       --bg: #f8fafc; --bg-card: #ffffff; --bg-hover: #f1f5f9;
       --text: #1e293b; --text-muted: #64748b; --text-dim: #94a3b8;
@@ -41,14 +41,14 @@
         --border: #334155;
       }
     }
-    /* ── Reset + typography ── */
+    /* 鈹€鈹€ Reset + typography 鈹€鈹€ */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg); color: var(--text); line-height: 1.5;
       -webkit-font-smoothing: antialiased;
     }
-    /* ── Layout shell ── */
+    /* 鈹€鈹€ Layout shell 鈹€鈹€ */
     .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     .header {
       display: flex; align-items: center; justify-content: space-between;
@@ -92,7 +92,7 @@
     .tab .ico { font-size: 14px; }
     .content { flex: 1; min-height: 0; overflow: hidden; padding: 14px 16px; position: relative; }
     .content > div { max-height: 100%; overflow-y: auto; }
-    /* ── Cards / forms ── */
+    /* 鈹€鈹€ Cards / forms 鈹€鈹€ */
     .card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
@@ -118,7 +118,7 @@
       font-size: 13px; outline: none; transition: border-color .15s, box-shadow .15s;
     }
     .input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,.18); }
-    /* Invalid form input — red border + ring. Paired with the
+    /* Invalid form input 鈥?red border + ring. Paired with the
        ``.field-warn-icon`` to the right of the input so the user
        sees both a colour cue and a focusable element they can hover
        to read the validation message. Avoids the always-on hint
@@ -156,13 +156,13 @@
       text-align: left; font-weight: 400; white-space: normal;
     }
     /* Arrow points DOWN from the bubble toward the icon. */
-    /* Folder picker row — input grows, buttons hug right (matches the
+    /* Folder picker row 鈥?input grows, buttons hug right (matches the
        seedance-video Settings layout users asked us to align with). */
     .folder-row { display: flex; align-items: center; gap: 8px; }
     .folder-row .input,
     .folder-row .field-wrap { flex: 1; min-width: 0; }
     /* In-plugin folder picker (FolderPickerModal). Lifted verbatim from
-       plugins/seedance-video so the look-and-feel of 「浏览」 matches
+       plugins/seedance-video so the look-and-feel of 銆屾祻瑙堛€?matches
        across our plugins. The picker overrides .modal-card paddings to
        lay out a header / sidebar / list / footer four-pane layout. */
     .modal-card.folder-picker { width: min(960px, 96vw); max-width: min(960px, 96vw); max-height: 82vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
@@ -199,7 +199,7 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
       background-repeat: no-repeat; background-position: right 8px center;
     }
-    /* ── Buttons ── */
+    /* 鈹€鈹€ Buttons 鈹€鈹€ */
     .btn {
       padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
       background: var(--bg-card); color: var(--text);
@@ -218,7 +218,7 @@
       width: 100%; padding: 12px 16px; font-size: 14px; font-weight: 600;
       border-radius: 8px;
     }
-    /* ── Helpers ── */
+    /* 鈹€鈹€ Helpers 鈹€鈹€ */
     .flex { display: flex; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; }
     .items-center { align-items: center; } .justify-between { justify-content: space-between; }
     .flex-1 { flex: 1; } .flex-wrap { flex-wrap: wrap; } .flex-col { flex-direction: column; }
@@ -228,14 +228,14 @@
     .text-muted { color: var(--text-muted); } .text-dim { color: var(--text-dim); }
     .text-success { color: var(--success); } .text-warning { color: var(--warning); } .text-danger { color: var(--danger); }
     .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* ── Tags / badges / mode chips ── */
+    /* 鈹€鈹€ Tags / badges / mode chips 鈹€鈹€ */
     .tag { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
     .tag-blue { background: rgba(37,99,235,.15); color: #60a5fa; }
     .tag-orange { background: rgba(245,158,11,.15); color: #fbbf24; }
     .tag-green { background: rgba(34,197,94,.15); color: #4ade80; }
     .tag-red { background: rgba(239,68,68,.15); color: #f87171; }
     .tag-gray { background: rgba(148,163,184,.15); color: #94a3b8; }
-    /* ── Mode chip group (CreateTab top row) ── */
+    /* 鈹€鈹€ Mode chip group (CreateTab top row) 鈹€鈹€ */
     .mode-group {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px; margin-bottom: 14px;
@@ -252,7 +252,7 @@
     .mode-chip__title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
     .mode-chip__desc { font-size: 11px; color: var(--text-muted); line-height: 1.35; }
     .mode-chip__icon { font-size: 16px; color: var(--primary); }
-    /* ── File upload zone ── */
+    /* 鈹€鈹€ File upload zone 鈹€鈹€ */
     .upload-zone {
       border: 2px dashed var(--border); border-radius: var(--radius);
       padding: 18px; text-align: center; cursor: pointer; transition: .15s;
@@ -267,7 +267,7 @@
     .upload-zone__preview-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
     .upload-zone__preview-row img { max-height: 100px; border-radius: 6px; }
     .upload-zone .progress { margin-top: 6px; }
-    /* Audio file card — used when uploaded item is an audio file. The
+    /* Audio file card 鈥?used when uploaded item is an audio file. The
        previous behaviour rendered only a small filename in muted text,
        which was easy to miss (users complained the file wasn't there).
        This card explicitly shows the file with a music icon, name, size,
@@ -291,7 +291,7 @@
     }
     .upload-zone__audio-sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
     .upload-zone__audio audio { width: 100%; height: 28px; margin-top: 4px; }
-    /* ── Split layout (Create tab) ── */
+    /* 鈹€鈹€ Split layout (Create tab) 鈹€鈹€ */
     .split-layout { display: flex; gap: 16px; height: 100%; }
     .split-left { width: 55%; min-width: 380px; overflow-y: auto; flex-shrink: 0; padding-right: 4px; }
     .split-right { flex: 1; overflow-y: auto; padding-left: 4px; }
@@ -299,15 +299,15 @@
       .split-layout { flex-direction: column; }
       .split-left { width: 100%; min-width: unset; }
     }
-    /* ── Video player ── */
+    /* 鈹€鈹€ Video player 鈹€鈹€ */
     .video-player-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; aspect-ratio: 16/9; position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
     .video-player-wrap video { max-width: 100%; max-height: 100%; }
-    /* ── Loading / "task in progress" state for the preview pane ──
+    /* 鈹€鈹€ Loading / "task in progress" state for the preview pane 鈹€鈹€
        Designed for the dark video-player-wrap; tries hard to NOT look
        like an interactive control (the previous version had a tiny
        white spinner ring that read as "button" and a cancel button
        that rendered solid white because it inherited .btn defaults).
-       Keep the visual very simple: spinner → title → optional bar →
+       Keep the visual very simple: spinner 鈫?title 鈫?optional bar 鈫?
        optional ghost cancel button. */
     .oa-loader { position: relative; }
     .oa-loader--dark { background: #0b0d10 !important; border-color: #16191e !important; }
@@ -334,13 +334,13 @@
       display: inline-flex; align-items: center; gap: 6px;
     }
     .oa-loader__cancel:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.5); }
-    /* ── Spinner & progress ── */
+    /* 鈹€鈹€ Spinner & progress 鈹€鈹€ */
     .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .6s linear infinite; }
     .spinner-sm { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; vertical-align: -2px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .progress { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
     .progress-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width .3s; }
-    /* ── Switch ── */
+    /* 鈹€鈹€ Switch 鈹€鈹€ */
     .switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--border); cursor: pointer; transition: .2s; flex-shrink: 0; }
     .switch.on { background: var(--primary); }
     .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; }
@@ -355,7 +355,7 @@
     .toggle-row:hover { background: var(--bg-hover); }
     .toggle-row__label { font-size: 13px; color: var(--text); flex: 1; }
     .toggle-row__hint { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-    /* ── Mode chip filter (tongyi-image style) ── */
+    /* 鈹€鈹€ Mode chip filter (tongyi-image style) 鈹€鈹€ */
     .mode-btn {
       padding: 6px 14px; border-radius: 999px;
       border: 1px solid var(--border); background: var(--bg);
@@ -366,7 +366,7 @@
     .mode-btn.active {
       background: var(--primary); color: #fff; border-color: var(--primary);
     }
-    /* ── Task card (split-pane list) ── */
+    /* 鈹€鈹€ Task card (split-pane list) 鈹€鈹€ */
     .task-card {
       display: flex; gap: 10px; padding: 10px 12px;
       border-radius: 8px; cursor: pointer; transition: all .15s;
@@ -393,10 +393,10 @@
       border: 2px solid var(--border); border-top-color: var(--primary);
       animation: spin .9s linear infinite;
     }
-    /* ── Advanced section divider ── */
+    /* 鈹€鈹€ Advanced section divider 鈹€鈹€ */
     .oa-settings-section .toggle-row + .form-row,
     .oa-settings-section .form-row + .toggle-row { margin-top: 12px; }
-    /* ── Status badges ── */
+    /* 鈹€鈹€ Status badges 鈹€鈹€ */
     .badge {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 2px 8px; border-radius: 999px;
@@ -408,7 +408,7 @@
     .badge-failed { background: rgba(239,68,68,.15); color: #f87171; }
     .badge-cancelled { background: rgba(245,158,11,.15); color: #fbbf24; }
     .badge-approval { background: rgba(245,158,11,.18); color: #fbbf24; }
-    /* ── Empty state ── */
+    /* 鈹€鈹€ Empty state 鈹€鈹€ */
     .empty-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 48px 20px; color: var(--text-dim); text-align: center;
@@ -416,7 +416,7 @@
     .empty-state .ico { font-size: 48px; opacity: .5; margin-bottom: 12px; }
     .empty-state h4 { font-size: 14px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
     .empty-state p { font-size: 12px; color: var(--text-dim); }
-    /* ── Tasks table ── */
+    /* 鈹€鈹€ Tasks table 鈹€鈹€ */
     .ak-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     .ak-table th, .ak-table td {
       padding: 10px 12px; text-align: left;
@@ -434,7 +434,7 @@
       overflow: hidden; flex-shrink: 0;
     }
     .task-thumb img, .task-thumb video { width: 100%; height: 100%; object-fit: cover; }
-    /* ── Drawer (task detail) ── */
+    /* 鈹€鈹€ Drawer (task detail) 鈹€鈹€ */
     .drawer {
       position: fixed; top: 0; right: 0; width: 460px; max-width: 100vw;
       height: 100vh; background: var(--bg-card);
@@ -454,7 +454,7 @@
     .drawer-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
     @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
     @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-    /* ── Modal (cost exceed / task started) ── */
+    /* 鈹€鈹€ Modal (cost exceed / task started) 鈹€鈹€ */
     .modal-mask {
       position: fixed; inset: 0; background: rgba(0,0,0,.5);
       display: flex; align-items: center; justify-content: center;
@@ -477,12 +477,12 @@
     .modal-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
     @keyframes scale-in { from { transform: scale(.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    /* ── Cost breakdown table ── */
+    /* 鈹€鈹€ Cost breakdown table 鈹€鈹€ */
     .cost-table { width: 100%; font-size: 12px; border-collapse: collapse; }
     .cost-table th, .cost-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); }
     .cost-table th:first-child, .cost-table td:first-child { text-align: left; }
     .cost-table tr.total td { font-weight: 600; color: var(--primary); border-bottom: none; padding-top: 10px; }
-    /* ── Error panel ── */
+    /* 鈹€鈹€ Error panel 鈹€鈹€ */
     .err-panel {
       border: 1px solid rgba(239,68,68,.3); background: rgba(239,68,68,.06);
       border-radius: 6px; padding: 10px 12px;
@@ -491,7 +491,7 @@
     .err-panel__msg { font-size: 12px; color: var(--text); margin-bottom: 6px; word-break: break-word; }
     .err-panel ul { font-size: 12px; color: var(--text-muted); padding-left: 18px; }
     .err-panel ul li { margin-bottom: 2px; }
-    /* ── API key pill ── */
+    /* 鈹€鈹€ API key pill 鈹€鈹€ */
     .api-pill {
       display: inline-flex; align-items: center; gap: 4px;
       padding: 3px 10px; border-radius: 999px;
@@ -503,7 +503,7 @@
       background: rgba(245,158,11,.15); color: var(--warning); cursor: pointer;
     }
     .api-pill--missing:hover { filter: brightness(0.95); }
-    /* ── Collapsible ── */
+    /* 鈹€鈹€ Collapsible 鈹€鈹€ */
     .coll {
       border: 1px solid var(--border); border-radius: 6px;
       margin-bottom: 10px; overflow: hidden;
@@ -515,10 +515,10 @@
     }
     .coll-head:hover { background: var(--bg-hover); }
     .coll-body { padding: 10px 12px; border-top: 1px solid var(--border); }
-    /* ── Settings sections ── */
+    /* 鈹€鈹€ Settings sections 鈹€鈹€ */
     .setting-section { margin-bottom: 22px; }
     .setting-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    /* ── Voice / figure cards ── */
+    /* 鈹€鈹€ Voice / figure cards 鈹€鈹€ */
     .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
     .lib-card {
       border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
@@ -531,7 +531,7 @@
     .lib-card__sub { font-size: 11px; color: var(--text-muted); }
     .lib-card__media { display: flex; align-items: center; gap: 6px; }
     .lib-card__media audio { height: 28px; flex: 1; min-width: 0; }
-    /* Voice-card preview slot — fixed height so the preview button below
+    /* Voice-card preview slot 鈥?fixed height so the preview button below
        never moves when state flips between empty / loading / audio. */
     .voice-media {
       min-height: 40px;
@@ -550,7 +550,7 @@
       display: inline-flex; align-items: center; gap: 6px;
       font-size: 12px; color: var(--text);
     }
-    /* Preview action — colour + icon + 1 row, instead of the cramped
+    /* Preview action 鈥?colour + icon + 1 row, instead of the cramped
        generic .btn-sm that used to render two near-identical loaders. */
     .voice-play-btn {
       display: inline-flex; align-items: center; justify-content: center;
@@ -576,7 +576,7 @@
       box-shadow: none; cursor: not-allowed;
     }
     .voice-play-btn .oa-icon { display: inline-flex; align-items: center; }
-    /* ── Settings → Python deps ── */
+    /* 鈹€鈹€ Settings 鈫?Python deps 鈹€鈹€ */
     .dep-panel { display: flex; flex-direction: column; gap: 12px; }
     .dep-panel__intro {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
@@ -633,7 +633,7 @@
       display: block;
     }
     /* Wrapper exists so the absolute-positioned overlay can target the
-       image's own box (1:1 ratio) instead of the entire card — that
+       image's own box (1:1 ratio) instead of the entire card 鈥?that
        keeps the title/tag/trash row below the overlay, not under it. */
     .fig-thumb-wrap { position: relative; border-radius: 6px; overflow: hidden; }
     .lib-card.is-pending .fig-thumb { filter: grayscale(.85) brightness(.78); }
@@ -645,21 +645,21 @@
       color: #fff;
       font-size: 12px; font-weight: 500;
       letter-spacing: .02em;
-      pointer-events: none; /* trash icon sits in the row below — overlay
+      pointer-events: none; /* trash icon sits in the row below 鈥?overlay
                                must not steal its click target. */
     }
     .fig-overlay__text { text-shadow: 0 1px 2px rgba(0,0,0,.4); }
-    /* White spinner for use on top of the gray overlay — the default
+    /* White spinner for use on top of the gray overlay 鈥?the default
        .spinner-sm picks up --primary which can be invisible on a dark tint. */
     .spinner-sm.spinner-light {
       border-color: rgba(255,255,255,.35);
       border-top-color: #fff;
     }
     /* Amber tag for the 'skipped' (= no API key at upload) verdict, so
-       it visually differs from the red 'fail' tag — the user action is
+       it visually differs from the red 'fail' tag 鈥?the user action is
        different too (configure key vs. swap photo). */
     .tag-amber { background: rgba(245,158,11,.15); color: #f59e0b; }
-    /* ── Settings → 模型可用性检测 mini-table ── */
+    /* 鈹€鈹€ Settings 鈫?妯″瀷鍙敤鎬ф娴?mini-table 鈹€鈹€ */
     .probe-table { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
     .probe-row {
       display: grid; grid-template-columns: 110px 1fr 90px;
@@ -689,7 +689,7 @@
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    /* ── Toast (fallback when not in iframe) ── */
+    /* 鈹€鈹€ Toast (fallback when not in iframe) 鈹€鈹€ */
     .ak-toast-stack { position: fixed; right: 20px; bottom: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 8px; }
     .ak-toast {
       background: var(--bg-card); color: var(--text);
@@ -699,7 +699,7 @@
     }
     .ak-toast.error { border-color: var(--danger); color: var(--danger); }
     .ak-toast.warn { border-color: var(--warning); color: var(--warning); }
-    /* ── Misc ── */
+    /* 鈹€鈹€ Misc 鈹€鈹€ */
     .ico {
       display: inline-flex; align-items: center; justify-content: center;
       width: 1em; height: 1em; vertical-align: -0.125em; flex-shrink: 0;
@@ -713,12 +713,12 @@
 <body>
 <div id="root"></div>
 
-<!-- ─────────────────────────────────────────────────────────────────────
+<!-- 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
      BRIDGE LAYER (vanilla JS, runs before React boots)
      1:1 ported from seedance-video / tongyi-image with the only
      difference being the plugin id default. Keep the API surface
      stable so the React layer never needs the iframe-vs-direct fork.
-     ───────────────────────────────────────────────────────────────────── -->
+     鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ -->
 <script>
 const PLUGIN_ID_DEFAULT = "avatar-studio";
 const BRIDGE_VER = 1;
@@ -816,8 +816,8 @@ function uploadFile(file, kind) {
   fd.append("file", file);
   if (kind) fd.append("kind", kind);
   // Read body as text first so a non-JSON 500 (FastAPI's text/plain
-  // 「Internal Server Error」 from any unhandled backend exception)
-  // doesn't blow up the caller with 「Unexpected token 'I'」 — surface
+  // 銆孖nternal Server Error銆?from any unhandled backend exception)
+  // doesn't blow up the caller with 銆孶nexpected token 'I'銆?鈥?surface
   // the raw payload instead so the upload zone can show what actually
   // happened.
   return fetch(base + "/upload", { method: "POST", body: fd }).then(async function (r) {
@@ -829,7 +829,7 @@ function uploadFile(file, kind) {
     } catch (e) {
       return {
         ok: false,
-        error: "HTTP " + r.status + "：" + (txt || r.statusText || "服务端无响应"),
+        error: "HTTP " + r.status + "锛? + (txt || r.statusText || "鏈嶅姟绔棤鍝嶅簲"),
       };
     }
   });
@@ -860,10 +860,10 @@ function downloadFile(url, filename) {
     const id = uid();
     _pending[id] = {
       resolve: function (p) {
-        if (p && p.ok) showToast(p.path ? "已保存：" + p.path : "已开始下载", "success");
-        else showToast("下载失败：" + ((p && p.error) || "unknown"), "error");
+        if (p && p.ok) showToast(p.path ? "宸蹭繚瀛橈細" + p.path : "宸插紑濮嬩笅杞?, "success");
+        else showToast("涓嬭浇澶辫触锛? + ((p && p.error) || "unknown"), "error");
       },
-      reject: function (err) { showToast("下载失败：" + err, "error"); },
+      reject: function (err) { showToast("涓嬭浇澶辫触锛? + err, "error"); },
     };
     post({ type: "bridge:download", requestId: id, payload: { url: resolved, filename: fname } });
     return;
@@ -876,13 +876,13 @@ function downloadFile(url, filename) {
 function copyToClipboard(text) {
   if (_inIframe && _bridgeConnected) {
     const id = uid();
-    _pending[id] = { resolve: function () { showToast("已复制"); }, reject: function () {} };
+    _pending[id] = { resolve: function () { showToast("宸插鍒?); }, reject: function () {} };
     post({ type: "bridge:clipboard", requestId: id, payload: { text } });
     return;
   }
-  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { showToast("已复制"); });
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { showToast("宸插鍒?); });
 }
-// Standard Synapse bridge — let the host show the path in OS file
+// Standard Synapse bridge 鈥?let the host show the path in OS file
 // manager (Explorer / Finder). Outside an iframe we silently no-op
 // because there's no API for the page to spawn an OS shell on its own.
 function showInFolder(path) {
@@ -892,7 +892,7 @@ function showInFolder(path) {
   }
   return Promise.resolve(false);
 }
-// Standard Synapse bridge — open the host's native folder picker.
+// Standard Synapse bridge 鈥?open the host's native folder picker.
 // Resolves with the selected absolute path, or null if the user
 // cancelled / the bridge isn't ready (we still want the input field
 // to remain editable as a typed-path fallback).
@@ -905,7 +905,7 @@ function pickFolder(title) {
         reject: function () { resolve(null); },
       };
       post({ type: "bridge:pick-folder", requestId: id,
-             payload: { title: title || "选择文件夹" } });
+             payload: { title: title || "閫夋嫨鏂囦欢澶? } });
       setTimeout(function () { if (_pending[id]) { delete _pending[id]; resolve(null); } }, 60000);
     });
   }
@@ -915,8 +915,8 @@ function pickFolder(title) {
 // cross-origin iframes (Chrome 92+), which is exactly how this plugin is
 // hosted by Synapse's setup-center. The native dialog used to work in
 // dev (browsing the file directly) but produced "click does nothing"
-// in production — surfaced to the user as both 「删除按键还是没用」 and
-// 「点上传并预检没反应」. ``oaConfirm`` returns a Promise<bool> that
+// in production 鈥?surfaced to the user as both 銆屽垹闄ゆ寜閿繕鏄病鐢ㄣ€?and
+// 銆岀偣涓婁紶骞堕妫€娌″弽搴斻€? ``oaConfirm`` returns a Promise<bool> that
 // resolves when the user clicks ok/cancel on a real React-rendered modal,
 // so the same call site works regardless of host context.
 let _confirmSubscriber = null;
@@ -930,10 +930,10 @@ function oaConfirm(opts) {
     }
     _confirmSubscriber({
       id: ++_confirmCounter,
-      title: (opts && opts.title) || "请确认",
+      title: (opts && opts.title) || "璇风‘璁?,
       message: (opts && opts.message) || "",
-      okText: (opts && opts.okText) || "确认",
-      cancelText: (opts && opts.cancelText) || "取消",
+      okText: (opts && opts.okText) || "纭",
+      cancelText: (opts && opts.cancelText) || "鍙栨秷",
       danger: !!(opts && opts.danger),
       resolve: resolve,
     });
@@ -948,315 +948,315 @@ window.__bridge = {
 };
 </script>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
 
-<!-- ─────────────────────────────────────────────────────────────────────
+<!-- 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
      REACT BUSINESS LAYER (single Babel-compiled script)
-     ───────────────────────────────────────────────────────────────────── -->
+     鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ -->
 <script type="text/babel" data-type="module">
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
 const { pluginApi, onEvent, uploadFile, downloadFile, showToast, copyToClipboard,
         showInFolder, pickFolder } = window.__bridge;
 
-/* ─── i18n dictionary (zh / en) ─────────────────────────────────────── */
+/* 鈹€鈹€鈹€ i18n dictionary (zh / en) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 const I18N_DICT = {
   zh: {
-    "app.title": "数字人工作室",
-    "app.subtitle": "DashScope · wan2.2-s2v / videoretalk / animate-mix / cosyvoice-v2",
+    "app.title": "鏁板瓧浜哄伐浣滃",
+    "app.subtitle": "DashScope 路 wan2.2-s2v / videoretalk / animate-mix / cosyvoice-v2",
     "app.api.label": "API Key",
-    "app.api.tooltip": "未配置百炼 API Key — 点此前往设置",
-    "app.api.missing": "未配置 API Key",
-    "tabs.create": "创建",
-    "tabs.tasks": "任务",
-    "tabs.voices": "音色库",
-    "tabs.figures": "形象库",
-    "tabs.guide": "提示词指南",
-    "tabs.settings": "设置",
-    "banner.noKey.title": "尚未配置 DashScope API Key",
-    "banner.noKey.desc": "请到「设置」中填写百炼 API Key 后再提交任务。",
-    "banner.noKey.cta": "去设置",
-    "create.mode.photo_speak": "照片说话",
-    "create.mode.photo_speak.desc": "1 张人像照 + 文本/音频 → 开口讲话视频",
-    "create.mode.video_relip": "视频换嘴",
-    "create.mode.video_relip.desc": "原视频保留动作，仅同步嘴型到新音频",
-    "create.mode.video_reface": "视频换人",
-    "create.mode.video_reface.desc": "保留场景与动作，把视频里的主角换成新人物",
-    "create.mode.avatar_compose": "数字人合成",
-    "create.mode.avatar_compose.desc": "多图融合生成新形象，再生成口播视频",
-    "create.mode.pose_drive": "图生动作",
-    "create.mode.pose_drive.desc": "将视频动作迁移到静态人像",
-    "create.section.image": "人像 / 主体图",
-    "create.section.video": "参考视频",
-    "create.section.refImage": "参考人物图",
-    "create.section.composeImages": "合成参考图（最多 3 张）",
-    "create.section.text": "口播文本与音色",
-    "create.section.params": "输出参数",
-    "create.section.advanced": "高级",
-    "create.assets.upload": "拖入文件或点击上传",
-    "create.assets.fromLib": "从形象库选择",
-    "create.assets.replace": "重新选择",
-    "create.assets.optional": "可选",
-    "create.text.placeholder": "输入要合成的口播文本（支持中英文混合，建议 ≤ 1000 字）",
-    "create.text.voice": "音色",
-    "create.text.audioUpload": "或上传现成音频（mp3/wav，覆盖 TTS）",
-    "create.text.charCount": "{n} 字",
-    "create.params.resolution": "分辨率",
-    "create.params.aspect": "画面比例",
-    "create.params.duration": "时长（秒）",
-    "create.params.durationHint": "未上传音频时按此估算费用；上传/TTS 后以音频时长为准",
-    "create.params.qualityMode": "质量模式",
-    "create.params.qualityStd": "标准（0.60 元/秒）",
-    "create.params.qualityPro": "专业（1.20 元/秒，更精细）",
-    "create.params.composeSize": "合成图尺寸",
-    "create.params.composeSizeAuto": "随最后一张参考图",
-    "create.advanced.watermark": "添加 DashScope 水印",
-    "create.advanced.seed": "随机种子（-1 = 自动）",
-    "create.advanced.composePrompt": "融合 Prompt（必填）",
-    "create.advanced.composePrompt.placeholder": "例如：把第二张图的服饰穿到第一张人物身上，背景换成第三张的咖啡馆",
-    "create.advanced.aiPrompt": "用 qwen-vl-max 帮我写",
-    "create.submit": "提交任务",
-    "create.submit.preflight": "正在估算费用...",
-    "create.draft.saved": "草稿已自动保存",
-    "create.draft.cleared": "草稿已清空",
-    "create.draft.clear": "清空表单",
-    "preview.empty.title": "暂无任务",
-    "preview.empty.desc": "在左侧填写参数后点击「提交任务」",
-    "preview.queued": "已加入队列",
-    "preview.processing": "处理中... {pct}%",
-    "preview.gotoTasks": "查看任务详情",
-    "tasks.filter.all": "全部",
-    "tasks.filter.pending": "排队中",
-    "tasks.filter.running": "处理中",
-    "tasks.filter.done": "已完成",
-    "tasks.filter.failed": "失败",
-    "tasks.filter.cancelled": "已取消",
-    "tasks.col.mode": "模式",
-    "tasks.col.id": "任务 ID",
-    "tasks.col.status": "状态",
-    "tasks.col.created": "创建时间",
-    "tasks.col.cost": "费用",
-    "tasks.col.actions": "操作",
-    "tasks.action.cancel": "取消",
-    "tasks.action.retry": "重试",
-    "tasks.action.download": "下载",
-    "tasks.action.delete": "删除",
-    "tasks.empty": "暂无任务",
-    "tasks.empty.hint": "在「创建」页提交第一个任务吧",
-    "tasks.detail.title": "任务详情",
-    "tasks.detail.params": "参数",
-    "tasks.detail.cost": "费用明细",
-    "tasks.detail.metadata": "元数据 JSON",
-    "tasks.detail.error": "错误信息",
-    "tasks.detail.copyId": "复制任务 ID",
-    "voices.system": "系统音色",
-    "voices.custom": "自定义音色",
-    "voices.create": "克隆新音色",
-    "voices.create.label": "音色名称",
-    "voices.create.audio": "参考音频（mp3/wav，5-30 秒最佳）",
-    "voices.create.submit": "提交克隆",
-    "voices.empty.custom": "暂无自定义音色，上传一段录音即可克隆",
-    "voices.delete.confirm": "确认删除该自定义音色？",
-    "voices.rename": "重命名",
-    "voices.rename.empty": "音色名称不能为空",
-    "voices.rename.ok": "音色名称已更新",
-    "voices.rename.fail": "重命名失败",
-    "voices.preview": "试听",
-    "voices.preview.busy": "合成中…",
-    "voices.preview.text": "你好，欢迎使用数字人工作室",
-    "voices.preview.fail": "试听合成失败：{msg}",
-    "voices.preview.empty": "尚未生成试听音频，点击下方「试听」按钮",
-    "voices.preview.needKey": "请先到「设置」中填写 DashScope API Key 后再试听",
-    "voices.source.title": "数据来源",
-    "voices.source.body": "下列系统音色来自 阿里云百炼 cosyvoice-v2 官方音色目录；中文显示名 / 风格描述与官方一致，调用时实际传入的标识符是行内显示的 longxxxxxx_v2。",
-    "voices.source.link": "查看官方音色列表",
-    "create.section.modelInfo": "模型与计费",
-    "create.modelInfo.model": "底层模型",
-    "create.modelInfo.price": "计费",
-    "create.modelInfo.maxRes": "支持分辨率",
-    "create.modelInfo.maxDur": "支持时长",
-    "create.modelInfo.input": "输入要求",
-    "create.modelInfo.notes": "限制说明",
-    "create.modelInfo.availability": "模型可用性",
-    "create.modelInfo.availability.value": "百炼公开模型，需在控制台「模型广场」找到对应模型开通后才可调用；同账号未开通的模型调用会返回 403。",
-    "create.modelInfo.availability.console": "前往百炼控制台 · 模型广场",
-    "create.modelInfo.availability.docs": "百炼平台介绍文档",
-    "tasks.filter.status": "状态",
-    "tasks.filter.mode": "模式",
-    "tasks.filter.allModes": "全部模式",
-    "tasks.totalCount": "共 {n} 个",
-    "tasks.empty.noSelection.title": "未选择任务",
-    "tasks.empty.noSelection.hint": "在左侧任务列表中点击一项查看详情",
-    "tasks.detail.id": "任务 ID",
-    "tasks.detail.mode": "模式",
-    "tasks.detail.model": "模型",
-    "tasks.detail.createdAt": "创建时间",
-    "tasks.detail.runningHint": "DashScope 正在生成，可在「任务」标签页查看实时进度。",
-    "tasks.detail.completedNoOutput": "任务已完成但未返回输出文件",
-    "tasks.detail.failedTitle": "任务失败",
-    "tasks.detail.recheck": "重新查询",
-    "tasks.detail.preview": "预览",
-    "tasks.detail.download": "下载",
-    "tasks.detail.retry": "重试",
-    "tasks.detail.delete": "删除",
-    "preview.result.title": "本次任务",
-    "preview.result.runningHint": "任务已提交至 DashScope，正在生成...",
-    "preview.result.viewInTasks": "查看任务详情",
-    "preview.result.refresh": "刷新结果",
-    "preview.result.failed": "生成失败",
-    "preview.result.completedNoOutput": "任务完成但未返回输出文件",
-    "create.aiPrompt.title": "调用 qwen-vl-max 多模态模型，根据已上传的参考图自动生成融合 Prompt",
-    "guide.intro": "数字人工作室的输出质量极大依赖输入素材与口播文本。下方按业务场景整理常用配方、最佳实践与避坑清单，可点击展开。",
-    "guide.section.formulas": "各模式配方",
-    "guide.section.bestPractices": "通用最佳实践",
-    "guide.section.voice": "音色选择建议",
-    "guide.section.reface": "视频换人最佳实践",
-    "guide.section.compose": "融合 Prompt 示例",
-    "guide.section.faq": "常见问题",
-    "figures.title": "形象库",
-    "figures.upload": "上传新形象",
-    "figures.upload.label": "形象名称",
-    "figures.upload.image": "人像图（png/jpg，单人正面）",
-    "figures.upload.submit": "上传并预检",
-    "figures.empty": "形象库为空，上传一张正面人像图开始",
-    "figures.detect.pending": "预检中…",
-    "figures.detect.pass": "可用",
-    "figures.detect.fail": "预检未通过",
-    "figures.detect.skipped": "未预检",
-    "figures.detect.hint": "请确保是真人正面照，无水印、无遮挡",
-    "figures.detect.pendingHint": "正在调用 wan2.2-s2v-detect 进行人像预检，约 5–30 秒；点击右上角即可中止并删除",
-    "figures.detect.failHint": "DashScope 拒绝了该图，常见原因：非真人 / 非正面 / 多人 / 有水印。删除后换图重传即可。",
-    "figures.detect.skippedHint": "上传时 API Key 还没配，已跳过预检；填好 Key 后请删除并重新上传。",
-    "figures.delete.confirm": "确认删除该形象？",
+    "app.api.tooltip": "鏈厤缃櫨鐐?API Key 鈥?鐐规鍓嶅線璁剧疆",
+    "app.api.missing": "鏈厤缃?API Key",
+    "tabs.create": "鍒涘缓",
+    "tabs.tasks": "浠诲姟",
+    "tabs.voices": "闊宠壊搴?,
+    "tabs.figures": "褰㈣薄搴?,
+    "tabs.guide": "鎻愮ず璇嶆寚鍗?,
+    "tabs.settings": "璁剧疆",
+    "banner.noKey.title": "灏氭湭閰嶇疆 DashScope API Key",
+    "banner.noKey.desc": "璇峰埌銆岃缃€嶄腑濉啓鐧剧偧 API Key 鍚庡啀鎻愪氦浠诲姟銆?,
+    "banner.noKey.cta": "鍘昏缃?,
+    "create.mode.photo_speak": "鐓х墖璇磋瘽",
+    "create.mode.photo_speak.desc": "1 寮犱汉鍍忕収 + 鏂囨湰/闊抽 鈫?寮€鍙ｈ璇濊棰?,
+    "create.mode.video_relip": "瑙嗛鎹㈠槾",
+    "create.mode.video_relip.desc": "鍘熻棰戜繚鐣欏姩浣滐紝浠呭悓姝ュ槾鍨嬪埌鏂伴煶棰?,
+    "create.mode.video_reface": "瑙嗛鎹汉",
+    "create.mode.video_reface.desc": "淇濈暀鍦烘櫙涓庡姩浣滐紝鎶婅棰戦噷鐨勪富瑙掓崲鎴愭柊浜虹墿",
+    "create.mode.avatar_compose": "鏁板瓧浜哄悎鎴?,
+    "create.mode.avatar_compose.desc": "澶氬浘铻嶅悎鐢熸垚鏂板舰璞★紝鍐嶇敓鎴愬彛鎾棰?,
+    "create.mode.pose_drive": "鍥剧敓鍔ㄤ綔",
+    "create.mode.pose_drive.desc": "灏嗚棰戝姩浣滆縼绉诲埌闈欐€佷汉鍍?,
+    "create.section.image": "浜哄儚 / 涓讳綋鍥?,
+    "create.section.video": "鍙傝€冭棰?,
+    "create.section.refImage": "鍙傝€冧汉鐗╁浘",
+    "create.section.composeImages": "鍚堟垚鍙傝€冨浘锛堟渶澶?3 寮狅級",
+    "create.section.text": "鍙ｆ挱鏂囨湰涓庨煶鑹?,
+    "create.section.params": "杈撳嚭鍙傛暟",
+    "create.section.advanced": "楂樼骇",
+    "create.assets.upload": "鎷栧叆鏂囦欢鎴栫偣鍑讳笂浼?,
+    "create.assets.fromLib": "浠庡舰璞″簱閫夋嫨",
+    "create.assets.replace": "閲嶆柊閫夋嫨",
+    "create.assets.optional": "鍙€?,
+    "create.text.placeholder": "杈撳叆瑕佸悎鎴愮殑鍙ｆ挱鏂囨湰锛堟敮鎸佷腑鑻辨枃娣峰悎锛屽缓璁?鈮?1000 瀛楋級",
+    "create.text.voice": "闊宠壊",
+    "create.text.audioUpload": "鎴栦笂浼犵幇鎴愰煶棰戯紙mp3/wav锛岃鐩?TTS锛?,
+    "create.text.charCount": "{n} 瀛?,
+    "create.params.resolution": "鍒嗚鲸鐜?,
+    "create.params.aspect": "鐢婚潰姣斾緥",
+    "create.params.duration": "鏃堕暱锛堢锛?,
+    "create.params.durationHint": "鏈笂浼犻煶棰戞椂鎸夋浼扮畻璐圭敤锛涗笂浼?TTS 鍚庝互闊抽鏃堕暱涓哄噯",
+    "create.params.qualityMode": "璐ㄩ噺妯″紡",
+    "create.params.qualityStd": "鏍囧噯锛?.60 鍏?绉掞級",
+    "create.params.qualityPro": "涓撲笟锛?.20 鍏?绉掞紝鏇寸簿缁嗭級",
+    "create.params.composeSize": "鍚堟垚鍥惧昂瀵?,
+    "create.params.composeSizeAuto": "闅忔渶鍚庝竴寮犲弬鑰冨浘",
+    "create.advanced.watermark": "娣诲姞 DashScope 姘村嵃",
+    "create.advanced.seed": "闅忔満绉嶅瓙锛?1 = 鑷姩锛?,
+    "create.advanced.composePrompt": "铻嶅悎 Prompt锛堝繀濉級",
+    "create.advanced.composePrompt.placeholder": "渚嬪锛氭妸绗簩寮犲浘鐨勬湇楗扮┛鍒扮涓€寮犱汉鐗╄韩涓婏紝鑳屾櫙鎹㈡垚绗笁寮犵殑鍜栧暋棣?,
+    "create.advanced.aiPrompt": "鐢?qwen-vl-max 甯垜鍐?,
+    "create.submit": "鎻愪氦浠诲姟",
+    "create.submit.preflight": "姝ｅ湪浼扮畻璐圭敤...",
+    "create.draft.saved": "鑽夌宸茶嚜鍔ㄤ繚瀛?,
+    "create.draft.cleared": "鑽夌宸叉竻绌?,
+    "create.draft.clear": "娓呯┖琛ㄥ崟",
+    "preview.empty.title": "鏆傛棤浠诲姟",
+    "preview.empty.desc": "鍦ㄥ乏渚у～鍐欏弬鏁板悗鐐瑰嚮銆屾彁浜や换鍔°€?,
+    "preview.queued": "宸插姞鍏ラ槦鍒?,
+    "preview.processing": "澶勭悊涓?.. {pct}%",
+    "preview.gotoTasks": "鏌ョ湅浠诲姟璇︽儏",
+    "tasks.filter.all": "鍏ㄩ儴",
+    "tasks.filter.pending": "鎺掗槦涓?,
+    "tasks.filter.running": "澶勭悊涓?,
+    "tasks.filter.done": "宸插畬鎴?,
+    "tasks.filter.failed": "澶辫触",
+    "tasks.filter.cancelled": "宸插彇娑?,
+    "tasks.col.mode": "妯″紡",
+    "tasks.col.id": "浠诲姟 ID",
+    "tasks.col.status": "鐘舵€?,
+    "tasks.col.created": "鍒涘缓鏃堕棿",
+    "tasks.col.cost": "璐圭敤",
+    "tasks.col.actions": "鎿嶄綔",
+    "tasks.action.cancel": "鍙栨秷",
+    "tasks.action.retry": "閲嶈瘯",
+    "tasks.action.download": "涓嬭浇",
+    "tasks.action.delete": "鍒犻櫎",
+    "tasks.empty": "鏆傛棤浠诲姟",
+    "tasks.empty.hint": "鍦ㄣ€屽垱寤恒€嶉〉鎻愪氦绗竴涓换鍔″惂",
+    "tasks.detail.title": "浠诲姟璇︽儏",
+    "tasks.detail.params": "鍙傛暟",
+    "tasks.detail.cost": "璐圭敤鏄庣粏",
+    "tasks.detail.metadata": "鍏冩暟鎹?JSON",
+    "tasks.detail.error": "閿欒淇℃伅",
+    "tasks.detail.copyId": "澶嶅埗浠诲姟 ID",
+    "voices.system": "绯荤粺闊宠壊",
+    "voices.custom": "鑷畾涔夐煶鑹?,
+    "voices.create": "鍏嬮殕鏂伴煶鑹?,
+    "voices.create.label": "闊宠壊鍚嶇О",
+    "voices.create.audio": "鍙傝€冮煶棰戯紙mp3/wav锛?-30 绉掓渶浣筹級",
+    "voices.create.submit": "鎻愪氦鍏嬮殕",
+    "voices.empty.custom": "鏆傛棤鑷畾涔夐煶鑹诧紝涓婁紶涓€娈靛綍闊冲嵆鍙厠闅?,
+    "voices.delete.confirm": "纭鍒犻櫎璇ヨ嚜瀹氫箟闊宠壊锛?,
+    "voices.rename": "閲嶅懡鍚?,
+    "voices.rename.empty": "闊宠壊鍚嶇О涓嶈兘涓虹┖",
+    "voices.rename.ok": "闊宠壊鍚嶇О宸叉洿鏂?,
+    "voices.rename.fail": "閲嶅懡鍚嶅け璐?,
+    "voices.preview": "璇曞惉",
+    "voices.preview.busy": "鍚堟垚涓€?,
+    "voices.preview.text": "浣犲ソ锛屾杩庝娇鐢ㄦ暟瀛椾汉宸ヤ綔瀹?,
+    "voices.preview.fail": "璇曞惉鍚堟垚澶辫触锛歿msg}",
+    "voices.preview.empty": "灏氭湭鐢熸垚璇曞惉闊抽锛岀偣鍑讳笅鏂广€岃瘯鍚€嶆寜閽?,
+    "voices.preview.needKey": "璇峰厛鍒般€岃缃€嶄腑濉啓 DashScope API Key 鍚庡啀璇曞惉",
+    "voices.source.title": "鏁版嵁鏉ユ簮",
+    "voices.source.body": "涓嬪垪绯荤粺闊宠壊鏉ヨ嚜 闃块噷浜戠櫨鐐?cosyvoice-v2 瀹樻柟闊宠壊鐩綍锛涗腑鏂囨樉绀哄悕 / 椋庢牸鎻忚堪涓庡畼鏂逛竴鑷达紝璋冪敤鏃跺疄闄呬紶鍏ョ殑鏍囪瘑绗︽槸琛屽唴鏄剧ず鐨?longxxxxxx_v2銆?,
+    "voices.source.link": "鏌ョ湅瀹樻柟闊宠壊鍒楄〃",
+    "create.section.modelInfo": "妯″瀷涓庤璐?,
+    "create.modelInfo.model": "搴曞眰妯″瀷",
+    "create.modelInfo.price": "璁¤垂",
+    "create.modelInfo.maxRes": "鏀寔鍒嗚鲸鐜?,
+    "create.modelInfo.maxDur": "鏀寔鏃堕暱",
+    "create.modelInfo.input": "杈撳叆瑕佹眰",
+    "create.modelInfo.notes": "闄愬埗璇存槑",
+    "create.modelInfo.availability": "妯″瀷鍙敤鎬?,
+    "create.modelInfo.availability.value": "鐧剧偧鍏紑妯″瀷锛岄渶鍦ㄦ帶鍒跺彴銆屾ā鍨嬪箍鍦恒€嶆壘鍒板搴旀ā鍨嬪紑閫氬悗鎵嶅彲璋冪敤锛涘悓璐﹀彿鏈紑閫氱殑妯″瀷璋冪敤浼氳繑鍥?403銆?,
+    "create.modelInfo.availability.console": "鍓嶅線鐧剧偧鎺у埗鍙?路 妯″瀷骞垮満",
+    "create.modelInfo.availability.docs": "鐧剧偧骞冲彴浠嬬粛鏂囨。",
+    "tasks.filter.status": "鐘舵€?,
+    "tasks.filter.mode": "妯″紡",
+    "tasks.filter.allModes": "鍏ㄩ儴妯″紡",
+    "tasks.totalCount": "鍏?{n} 涓?,
+    "tasks.empty.noSelection.title": "鏈€夋嫨浠诲姟",
+    "tasks.empty.noSelection.hint": "鍦ㄥ乏渚т换鍔″垪琛ㄤ腑鐐瑰嚮涓€椤规煡鐪嬭鎯?,
+    "tasks.detail.id": "浠诲姟 ID",
+    "tasks.detail.mode": "妯″紡",
+    "tasks.detail.model": "妯″瀷",
+    "tasks.detail.createdAt": "鍒涘缓鏃堕棿",
+    "tasks.detail.runningHint": "DashScope 姝ｅ湪鐢熸垚锛屽彲鍦ㄣ€屼换鍔°€嶆爣绛鹃〉鏌ョ湅瀹炴椂杩涘害銆?,
+    "tasks.detail.completedNoOutput": "浠诲姟宸插畬鎴愪絾鏈繑鍥炶緭鍑烘枃浠?,
+    "tasks.detail.failedTitle": "浠诲姟澶辫触",
+    "tasks.detail.recheck": "閲嶆柊鏌ヨ",
+    "tasks.detail.preview": "棰勮",
+    "tasks.detail.download": "涓嬭浇",
+    "tasks.detail.retry": "閲嶈瘯",
+    "tasks.detail.delete": "鍒犻櫎",
+    "preview.result.title": "鏈浠诲姟",
+    "preview.result.runningHint": "浠诲姟宸叉彁浜よ嚦 DashScope锛屾鍦ㄧ敓鎴?..",
+    "preview.result.viewInTasks": "鏌ョ湅浠诲姟璇︽儏",
+    "preview.result.refresh": "鍒锋柊缁撴灉",
+    "preview.result.failed": "鐢熸垚澶辫触",
+    "preview.result.completedNoOutput": "浠诲姟瀹屾垚浣嗘湭杩斿洖杈撳嚭鏂囦欢",
+    "create.aiPrompt.title": "璋冪敤 qwen-vl-max 澶氭ā鎬佹ā鍨嬶紝鏍规嵁宸蹭笂浼犵殑鍙傝€冨浘鑷姩鐢熸垚铻嶅悎 Prompt",
+    "guide.intro": "鏁板瓧浜哄伐浣滃鐨勮緭鍑鸿川閲忔瀬澶т緷璧栬緭鍏ョ礌鏉愪笌鍙ｆ挱鏂囨湰銆備笅鏂规寜涓氬姟鍦烘櫙鏁寸悊甯哥敤閰嶆柟銆佹渶浣冲疄璺典笌閬垮潙娓呭崟锛屽彲鐐瑰嚮灞曞紑銆?,
+    "guide.section.formulas": "鍚勬ā寮忛厤鏂?,
+    "guide.section.bestPractices": "閫氱敤鏈€浣冲疄璺?,
+    "guide.section.voice": "闊宠壊閫夋嫨寤鸿",
+    "guide.section.reface": "瑙嗛鎹汉鏈€浣冲疄璺?,
+    "guide.section.compose": "铻嶅悎 Prompt 绀轰緥",
+    "guide.section.faq": "甯歌闂",
+    "figures.title": "褰㈣薄搴?,
+    "figures.upload": "涓婁紶鏂板舰璞?,
+    "figures.upload.label": "褰㈣薄鍚嶇О",
+    "figures.upload.image": "浜哄儚鍥撅紙png/jpg锛屽崟浜烘闈級",
+    "figures.upload.submit": "涓婁紶骞堕妫€",
+    "figures.empty": "褰㈣薄搴撲负绌猴紝涓婁紶涓€寮犳闈汉鍍忓浘寮€濮?,
+    "figures.detect.pending": "棰勬涓€?,
+    "figures.detect.pass": "鍙敤",
+    "figures.detect.fail": "棰勬鏈€氳繃",
+    "figures.detect.skipped": "鏈妫€",
+    "figures.detect.hint": "璇风‘淇濇槸鐪熶汉姝ｉ潰鐓э紝鏃犳按鍗般€佹棤閬尅",
+    "figures.detect.pendingHint": "姝ｅ湪璋冪敤 wan2.2-s2v-detect 杩涜浜哄儚棰勬锛岀害 5鈥?0 绉掞紱鐐瑰嚮鍙充笂瑙掑嵆鍙腑姝㈠苟鍒犻櫎",
+    "figures.detect.failHint": "DashScope 鎷掔粷浜嗚鍥撅紝甯歌鍘熷洜锛氶潪鐪熶汉 / 闈炴闈?/ 澶氫汉 / 鏈夋按鍗般€傚垹闄ゅ悗鎹㈠浘閲嶄紶鍗冲彲銆?,
+    "figures.detect.skippedHint": "涓婁紶鏃?API Key 杩樻病閰嶏紝宸茶烦杩囬妫€锛涘～濂?Key 鍚庤鍒犻櫎骞堕噸鏂颁笂浼犮€?,
+    "figures.delete.confirm": "纭鍒犻櫎璇ュ舰璞★紵",
     "settings.section.api": "API Key",
-    "settings.section.defaults": "默认偏好",
-    "settings.section.storage": "存储与清理",
-    "settings.section.advanced": "高级",
-    "settings.section.about": "关于",
+    "settings.section.defaults": "榛樿鍋忓ソ",
+    "settings.section.storage": "瀛樺偍涓庢竻鐞?,
+    "settings.section.advanced": "楂樼骇",
+    "settings.section.about": "鍏充簬",
     "settings.api.placeholder": "sk-xxxxxxxxxxxxxxxx",
-    "settings.api.savedBadge": "已保存",
-    "settings.api.test": "测试连接",
-    "settings.api.test.ok": "API Key 有效",
-    "settings.api.test.fail": "API Key 无效：{msg}",
-    "settings.api.region": "服务地域",
-    "settings.api.region.bj": "北京 (默认)",
-    "settings.api.region.sg": "新加坡",
-    "settings.api.region.hint": "国内「阿里云百炼」用户保持「北京」即可。仅在使用 alibabacloud.com 国际站账号或将服务部署在境外时才需要切到「新加坡」。两套接入点账号体系隔离，国内 key 在新加坡端会直接 401。",
-    "settings.api.advanced": "高级（服务地域 / 模型可用性）",
-    "settings.api.probe.title": "模型可用性检测",
-    "settings.api.probe.desc": "用当前 API Key 探测每个模型的访问权限。100% 不会创建真实任务、不会扣费——后台只发送故意残缺的请求，DashScope 返回 400 = 可用 / 401-403 = 未授权 / 404 = 该地域未开通。cosyvoice-v2 仅支持 WebSocket，无法预探测，鉴权通过即推断为可用（≈），请用「试听」做端到端验证。",
-    "settings.api.probe.btn": "开始检测",
-    "settings.api.probe.btn.busy": "检测中…",
-    "settings.api.probe.never": "尚未检测",
-    "settings.api.probe.col.mode": "功能",
-    "settings.api.probe.col.models": "依赖模型",
-    "settings.api.probe.col.status": "状态",
-    "settings.api.probe.status.available": "可用",
-    "settings.api.probe.status.denied": "未授权",
-    "settings.api.probe.status.unknown": "未知",
-    "settings.api.probe.openConsole": "前往百炼模型广场开通",
-    "settings.defaults.resolution": "默认分辨率",
-    "settings.defaults.voice": "默认音色",
-    "settings.defaults.threshold": "成本确认阈值（元）",
-    "settings.defaults.thresholdHint": "单次任务超过此金额时弹窗确认",
-    "settings.storage.dir": "数据目录",
-    "settings.storage.dir.placeholder": "留空 = 使用默认目录（由 Synapse 管理）",
-    "settings.storage.dir.hint": "可改成更大的盘 / 别的用户目录。仅支持绝对路径。",
-    "settings.storage.dir.active": "当前生效：",
-    "settings.storage.dir.pending": "已保存，重新加载插件后生效",
-    "settings.storage.dir.reset": "恢复默认",
-    "settings.storage.dir.browse": "浏览",
-    "settings.storage.dir.open": "打开",
-    "settings.storage.dir.pickTitle": "选择数据目录",
-    "settings.storage.subdir": "子目录结构",
-    "settings.storage.subdir.task": "按任务（tasks/{task_id}/，默认）",
-    "settings.storage.subdir.date": "按日期（outputs/2026-04-22/）",
-    "settings.storage.subdir.mode": "按功能（outputs/photo_speak/）",
-    "settings.storage.subdir.dateMode": "按日期+功能（outputs/2026-04-22/photo_speak/）",
-    "settings.storage.subdir.flat": "平铺（outputs/）",
-    "settings.storage.naming": "文件命名规则",
-    "settings.storage.naming.filename": "{filename}（DashScope 原始文件名，默认）",
+    "settings.api.savedBadge": "宸蹭繚瀛?,
+    "settings.api.test": "娴嬭瘯杩炴帴",
+    "settings.api.test.ok": "API Key 鏈夋晥",
+    "settings.api.test.fail": "API Key 鏃犳晥锛歿msg}",
+    "settings.api.region": "鏈嶅姟鍦板煙",
+    "settings.api.region.bj": "鍖椾含 (榛樿)",
+    "settings.api.region.sg": "鏂板姞鍧?,
+    "settings.api.region.hint": "鍥藉唴銆岄樋閲屼簯鐧剧偧銆嶇敤鎴蜂繚鎸併€屽寳浜€嶅嵆鍙€備粎鍦ㄤ娇鐢?alibabacloud.com 鍥介檯绔欒处鍙锋垨灏嗘湇鍔￠儴缃插湪澧冨鏃舵墠闇€瑕佸垏鍒般€屾柊鍔犲潯銆嶃€備袱濂楁帴鍏ョ偣璐﹀彿浣撶郴闅旂锛屽浗鍐?key 鍦ㄦ柊鍔犲潯绔細鐩存帴 401銆?,
+    "settings.api.advanced": "楂樼骇锛堟湇鍔″湴鍩?/ 妯″瀷鍙敤鎬э級",
+    "settings.api.probe.title": "妯″瀷鍙敤鎬ф娴?,
+    "settings.api.probe.desc": "鐢ㄥ綋鍓?API Key 鎺㈡祴姣忎釜妯″瀷鐨勮闂潈闄愩€?00% 涓嶄細鍒涘缓鐪熷疄浠诲姟銆佷笉浼氭墸璐光€斺€斿悗鍙板彧鍙戦€佹晠鎰忔畫缂虹殑璇锋眰锛孌ashScope 杩斿洖 400 = 鍙敤 / 401-403 = 鏈巿鏉?/ 404 = 璇ュ湴鍩熸湭寮€閫氥€俢osyvoice-v2 浠呮敮鎸?WebSocket锛屾棤娉曢鎺㈡祴锛岄壌鏉冮€氳繃鍗虫帹鏂负鍙敤锛堚増锛夛紝璇风敤銆岃瘯鍚€嶅仛绔埌绔獙璇併€?,
+    "settings.api.probe.btn": "寮€濮嬫娴?,
+    "settings.api.probe.btn.busy": "妫€娴嬩腑鈥?,
+    "settings.api.probe.never": "灏氭湭妫€娴?,
+    "settings.api.probe.col.mode": "鍔熻兘",
+    "settings.api.probe.col.models": "渚濊禆妯″瀷",
+    "settings.api.probe.col.status": "鐘舵€?,
+    "settings.api.probe.status.available": "鍙敤",
+    "settings.api.probe.status.denied": "鏈巿鏉?,
+    "settings.api.probe.status.unknown": "鏈煡",
+    "settings.api.probe.openConsole": "鍓嶅線鐧剧偧妯″瀷骞垮満寮€閫?,
+    "settings.defaults.resolution": "榛樿鍒嗚鲸鐜?,
+    "settings.defaults.voice": "榛樿闊宠壊",
+    "settings.defaults.threshold": "鎴愭湰纭闃堝€硷紙鍏冿級",
+    "settings.defaults.thresholdHint": "鍗曟浠诲姟瓒呰繃姝ら噾棰濇椂寮圭獥纭",
+    "settings.storage.dir": "鏁版嵁鐩綍",
+    "settings.storage.dir.placeholder": "鐣欑┖ = 浣跨敤榛樿鐩綍锛堢敱 Synapse 绠＄悊锛?,
+    "settings.storage.dir.hint": "鍙敼鎴愭洿澶х殑鐩?/ 鍒殑鐢ㄦ埛鐩綍銆備粎鏀寔缁濆璺緞銆?,
+    "settings.storage.dir.active": "褰撳墠鐢熸晥锛?,
+    "settings.storage.dir.pending": "宸蹭繚瀛橈紝閲嶆柊鍔犺浇鎻掍欢鍚庣敓鏁?,
+    "settings.storage.dir.reset": "鎭㈠榛樿",
+    "settings.storage.dir.browse": "娴忚",
+    "settings.storage.dir.open": "鎵撳紑",
+    "settings.storage.dir.pickTitle": "閫夋嫨鏁版嵁鐩綍",
+    "settings.storage.subdir": "瀛愮洰褰曠粨鏋?,
+    "settings.storage.subdir.task": "鎸変换鍔★紙tasks/{task_id}/锛岄粯璁わ級",
+    "settings.storage.subdir.date": "鎸夋棩鏈燂紙outputs/2026-04-22/锛?,
+    "settings.storage.subdir.mode": "鎸夊姛鑳斤紙outputs/photo_speak/锛?,
+    "settings.storage.subdir.dateMode": "鎸夋棩鏈?鍔熻兘锛坥utputs/2026-04-22/photo_speak/锛?,
+    "settings.storage.subdir.flat": "骞抽摵锛坥utputs/锛?,
+    "settings.storage.naming": "鏂囦欢鍛藉悕瑙勫垯",
+    "settings.storage.naming.filename": "{filename}锛圖ashScope 鍘熷鏂囦欢鍚嶏紝榛樿锛?,
     "settings.storage.naming.task": "{task_id}.{ext}",
     "settings.storage.naming.dateMode": "{date}_{mode}_{short_id}.{ext}",
     "settings.storage.naming.dateTime": "{date}_{time}_{short_id}.{ext}",
     "settings.storage.naming.modeShort": "{mode}_{short_id}.{ext}",
-    "settings.storage.naming.hint": "可用占位符：{task_id} {short_id} {date} {time} {datetime} {mode} {filename} {ext}",
-    "settings.storage.usage": "当前占用：{n}",
-    "settings.storage.retention": "保留天数",
-    "settings.storage.cleanup": "清理 {n} 天前的过期任务",
-    "settings.storage.cleanup.btn": "立即清理",
-    "settings.btn.browse": "浏览",
-    "settings.btn.open": "打开",
-    "settings.stats.dataDir": "数据目录",
-    "settings.stats.outputs": "成品 outputs",
-    "settings.stats.uploads": "原始素材 uploads",
-    "settings.stats.tasks": "任务缓存 tasks",
-    "settings.stats.fileCount": "{n} 个文件",
-    "settings.folder.openFailed": "打开文件夹失败：{msg}",
-    "settings.folder.savedTo": "已保存路径：{path}",
-    "picker.title": "选择文件夹",
-    "picker.crumb.root": "返回锚点",
-    "picker.shortcut.start": "起点",
-    "picker.loading": "加载中…",
-    "picker.empty": "此目录下没有子文件夹",
-    "picker.error.load": "加载失败：{msg}",
-    "picker.error.create": "创建失败：{msg}",
-    "picker.created": "已创建：{name}",
-    "picker.newFolder.placeholder": "输入新文件夹名…",
-    "picker.btn.cancel": "取消",
-    "picker.btn.choose": "选择此目录",
-    "picker.btn.newFolder": "新建文件夹",
-    "picker.btn.confirmCreate": "创建",
-    "settings.advanced.timeout": "DashScope 请求超时（秒）",
-    "settings.advanced.maxRetry": "最大重试次数",
-    "settings.about.version": "版本",
-    "settings.about.docs": "插件文档",
-    "settings.about.feedback": "反馈问题",
-    "settings.save": "保存设置",
-    "settings.save.ok": "设置已保存",
-    "cost.title": "费用预估",
-    "cost.col.item": "项目",
-    "cost.col.units": "用量",
-    "cost.col.unit": "单价",
-    "cost.col.subtotal": "小计",
-    "cost.total": "合计",
-    "cost.exceed.title": "费用超过确认阈值",
-    "cost.exceed.desc": "本次任务预估 {total}，已超过你设置的阈值 {threshold}。是否继续提交？",
-    "cost.exceed.confirm": "确认提交",
-    "cost.exceed.cancel": "再想想",
-    "started.title": "任务已提交",
-    "started.desc": "任务正在 DashScope 队列中处理，可在「任务」标签页查看进度。",
-    "started.gotoTasks": "查看任务",
-    "started.stay": "继续创建",
-    "common.confirm": "确定",
-    "common.cancel": "取消",
-    "common.delete": "删除",
-    "common.save": "保存",
-    "common.close": "关闭",
-    "common.refresh": "刷新",
-    "common.copy": "复制",
-    "common.upload": "上传",
-    "common.optional": "（可选）",
-    "common.required": "（必填）",
-    "err.network": "网络错误",
-    "err.timeout": "请求超时",
-    "err.rate_limit": "请求过于频繁",
-    "err.auth": "API Key 无效",
-    "err.not_found": "资源不存在",
-    "err.moderation": "内容审核未通过",
-    "err.quota": "余额不足或配额超限",
-    "err.dependency": "输入素材不符合要求",
-    "err.unknown": "未知错误",
-    "err.title": "插件渲染出错",
-    "err.retry": "重试",
-    "err.stackLabel": "技术细节（堆栈）",
+    "settings.storage.naming.hint": "鍙敤鍗犱綅绗︼細{task_id} {short_id} {date} {time} {datetime} {mode} {filename} {ext}",
+    "settings.storage.usage": "褰撳墠鍗犵敤锛歿n}",
+    "settings.storage.retention": "淇濈暀澶╂暟",
+    "settings.storage.cleanup": "娓呯悊 {n} 澶╁墠鐨勮繃鏈熶换鍔?,
+    "settings.storage.cleanup.btn": "绔嬪嵆娓呯悊",
+    "settings.btn.browse": "娴忚",
+    "settings.btn.open": "鎵撳紑",
+    "settings.stats.dataDir": "鏁版嵁鐩綍",
+    "settings.stats.outputs": "鎴愬搧 outputs",
+    "settings.stats.uploads": "鍘熷绱犳潗 uploads",
+    "settings.stats.tasks": "浠诲姟缂撳瓨 tasks",
+    "settings.stats.fileCount": "{n} 涓枃浠?,
+    "settings.folder.openFailed": "鎵撳紑鏂囦欢澶瑰け璐ワ細{msg}",
+    "settings.folder.savedTo": "宸蹭繚瀛樿矾寰勶細{path}",
+    "picker.title": "閫夋嫨鏂囦欢澶?,
+    "picker.crumb.root": "杩斿洖閿氱偣",
+    "picker.shortcut.start": "璧风偣",
+    "picker.loading": "鍔犺浇涓€?,
+    "picker.empty": "姝ょ洰褰曚笅娌℃湁瀛愭枃浠跺す",
+    "picker.error.load": "鍔犺浇澶辫触锛歿msg}",
+    "picker.error.create": "鍒涘缓澶辫触锛歿msg}",
+    "picker.created": "宸插垱寤猴細{name}",
+    "picker.newFolder.placeholder": "杈撳叆鏂版枃浠跺す鍚嶁€?,
+    "picker.btn.cancel": "鍙栨秷",
+    "picker.btn.choose": "閫夋嫨姝ょ洰褰?,
+    "picker.btn.newFolder": "鏂板缓鏂囦欢澶?,
+    "picker.btn.confirmCreate": "鍒涘缓",
+    "settings.advanced.timeout": "DashScope 璇锋眰瓒呮椂锛堢锛?,
+    "settings.advanced.maxRetry": "鏈€澶ч噸璇曟鏁?,
+    "settings.about.version": "鐗堟湰",
+    "settings.about.docs": "鎻掍欢鏂囨。",
+    "settings.about.feedback": "鍙嶉闂",
+    "settings.save": "淇濆瓨璁剧疆",
+    "settings.save.ok": "璁剧疆宸蹭繚瀛?,
+    "cost.title": "璐圭敤棰勪及",
+    "cost.col.item": "椤圭洰",
+    "cost.col.units": "鐢ㄩ噺",
+    "cost.col.unit": "鍗曚环",
+    "cost.col.subtotal": "灏忚",
+    "cost.total": "鍚堣",
+    "cost.exceed.title": "璐圭敤瓒呰繃纭闃堝€?,
+    "cost.exceed.desc": "鏈浠诲姟棰勪及 {total}锛屽凡瓒呰繃浣犺缃殑闃堝€?{threshold}銆傛槸鍚︾户缁彁浜わ紵",
+    "cost.exceed.confirm": "纭鎻愪氦",
+    "cost.exceed.cancel": "鍐嶆兂鎯?,
+    "started.title": "浠诲姟宸叉彁浜?,
+    "started.desc": "浠诲姟姝ｅ湪 DashScope 闃熷垪涓鐞嗭紝鍙湪銆屼换鍔°€嶆爣绛鹃〉鏌ョ湅杩涘害銆?,
+    "started.gotoTasks": "鏌ョ湅浠诲姟",
+    "started.stay": "缁х画鍒涘缓",
+    "common.confirm": "纭畾",
+    "common.cancel": "鍙栨秷",
+    "common.delete": "鍒犻櫎",
+    "common.save": "淇濆瓨",
+    "common.close": "鍏抽棴",
+    "common.refresh": "鍒锋柊",
+    "common.copy": "澶嶅埗",
+    "common.upload": "涓婁紶",
+    "common.optional": "锛堝彲閫夛級",
+    "common.required": "锛堝繀濉級",
+    "err.network": "缃戠粶閿欒",
+    "err.timeout": "璇锋眰瓒呮椂",
+    "err.rate_limit": "璇锋眰杩囦簬棰戠箒",
+    "err.auth": "API Key 鏃犳晥",
+    "err.not_found": "璧勬簮涓嶅瓨鍦?,
+    "err.moderation": "鍐呭瀹℃牳鏈€氳繃",
+    "err.quota": "浣欓涓嶈冻鎴栭厤棰濊秴闄?,
+    "err.dependency": "杈撳叆绱犳潗涓嶇鍚堣姹?,
+    "err.unknown": "鏈煡閿欒",
+    "err.title": "鎻掍欢娓叉煋鍑洪敊",
+    "err.retry": "閲嶈瘯",
+    "err.stackLabel": "鎶€鏈粏鑺傦紙鍫嗘爤锛?,
   },
   en: {
     "app.title": "Avatar Studio",
-    "app.subtitle": "DashScope · wan2.2-s2v / videoretalk / animate-mix / cosyvoice-v2",
+    "app.subtitle": "DashScope 路 wan2.2-s2v / videoretalk / animate-mix / cosyvoice-v2",
     "app.api.label": "API Key",
-    "app.api.tooltip": "DashScope API Key not configured — click to open Settings",
+    "app.api.tooltip": "DashScope API Key not configured 鈥?click to open Settings",
     "app.api.missing": "API Key missing",
     "tabs.create": "Create",
     "tabs.tasks": "Tasks",
@@ -1268,7 +1268,7 @@ const I18N_DICT = {
     "banner.noKey.desc": "Add your Bailian API Key under Settings before submitting tasks.",
     "banner.noKey.cta": "Open Settings",
     "create.mode.photo_speak": "Photo Speak",
-    "create.mode.photo_speak.desc": "1 portrait + text/audio → talking video",
+    "create.mode.photo_speak.desc": "1 portrait + text/audio 鈫?talking video",
     "create.mode.video_relip": "Video Re-lip",
     "create.mode.video_relip.desc": "Keep original motion, sync lips to new audio",
     "create.mode.video_reface": "Video Reface",
@@ -1288,7 +1288,7 @@ const I18N_DICT = {
     "create.assets.fromLib": "Pick from library",
     "create.assets.replace": "Replace",
     "create.assets.optional": "Optional",
-    "create.text.placeholder": "Type the speech text (CN/EN mixed OK, ≤ 1000 chars recommended)",
+    "create.text.placeholder": "Type the speech text (CN/EN mixed OK, 鈮?1000 chars recommended)",
     "create.text.voice": "Voice",
     "create.text.audioUpload": "Or upload an existing audio file (overrides TTS)",
     "create.text.charCount": "{n} chars",
@@ -1297,8 +1297,8 @@ const I18N_DICT = {
     "create.params.duration": "Duration (sec)",
     "create.params.durationHint": "Used to estimate cost when no audio is uploaded; otherwise audio length wins",
     "create.params.qualityMode": "Quality mode",
-    "create.params.qualityStd": "Standard (¥0.60 / sec)",
-    "create.params.qualityPro": "Pro (¥1.20 / sec, finer detail)",
+    "create.params.qualityStd": "Standard (楼0.60 / sec)",
+    "create.params.qualityPro": "Pro (楼1.20 / sec, finer detail)",
     "create.params.composeSize": "Compose size",
     "create.params.composeSizeAuto": "Match last reference image",
     "create.advanced.watermark": "Add DashScope watermark",
@@ -1344,19 +1344,19 @@ const I18N_DICT = {
     "voices.custom": "Custom voices",
     "voices.create": "Clone a new voice",
     "voices.create.label": "Voice label",
-    "voices.create.audio": "Reference audio (mp3/wav, 5–30s ideal)",
+    "voices.create.audio": "Reference audio (mp3/wav, 5鈥?0s ideal)",
     "voices.create.submit": "Submit clone",
-    "voices.empty.custom": "No custom voices yet — upload a sample to clone one",
+    "voices.empty.custom": "No custom voices yet 鈥?upload a sample to clone one",
     "voices.delete.confirm": "Delete this custom voice?",
     "voices.rename": "Rename",
     "voices.rename.empty": "Voice name can't be empty",
     "voices.rename.ok": "Voice renamed",
     "voices.rename.fail": "Rename failed",
     "voices.preview": "Preview",
-    "voices.preview.busy": "Synthesising…",
+    "voices.preview.busy": "Synthesising鈥?,
     "voices.preview.text": "Hello, welcome to Avatar Studio.",
     "voices.preview.fail": "Preview synth failed: {msg}",
-    "voices.preview.empty": "No sample yet — click Preview below.",
+    "voices.preview.empty": "No sample yet 鈥?click Preview below.",
     "voices.preview.needKey": "Configure a DashScope API Key in Settings before previewing.",
     "voices.source.title": "Where these come from",
     "voices.source.body": "The system voices below are the official cosyvoice-v2 catalog from Aliyun Bailian. The Chinese labels and style descriptions match the official catalog; the actual identifier sent to the API is the longxxxxxx_v2 string shown on each card.",
@@ -1369,8 +1369,8 @@ const I18N_DICT = {
     "create.modelInfo.input": "Inputs",
     "create.modelInfo.notes": "Notes",
     "create.modelInfo.availability": "Availability",
-    "create.modelInfo.availability.value": "Public Bailian model — open the Model Marketplace in the console to enable it for your account, otherwise calls return 403.",
-    "create.modelInfo.availability.console": "Open Bailian console · Model Marketplace",
+    "create.modelInfo.availability.value": "Public Bailian model 鈥?open the Model Marketplace in the console to enable it for your account, otherwise calls return 403.",
+    "create.modelInfo.availability.console": "Open Bailian console 路 Model Marketplace",
     "create.modelInfo.availability.docs": "Bailian platform docs",
     "tasks.filter.status": "Status",
     "tasks.filter.mode": "Mode",
@@ -1382,7 +1382,7 @@ const I18N_DICT = {
     "tasks.detail.mode": "Mode",
     "tasks.detail.model": "Model",
     "tasks.detail.createdAt": "Created",
-    "tasks.detail.runningHint": "DashScope is generating — track live progress in the Tasks tab.",
+    "tasks.detail.runningHint": "DashScope is generating 鈥?track live progress in the Tasks tab.",
     "tasks.detail.completedNoOutput": "Completed but no output file was returned",
     "tasks.detail.failedTitle": "Task failed",
     "tasks.detail.recheck": "Re-query",
@@ -1409,13 +1409,13 @@ const I18N_DICT = {
     "figures.upload.label": "Figure label",
     "figures.upload.image": "Portrait (png/jpg, frontal single person)",
     "figures.upload.submit": "Upload & pre-check",
-    "figures.empty": "Figure library is empty — add a frontal portrait to start",
-    "figures.detect.pending": "Pre-checking…",
+    "figures.empty": "Figure library is empty 鈥?add a frontal portrait to start",
+    "figures.detect.pending": "Pre-checking鈥?,
     "figures.detect.pass": "Ready",
     "figures.detect.fail": "Pre-check failed",
     "figures.detect.skipped": "Not pre-checked",
     "figures.detect.hint": "Use a clear frontal photo, no watermark, no occlusion",
-    "figures.detect.pendingHint": "Calling wan2.2-s2v-detect (~5–30s). Hit the trash icon to abort & delete.",
+    "figures.detect.pendingHint": "Calling wan2.2-s2v-detect (~5鈥?0s). Hit the trash icon to abort & delete.",
     "figures.detect.failHint": "DashScope rejected the image. Usual causes: not a real human / not frontal / multiple faces / watermark. Delete and re-upload a fresh photo.",
     "figures.detect.skippedHint": "API Key was missing when this was uploaded. Configure it, then delete & re-upload.",
     "figures.delete.confirm": "Delete this figure?",
@@ -1432,12 +1432,12 @@ const I18N_DICT = {
     "settings.api.region": "Region",
     "settings.api.region.bj": "Beijing (default)",
     "settings.api.region.sg": "Singapore",
-    "settings.api.region.hint": "Mainland Aliyun Bailian users should keep \"Beijing\". Switch to \"Singapore\" only if your account is on alibabacloud.com (international site) or your deployment is outside mainland China — the two endpoints have separate account systems and a Bailian key will 401 against the Singapore endpoint.",
+    "settings.api.region.hint": "Mainland Aliyun Bailian users should keep \"Beijing\". Switch to \"Singapore\" only if your account is on alibabacloud.com (international site) or your deployment is outside mainland China 鈥?the two endpoints have separate account systems and a Bailian key will 401 against the Singapore endpoint.",
     "settings.api.advanced": "Advanced (region / model availability)",
     "settings.api.probe.title": "Model availability check",
-    "settings.api.probe.desc": "Probe every model your current key needs. We never create a real task or incur charges — the backend sends a deliberately empty request and reads HTTP status: 400 → available, 401/403 → not authorised, 404 → not available in this region. cosyvoice-v2 is WebSocket-only and cannot be HTTP-probed; if your key passes auth we mark it available (≈) and ask you to verify with 试听.",
+    "settings.api.probe.desc": "Probe every model your current key needs. We never create a real task or incur charges 鈥?the backend sends a deliberately empty request and reads HTTP status: 400 鈫?available, 401/403 鈫?not authorised, 404 鈫?not available in this region. cosyvoice-v2 is WebSocket-only and cannot be HTTP-probed; if your key passes auth we mark it available (鈮? and ask you to verify with 璇曞惉.",
     "settings.api.probe.btn": "Run check",
-    "settings.api.probe.btn.busy": "Probing…",
+    "settings.api.probe.btn.busy": "Probing鈥?,
     "settings.api.probe.never": "Not checked yet",
     "settings.api.probe.col.mode": "Feature",
     "settings.api.probe.col.models": "Required models",
@@ -1448,13 +1448,13 @@ const I18N_DICT = {
     "settings.api.probe.openConsole": "Open Bailian model marketplace",
     "settings.defaults.resolution": "Default resolution",
     "settings.defaults.voice": "Default voice",
-    "settings.defaults.threshold": "Cost confirm threshold (¥)",
+    "settings.defaults.threshold": "Cost confirm threshold (楼)",
     "settings.defaults.thresholdHint": "Show a confirmation modal when a single task exceeds this amount",
     "settings.storage.dir": "Data directory",
     "settings.storage.dir.placeholder": "Leave empty to use the default (managed by Synapse)",
     "settings.storage.dir.hint": "Useful when you want to point at a larger drive or a shared folder. Absolute paths only.",
     "settings.storage.dir.active": "In use:",
-    "settings.storage.dir.pending": "Saved — reload the plugin for the new path to take effect.",
+    "settings.storage.dir.pending": "Saved 鈥?reload the plugin for the new path to take effect.",
     "settings.storage.dir.reset": "Reset to default",
     "settings.storage.dir.browse": "Browse",
     "settings.storage.dir.open": "Open",
@@ -1488,12 +1488,12 @@ const I18N_DICT = {
     "picker.title": "Pick a folder",
     "picker.crumb.root": "Back to anchors",
     "picker.shortcut.start": "Start",
-    "picker.loading": "Loading…",
+    "picker.loading": "Loading鈥?,
     "picker.empty": "No subfolders here",
     "picker.error.load": "Load failed: {msg}",
     "picker.error.create": "Create failed: {msg}",
     "picker.created": "Created: {name}",
-    "picker.newFolder.placeholder": "New folder name…",
+    "picker.newFolder.placeholder": "New folder name鈥?,
     "picker.btn.cancel": "Cancel",
     "picker.btn.choose": "Choose this folder",
     "picker.btn.newFolder": "New folder",
@@ -1572,7 +1572,7 @@ const _i18n = (function () {
 function useT() { return _i18n.t.bind(_i18n); }
 function _tr(k, vars) { return _i18n.t(k, vars); }
 
-/* ─── Misc helpers ─────────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ Misc helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function formatBytes(n) {
   if (!n || n < 0) return "0 B";
   const u = ["B", "KB", "MB", "GB"]; let i = 0; let v = n;
@@ -1580,12 +1580,12 @@ function formatBytes(n) {
   return v.toFixed(v >= 10 || i === 0 ? 0 : 1) + " " + u[i];
 }
 function formatDuration(s) {
-  if (s == null) return "—";
+  if (s == null) return "鈥?;
   const m = Math.floor(s / 60); const r = Math.round(s % 60);
   return m > 0 ? m + "m" + r + "s" : r + "s";
 }
 function formatTime(ts) {
-  if (!ts) return "—";
+  if (!ts) return "鈥?;
   const d = new Date(ts * 1000);
   const pad = function (n) { return n < 10 ? "0" + n : "" + n; };
   return d.getMonth() + 1 + "/" + d.getDate() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
@@ -1618,7 +1618,7 @@ function useDraft(key, initial) {
   return [v, setV, function () { clearDraft(key); setV(initial); }];
 }
 
-/* ─── Tiny <Ico> component ────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ Tiny <Ico> component 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 const ICONS = {
   bomb: '<g fill="none"><path stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M10 16h2"/><path fill="currentColor" d="M14 12.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5s.448-1.5 1-1.5s1 .672 1 1.5"/><ellipse cx="9" cy="12.5" fill="currentColor" rx="1" ry="1.5"/><path stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="m17 7l-2 2"/><path stroke="currentColor" stroke-width="1.5" d="M17.981 2.353a.558.558 0 0 1 1.038 0l.654 1.66c.057.143.17.257.315.314l1.659.654c.47.186.47.852 0 1.038l-1.66.654a.56.56 0 0 0-.314.315l-.654 1.659a.558.558 0 0 1-1.038 0l-.654-1.66a.56.56 0 0 0-.315-.314l-1.659-.654a.558.558 0 0 1 0-1.038l1.66-.654a.56.56 0 0 0 .314-.315z"/><path stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M5.75 8.003a7.5 7.5 0 1 1-2.747 2.747"/></g>',
   video: '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
@@ -1661,7 +1661,7 @@ function Ico(props) {
   );
 }
 
-/* ─── Common UI atoms ─────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ Common UI atoms 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function Switch({ on, onChange, disabled }) {
   return (
     <span className={"switch " + (on ? "on" : "")}
@@ -1698,9 +1698,9 @@ function StatusBadge({ status }) {
     succeeded: { cls: "badge-done", label: t("tasks.filter.done") },
     failed: { cls: "badge-failed", label: t("tasks.filter.failed") },
     cancelled: { cls: "badge-cancelled", label: t("tasks.filter.cancelled") },
-    approval_required: { cls: "badge-approval", label: "待确认" },
+    approval_required: { cls: "badge-approval", label: "寰呯‘璁? },
   };
-  const m = map[status] || { cls: "badge-pending", label: status || "—" };
+  const m = map[status] || { cls: "badge-pending", label: status || "鈥? };
   return <span className={"badge " + m.cls}>{m.label}</span>;
 }
 
@@ -1751,14 +1751,14 @@ function CostBreakdown({ items, total, formattedTotal }) {
                   {it.note && <div className="text-xs text-dim">{it.note}</div>}
                 </td>
                 <td>{it.units}</td>
-                <td>¥{Number(it.unit_price).toFixed(4)}</td>
-                <td>¥{Number(it.subtotal).toFixed(4)}</td>
+                <td>楼{Number(it.unit_price).toFixed(4)}</td>
+                <td>楼{Number(it.subtotal).toFixed(4)}</td>
               </tr>
             );
           })}
           <tr className="total">
             <td colSpan="3">{t("cost.total")}</td>
-            <td>{formattedTotal || "¥" + Number(total || 0).toFixed(2)}</td>
+            <td>{formattedTotal || "楼" + Number(total || 0).toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
@@ -1776,8 +1776,8 @@ function CostExceedModal({ preview, threshold, onConfirm, onCancel }) {
         <div className="modal-title">{t("cost.exceed.title")}</div>
         <div className="modal-desc">
           {t("cost.exceed.desc", {
-            total: preview.formatted_total || "¥" + Number(preview.total || 0).toFixed(2),
-            threshold: "¥" + Number(threshold || 0).toFixed(2),
+            total: preview.formatted_total || "楼" + Number(preview.total || 0).toFixed(2),
+            threshold: "楼" + Number(threshold || 0).toFixed(2),
           })}
         </div>
         <CostBreakdown items={preview.items} total={preview.total} formattedTotal={preview.formatted_total} />
@@ -1791,7 +1791,7 @@ function CostExceedModal({ preview, threshold, onConfirm, onCancel }) {
   );
 }
 
-/* ─── FolderPickerModal ───────────────────────────────────────────
+/* 鈹€鈹€鈹€ FolderPickerModal 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
  * In-plugin folder browser, ported from plugins/seedance-video. Uses
  * GET /storage/list-dir and POST /storage/mkdir so we don't depend on
  * Tauri's native folder dialog (which has been unreliable across
@@ -1946,7 +1946,7 @@ function FolderPickerModal({ open, title, initialPath, onCancel, onSelect }) {
             {loading && <div className="folder-picker__empty">{t("picker.loading")}</div>}
             {!loading && !isAnchor && parent != null && (
               <div className="folder-picker__item" onClick={function () { handleNavigate(parent); }}>
-                <span className="folder-picker__item-icon">↰</span>
+                <span className="folder-picker__item-icon">鈫?/span>
                 <span className="folder-picker__item-name">..</span>
               </div>
             )}
@@ -2029,7 +2029,7 @@ function TaskStartedModal({ taskId, onGotoTasks, onClose }) {
   );
 }
 
-/* ─── File upload zone ────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ File upload zone 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function FileUploadZone({ accept, multiple, onUploaded, value, max, kind, hint }) {
   const t = useT();
   const inputRef = useRef(null);
@@ -2041,7 +2041,7 @@ function FileUploadZone({ accept, multiple, onUploaded, value, max, kind, hint }
     if (!files || !files.length) return;
     const list = Array.from(files);
     if (max && items.length + list.length > max) {
-      showToast("最多 " + max + " 个文件", "error");
+      showToast("鏈€澶?" + max + " 涓枃浠?, "error");
       return;
     }
     setBusy(true); setProgress(0);
@@ -2053,15 +2053,15 @@ function FileUploadZone({ accept, multiple, onUploaded, value, max, kind, hint }
           // Local file persisted OK but OSS push failed (e.g. invalid
           // bucket name, expired key). Keep the preview so the user
           // sees their image but warn loudly so they don't think they
-          // can submit a task — the s2v call would fail with the same
+          // can submit a task 鈥?the s2v call would fail with the same
           // OSS misconfig 5 s later.
           if (r.oss_error) {
-            showToast("OSS 上传失败：" + r.oss_error, "error");
+            showToast("OSS 涓婁紶澶辫触锛? + r.oss_error, "error");
           }
           results.push(r);
         }
-        else { showToast("上传失败：" + (r && r.error || "unknown"), "error"); }
-      } catch (e) { showToast("上传失败：" + e, "error"); }
+        else { showToast("涓婁紶澶辫触锛? + (r && r.error || "unknown"), "error"); }
+      } catch (e) { showToast("涓婁紶澶辫触锛? + e, "error"); }
       setProgress(Math.round(((i + 1) / list.length) * 100));
     }
     setBusy(false); setProgress(0);
@@ -2108,7 +2108,7 @@ function FileUploadZone({ accept, multiple, onUploaded, value, max, kind, hint }
                   {items[0].filename || items[0].name || "audio file"}
                 </div>
                 <div className="upload-zone__audio-sub">
-                  {[items[0].mime || "audio", fmtSize(items[0].size)].filter(Boolean).join(" · ")}
+                  {[items[0].mime || "audio", fmtSize(items[0].size)].filter(Boolean).join(" 路 ")}
                 </div>
                 {previewSrc(items[0]) && (
                   <audio src={previewSrc(items[0])} controls preload="metadata" />
@@ -2173,7 +2173,7 @@ function FileUploadZone({ accept, multiple, onUploaded, value, max, kind, hint }
   );
 }
 
-/* ─── Business hooks ─────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ Business hooks 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function useCatalog() {
   const [cat, setCat] = useState(null);
   useEffect(function () {
@@ -2199,7 +2199,7 @@ function useSettings() {
     if (r.ok) {
       // PUT /settings returns the *full* config (including derived
       // fields like ``oss_configured`` / ``oss_status_message``), so
-      // prefer the server's shape over a local merge — otherwise the
+      // prefer the server's shape over a local merge 鈥?otherwise the
       // OSS banner can't react to the bucket name we just typed
       // (Object.assign would overwrite ``oss_configured`` with stale
       // truthiness from the previous successful save).
@@ -2207,7 +2207,7 @@ function useSettings() {
       setS(fresh ? Object.assign({}, s, fresh) : Object.assign({}, s, patch));
       showToast(_tr("settings.save.ok"));
     }
-    else { showToast("保存失败", "error"); }
+    else { showToast("淇濆瓨澶辫触", "error"); }
     return r;
   }, [s]);
   return { settings: s, loaded, refresh, save };
@@ -2276,10 +2276,10 @@ function useVoices() {
       }
       if (await loadCatalogFallback()) return;
       setVoices([]);
-      if (!r.ok) setError((r.body && (r.body.message || r.body.detail)) || "音色接口暂不可用");
+      if (!r.ok) setError((r.body && (r.body.message || r.body.detail)) || "闊宠壊鎺ュ彛鏆備笉鍙敤");
     } catch (e) {
       const ok = await loadCatalogFallback().catch(function () { return false; });
-      if (!ok) setError((e && e.message) || String(e) || "音色接口暂不可用");
+      if (!ok) setError((e && e.message) || String(e) || "闊宠壊鎺ュ彛鏆備笉鍙敤");
     }
   }, [loadCatalogFallback]);
   useEffect(function () { refresh(); }, [refresh]);
@@ -2293,7 +2293,7 @@ function useFigures() {
     if (r.ok && r.body && Array.isArray(r.body.figures)) setFigures(r.body.figures);
   }, []);
   // Local-only removal so the FiguresTab can drop a card the moment the
-  // user confirms 删除, even though the backend DELETE is still in
+  // user confirms 鍒犻櫎, even though the backend DELETE is still in
   // flight (it has to fire-and-forget cancel the in-progress detect
   // probe, which can take a couple of seconds in the worst case). The
   // next refresh() will reconcile if anything went wrong server-side.
@@ -2304,8 +2304,8 @@ function useFigures() {
   }, []);
   useEffect(function () { refresh(); }, [refresh]);
   // Auto-poll while any figure is still in pre-check. We use detect_status
-  // (the new server field) and keep a 4s cadence — fast enough that the
-  // Library card flips to 「可用」/「预检未通过」 within a heartbeat of
+  // (the new server field) and keep a 4s cadence 鈥?fast enough that the
+  // Library card flips to 銆屽彲鐢ㄣ€?銆岄妫€鏈€氳繃銆?within a heartbeat of
   // the wan2.2-s2v-detect call returning, slow enough to not hammer the
   // backend if the user keeps the tab open. The interval is torn down the
   // instant nothing's pending, so steady-state cost is zero.
@@ -2318,7 +2318,7 @@ function useFigures() {
   return { figures, refresh, removeOptimistic };
 }
 
-/* ─── CreateTab ───────────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ CreateTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 // All resolutions DashScope can hand back; per-mode subsets live in
 // MODE_DEFS[*].resolutions so we never present a value the backing model
 // will reject. Keep this list flat for the SettingsTab default picker.
@@ -2327,67 +2327,67 @@ const ASPECTS = ["1:1", "9:16", "16:9", "3:4", "4:3"];
 
 // Per-mode capability matrix. The `model`, `price`, `resolutions`,
 // `maxDuration`, `inputs`, `notes` fields drive the in-place
-// "模型与计费" panel inside CreateTab so users can see exactly which
+// "妯″瀷涓庤璐? panel inside CreateTab so users can see exactly which
 // DashScope endpoint is wired up and what its hard limits are. Numbers
-// here mirror avatar_models.py's pricing constants — keep both in sync.
+// here mirror avatar_models.py's pricing constants 鈥?keep both in sync.
 const MODE_DEFS = [
   {
     id: "photo_speak", icon: "user",
     needsImage: true, needsVideo: false, needsTts: true,
     needsRefImage: false, needsCompose: false,
     model: "wan2.2-s2v + wan2.2-s2v-detect",
-    price: "¥0.60/s（标准）",
+    price: "楼0.60/s锛堟爣鍑嗭級",
     resolutions: ["480P", "720P"],
-    maxDuration: "音频 ≤ 20s",
+    maxDuration: "闊抽 鈮?20s",
     audioMinSec: 0.5, audioMaxSec: 19.5,
-    inputs: "1 张正面证件照（≥ 512px）+ 文本/音频",
-    notes: "需要先做人脸预检（s2v-detect）。1080P 暂不支持。音频时长由 wan2.2-s2v 限制为 20 秒以内。",
+    inputs: "1 寮犳闈㈣瘉浠剁収锛堚墺 512px锛? 鏂囨湰/闊抽",
+    notes: "闇€瑕佸厛鍋氫汉鑴搁妫€锛坰2v-detect锛夈€?080P 鏆備笉鏀寔銆傞煶棰戞椂闀跨敱 wan2.2-s2v 闄愬埗涓?20 绉掍互鍐呫€?,
   },
   {
     id: "video_relip", icon: "film",
     needsImage: false, needsVideo: true, needsTts: true,
     needsRefImage: false, needsCompose: false,
     model: "videoretalk",
-    price: "¥0.40/s",
-    resolutions: ["原视频分辨率"],
-    maxDuration: "音频/视频 2-120s",
+    price: "楼0.40/s",
+    resolutions: ["鍘熻棰戝垎杈ㄧ巼"],
+    maxDuration: "闊抽/瑙嗛 2-120s",
     audioMinSec: 2.0, audioMaxSec: 120.0,
-    inputs: "原视频（人物正脸时长 ≥ 60%）+ 新音频/文本",
-    notes: "保留原视频画面与动作，仅替换嘴型；输出与输入同分辨率。音频与视频时长须在 2~120 秒之间。",
+    inputs: "鍘熻棰戯紙浜虹墿姝ｈ劯鏃堕暱 鈮?60%锛? 鏂伴煶棰?鏂囨湰",
+    notes: "淇濈暀鍘熻棰戠敾闈笌鍔ㄤ綔锛屼粎鏇挎崲鍢村瀷锛涜緭鍑轰笌杈撳叆鍚屽垎杈ㄧ巼銆傞煶棰戜笌瑙嗛鏃堕暱椤诲湪 2~120 绉掍箣闂淬€?,
   },
   {
     id: "video_reface", icon: "swap",
     needsImage: false, needsVideo: true, needsTts: false,
     needsRefImage: true, needsCompose: false,
-    model: "wan2.2-animate-mix（std / pro 双档）",
-    price: "¥0.60/s（std） · ¥1.20/s（pro）",
+    model: "wan2.2-animate-mix锛坰td / pro 鍙屾。锛?,
+    price: "楼0.60/s锛坰td锛?路 楼1.20/s锛坧ro锛?,
     resolutions: ["480P", "720P", "1080P"],
-    maxDuration: "≤ 30s",
-    inputs: "≤ 30s 动作视频 + 1 张新人物正面照",
-    notes: "保留场景与肢体动作，替换主角面部与发型；商用建议 pro 档。",
+    maxDuration: "鈮?30s",
+    inputs: "鈮?30s 鍔ㄤ綔瑙嗛 + 1 寮犳柊浜虹墿姝ｉ潰鐓?,
+    notes: "淇濈暀鍦烘櫙涓庤偄浣撳姩浣滐紝鏇挎崲涓昏闈㈤儴涓庡彂鍨嬶紱鍟嗙敤寤鸿 pro 妗ｃ€?,
   },
   {
     id: "avatar_compose", icon: "layers",
     needsImage: false, needsVideo: false, needsTts: true,
     needsRefImage: false, needsCompose: true,
-    model: "wan2.5-i2i-preview → wan2.2-s2v",
-    price: "¥0.20/张（合成） + ¥0.60/s（口播）",
+    model: "wan2.5-i2i-preview 鈫?wan2.2-s2v",
+    price: "楼0.20/寮狅紙鍚堟垚锛?+ 楼0.60/s锛堝彛鎾級",
     resolutions: ["480P", "720P"],
-    maxDuration: "音频 ≤ 20s",
+    maxDuration: "闊抽 鈮?20s",
     audioMinSec: 0.5, audioMaxSec: 19.5,
-    inputs: "1-3 张参考图 + 中文融合 prompt + 文本/音频",
-    notes: "qwen-vl-max 可代写 prompt；融合后才进入口播管线。口播阶段由 wan2.2-s2v 限制音频 ≤ 20s。",
+    inputs: "1-3 寮犲弬鑰冨浘 + 涓枃铻嶅悎 prompt + 鏂囨湰/闊抽",
+    notes: "qwen-vl-max 鍙唬鍐?prompt锛涜瀺鍚堝悗鎵嶈繘鍏ュ彛鎾绾裤€傚彛鎾樁娈电敱 wan2.2-s2v 闄愬埗闊抽 鈮?20s銆?,
   },
   {
     id: "pose_drive", icon: "walk",
     needsImage: true, needsVideo: true, needsTts: false,
     needsRefImage: false, needsCompose: false,
-    model: "wan2.2-animate-move（std / pro 双档）",
-    price: "¥0.40/s（std） · ¥0.60/s（pro）",
+    model: "wan2.2-animate-move锛坰td / pro 鍙屾。锛?,
+    price: "楼0.40/s锛坰td锛?路 楼0.60/s锛坧ro锛?,
     resolutions: ["720P", "1080P"],
-    maxDuration: "≤ 30s",
-    inputs: "1 张正面人像照 + ≤ 30s 参考动作视频",
-    notes: "将视频中的动作/表情迁移到图片人物上；支持北京+新加坡地域。",
+    maxDuration: "鈮?30s",
+    inputs: "1 寮犳闈汉鍍忕収 + 鈮?30s 鍙傝€冨姩浣滆棰?,
+    notes: "灏嗚棰戜腑鐨勫姩浣?琛ㄦ儏杩佺Щ鍒板浘鐗囦汉鐗╀笂锛涙敮鎸佸寳浜?鏂板姞鍧″湴鍩熴€?,
   },
 ];
 
@@ -2414,16 +2414,16 @@ function ModeChips({ active, onChange }) {
 
 function BackendSelector({ active, onChange, settings }) {
   var backends = [
-    { id: "dashscope", label: "阿里云 DashScope",
+    { id: "dashscope", label: "闃块噷浜?DashScope",
       configured: !!(settings.api_key || settings.has_api_key), icon: "cloud" },
     { id: "runninghub", label: "RunningHub",
       configured: !!settings.rh_configured, icon: "server" },
-    { id: "comfyui_local", label: "本地 ComfyUI",
+    { id: "comfyui_local", label: "鏈湴 ComfyUI",
       configured: !!settings.comfyui_configured, icon: "cpu" },
   ];
   return (
     <div style={{marginBottom: 8}}>
-      <div className="label" style={{marginBottom: 4}}>选择后端</div>
+      <div className="label" style={{marginBottom: 4}}>閫夋嫨鍚庣</div>
       <div className="mode-group">
         {backends.map(function (b) {
           var isActive = active === b.id;
@@ -2464,12 +2464,12 @@ function ModelInfoCard({ mode, backend, settings }) {
     return (
       <div className="card" style={{background: "rgba(37,99,235,.04)", borderColor: "rgba(37,99,235,.25)"}}>
         <div className="label" style={{marginBottom: 6}}>
-          <Ico name="info"/>RunningHub 信息
+          <Ico name="info"/>RunningHub 淇℃伅
         </div>
-        <Row label="后端" value="RunningHub" />
-        <Row label="Workflow ID" value={presetId || "未预设 — 请在设置中配置"} />
-        <Row label="计费" value="按 RunningHub 实际用量扣费" />
-        <Row label="输入" value={md.inputs} />
+        <Row label="鍚庣" value="RunningHub" />
+        <Row label="Workflow ID" value={presetId || "鏈璁?鈥?璇峰湪璁剧疆涓厤缃?} />
+        <Row label="璁¤垂" value="鎸?RunningHub 瀹為檯鐢ㄩ噺鎵ｈ垂" />
+        <Row label="杈撳叆" value={md.inputs} />
       </div>
     );
   }
@@ -2479,12 +2479,12 @@ function ModelInfoCard({ mode, backend, settings }) {
     return (
       <div className="card" style={{background: "rgba(37,99,235,.04)", borderColor: "rgba(37,99,235,.25)"}}>
         <div className="label" style={{marginBottom: 6}}>
-          <Ico name="info"/>本地 ComfyUI 信息
+          <Ico name="info"/>鏈湴 ComfyUI 淇℃伅
         </div>
-        <Row label="后端" value="本地 ComfyUI" />
-        <Row label="Workflow" value={presetId2 || "未预设 — 请在设置中配置"} />
-        <Row label="计费" value="本地推理，无云端费用" />
-        <Row label="输入" value={md.inputs} />
+        <Row label="鍚庣" value="鏈湴 ComfyUI" />
+        <Row label="Workflow" value={presetId2 || "鏈璁?鈥?璇峰湪璁剧疆涓厤缃?} />
+        <Row label="璁¤垂" value="鏈湴鎺ㄧ悊锛屾棤浜戠璐圭敤" />
+        <Row label="杈撳叆" value={md.inputs} />
       </div>
     );
   }
@@ -2538,7 +2538,7 @@ function VoicePicker({ voices, edgeVoices, ttsEngine, value, onChange }) {
     return (
       <select className="input select" value={eEff}
               onChange={function (e) { onChange(e.target.value); }}>
-        <optgroup label="Edge-TTS 音色">
+        <optgroup label="Edge-TTS 闊宠壊">
           {edgeVoices.map(function (v) {
             return <option key={v.id} value={v.id}>{v.label}</option>;
           })}
@@ -2648,7 +2648,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
   const [aiBusy, setAiBusy] = useState(false);
   // Real audio duration (seconds) for the user-uploaded audio file.
   // Measured via the browser's <audio> element so we can validate
-  // against the per-mode cap (wan2.2-s2v ≤ 20s) BEFORE the user pays
+  // against the per-mode cap (wan2.2-s2v 鈮?20s) BEFORE the user pays
   // for face-detect / i2i / TTS.
   const [audioFileDuration, setAudioFileDuration] = useState(null);
 
@@ -2681,7 +2681,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
 
   // Estimated TTS duration from text (rough heuristic: cosyvoice ~3.5
   // Chinese chars/sec at default speed; English drops to ~5 chars/sec
-  // but we keep one number — being slightly conservative is safer for
+  // but we keep one number 鈥?being slightly conservative is safer for
   // a 20s hard cap than missing it).
   const estimateTtsDuration = function (text) {
     if (!text) return 0;
@@ -2697,7 +2697,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
     return null;
   })();
 
-  // Static caps from MODE_DEFS — only apply to TTS-bearing modes.
+  // Static caps from MODE_DEFS 鈥?only apply to TTS-bearing modes.
   const audioCap = (md.audioMaxSec && md.needsTts) ? md.audioMaxSec : null;
   const audioFloor = (md.audioMinSec && md.needsTts) ? md.audioMinSec : null;
   const audioOverLimit = audioCap && effectiveAudioDuration && effectiveAudioDuration > audioCap;
@@ -2710,7 +2710,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
   //   - FigurePicker now stores `oss_url` separately so we never
   //     accidentally feed DashScope a local /api/... URL.
   // Order: oss_url > url > preview_url (preview_url is local-only so
-  // it should *never* end up in `assets` — backend rejects it with a
+  // it should *never* end up in `assets` 鈥?backend rejects it with a
   // clear "configure OSS" error if it ever does).
   const pickAssetUrl = function (it) {
     if (!it) return "";
@@ -2727,7 +2727,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
     }
     if (form.audio) assets.audio_url = pickAssetUrl(form.audio);
     // ``figure_id`` is the canonical way to reference a previously
-    // pre-checked library figure — backend resolves it to the
+    // pre-checked library figure 鈥?backend resolves it to the
     // persisted OSS URL so the UI doesn't have to know about OSS for
     // this case (matches FigurePicker's onPick contract).
     const figureId = (form.image && form.image.figure_id)
@@ -2770,29 +2770,29 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
 
   const submit = useCallback(async function () {
     if (backend === "dashscope" && !(settings.api_key || settings.has_api_key)) {
-      showToast("请先配置 DashScope API Key", "error"); return;
+      showToast("璇峰厛閰嶇疆 DashScope API Key", "error"); return;
     }
     if (backend === "runninghub" && !settings.rh_configured) {
-      showToast("请先配置 RunningHub API Key", "error"); return;
+      showToast("璇峰厛閰嶇疆 RunningHub API Key", "error"); return;
     }
     if (backend === "comfyui_local" && !settings.comfyui_configured) {
-      showToast("请先配置 ComfyUI 地址", "error"); return;
+      showToast("璇峰厛閰嶇疆 ComfyUI 鍦板潃", "error"); return;
     }
-    // Hard audio-duration check — block submission rather than burn
+    // Hard audio-duration check 鈥?block submission rather than burn
     // money on TTS + face-detect just to fail at video synth.
     if (audioOverLimit) {
       showToast(
-        "音频时长 " + effectiveAudioDuration.toFixed(1) + "s 超过 "
-        + audioCap + "s 上限（" + (md.model || "video synth") + " 限制），"
-        + "请缩短台词或截短音频。",
+        "闊抽鏃堕暱 " + effectiveAudioDuration.toFixed(1) + "s 瓒呰繃 "
+        + audioCap + "s 涓婇檺锛? + (md.model || "video synth") + " 闄愬埗锛夛紝"
+        + "璇风缉鐭彴璇嶆垨鎴煭闊抽銆?,
         "error",
       );
       return;
     }
     if (audioUnderLimit) {
       showToast(
-        "上传的音频时长仅 " + audioFileDuration.toFixed(1) + "s，"
-        + "低于 " + audioFloor + "s 下限，请上传更长的音频。",
+        "涓婁紶鐨勯煶棰戞椂闀夸粎 " + audioFileDuration.toFixed(1) + "s锛?
+        + "浣庝簬 " + audioFloor + "s 涓嬮檺锛岃涓婁紶鏇撮暱鐨勯煶棰戙€?,
         "error",
       );
       return;
@@ -2801,13 +2801,13 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
     if (backend !== "dashscope" && !payload.workflow_id) {
       var presetKey = (backend === "runninghub" ? "rh_wf_" : "comfyui_wf_") + mode;
       if (!(settings && settings[presetKey])) {
-        showToast("请在设置中预设或手动填写 workflow_id", "error"); return;
+        showToast("璇峰湪璁剧疆涓璁炬垨鎵嬪姩濉啓 workflow_id", "error"); return;
       }
     }
     setSubmitting(true);
     try {
       const cp = await pluginApi("POST", "/cost-preview", payload);
-      if (!cp.ok) { showToast("估价失败：" + (cp.body && cp.body.message || ""), "error"); return; }
+      if (!cp.ok) { showToast("浼颁环澶辫触锛? + (cp.body && cp.body.message || ""), "error"); return; }
       const preview = (cp.body && cp.body.preview) || cp.body || {};
       const threshold = Number(settings.cost_threshold_cny || settings.cost_threshold || 5);
       if (preview.total > threshold) {
@@ -2825,7 +2825,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
       const r = await pluginApi("POST", "/tasks", payload);
       if (!r.ok) {
         showToast(
-          (r.body && r.body.message) || (r.body && r.body.code) || "提交失败",
+          (r.body && r.body.message) || (r.body && r.body.code) || "鎻愪氦澶辫触",
           "error",
         );
         return;
@@ -2844,7 +2844,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
 
   const aiWritePrompt = useCallback(async function () {
     if (!form.composeImages || form.composeImages.length === 0) {
-      showToast("请先上传至少一张参考图", "warn");
+      showToast("璇峰厛涓婁紶鑷冲皯涓€寮犲弬鑰冨浘", "warn");
       return;
     }
     setAiBusy(true);
@@ -2855,9 +2855,9 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
       if (r.ok && r.body && r.body.prompt) {
         update("compose_prompt", r.body.prompt);
       } else {
-        showToast("生成失败，请手动输入 prompt", "warn");
+        showToast("鐢熸垚澶辫触锛岃鎵嬪姩杈撳叆 prompt", "warn");
       }
-    } catch (e) { showToast("生成失败：" + e, "error"); }
+    } catch (e) { showToast("鐢熸垚澶辫触锛? + e, "error"); }
     finally { setAiBusy(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.composeImages]);
@@ -2884,12 +2884,12 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                     onChange={function (e) { update("workflow_id", e.target.value); }}>
                     {presetWfId
                       ? <option value={presetWfId}>{presetWfId}</option>
-                      : <option value="">{"未预设 \u2014 请在设置中配置"}</option>
+                      : <option value="">{"鏈璁?\u2014 璇峰湪璁剧疆涓厤缃?}</option>
                     }
-                    <option value="__custom__">{"自定义填写..."}</option>
+                    <option value="__custom__">{"鑷畾涔夊～鍐?.."}</option>
                   </select>
                   {form.workflow_id === "__custom__" && (
-                    <input className="input flex-1" placeholder={"粘贴 workflow_id"}
+                    <input className="input flex-1" placeholder={"绮樿创 workflow_id"}
                       value={form.custom_workflow_id || ""}
                       onChange={function (e) { update("custom_workflow_id", e.target.value); }} />
                   )}
@@ -2899,14 +2899,14 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
           </div>
         )}
 
-        {/* ── Asset uploads ──────────────────────────────────── */}
+        {/* 鈹€鈹€ Asset uploads 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
         {md.needsImage && (
           <div className="card">
             <div className="label"><Ico name="user"/>{t("create.section.image")}</div>
             <FileUploadZone accept="image/*" kind="image"
                             value={form.image}
                             onUploaded={function (v) { update("image", v); }}
-                            hint="png/jpg，正面单人照效果最佳" />
+                            hint="png/jpg锛屾闈㈠崟浜虹収鏁堟灉鏈€浣? />
             <FigurePicker figures={figures} onPick={function (f) {
               // Store BOTH preview_url (for local <img> render) and
               // oss_url (for the DashScope payload). Stash figure_id so
@@ -2928,7 +2928,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
             <FileUploadZone accept="video/*" kind="video"
                             value={form.video}
                             onUploaded={function (v) { update("video", v); }}
-                            hint="mp4，建议 ≤ 30 秒" />
+                            hint="mp4锛屽缓璁?鈮?30 绉? />
           </div>
         )}
         {md.needsRefImage && (
@@ -2937,7 +2937,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
             <FileUploadZone accept="image/*" kind="image"
                             value={form.refImage}
                             onUploaded={function (v) { update("refImage", v); }}
-                            hint="想要替换成的人物正面照" />
+                            hint="鎯宠鏇挎崲鎴愮殑浜虹墿姝ｉ潰鐓? />
             <FigurePicker figures={figures} onPick={function (f) {
               update("refImage", {
                 preview_url: f.preview_url,
@@ -2955,7 +2955,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
             <FileUploadZone accept="image/*" kind="image" multiple max={3}
                             value={form.composeImages}
                             onUploaded={function (v) { update("composeImages", v); }}
-                            hint="最多 3 张：人物 + 服饰 + 场景" />
+                            hint="鏈€澶?3 寮狅細浜虹墿 + 鏈嶉グ + 鍦烘櫙" />
             <div className="form-row" style={{marginTop: 10}}>
               <div className="oa-section-label oa-section-label--inline" style={{marginBottom: 6}}>
                 <span style={{display: "inline-flex", alignItems: "center", gap: 4}}>
@@ -2980,7 +2980,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
           </div>
         )}
 
-        {/* ── Text + voice (TTS) ─────────────────────────────── */}
+        {/* 鈹€鈹€ Text + voice (TTS) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
         {md.needsTts && (
           <div className="card">
             <div className="label"><Ico name="mic"/>{t("create.section.text")}</div>
@@ -2990,11 +2990,11 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
               var pct = cur && audioCap ? Math.min(100, (cur / audioCap) * 100) : 0;
               var label;
               if (audioFileDuration && audioFileDuration > 0) {
-                label = "已上传音频时长 " + audioFileDuration.toFixed(1) + "s";
+                label = "宸蹭笂浼犻煶棰戞椂闀?" + audioFileDuration.toFixed(1) + "s";
               } else if (form.text) {
-                label = "TTS 文本预估约 " + (cur || 0).toFixed(1) + "s（按 3.5 字/秒）";
+                label = "TTS 鏂囨湰棰勪及绾?" + (cur || 0).toFixed(1) + "s锛堟寜 3.5 瀛?绉掞級";
               } else {
-                label = "尚未输入文本或上传音频";
+                label = "灏氭湭杈撳叆鏂囨湰鎴栦笂浼犻煶棰?;
               }
               return (
                 <div style={{
@@ -3006,8 +3006,8 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                   <div style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
                     <span>
                       <Ico name={bad ? "warn" : "info"}/>
-                      {" "}音频时长上限 <b>{audioFloor || 0}s ~ {audioCap}s</b>
-                      {" "}（{md.model.split(" ")[0]} 限制）
+                      {" "}闊抽鏃堕暱涓婇檺 <b>{audioFloor || 0}s ~ {audioCap}s</b>
+                      {" "}锛坽md.model.split(" ")[0]} 闄愬埗锛?
                     </span>
                     <span style={{opacity: .8}}>{label}</span>
                   </div>
@@ -3025,12 +3025,12 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                   )}
                   {audioOverLimit && (
                     <div style={{marginTop: 4}}>
-                      超过 {audioCap}s 上限，请缩短文本或截短音频后再提交。
+                      瓒呰繃 {audioCap}s 涓婇檺锛岃缂╃煭鏂囨湰鎴栨埅鐭煶棰戝悗鍐嶆彁浜ゃ€?
                     </div>
                   )}
                   {audioUnderLimit && (
                     <div style={{marginTop: 4}}>
-                      低于 {audioFloor}s 下限，请上传更长的音频。
+                      浣庝簬 {audioFloor}s 涓嬮檺锛岃涓婁紶鏇撮暱鐨勯煶棰戙€?
                     </div>
                   )}
                 </div>
@@ -3059,7 +3059,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
           </div>
         )}
 
-        {/* ── Output parameters ──────────────────────────────── */}
+        {/* 鈹€鈹€ Output parameters 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
         <div className="card">
           <div className="label"><Ico name="cog"/>{t("create.section.params")}</div>
           {(mode === "photo_speak" || mode === "avatar_compose" || mode === "video_reface") && (
@@ -3069,7 +3069,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                 <select className="input select" value={form.resolution}
                         onChange={function (e) { update("resolution", e.target.value); }}>
                   {(md.resolutions || RESOLUTIONS)
-                    .filter(function (r) { return r !== "原视频分辨率"; })
+                    .filter(function (r) { return r !== "鍘熻棰戝垎杈ㄧ巼"; })
                     .map(function (r) { return <option key={r} value={r}>{r}</option>; })}
                 </select>
               </div>
@@ -3085,7 +3085,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
           )}
           {mode === "video_relip" && (
             <div className="text-xs text-dim" style={{padding: "4px 0"}}>
-              <Ico name="info"/> 输出与原视频相同分辨率与比例，不可调整。
+              <Ico name="info"/> 杈撳嚭涓庡師瑙嗛鐩稿悓鍒嗚鲸鐜囦笌姣斾緥锛屼笉鍙皟鏁淬€?
             </div>
           )}
           {mode === "video_reface" && (
@@ -3115,17 +3115,17 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
           )}
         </div>
 
-        {/* ── Advanced ──────────────────────────────────────────
+        {/* 鈹€鈹€ Advanced 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
          * Each option is wrapped in its own card-like row so the
          * boundary between toggle / number / text inputs is
-         * visually unambiguous (addresses "感觉没对齐" feedback). */}
+         * visually unambiguous (addresses "鎰熻娌″榻? feedback). */}
         <Collapsible title={<span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
           <Ico name="cog"/>{t("create.section.advanced")}
         </span>}>
           <div className="toggle-row" onClick={function () { update("watermark", !form.watermark); }}>
             <div style={{flex: 1}}>
               <div className="toggle-row__label">{t("create.advanced.watermark")}</div>
-              <div className="toggle-row__hint">DashScope 在生成视频右下角添加平台水印。</div>
+              <div className="toggle-row__hint">DashScope 鍦ㄧ敓鎴愯棰戝彸涓嬭娣诲姞骞冲彴姘村嵃銆?/div>
             </div>
             <Switch on={form.watermark} onChange={function (v) { update("watermark", v); }} />
           </div>
@@ -3136,7 +3136,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
             <input type="number" className="input" value={form.seed}
                    onChange={function (e) { update("seed", parseInt(e.target.value, 10)); }} />
             <div className="text-xs text-dim" style={{marginTop: 4}}>
-              相同种子 + 相同输入 → 可复现的输出，便于调参对照。
+              鐩稿悓绉嶅瓙 + 鐩稿悓杈撳叆 鈫?鍙鐜扮殑杈撳嚭锛屼究浜庤皟鍙傚鐓с€?
             </div>
           </div>
           {mode === "avatar_compose" && (
@@ -3148,13 +3148,13 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                      value={form.compose_size}
                      onChange={function (e) { update("compose_size", e.target.value); }} />
               <div className="text-xs text-dim" style={{marginTop: 4}}>
-                例：1024*1024、768*1344；留空时随最后一张参考图。
+                渚嬶細1024*1024銆?68*1344锛涚暀绌烘椂闅忔渶鍚庝竴寮犲弬鑰冨浘銆?
               </div>
             </div>
           )}
         </Collapsible>
 
-        {/* ── Submit row ────────────────────────────────────── */}
+        {/* 鈹€鈹€ Submit row 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
         <div className="flex gap-2" style={{marginTop: 14}}>
           <button className="btn btn-primary btn-block" disabled={submitting} onClick={submit}>
             {submitting && <span className="spinner-sm"/>}
@@ -3166,7 +3166,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
         </div>
       </div>
 
-      {/* ── Right preview pane (tongyi-image style) ──────────── */}
+      {/* 鈹€鈹€ Right preview pane (tongyi-image style) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className={"split-right oa-preview-area" + (!previewTaskId ? " oa-preview-area--centered" : "")}>
         {previewTaskId && liveTask ? (
           <div style={{width: "100%"}}>
@@ -3195,7 +3195,7 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                 <div className="oa-loader__inner">
                   <div className="oa-loader__spinner"/>
                   <div className="oa-loader__title">{t("preview.result.runningHint")}</div>
-                  {/* Backend emits ``progress`` as 0..100 already — do
+                  {/* Backend emits ``progress`` as 0..100 already 鈥?do
                       NOT multiply by 100 again. Skip the bar entirely
                       when no progress is reported (most DashScope steps
                       have no fine-grained progress, so an "always 0%"
@@ -3235,9 +3235,9 @@ function CreateTab({ onGoToTasks, settings, voices, figures }) {
                             onClick={async function () {
                               var r = await pluginApi("POST", "/tasks/" + previewTaskId + "/recheck", {});
                               if (r.ok && r.body && r.body.output_url) {
-                                showToast("已找回视频并下载到本地");
+                                showToast("宸叉壘鍥炶棰戝苟涓嬭浇鍒版湰鍦?);
                               } else {
-                                showToast((r.body && r.body.message) || "DashScope 未返回输出，链接可能已过期", "warn");
+                                showToast((r.body && r.body.message) || "DashScope 鏈繑鍥炶緭鍑猴紝閾炬帴鍙兘宸茶繃鏈?, "warn");
                               }
                             }}>
                       <Ico name="refresh"/> {t("preview.result.refresh")}
@@ -3312,16 +3312,16 @@ function useTaskHeartbeat(taskId) {
   return task;
 }
 
-/* ─── TasksTab ─────────────────────────────────────────────────────
+/* 鈹€鈹€鈹€ TasksTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
  * Split-pane layout mirroring tongyi-image:
- *   ┌──────────────────────┬─────────────────────────────────┐
- *   │ chip filters (status │  selected task detail OR         │
- *   │ + mode)              │  oa-preview-empty placeholder    │
- *   │ ────────────         │                                  │
- *   │ task-card list       │                                  │
- *   │ ────────────         │                                  │
- *   │ footer: "共 N 个"    │                                  │
- *   └──────────────────────┴─────────────────────────────────┘ */
+ *   鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+ *   鈹?chip filters (status 鈹? selected task detail OR         鈹?
+ *   鈹?+ mode)              鈹? oa-preview-empty placeholder    鈹?
+ *   鈹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€         鈹?                                 鈹?
+ *   鈹?task-card list       鈹?                                 鈹?
+ *   鈹?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€         鈹?                                 鈹?
+ *   鈹?footer: "鍏?N 涓?    鈹?                                 鈹?
+ *   鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?*/
 function TasksTab() {
   const t = useT();
   const { tasks, loading, refresh, setTasks } = useTasks();
@@ -3350,13 +3350,13 @@ function TasksTab() {
 
   const cancelTask = async function (id) {
     const r = await pluginApi("POST", "/tasks/" + id + "/cancel", {});
-    if (r.ok) { showToast("已请求取消"); refresh(); }
-    else { showToast("取消失败", "error"); }
+    if (r.ok) { showToast("宸茶姹傚彇娑?); refresh(); }
+    else { showToast("鍙栨秷澶辫触", "error"); }
   };
   const retryTask = async function (id) {
     const r = await pluginApi("POST", "/tasks/" + id + "/retry", {});
-    if (r.ok) { showToast("已重新提交"); refresh(); }
-    else { showToast("重试失败", "error"); }
+    if (r.ok) { showToast("宸查噸鏂版彁浜?); refresh(); }
+    else { showToast("閲嶈瘯澶辫触", "error"); }
   };
   const deleteTask = async function (id) {
     const r = await pluginApi("DELETE", "/tasks/" + id);
@@ -3380,7 +3380,7 @@ function TasksTab() {
 
   return (
     <div className="split-layout">
-      {/* ── Left: filters + task list ─────────────────────────── */}
+      {/* 鈹€鈹€ Left: filters + task list 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="split-left oa-list-panel">
         <div className="oa-list-panel__filters">
           <div>
@@ -3442,7 +3442,7 @@ function TasksTab() {
                               <span className="spinner-sm"/>
                             </div>
                           : <span className="text-dim text-xs"
-                                  style={{display: "flex", alignItems: "center", justifyContent: "center", height: "100%"}}>—</span>}
+                                  style={{display: "flex", alignItems: "center", justifyContent: "center", height: "100%"}}>鈥?/span>}
                   </div>
                   <div className="task-info">
                     <h4>
@@ -3453,7 +3453,7 @@ function TasksTab() {
                       <StatusBadge status={tk.status}/>
                       <span className="text-xs">{formatTime(tk.created_at)}</span>
                       {tk.cost_total != null && (
-                        <span className="text-xs">¥{Number(tk.cost_total).toFixed(2)}</span>
+                        <span className="text-xs">楼{Number(tk.cost_total).toFixed(2)}</span>
                       )}
                     </div>
                   </div>
@@ -3473,11 +3473,11 @@ function TasksTab() {
         </div>
       </div>
 
-      {/* ── Right: task detail or empty state ─────────────────── */}
+      {/* 鈹€鈹€ Right: task detail or empty state 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className={"split-right oa-preview-area" + (!active ? " oa-preview-area--centered" : "")}>
         {active ? (
           <div style={{width: "100%"}}>
-            {/* ── Header + action buttons ── */}
+            {/* 鈹€鈹€ Header + action buttons 鈹€鈹€ */}
             <div className="card">
               <div className="flex items-center justify-between" style={{marginBottom: 0}}>
                 <span className="card-title" style={{marginBottom: 0}}>
@@ -3505,13 +3505,13 @@ function TasksTab() {
               </div>
             </div>
 
-            {/* ── Video / status area ── */}
+            {/* 鈹€鈹€ Video / status area 鈹€鈹€ */}
             {(active.status === "running" || active.status === "pending") ? (
               <div className="video-player-wrap oa-loader oa-loader--dark">
                 <div className="oa-loader__inner">
                   <div className="oa-loader__spinner"/>
                   <div className="oa-loader__title">{t("tasks.detail.runningHint")}</div>
-                  {/* Same progress fix as the Create-tab preview — see
+                  {/* Same progress fix as the Create-tab preview 鈥?see
                       note there. Backend emits a 0..100 integer, never
                       a 0..1 decimal. */}
                   {active.progress != null && Number(active.progress) > 0 && (
@@ -3528,7 +3528,7 @@ function TasksTab() {
                   {/* The cancel "button" used to render as a solid
                       white rectangle because ``.btn`` defaults to
                       ``background: var(--bg-card)`` (light) while we
-                      only overrode color/border to white — white-on-
+                      only overrode color/border to white 鈥?white-on-
                       white made the icon+label invisible. The new
                       ``.oa-loader__cancel`` class sets a transparent
                       background with a translucent white outline. */}
@@ -3559,9 +3559,9 @@ function TasksTab() {
                             onClick={async function () {
                               var r = await pluginApi("POST", "/tasks/" + active.id + "/recheck", {});
                               if (r.ok && r.body && r.body.output_url) {
-                                showToast("已找回视频并下载到本地"); refresh();
+                                showToast("宸叉壘鍥炶棰戝苟涓嬭浇鍒版湰鍦?); refresh();
                               } else {
-                                showToast((r.body && r.body.message) || "DashScope 未返回输出，链接可能已过期", "warn");
+                                showToast((r.body && r.body.message) || "DashScope 鏈繑鍥炶緭鍑猴紝閾炬帴鍙兘宸茶繃鏈?, "warn");
                               }
                             }}>
                       <Ico name="refresh"/> {t("tasks.detail.recheck")}
@@ -3583,7 +3583,7 @@ function TasksTab() {
               </div>
             ) : null}
 
-            {/* ── Info cards below, scroll naturally ── */}
+            {/* 鈹€鈹€ Info cards below, scroll naturally 鈹€鈹€ */}
             <div className="card">
               <div className="grid-2">
                 <div>
@@ -3600,7 +3600,7 @@ function TasksTab() {
                   <span className="text-xs text-dim">{t("tasks.detail.model")}</span>
                   <div className="text-sm">
                     <code className="inline">
-                      {(MODE_DEFS.find(function (m) { return m.id === active.mode; }) || {}).model || "—"}
+                      {(MODE_DEFS.find(function (m) { return m.id === active.mode; }) || {}).model || "鈥?}
                     </code>
                   </div>
                 </div>
@@ -3645,9 +3645,9 @@ function TasksTab() {
   );
 }
 
-/* ─── VoicesTab ──────────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ VoicesTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function VoiceCard({ voice, onDelete, onRename, hasApiKey, onGoSettings }) {
-  // Per-card preview state. Clicking "试听" calls
+  // Per-card preview state. Clicking "璇曞惉" calls
   // POST /voices/{dashscope_voice_id}/sample which synthesises a short
   // demo via cosyvoice-v2 and returns a preview URL we can play inline.
   //
@@ -3656,11 +3656,11 @@ function VoiceCard({ voice, onDelete, onRename, hasApiKey, onGoSettings }) {
   // Previously the empty hint (one line of dim text) was unmounted when
   // `busy` flipped, the audio element height jumped from 0 to 32px, and
   // the loader Ico (which doesn't exist in our ICONS table) rendered as
-  // an empty <span> — net effect was the whole card 'jumping up'.
+  // an empty <span> 鈥?net effect was the whole card 'jumping up'.
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [url, setUrl] = useState(voice.sample_url || "");
-  // ── Rename state ────────────────────────────────────────────────
+  // 鈹€鈹€ Rename state 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   // Editing the label is a local-only UX flow: when the user clicks
   // the pencil, we swap the title text for an inline input. Pressing
   // Enter / clicking save calls onRename(newLabel) which the parent
@@ -3750,11 +3750,11 @@ function VoiceCard({ voice, onDelete, onRename, hasApiKey, onGoSettings }) {
             <div className="lib-card__title truncate">{v.label || v.label_zh || v.id}</div>
           )}
           <div className="lib-card__sub truncate">
-            {(v.gender || "—") + " · " + (v.style || v.style_zh || v.language || "zh")}
+            {(v.gender || "鈥?) + " 路 " + (v.style || v.style_zh || v.language || "zh")}
           </div>
         </div>
         {v.is_system ? (
-          <span className="tag tag-blue">系统</span>
+          <span className="tag tag-blue">绯荤粺</span>
         ) : !editing && (
           <div style={{display: "flex", gap: 4}}>
             <button className="btn btn-sm" title={t("voices.rename")}
@@ -3771,7 +3771,7 @@ function VoiceCard({ voice, onDelete, onRename, hasApiKey, onGoSettings }) {
       <div className="text-xs text-dim truncate" title={cosyId}>
         <code className="inline">{cosyId}</code>
       </div>
-      {/* Fixed-height media slot — keeps the button anchored regardless of state. */}
+      {/* Fixed-height media slot 鈥?keeps the button anchored regardless of state. */}
       <div className="voice-media">
         {url ? (
           <audio src={url} controls preload="none" />
@@ -3806,13 +3806,13 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
   const [busy, setBusy] = useState(false);
 
   const submitClone = async function () {
-    if (!draft.label || !draft.audio) { showToast("请填写名称并上传音频", "warn"); return; }
+    if (!draft.label || !draft.audio) { showToast("璇峰～鍐欏悕绉板苟涓婁紶闊抽", "warn"); return; }
     if (!draft.audio.oss_url) {
       // VoiceEnrollmentService.create_voice MUST receive a public URL
       // (DashScope pulls the sample from there server-side). A local
       // /api/... URL would fail with an opaque "url unreachable" error
       // 30-90 s into training, so we block at submit time instead.
-      showToast("OSS 未配置，无法克隆音色（DashScope 需公网拉取样本）。请到「设置 → 阿里云 OSS」配置。", "error");
+      showToast("OSS 鏈厤缃紝鏃犳硶鍏嬮殕闊宠壊锛圖ashScope 闇€鍏綉鎷夊彇鏍锋湰锛夈€傝鍒般€岃缃?鈫?闃块噷浜?OSS銆嶉厤缃€?, "error");
       return;
     }
     setBusy(true);
@@ -3824,14 +3824,14 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
         sample_url: draft.audio.preview_url || draft.audio.url,
       });
       if (r.ok) {
-        showToast("音色已克隆：" + (r.body && r.body.dashscope_voice_id || "(no id)"));
+        showToast("闊宠壊宸插厠闅嗭細" + (r.body && r.body.dashscope_voice_id || "(no id)"));
         setDraft({ label: "", audio: null });
         setShowCreate(false);
         refresh();
       } else {
         const msg = (r.body && (r.body.message
-          || (r.body.detail && r.body.detail.message))) || "提交失败";
-        showToast("提交失败：" + msg, "error");
+          || (r.body.detail && r.body.detail.message))) || "鎻愪氦澶辫触";
+        showToast("鎻愪氦澶辫触锛? + msg, "error");
       }
     } finally { setBusy(false); }
   };
@@ -3846,7 +3846,7 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
     const r = await pluginApi("DELETE", "/voices/" + v.id);
     if (r.ok) refresh();
   };
-  // ── Inline rename ────────────────────────────────────────────────
+  // 鈹€鈹€ Inline rename 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   // Returns truthy when the PATCH succeeds so VoiceCard can collapse
   // its edit form. Errors stay on screen (input remains editable) so
   // the user can correct typos without losing draft state.
@@ -3868,7 +3868,7 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
 
   return (
     <div>
-      {/* Inline documentation card — explains where the system voice list
+      {/* Inline documentation card 鈥?explains where the system voice list
           comes from so the user is never confused by the "longxxxxx_v2"
           identifiers (they're DashScope's official cosyvoice-v2 catalog,
           not strings we made up). */}
@@ -3884,27 +3884,27 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
         </span>
         <div style={{minWidth: 0, flex: 1, color: "var(--text)"}}>
           <strong style={{fontWeight: 600}}>{t("voices.source.title")}</strong>
-          <span style={{margin: "0 6px", color: "var(--text-muted)"}}>·</span>
+          <span style={{margin: "0 6px", color: "var(--text-muted)"}}>路</span>
           <span style={{color: "var(--text-muted)"}}>{t("voices.source.body")}</span>
           <a href="https://help.aliyun.com/zh/model-studio/cosyvoice-quick-start"
              target="_blank" rel="noopener"
              style={{marginLeft: 6, color: "var(--primary)", whiteSpace: "nowrap"}}>
-            {t("voices.source.link")} ↗
+            {t("voices.source.link")} 鈫?
           </a>
         </div>
       </div>
 
       <div className="flex items-center justify-between" style={{marginBottom: 12}}>
-        <h3 style={{fontSize: 14, fontWeight: 600}}>{t("voices.system")} <span className="text-xs text-muted">· {sys.length}</span></h3>
+        <h3 style={{fontSize: 14, fontWeight: 600}}>{t("voices.system")} <span className="text-xs text-muted">路 {sys.length}</span></h3>
         <button className="btn btn-primary btn-sm" onClick={function () { setShowCreate(!showCreate); }}>
           <Ico name="plus"/> {t("voices.create")}
         </button>
       </div>
       {error && (
         <div className="err-panel" style={{marginBottom: 12}}>
-          <div className="err-panel__title"><Ico name="warn"/> 音色接口暂不可用</div>
+          <div className="err-panel__title"><Ico name="warn"/> 闊宠壊鎺ュ彛鏆備笉鍙敤</div>
           <div className="err-panel__msg">{String(error)}</div>
-          <button className="btn btn-sm" type="button" onClick={refresh}>重新加载音色</button>
+          <button className="btn btn-sm" type="button" onClick={refresh}>閲嶆柊鍔犺浇闊宠壊</button>
         </div>
       )}
 
@@ -3931,9 +3931,9 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
 
       {sys.length === 0 ? (
         <div style={{marginBottom: 18}}>
-          <EmptyState icon="mic" title="系统音色暂未加载" hint="请刷新音色库；如果仍为空，请重启插件后端。"/>
+          <EmptyState icon="mic" title="绯荤粺闊宠壊鏆傛湭鍔犺浇" hint="璇峰埛鏂伴煶鑹插簱锛涘鏋滀粛涓虹┖锛岃閲嶅惎鎻掍欢鍚庣銆?/>
           <div style={{display: "flex", justifyContent: "center", marginTop: 10}}>
-            <button className="btn btn-sm" type="button" onClick={refresh}>刷新音色库</button>
+            <button className="btn btn-sm" type="button" onClick={refresh}>鍒锋柊闊宠壊搴?/button>
           </div>
         </div>
       ) : (
@@ -3946,7 +3946,7 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
       )}
 
       <h3 style={{fontSize: 14, fontWeight: 600, marginBottom: 8}}>
-        {t("voices.custom")} <span className="text-xs text-muted">· {cust.length}</span>
+        {t("voices.custom")} <span className="text-xs text-muted">路 {cust.length}</span>
       </h3>
       {cust.length === 0
         ? <EmptyState icon="mic" title={t("voices.empty.custom")} />
@@ -3962,7 +3962,7 @@ function VoicesTab({ hasApiKey, onGoSettings }) {
   );
 }
 
-/* ─── FiguresTab ─────────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ FiguresTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function FiguresTab() {
   const t = useT();
   const { figures, refresh, removeOptimistic } = useFigures();
@@ -3975,18 +3975,18 @@ function FiguresTab() {
   const [deletingIds, setDeletingIds] = useState({});
 
   const submitFig = async function () {
-    if (!draft.label || !draft.image) { showToast("请填写名称并上传人像图", "warn"); return; }
+    if (!draft.label || !draft.image) { showToast("璇峰～鍐欏悕绉板苟涓婁紶浜哄儚鍥?, "warn"); return; }
     if (!draft.image.oss_url) {
       // POST /upload only fills oss_url when OSS is fully configured;
       // an empty value means face-detect would skip and the figure
       // would land in 'skipped'. Tell the user up front so they can
-      // open Settings → OSS, instead of finding out 5 seconds later
+      // open Settings 鈫?OSS, instead of finding out 5 seconds later
       // from a yellow tag on the card.
       const ok = await oaConfirm({
-        title: "OSS 未配置",
-        message: "DashScope 无法 fetch 该图片，形象会跳过预检（下次任务需重新上传）。仍要保存吗？",
-        okText: "仍然保存",
-        cancelText: "去配置 OSS",
+        title: "OSS 鏈厤缃?,
+        message: "DashScope 鏃犳硶 fetch 璇ュ浘鐗囷紝褰㈣薄浼氳烦杩囬妫€锛堜笅娆′换鍔￠渶閲嶆柊涓婁紶锛夈€備粛瑕佷繚瀛樺悧锛?,
+        okText: "浠嶇劧淇濆瓨",
+        cancelText: "鍘婚厤缃?OSS",
         danger: true,
       });
       if (!ok) return;
@@ -4002,11 +4002,11 @@ function FiguresTab() {
       });
       if (r.ok) {
         showToast(r.body && r.body.oss_configured
-          ? "已提交预检" : "已保存（未配置 OSS，已跳过预检）");
+          ? "宸叉彁浜ら妫€" : "宸蹭繚瀛橈紙鏈厤缃?OSS锛屽凡璺宠繃棰勬锛?);
         setDraft({ label: "", image: null });
         setShowCreate(false);
         refresh();
-      } else { showToast("提交失败：" + (r.body && r.body.message || ""), "error"); }
+      } else { showToast("鎻愪氦澶辫触锛? + (r.body && r.body.message || ""), "error"); }
     } finally { setBusy(false); }
   };
   const del = async function (f) {
@@ -4021,14 +4021,14 @@ function FiguresTab() {
     // Optimistically yank the card out of the grid the instant the user
     // confirms. The DELETE request runs in the background; if it fails
     // we re-fetch and the row reappears with whatever its current
-    // detect_status is. This is what makes 「点了没反应」 go away even
+    // detect_status is. This is what makes 銆岀偣浜嗘病鍙嶅簲銆?go away even
     // when the backend's cancellation path is still draining httpx.
     setDeletingIds(function (prev) { return Object.assign({}, prev, { [f.id]: true }); });
     removeOptimistic(f.id);
     try {
       const r = await pluginApi("DELETE", "/figures/" + f.id);
       if (!r.ok) {
-        showToast("删除失败：" + (r.body && r.body.message || "未知错误"), "error");
+        showToast("鍒犻櫎澶辫触锛? + (r.body && r.body.message || "鏈煡閿欒"), "error");
         refresh();
       }
     } finally {
@@ -4043,7 +4043,7 @@ function FiguresTab() {
   return (
     <div>
       <div className="flex items-center justify-between" style={{marginBottom: 12}}>
-        <h3 style={{fontSize: 14, fontWeight: 600}}>{t("figures.title")} <span className="text-xs text-muted">· {figures.length}</span></h3>
+        <h3 style={{fontSize: 14, fontWeight: 600}}>{t("figures.title")} <span className="text-xs text-muted">路 {figures.length}</span></h3>
         <button className="btn btn-primary btn-sm" onClick={function () { setShowCreate(!showCreate); }}>
           <Ico name="plus"/> {t("figures.upload")}
         </button>
@@ -4079,8 +4079,8 @@ function FiguresTab() {
               // Server-of-truth status field. Falls back to the legacy
               // detect_pass bool for figures created before the schema
               // migration so we never crash on stale rows. SQLite stores
-              // booleans as 0/1, so "=== true" never matched — that's
-              // why the old card was perpetually 「等待预检」.
+              // booleans as 0/1, so "=== true" never matched 鈥?that's
+              // why the old card was perpetually 銆岀瓑寰呴妫€銆?
               const status = f.detect_status
                 || (f.detect_pass === 1 || f.detect_pass === true ? "pass"
                     : f.detect_pass === 0 || f.detect_pass === false ? "pending"
@@ -4116,7 +4116,7 @@ function FiguresTab() {
                         </span>
                       </div>
                     </div>
-                    {/* Trash is intentionally always-on — it's the only
+                    {/* Trash is intentionally always-on 鈥?it's the only
                         action a user has on a figure, and during a long
                         pre-check the DELETE handler will cancel the
                         in-flight wan2.2-s2v-detect probe (no orphaned
@@ -4144,18 +4144,18 @@ function FiguresTab() {
   );
 }
 
-/* ─── ModelProbePanel ───────────────────────────────────────────────
+/* 鈹€鈹€鈹€ ModelProbePanel 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
  * On-demand "which models can my key actually invoke?" check that
- * lives inside the Settings → 高级 collapsible. Every probe goes to
+ * lives inside the Settings 鈫?楂樼骇 collapsible. Every probe goes to
  * POST /capabilities/probe which does parallel HTTP probes and rolls
- * the per-model verdict up to per-mode 「可用 / 未授权 / 未知」 — see
+ * the per-model verdict up to per-mode 銆屽彲鐢?/ 鏈巿鏉?/ 鏈煡銆?鈥?see
  * AvatarDashScopeClient.probe_models() for the protocol. Verdicts are
  * cached in component state so revisiting the tab doesn't auto-rerun.
- * ──────────────────────────────────────────────────────────────────── */
+ * 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 function ModelProbePanel({ hasApiKey }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
-  const [data, setData] = useState(null); // { ts, modes:[…], models:[…] }
+  const [data, setData] = useState(null); // { ts, modes:[鈥, models:[鈥 }
   const [error, setError] = useState("");
 
   const run = async function () {
@@ -4172,19 +4172,19 @@ function ModelProbePanel({ hasApiKey }) {
   };
 
   const STATUS_META = {
-    available: { cls: "tag-green", label: t("settings.api.probe.status.available"), icon: "✓" },
-    denied:    { cls: "tag-red",   label: t("settings.api.probe.status.denied"),    icon: "✗" },
+    available: { cls: "tag-green", label: t("settings.api.probe.status.available"), icon: "鉁? },
+    denied:    { cls: "tag-red",   label: t("settings.api.probe.status.denied"),    icon: "鉁? },
     unknown:   { cls: "tag-gray",  label: t("settings.api.probe.status.unknown"),   icon: "?" },
   };
   // ``inferred=true`` means the backend could not run a real probe (the
   // model is WebSocket-only, e.g. cosyvoice-v2) but the credentials
   // passed auth so we *strongly suspect* it works. Render this with an
-  // amber chip + ≈ glyph instead of the normal solid green so the user
-  // knows to verify with 试听 rather than assume green = guaranteed.
+  // amber chip + 鈮?glyph instead of the normal solid green so the user
+  // knows to verify with 璇曞惉 rather than assume green = guaranteed.
   function chipMeta(d) {
     const base = STATUS_META[d.status] || STATUS_META.unknown;
     if (d.inferred && d.status === "available") {
-      return { cls: "tag-amber", label: base.label + "（推断）", icon: "≈" };
+      return { cls: "tag-amber", label: base.label + "锛堟帹鏂級", icon: "鈮? };
     }
     return base;
   }
@@ -4198,7 +4198,7 @@ function ModelProbePanel({ hasApiKey }) {
         <span>{t("settings.api.probe.title")}</span>
         <button className="btn btn-sm btn-primary"
                 disabled={busy || !hasApiKey}
-                title={!hasApiKey ? "请先配置并保存 API Key" : ""}
+                title={!hasApiKey ? "璇峰厛閰嶇疆骞朵繚瀛?API Key" : ""}
                 onClick={run}>
           {busy && <span className="spinner-sm spinner-light" style={{marginRight: 4}}/>}
           {busy ? t("settings.api.probe.btn.busy") : t("settings.api.probe.btn")}
@@ -4250,8 +4250,8 @@ function ModelProbePanel({ hasApiKey }) {
           })}
           {/* WebSocket-only models (cosyvoice-v2) cannot be probed via
               HTTP, so we render an inline note to set expectations: the
-              ≈ chip means "credentials work, but only a real synth call
-              can confirm". The 试听 button on the Voices tab does
+              鈮?chip means "credentials work, but only a real synth call
+              can confirm". The 璇曞惉 button on the Voices tab does
               exactly that. */}
           {(data.models || []).some(function (m) { return m.inferred; }) && (
             <div style={{
@@ -4260,8 +4260,8 @@ function ModelProbePanel({ hasApiKey }) {
               border: "1px solid rgba(245,158,11,.35)",
               borderRadius: 6, padding: "6px 10px", lineHeight: 1.55,
             }}>
-              ≈ 标记的模型走 WebSocket，无法预探测；点击「音色库」中的
-              <b> 试听 </b>可做端到端验证。
+              鈮?鏍囪鐨勬ā鍨嬭蛋 WebSocket锛屾棤娉曢鎺㈡祴锛涚偣鍑汇€岄煶鑹插簱銆嶄腑鐨?
+              <b> 璇曞惉 </b>鍙仛绔埌绔獙璇併€?
             </div>
           )}
           {(data.modes || []).some(function (m) { return m.status === "denied"; }) && (
@@ -4269,7 +4269,7 @@ function ModelProbePanel({ hasApiKey }) {
               <a href="https://bailian.console.aliyun.com/?tab=model#/model-market"
                  target="_blank" rel="noopener"
                  style={{color: "var(--primary)"}}>
-                {t("settings.api.probe.openConsole")} →
+                {t("settings.api.probe.openConsole")} 鈫?
               </a>
             </div>
           )}
@@ -4279,12 +4279,12 @@ function ModelProbePanel({ hasApiKey }) {
   );
 }
 
-/* ─── SettingsTab ────────────────────────────────────────────────── */
-/* ─── OSS field validators ────────────────────────────────────────────
+/* 鈹€鈹€鈹€ SettingsTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
+/* 鈹€鈹€鈹€ OSS field validators 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
    Mirrors the regex / shape checks the backend's OssConfig.from_settings
    runs, so the user gets the red badge BEFORE the on-blur PUT round-trip
    completes. Each validator returns "" when the value is acceptable
-   (including empty — empty means "user hasn't filled it yet" which is
+   (including empty 鈥?empty means "user hasn't filled it yet" which is
    not an error in itself, only when the user tries to use OSS) or a
    short message describing what's wrong. */
 function validateOssEndpoint(v) {
@@ -4293,13 +4293,13 @@ function validateOssEndpoint(v) {
   // Accept with or without scheme; reject obvious bucket-name-style values.
   const host = s.replace(/^https?:\/\//i, "").replace(/\/$/, "");
   if (!/\.aliyuncs\.com$/i.test(host)) {
-    return "Endpoint 应当以 .aliyuncs.com 结尾，例如 https://oss-cn-beijing.aliyuncs.com";
+    return "Endpoint 搴斿綋浠?.aliyuncs.com 缁撳熬锛屼緥濡?https://oss-cn-beijing.aliyuncs.com";
   }
   // If the user pasted a bucket-prefixed endpoint
-  // (e.g. avatar-studio.oss-cn-hangzhou.aliyuncs.com), warn — that
+  // (e.g. avatar-studio.oss-cn-hangzhou.aliyuncs.com), warn 鈥?that
   // belongs in the Bucket field instead.
   if (host.split(".").length > 3) {
-    return "看起来你把 bucket 名也粘进来了；这里只填地域 endpoint，bucket 名移到下面那个字段。";
+    return "鐪嬭捣鏉ヤ綘鎶?bucket 鍚嶄篃绮樿繘鏉ヤ簡锛涜繖閲屽彧濉湴鍩?endpoint锛宐ucket 鍚嶇Щ鍒颁笅闈㈤偅涓瓧娈点€?;
   }
   return "";
 }
@@ -4307,10 +4307,10 @@ function validateOssBucket(v) {
   const s = (v || "").trim();
   if (!s) return "";
   if (s.includes(".")) {
-    return "Bucket 字段不能包含 . — 你可能把完整域名 xxx.oss-cn-xxx.aliyuncs.com 填到这里了，只保留 bucket 名（第一个 . 之前的部分）。";
+    return "Bucket 瀛楁涓嶈兘鍖呭惈 . 鈥?浣犲彲鑳芥妸瀹屾暣鍩熷悕 xxx.oss-cn-xxx.aliyuncs.com 濉埌杩欓噷浜嗭紝鍙繚鐣?bucket 鍚嶏紙绗竴涓?. 涔嬪墠鐨勯儴鍒嗭級銆?;
   }
   if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(s)) {
-    return "Bucket 名只能含小写字母 / 数字 / 连字符 (-)，长度 3-63，首尾必须是字母或数字。";
+    return "Bucket 鍚嶅彧鑳藉惈灏忓啓瀛楁瘝 / 鏁板瓧 / 杩炲瓧绗?(-)锛岄暱搴?3-63锛岄灏惧繀椤绘槸瀛楁瘝鎴栨暟瀛椼€?;
   }
   return "";
 }
@@ -4318,18 +4318,18 @@ function validateOssAk(v) {
   const s = (v || "").trim();
   if (!s) return "";
   if (!/^LTAI[A-Za-z0-9]{10,}$/.test(s)) {
-    return "AccessKey ID 通常以 LTAI 开头，且长度 ≥ 14 位；请确认未把 Secret 粘到这里。";
+    return "AccessKey ID 閫氬父浠?LTAI 寮€澶达紝涓旈暱搴?鈮?14 浣嶏紱璇风‘璁ゆ湭鎶?Secret 绮樺埌杩欓噷銆?;
   }
   return "";
 }
 function validateOssSecret(v, secretSet) {
   const s = (v || "").trim();
-  // ``secretSet`` is the backend-echoed flag — when true, the user
+  // ``secretSet`` is the backend-echoed flag 鈥?when true, the user
   // already saved a secret on a previous session; the input may stay
   // empty without that being a real error.
   if (!s) return "";
   if (s.length < 16) {
-    return "Secret 长度看起来不够（实际 AccessKey Secret 通常为 30 位）。";
+    return "Secret 闀垮害鐪嬭捣鏉ヤ笉澶燂紙瀹為檯 AccessKey Secret 閫氬父涓?30 浣嶏級銆?;
   }
   return "";
 }
@@ -4382,13 +4382,13 @@ function PythonDepsPanel() {
   const install = function (id) {
     pluginApi("POST", "/system/python-deps/" + id + "/install", {}).then(function (r) {
       if (!r.ok || !r.body || !r.body.ok) {
-        showToast("依赖安装启动失败", "error");
+        showToast("渚濊禆瀹夎鍚姩澶辫触", "error");
         return;
       }
-      showToast("已开始安装依赖");
+      showToast("宸插紑濮嬪畨瑁呬緷璧?);
       refresh();
     }).catch(function (e) {
-      showToast((e && e.message) || "依赖安装启动失败", "error");
+      showToast((e && e.message) || "渚濊禆瀹夎鍚姩澶辫触", "error");
     });
   };
 
@@ -4400,27 +4400,27 @@ function PythonDepsPanel() {
     <div className="dep-panel">
       <div className="dep-panel__intro">
         <div>
-          <div className="dep-panel__intro-title">插件运行依赖</div>
+          <div className="dep-panel__intro-title">鎻掍欢杩愯渚濊禆</div>
           <div className="dep-panel__intro-text">
-            打包版会使用独立 Python 环境。这里可以检查并修复插件私有依赖，不需要手动打开命令行。
+            鎵撳寘鐗堜細浣跨敤鐙珛 Python 鐜銆傝繖閲屽彲浠ユ鏌ュ苟淇鎻掍欢绉佹湁渚濊禆锛屼笉闇€瑕佹墜鍔ㄦ墦寮€鍛戒护琛屻€?
           </div>
         </div>
-        <div className="dep-summary" aria-label="依赖状态汇总">
-          <span className="dep-summary__item"><Ico name="check"/> {ready}/{total || "—"} 可用</span>
-          {busyCount > 0 && <span className="dep-summary__item"><span className="spinner-sm"/> {busyCount} 安装中</span>}
+        <div className="dep-summary" aria-label="渚濊禆鐘舵€佹眹鎬?>
+          <span className="dep-summary__item"><Ico name="check"/> {ready}/{total || "鈥?} 鍙敤</span>
+          {busyCount > 0 && <span className="dep-summary__item"><span className="spinner-sm"/> {busyCount} 瀹夎涓?/span>}
           <button className="btn btn-sm" type="button" onClick={refresh} disabled={loading}>
-            {loading && <span className="spinner-sm"/>} 刷新
+            {loading && <span className="spinner-sm"/>} 鍒锋柊
           </button>
         </div>
       </div>
-      {loading && !items.length && <div className="text-xs text-muted">正在检测依赖…</div>}
+      {loading && !items.length && <div className="text-xs text-muted">姝ｅ湪妫€娴嬩緷璧栤€?/div>}
       <div className="dep-grid">
         {items.map(function (dep) {
           const ok = !!dep.ok;
           const busy = !!dep.busy;
           const logTail = dep.log_tail || [];
           const statusCls = busy ? "busy" : (ok ? "ok" : "warn");
-          const statusText = busy ? "安装中" : (ok ? "可用" : "需安装");
+          const statusText = busy ? "瀹夎涓? : (ok ? "鍙敤" : "闇€瀹夎");
           return (
             <div key={dep.id} className={"dep-card dep-card--" + statusCls}>
               <div className="dep-card__head">
@@ -4439,30 +4439,30 @@ function PythonDepsPanel() {
               </div>
               <div className="dep-meta">
                 <div className="dep-meta-row">
-                  <span className="dep-meta-label">包</span>
+                  <span className="dep-meta-label">鍖?/span>
                   <code>{dep.pip_spec}</code>
                 </div>
                 {dep.version && (
                   <div className="dep-meta-row">
-                    <span className="dep-meta-label">版本</span>
+                    <span className="dep-meta-label">鐗堟湰</span>
                     <code>{dep.version}</code>
                   </div>
                 )}
                 {dep.module_file && (
                   <div className="dep-meta-row">
-                    <span className="dep-meta-label">路径</span>
+                    <span className="dep-meta-label">璺緞</span>
                     <code title={dep.module_file}>{dep.module_file}</code>
                   </div>
                 )}
                 {!ok && dep.error && (
                   <div className="dep-meta-row text-danger">
-                    <span className="dep-meta-label">错误</span>
+                    <span className="dep-meta-label">閿欒</span>
                     <span>{dep.error}</span>
                   </div>
                 )}
                 {dep.last_error && (
                   <div className="dep-meta-row text-danger">
-                    <span className="dep-meta-label">最近</span>
+                    <span className="dep-meta-label">鏈€杩?/span>
                     <span>{dep.last_error}</span>
                   </div>
                 )}
@@ -4471,9 +4471,9 @@ function PythonDepsPanel() {
                 <button className={"btn btn-sm " + (!ok ? "btn-primary" : "")}
                         type="button" disabled={busy}
                         onClick={function () { install(dep.id); }}>
-                  {busy && <span className="spinner-sm"/>} {ok ? "重新安装" : "安装依赖"}
+                  {busy && <span className="spinner-sm"/>} {ok ? "閲嶆柊瀹夎" : "瀹夎渚濊禆"}
                 </button>
-                <button className="btn btn-sm" type="button" onClick={refresh}>重新检测</button>
+                <button className="btn btn-sm" type="button" onClick={refresh}>閲嶆柊妫€娴?/button>
               </div>
               {!!logTail.length && (
                 <pre className="dep-log text-xs">{logTail.slice(-8).join("\n")}</pre>
@@ -4500,12 +4500,12 @@ function SettingsTab({ settings, onSaved, voices }) {
   const [testBusy, setTestBusy] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
   const [storage, setStorage] = useState(null);
-  // Per-folder storage rollup: {data_dir, outputs, uploads, tasks} →
+  // Per-folder storage rollup: {data_dir, outputs, uploads, tasks} 鈫?
   // {path, size_mb, file_count, ...}. Mirrors plugins/seedance-video so
   // we can render the same grid-3 stat cards under the folder rows.
   const [stats, setStats] = useState(null);
-  // FolderPickerModal state — {key, title, initialPath} | null. Same
-  // 「open one folder picker at a time」 contract as seedance.
+  // FolderPickerModal state 鈥?{key, title, initialPath} | null. Same
+  // 銆宱pen one folder picker at a time銆?contract as seedance.
   const [folderPicker, setFolderPicker] = useState(null);
 
   const refreshStats = useCallback(function () {
@@ -4522,7 +4522,7 @@ function SettingsTab({ settings, onSaved, voices }) {
   }, [refreshStats]);
 
   // Open a folder via the backend so the action works even when the
-  // path hasn't been customized yet — backend resolves `key` to the
+  // path hasn't been customized yet 鈥?backend resolves `key` to the
   // built-in default (mirrors /storage/stats). This is the seedance-
   // video pattern; it deliberately bypasses any host bridge.
   const openFolderByKey = async function (key) {
@@ -4563,7 +4563,7 @@ function SettingsTab({ settings, onSaved, voices }) {
   const save = async function (patch) {
     const r = await pluginApi("PUT", "/settings", patch);
     if (r.ok) { showToast(t("settings.save.ok")); if (onSaved) onSaved(); }
-    else { showToast("保存失败", "error"); }
+    else { showToast("淇濆瓨澶辫触", "error"); }
   };
 
   const saveAll = async function () {
@@ -4607,8 +4607,8 @@ function SettingsTab({ settings, onSaved, voices }) {
 
   const saveKey = async function () {
     // Empty save is a deliberate "clear key" action (per UX request).
-    // We do NOT prompt — a Settings tab user has no other way to wipe a
-    // stale credential, and the green 「已保存」 badge will disappear
+    // We do NOT prompt 鈥?a Settings tab user has no other way to wipe a
+    // stale credential, and the green 銆屽凡淇濆瓨銆?badge will disappear
     // immediately after, providing the feedback they need.
     setSavingKey(true);
     try { await save({ api_key: (draft.api_key || "").trim() }); }
@@ -4619,7 +4619,7 @@ function SettingsTab({ settings, onSaved, voices }) {
     setTestBusy(true);
     try {
       // Send the *typed* draft key in the request body so the probe
-      // tests what's currently in the input — without first persisting
+      // tests what's currently in the input 鈥?without first persisting
       // it. That means an obviously-wrong key never overwrites a known-
       // good stored one just to be tested. The backend hits DashScope's
       // /v1/models endpoint and reports a real 401 vs 200, so a typo
@@ -4638,7 +4638,7 @@ function SettingsTab({ settings, onSaved, voices }) {
 
   const cleanup = async function () {
     const r = await pluginApi("POST", "/cleanup", { retention_days: Number(draft.retention_days || 30) });
-    if (r.ok) showToast("已清理 " + (r.body && r.body.removed || 0) + " 条任务");
+    if (r.ok) showToast("宸叉竻鐞?" + (r.body && r.body.removed || 0) + " 鏉′换鍔?);
   };
 
   // Voice option list resilient to: (1) backend not yet responded
@@ -4666,13 +4666,13 @@ function SettingsTab({ settings, onSaved, voices }) {
   // flush with the rest of the plugin's tabs.
   return (
     <div style={{maxWidth: 640}}>
-      {/* ── Section 1: 阿里云 DashScope (API + OSS merged) ────── */}
+      {/* 鈹€鈹€ Section 1: 闃块噷浜?DashScope (API + OSS merged) 鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"
             style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8}}>
           <span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
             <span className="oa-icon"><Ico name="cloud"/></span>
-            阿里云 DashScope
+            闃块噷浜?DashScope
           </span>
           <button className="btn btn-sm" type="button"
                   style={{fontWeight: 400}}
@@ -4687,7 +4687,7 @@ function SettingsTab({ settings, onSaved, voices }) {
             && draft.api_key === settings.api_key;
           return (
             <div className={"form-row" + (keyConfigured ? "" : " oa-config-field-callout")}
-                 data-callout={keyConfigured ? undefined : "必填项"}>
+                 data-callout={keyConfigured ? undefined : "蹇呭～椤?}>
               <div className="label" style={{display: "flex", alignItems: "center", gap: 6}}>
                 <span>DashScope API Key</span>
                 {keySaved && (
@@ -4707,17 +4707,17 @@ function SettingsTab({ settings, onSaved, voices }) {
                        onChange={function (e) { update("api_key", e.target.value); }} />
                 <button className="btn btn-sm" type="button"
                         onClick={function () { setKeyVisible(!keyVisible); }}>
-                  {keyVisible ? "隐藏" : "显示"}
+                  {keyVisible ? "闅愯棌" : "鏄剧ず"}
                 </button>
                 <button className="btn btn-sm btn-primary" type="button"
                         disabled={savingKey} onClick={saveKey}>
-                  {savingKey && <span className="spinner-sm"/>} 保存
+                  {savingKey && <span className="spinner-sm"/>} 淇濆瓨
                 </button>
               </div>
               <div className="text-xs text-dim" style={{marginTop: 4}}>
-                获取地址：
+                鑾峰彇鍦板潃锛?
                 <a href="https://bailian.console.aliyun.com/#/api-key" target="_blank" rel="noopener"
-                   style={{color: "var(--primary)"}}>阿里云百炼控制台</a>
+                   style={{color: "var(--primary)"}}>闃块噷浜戠櫨鐐兼帶鍒跺彴</a>
               </div>
             </div>
           );
@@ -4740,42 +4740,42 @@ function SettingsTab({ settings, onSaved, voices }) {
           <div style={{height: 1, background: "var(--border)", margin: "14px 0"}}/>
           <div className="grid-2">
             <div className="form-row">
-              <div className="text-xs text-muted" style={{marginBottom: 4}}>共享中转站名称（可选）</div>
+              <div className="text-xs text-muted" style={{marginBottom: 4}}>鍏变韩涓浆绔欏悕绉帮紙鍙€夛級</div>
               <input className="input"
                      value={draft.relay_endpoint || ""}
-                     placeholder="例如: yunwu-avatar"
+                     placeholder="渚嬪: yunwu-avatar"
                      onChange={function(e) { update("relay_endpoint", e.target.value); }}
                      onBlur={function() { save({ relay_endpoint: (draft.relay_endpoint || "").trim() }); }} />
               <div className="text-xs text-dim" style={{marginTop: 6, lineHeight: 1.5}}>
-                来自 LLM 配置页 relay_endpoints；填写后优先使用共享中转站。
+                鏉ヨ嚜 LLM 閰嶇疆椤?relay_endpoints锛涘～鍐欏悗浼樺厛浣跨敤鍏变韩涓浆绔欍€?
               </div>
             </div>
             <div className="form-row">
-              <div className="text-xs text-muted" style={{marginBottom: 4}}>中转站失败策略</div>
+              <div className="text-xs text-muted" style={{marginBottom: 4}}>涓浆绔欏け璐ョ瓥鐣?/div>
               <select className="input select"
                       value={draft.relay_fallback_policy || "official"}
                       onChange={function(e) {
                         update("relay_fallback_policy", e.target.value);
                         save({ relay_fallback_policy: e.target.value });
                       }}>
-                <option value="official">official：失败时回官方/插件配置</option>
-                <option value="strict">strict：失败时阻止提交</option>
+                <option value="official">official锛氬け璐ユ椂鍥炲畼鏂?鎻掍欢閰嶇疆</option>
+                <option value="strict">strict锛氬け璐ユ椂闃绘鎻愪氦</option>
               </select>
             </div>
           </div>
           <div style={{height: 1, background: "var(--border)", margin: "14px 0"}}/>
           <ModelProbePanel hasApiKey={!!(settings.api_key || settings.has_api_key)}/>
         </Collapsible>
-        <Collapsible title={"OSS 对象存储" + (settings.oss_configured ? " ✓" : "")} defaultOpen={false}>
+        <Collapsible title={"OSS 瀵硅薄瀛樺偍" + (settings.oss_configured ? " 鉁? : "")} defaultOpen={false}>
           <div className="text-xs text-dim" style={{marginBottom: 10, lineHeight: 1.5}}>
-            DashScope 后端必须配置 OSS 才能提交任务。上传素材和 TTS 音频会自动推到这个 bucket，
-            再用签名 URL 传给 DashScope。
+            DashScope 鍚庣蹇呴』閰嶇疆 OSS 鎵嶈兘鎻愪氦浠诲姟銆備笂浼犵礌鏉愬拰 TTS 闊抽浼氳嚜鍔ㄦ帹鍒拌繖涓?bucket锛?
+            鍐嶇敤绛惧悕 URL 浼犵粰 DashScope銆?
             <a href="https://oss.console.aliyun.com/bucket" target="_blank" rel="noopener"
-               style={{color: "var(--primary)", marginLeft: 4}}>OSS 控制台</a>
+               style={{color: "var(--primary)", marginLeft: 4}}>OSS 鎺у埗鍙?/a>
           </div>
           <div className="grid-2">
             <div className="form-row">
-              <div className="label">终端地址 (Endpoint)</div>
+              <div className="label">缁堢鍦板潃 (Endpoint)</div>
               <ValidatedInput
                 placeholder="https://oss-cn-beijing.aliyuncs.com"
                 value={draft.oss_endpoint}
@@ -4788,7 +4788,7 @@ function SettingsTab({ settings, onSaved, voices }) {
                 }} />
             </div>
             <div className="form-row">
-              <div className="label">存储桶 (Bucket)</div>
+              <div className="label">瀛樺偍妗?(Bucket)</div>
               <ValidatedInput
                 placeholder="my-bucket"
                 value={draft.oss_bucket}
@@ -4801,9 +4801,9 @@ function SettingsTab({ settings, onSaved, voices }) {
                 }} />
             </div>
             <div className="form-row">
-              <div className="label">访问密钥 ID (AccessKey ID)</div>
+              <div className="label">璁块棶瀵嗛挜 ID (AccessKey ID)</div>
               <ValidatedInput
-                placeholder="LTAI…"
+                placeholder="LTAI鈥?
                 value={draft.oss_access_key_id}
                 error={validateOssAk(draft.oss_access_key_id)}
                 onChange={function (e) { update("oss_access_key_id", e.target.value); }}
@@ -4814,10 +4814,10 @@ function SettingsTab({ settings, onSaved, voices }) {
                 }} />
             </div>
             <div className="form-row">
-              <div className="label">访问密钥 Secret (AccessKey Secret)</div>
+              <div className="label">璁块棶瀵嗛挜 Secret (AccessKey Secret)</div>
               <ValidatedInput
                 type="password"
-                placeholder={settings.oss_secret_set ? "已保存（重新输入将覆盖）" : "Secret"}
+                placeholder={settings.oss_secret_set ? "宸蹭繚瀛橈紙閲嶆柊杈撳叆灏嗚鐩栵級" : "Secret"}
                 value={draft.oss_access_key_secret}
                 error={validateOssSecret(draft.oss_access_key_secret, settings.oss_secret_set)}
                 onChange={function (e) { update("oss_access_key_secret", e.target.value); }}
@@ -4829,32 +4829,32 @@ function SettingsTab({ settings, onSaved, voices }) {
             </div>
           </div>
           <div className="form-row">
-            <div className="label">对象路径前缀 (Path prefix，可选)</div>
+            <div className="label">瀵硅薄璺緞鍓嶇紑 (Path prefix锛屽彲閫?</div>
             <input className="input" type="text"
                    placeholder="avatar-studio"
                    value={draft.oss_path_prefix || ""}
                    onChange={function (e) { update("oss_path_prefix", e.target.value); }}
                    onBlur={function () { save({ oss_path_prefix: draft.oss_path_prefix || "" }); }} />
             <div className="text-xs text-dim" style={{marginTop: 4}}>
-              所有对象会写到 <code className="inline">{draft.oss_path_prefix || "avatar-studio"}/uploads/...</code> 下。
+              鎵€鏈夊璞′細鍐欏埌 <code className="inline">{draft.oss_path_prefix || "avatar-studio"}/uploads/...</code> 涓嬨€?
             </div>
           </div>
         </Collapsible>
       </div>
 
-      {/* ── Python runtime dependencies ─────────────────────────── */}
+      {/* 鈹€鈹€ Python runtime dependencies 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"
             style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8}}>
           <span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
             <span className="oa-icon"><Ico name="server"/></span>
-            Python 依赖
+            Python 渚濊禆
           </span>
         </h3>
         <PythonDepsPanel/>
       </div>
 
-      {/* ── Section 2: RunningHub ──────────────────────────────── */}
+      {/* 鈹€鈹€ Section 2: RunningHub 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"
             style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8}}>
@@ -4869,7 +4869,7 @@ function SettingsTab({ settings, onSaved, voices }) {
               color: "var(--success, #059669)",
               border: "1px solid var(--success-border, #a7f3d0)",
               fontWeight: 500,
-            }}>已配置</span>
+            }}>宸查厤缃?/span>
           )}
         </h3>
         <div className="form-row">
@@ -4877,7 +4877,7 @@ function SettingsTab({ settings, onSaved, voices }) {
           <div className="flex gap-2">
             <input className="input flex-1" type="password"
                    value={draft.rh_api_key || ""}
-                   placeholder="输入 RunningHub API Key"
+                   placeholder="杈撳叆 RunningHub API Key"
                    onChange={function (e) { update("rh_api_key", e.target.value); }}
                    onBlur={function () { save({ rh_api_key: (draft.rh_api_key || "").trim() }); }} />
             <button className="btn btn-sm" type="button"
@@ -4886,18 +4886,18 @@ function SettingsTab({ settings, onSaved, voices }) {
                         backend: "runninghub",
                         rh_api_key: (draft.rh_api_key || "").trim()
                       }).then(function (r) {
-                        if (r.ok && r.body && r.body.ok) showToast("RunningHub 连接成功");
-                        else showToast("连接失败: " + ((r.body && r.body.message) || "未知错误"), "error");
+                        if (r.ok && r.body && r.body.ok) showToast("RunningHub 杩炴帴鎴愬姛");
+                        else showToast("杩炴帴澶辫触: " + ((r.body && r.body.message) || "鏈煡閿欒"), "error");
                       });
-                    }}>测试连接</button>
+                    }}>娴嬭瘯杩炴帴</button>
           </div>
           <div className="text-xs text-dim" style={{marginTop: 4}}>
-            获取地址：<a href="https://www.runninghub.cn" target="_blank" rel="noopener"
-               style={{color: "var(--primary)"}}>RunningHub 控制台</a>
+            鑾峰彇鍦板潃锛?a href="https://www.runninghub.cn" target="_blank" rel="noopener"
+               style={{color: "var(--primary)"}}>RunningHub 鎺у埗鍙?/a>
           </div>
         </div>
         <div className="form-row">
-          <div className="label">实例规格 (Instance Type)</div>
+          <div className="label">瀹炰緥瑙勬牸 (Instance Type)</div>
           <select className="input select" value={draft.rh_instance_type || "plus"}
                   onChange={function (e) {
                     update("rh_instance_type", e.target.value);
@@ -4907,18 +4907,18 @@ function SettingsTab({ settings, onSaved, voices }) {
             <option value="plus">Plus</option>
           </select>
         </div>
-        <Collapsible title="Workflow 预设" defaultOpen={false}>
+        <Collapsible title="Workflow 棰勮" defaultOpen={false}>
           <div className="text-xs text-dim" style={{marginBottom: 8, lineHeight: 1.5}}>
-            为每个模式预设 RunningHub workflow_id，创建任务时可直接选用。
+            涓烘瘡涓ā寮忛璁?RunningHub workflow_id锛屽垱寤轰换鍔℃椂鍙洿鎺ラ€夌敤銆?
           </div>
           {["photo_speak", "video_relip", "video_reface", "avatar_compose", "pose_drive"].map(function (m) {
             var key = "rh_wf_" + m;
-            var labels = {photo_speak: "照片说话", video_relip: "视频换嘴", video_reface: "视频换人", avatar_compose: "数字人合成", pose_drive: "图生动作"};
+            var labels = {photo_speak: "鐓х墖璇磋瘽", video_relip: "瑙嗛鎹㈠槾", video_reface: "瑙嗛鎹汉", avatar_compose: "鏁板瓧浜哄悎鎴?, pose_drive: "鍥剧敓鍔ㄤ綔"};
             return (
               <div key={key} className="form-row" style={{marginBottom: 6}}>
                 <div className="label" style={{fontSize: 12}}>{labels[m]}</div>
                 <input className="input" type="text"
-                       placeholder="粘贴 workflow_id"
+                       placeholder="绮樿创 workflow_id"
                        value={draft[key] || ""}
                        onChange={function (e) { update(key, e.target.value); }}
                        onBlur={function () { save({ [key]: (draft[key] || "").trim() }); }} />
@@ -4928,13 +4928,13 @@ function SettingsTab({ settings, onSaved, voices }) {
         </Collapsible>
       </div>
 
-      {/* ── Section 3: 本地 ComfyUI ────────────────────────────── */}
+      {/* 鈹€鈹€ Section 3: 鏈湴 ComfyUI 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title"
             style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8}}>
           <span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
             <span className="oa-icon"><Ico name="cpu"/></span>
-            本地 ComfyUI
+            鏈湴 ComfyUI
           </span>
           {settings.comfyui_configured && (
             <span style={{
@@ -4943,11 +4943,11 @@ function SettingsTab({ settings, onSaved, voices }) {
               color: "var(--success, #059669)",
               border: "1px solid var(--success-border, #a7f3d0)",
               fontWeight: 500,
-            }}>已配置</span>
+            }}>宸查厤缃?/span>
           )}
         </h3>
         <div className="form-row">
-          <div className="label">ComfyUI 地址 (URL)</div>
+          <div className="label">ComfyUI 鍦板潃 (URL)</div>
           <div className="flex gap-2">
             <input className="input flex-1" type="text"
                    value={draft.comfyui_url || ""}
@@ -4961,32 +4961,32 @@ function SettingsTab({ settings, onSaved, voices }) {
                         comfyui_url: (draft.comfyui_url || "").trim(),
                         comfyui_api_key: (draft.comfyui_api_key || "").trim()
                       }).then(function (r) {
-                        if (r.ok && r.body && r.body.ok) showToast("ComfyUI 连接成功");
-                        else showToast("连接失败: " + ((r.body && r.body.message) || "未知错误"), "error");
+                        if (r.ok && r.body && r.body.ok) showToast("ComfyUI 杩炴帴鎴愬姛");
+                        else showToast("杩炴帴澶辫触: " + ((r.body && r.body.message) || "鏈煡閿欒"), "error");
                       });
-                    }}>测试连接</button>
+                    }}>娴嬭瘯杩炴帴</button>
           </div>
         </div>
         <div className="form-row">
-          <div className="label">API Key（可选）</div>
+          <div className="label">API Key锛堝彲閫夛級</div>
           <input className="input" type="password"
                  value={draft.comfyui_api_key || ""}
-                 placeholder="留空则不鉴权"
+                 placeholder="鐣欑┖鍒欎笉閴存潈"
                  onChange={function (e) { update("comfyui_api_key", e.target.value); }}
                  onBlur={function () { save({ comfyui_api_key: (draft.comfyui_api_key || "").trim() }); }} />
         </div>
-        <Collapsible title="Workflow 预设" defaultOpen={false}>
+        <Collapsible title="Workflow 棰勮" defaultOpen={false}>
           <div className="text-xs text-dim" style={{marginBottom: 8, lineHeight: 1.5}}>
-            为每个模式预设本地 workflow_id 或 .json 文件路径。
+            涓烘瘡涓ā寮忛璁炬湰鍦?workflow_id 鎴?.json 鏂囦欢璺緞銆?
           </div>
           {["photo_speak", "video_relip", "video_reface", "avatar_compose", "pose_drive"].map(function (m) {
             var key = "comfyui_wf_" + m;
-            var labels = {photo_speak: "照片说话", video_relip: "视频换嘴", video_reface: "视频换人", avatar_compose: "数字人合成", pose_drive: "图生动作"};
+            var labels = {photo_speak: "鐓х墖璇磋瘽", video_relip: "瑙嗛鎹㈠槾", video_reface: "瑙嗛鎹汉", avatar_compose: "鏁板瓧浜哄悎鎴?, pose_drive: "鍥剧敓鍔ㄤ綔"};
             return (
               <div key={key} className="form-row" style={{marginBottom: 6}}>
                 <div className="label" style={{fontSize: 12}}>{labels[m]}</div>
                 <input className="input" type="text"
-                       placeholder="workflow_id 或本地路径"
+                       placeholder="workflow_id 鎴栨湰鍦拌矾寰?
                        value={draft[key] || ""}
                        onChange={function (e) { update(key, e.target.value); }}
                        onBlur={function () { save({ [key]: (draft[key] || "").trim() }); }} />
@@ -4996,12 +4996,12 @@ function SettingsTab({ settings, onSaved, voices }) {
         </Collapsible>
       </div>
 
-      {/* ── Section 4: TTS 引擎 ───────────────────────────────── */}
+      {/* 鈹€鈹€ Section 4: TTS 寮曟搸 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span style={{display: "inline-flex", alignItems: "center", gap: 6}}>
             <span className="oa-icon"><Ico name="mic"/></span>
-            TTS 引擎
+            TTS 寮曟搸
           </span>
         </h3>
         <div className="form-row">
@@ -5013,7 +5013,7 @@ function SettingsTab({ settings, onSaved, voices }) {
                        update("tts_engine", "cosyvoice");
                        pluginApi("PUT", "/settings", { tts_engine: "cosyvoice" });
                      }} />
-              CosyVoice（百炼付费）
+              CosyVoice锛堢櫨鐐间粯璐癸級
             </label>
             <label style={{display: "flex", alignItems: "center", gap: 4, cursor: "pointer"}}>
               <input type="radio" name="tts_engine"
@@ -5022,30 +5022,30 @@ function SettingsTab({ settings, onSaved, voices }) {
                        update("tts_engine", "edge");
                        pluginApi("PUT", "/settings", { tts_engine: "edge" });
                      }} />
-              Edge-TTS（免费）
+              Edge-TTS锛堝厤璐癸級
             </label>
           </div>
           {draft.tts_engine === "edge" ? (
             <div>
-              <div className="label">Edge-TTS 默认音色</div>
+              <div className="label">Edge-TTS 榛樿闊宠壊</div>
               <select className="input select" value={draft.tts_voice_edge || "zh-CN-YunxiNeural"}
                       onChange={function (e) {
                         update("tts_voice_edge", e.target.value);
                         save({ tts_voice_edge: e.target.value });
                       }}>
                 {(settings.edge_voices || [
-                  {id: "zh-CN-YunxiNeural", label: "云希（男-阳光）"},
-                  {id: "zh-CN-YunjianNeural", label: "云健（男-沉稳）"},
-                  {id: "zh-CN-YunxiaNeural", label: "云夏（男-少年）"},
-                  {id: "zh-CN-YunyangNeural", label: "云扬（男-新闻）"},
-                  {id: "zh-CN-XiaoxiaoNeural", label: "晓晓（女-温柔）"},
-                  {id: "zh-CN-XiaoyiNeural", label: "晓伊（女-活泼）"},
-                  {id: "zh-CN-XiaochenNeural", label: "晓辰（女-知性）"},
-                  {id: "zh-CN-XiaohanNeural", label: "晓涵（女-沉静）"},
-                  {id: "zh-CN-XiaomoNeural", label: "晓墨（女-柔美）"},
-                  {id: "zh-CN-XiaoqiuNeural", label: "晓秋（女-优雅）"},
-                  {id: "zh-CN-XiaoruiNeural", label: "晓睿（女-甜美）"},
-                  {id: "zh-CN-XiaoshuangNeural", label: "晓双（女-童声）"},
+                  {id: "zh-CN-YunxiNeural", label: "浜戝笇锛堢敺-闃冲厜锛?},
+                  {id: "zh-CN-YunjianNeural", label: "浜戝仴锛堢敺-娌夌ǔ锛?},
+                  {id: "zh-CN-YunxiaNeural", label: "浜戝锛堢敺-灏戝勾锛?},
+                  {id: "zh-CN-YunyangNeural", label: "浜戞壃锛堢敺-鏂伴椈锛?},
+                  {id: "zh-CN-XiaoxiaoNeural", label: "鏅撴檽锛堝コ-娓╂煍锛?},
+                  {id: "zh-CN-XiaoyiNeural", label: "鏅撲紛锛堝コ-娲绘臣锛?},
+                  {id: "zh-CN-XiaochenNeural", label: "鏅撹景锛堝コ-鐭ユ€э級"},
+                  {id: "zh-CN-XiaohanNeural", label: "鏅撴兜锛堝コ-娌夐潤锛?},
+                  {id: "zh-CN-XiaomoNeural", label: "鏅撳ⅷ锛堝コ-鏌旂編锛?},
+                  {id: "zh-CN-XiaoqiuNeural", label: "鏅撶锛堝コ-浼橀泤锛?},
+                  {id: "zh-CN-XiaoruiNeural", label: "鏅撶澘锛堝コ-鐢滅編锛?},
+                  {id: "zh-CN-XiaoshuangNeural", label: "鏅撳弻锛堝コ-绔ュ０锛?},
                 ]).map(function (v) {
                   return <option key={v.id} value={v.id}>{v.label}</option>;
                 })}
@@ -5053,13 +5053,13 @@ function SettingsTab({ settings, onSaved, voices }) {
             </div>
           ) : (
             <div className="text-xs text-dim">
-              CosyVoice 音色在创建任务时选择，使用百炼 API Key 计费。
+              CosyVoice 闊宠壊鍦ㄥ垱寤轰换鍔℃椂閫夋嫨锛屼娇鐢ㄧ櫨鐐?API Key 璁¤垂銆?
             </div>
           )}
         </div>
       </div>
 
-      {/* ── 默认偏好 ─────────────────────────────────────────── */}
+      {/* 鈹€鈹€ 榛樿鍋忓ソ 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"><Ico name="cog"/></span>
@@ -5084,7 +5084,7 @@ function SettingsTab({ settings, onSaved, voices }) {
                       save({ default_voice: e.target.value });
                     }}>
               {voiceOptions.map(function (v) {
-                return <option key={v.id} value={v.id}>{v.label}{v.system ? "" : " · 自定义"}</option>;
+                return <option key={v.id} value={v.id}>{v.label}{v.system ? "" : " 路 鑷畾涔?}</option>;
               })}
             </select>
           </div>
@@ -5099,22 +5099,22 @@ function SettingsTab({ settings, onSaved, voices }) {
         </div>
       </div>
 
-      {/* ── 存储与清理 ────────────────────────────────────────
+      {/* 鈹€鈹€ 瀛樺偍涓庢竻鐞?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
           Layout deliberately mirrors plugins/seedance-video so users
           flipping between the two plugins encounter the same affordances
           (input + Browse + Open, an output subdir / filename template,
           and per-folder usage cards). All folder paths go through
           /storage/open-folder + /storage/list-dir + /storage/mkdir on
-          the backend — no host bridge or native dialog dependency. */}
+          the backend 鈥?no host bridge or native dialog dependency. */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"><Ico name="layers"/></span>
           {t("settings.section.storage")}
         </h3>
 
-        {/* ── 数据目录 ── input + Browse + Open. Empty input = use the
+        {/* 鈹€鈹€ 鏁版嵁鐩綍 鈹€鈹€ input + Browse + Open. Empty input = use the
             built-in default (~/.synapse/.../avatar-studio). Backend's
-            「打开」 endpoint resolves the default automatically when the
+            銆屾墦寮€銆?endpoint resolves the default automatically when the
             value is blank, so the button always works. */}
         <div className="form-row">
           <label className="label">{t("settings.storage.dir")}</label>
@@ -5142,7 +5142,7 @@ function SettingsTab({ settings, onSaved, voices }) {
               {t("settings.storage.dir.active")} {settings.data_dir_active}
             </div>
           )}
-          {/* Subdir + naming sit *under* the data dir like seedance — the
+          {/* Subdir + naming sit *under* the data dir like seedance 鈥?the
               naming template applies to the final mp4/mp3 inside outputs/
               so it belongs to the same logical group as the output root. */}
           <div className="grid-2" style={{marginTop: 6}}>
@@ -5185,12 +5185,12 @@ function SettingsTab({ settings, onSaved, voices }) {
           {settings.data_dir_pending_reload && !settings.data_dir_status && (
             <div className="text-xs"
                  style={{marginTop: 4, color: "#b45309"}}>
-              ⚠ {t("settings.storage.dir.pending")}
+              鈿?{t("settings.storage.dir.pending")}
             </div>
           )}
         </div>
 
-        {/* ── Per-folder usage cards (grid-2 → two rows of two on narrow
+        {/* 鈹€鈹€ Per-folder usage cards (grid-2 鈫?two rows of two on narrow
             widths, single row of four when the parent is wide enough).
             Mirrors seedance-video's grid-3 stats block; the click target
             opens the actual folder via the backend. */}
@@ -5224,7 +5224,7 @@ function SettingsTab({ settings, onSaved, voices }) {
           </div>
         )}
 
-        {/* ── Cleanup row at the bottom — keeps with the other storage
+        {/* 鈹€鈹€ Cleanup row at the bottom 鈥?keeps with the other storage
             controls instead of jumping back into the API/Defaults block. */}
         <div className="form-row" style={{marginTop: 14}}>
           <label className="label">{t("settings.storage.retention")}</label>
@@ -5247,7 +5247,7 @@ function SettingsTab({ settings, onSaved, voices }) {
         </div>
       </div>
 
-      {/* ── 高级 ────────────────────────────────────────────── */}
+      {/* 鈹€鈹€ 楂樼骇 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"><Ico name="info"/></span>
@@ -5271,7 +5271,7 @@ function SettingsTab({ settings, onSaved, voices }) {
         </div>
       </div>
 
-      {/* ── 关于 ────────────────────────────────────────────── */}
+      {/* 鈹€鈹€ 鍏充簬 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */}
       <div className="setting-section oa-settings-section">
         <h3 className="oa-settings-section__title">
           <span className="oa-icon"><Ico name="info"/></span>
@@ -5283,9 +5283,9 @@ function SettingsTab({ settings, onSaved, voices }) {
           <div className="text-sm"><code className="inline">1.0.0</code></div>
         </div>
         <div className="flex items-center justify-between" style={{padding: "6px 0"}}>
-          <div className="text-sm text-muted">DashScope 模型矩阵</div>
+          <div className="text-sm text-muted">DashScope 妯″瀷鐭╅樀</div>
           <div className="text-xs text-dim">
-            wan2.2-s2v · videoretalk · animate-mix · cosyvoice-v2
+            wan2.2-s2v 路 videoretalk 路 animate-mix 路 cosyvoice-v2
           </div>
         </div>
       </div>
@@ -5305,11 +5305,11 @@ function SettingsTab({ settings, onSaved, voices }) {
   );
 }
 
-/* ─── PromptGuideTab ──────────────────────────────────────────────
+/* 鈹€鈹€鈹€ PromptGuideTab 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
  * Static knowledge base served by GET /prompt-guide. Renders 6
- * <Collapsible> chapters: 配方 / 最佳实践 / 音色 / 视频换人 / 融合 / FAQ.
- * Falls back to a friendly "请在 Settings 配置 API Key" panel if the
- * fetch fails — the route itself doesn't need an API key, but the
+ * <Collapsible> chapters: 閰嶆柟 / 鏈€浣冲疄璺?/ 闊宠壊 / 瑙嗛鎹汉 / 铻嶅悎 / FAQ.
+ * Falls back to a friendly "璇峰湪 Settings 閰嶇疆 API Key" panel if the
+ * fetch fails 鈥?the route itself doesn't need an API key, but the
  * banner overlay above already handles the unconfigured case. */
 
 function PromptGuideTab() {
@@ -5323,8 +5323,8 @@ function PromptGuideTab() {
     }).catch(function (e) { setErr(String(e)); });
   }, []);
 
-  if (err) return <EmptyState icon="warn" title="加载失败" hint={err} />;
-  if (!guide) return <EmptyState icon="loader" title="加载中..." />;
+  if (err) return <EmptyState icon="warn" title="鍔犺浇澶辫触" hint={err} />;
+  if (!guide) return <EmptyState icon="loader" title="鍔犺浇涓?.." />;
 
   const Section = function ({ title, children }) {
     return (
@@ -5346,7 +5346,7 @@ function PromptGuideTab() {
           return (
             <div key={k} style={{marginBottom: 10}}>
               <div className="text-sm" style={{fontWeight: 600, marginBottom: 4}}>
-                {t("create.mode." + k) + " · " + k}
+                {t("create.mode." + k) + " 路 " + k}
               </div>
               <div className="text-sm text-muted" style={{lineHeight: 1.7}}>{v}</div>
             </div>
@@ -5390,8 +5390,8 @@ function PromptGuideTab() {
         {(guide.faq || []).map(function (pair, i) {
           return (
             <div key={i} style={{marginBottom: 10}}>
-              <div className="text-sm" style={{fontWeight: 600, marginBottom: 4}}>Q · {pair[0]}</div>
-              <div className="text-sm text-muted" style={{lineHeight: 1.7}}>A · {pair[1]}</div>
+              <div className="text-sm" style={{fontWeight: 600, marginBottom: 4}}>Q 路 {pair[0]}</div>
+              <div className="text-sm text-muted" style={{lineHeight: 1.7}}>A 路 {pair[1]}</div>
             </div>
           );
         })}
@@ -5401,7 +5401,7 @@ function PromptGuideTab() {
 }
 
 
-/* ─── Top-level App ──────────────────────────────────────────────── */
+/* 鈹€鈹€鈹€ Top-level App 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ */
 // Order matches App's switch on `activeTab` (0..5). The "guide" tab sits
 // just before "settings" for parity with tongyi-image.
 const TAB_IDS = ["create", "tasks", "voices", "figures", "guide", "settings"];
@@ -5427,17 +5427,17 @@ function App() {
     return s;
   }, [settings, catalog]);
 
-  // Truthy whenever the backend has a key on disk — regardless of whether
+  // Truthy whenever the backend has a key on disk 鈥?regardless of whether
   // ``settings.api_key`` was echoed back as the real value (current
   // behaviour) or masked to "" (pre-2026-04 behaviour). Using the
   // ``has_api_key`` flag as a fallback means an old cached backend
-  // response can no longer falsely trigger the "尚未配置" banner.
+  // response can no longer falsely trigger the "灏氭湭閰嶇疆" banner.
   const hasKey = !!(settings.api_key || settings.has_api_key);
   const apiKeyDisplay = settings.api_key ? (settings.api_key.length > 12 ? settings.api_key.slice(0, 4) + "..." + settings.api_key.slice(-4) : settings.api_key) : "";
   const settingsIdx = TAB_IDS.indexOf("settings");
   const showKeyBanner = settingsLoaded && !hasKey && activeTab !== settingsIdx;
   // OSS banner: shown only when key is set (otherwise the API-key
-  // banner takes precedence — no point asking the user to wire up
+  // banner takes precedence 鈥?no point asking the user to wire up
   // OSS before they've even got an API key). DashScope cannot fetch
   // local /api/... URLs, so any task with assets will 422 without OSS.
   const ossConfigured = !!settings.oss_configured;
@@ -5446,7 +5446,7 @@ function App() {
   return (
     <div className="app">
       <div className="header">
-        {/* Hero title — same visual treatment as tongyi-image / seedance-video.
+        {/* Hero title 鈥?same visual treatment as tongyi-image / seedance-video.
             The right slot is intentionally empty: the long yellow banner below
             already announces "missing API key", a duplicate pill on the right
             would be visual noise (matches tongyi-image's design). */}
@@ -5493,15 +5493,15 @@ function App() {
              style={{margin: "12px 20px 0", flexShrink: 0}}>
           <span className="oa-icon oa-config-banner__icon"><Ico name="warn"/></span>
           <div className="oa-config-banner__text">
-            <strong>{settings.oss_status_message ? "阿里云 OSS 配置无效" : "阿里云 OSS 未配置"}</strong>
+            <strong>{settings.oss_status_message ? "闃块噷浜?OSS 閰嶇疆鏃犳晥" : "闃块噷浜?OSS 鏈厤缃?}</strong>
             <div style={{fontSize: 12, color: "var(--text-muted)", marginTop: 2}}>
-              DashScope 无法 fetch 本地 URL，所有任务都需要先把素材推到你自己的 OSS bucket。
-              到「设置 → 阿里云 OSS」检查 4 个字段（endpoint / bucket / key / secret）。
+              DashScope 鏃犳硶 fetch 鏈湴 URL锛屾墍鏈変换鍔￠兘闇€瑕佸厛鎶婄礌鏉愭帹鍒颁綘鑷繁鐨?OSS bucket銆?
+              鍒般€岃缃?鈫?闃块噷浜?OSS銆嶆鏌?4 涓瓧娈碉紙endpoint / bucket / key / secret锛夈€?
             </div>
           </div>
           <button className="oa-config-banner__action" type="button"
                   onClick={function () { setActiveTab(settingsIdx); }}>
-            前往配置
+            鍓嶅線閰嶇疆
             <span className="oa-icon"><Ico name="play"/></span>
           </button>
         </div>
@@ -5522,11 +5522,11 @@ function App() {
   );
 }
 
-/* ─── ConfirmHost ─────────────────────────────────────────────────────
+/* 鈹€鈹€鈹€ ConfirmHost 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
    Renders any pending oaConfirm() request as a modal. Mounted once at
    the bottom of <App/> so every callsite shares the same overlay and
    we never show two stacked confirms (each new oaConfirm replaces the
-   one in flight — matches what the native confirm() does serially). */
+   one in flight 鈥?matches what the native confirm() does serially). */
 function ConfirmHost() {
   const [pending, setPending] = useState(null);
   useEffect(function () {

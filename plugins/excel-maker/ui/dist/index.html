@@ -1,13 +1,13 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Excel Maker</title>
     <link rel="stylesheet" href="./_assets/styles.css" />
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.7/babel.min.js"></script>
   </head>
   <body>
     <div id="root"></div>
@@ -25,13 +25,13 @@
         folder: ["M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"],
         palette: ["M12 22a10 10 0 1 1 10-10c0 3-2 4-4 4h-1.5a1.5 1.5 0 0 0 0 3H17a5 5 0 0 1-5 3Z", "M7.5 10.5h.01", "M10.5 7.5h.01", "M14.5 7.5h.01", "M16.5 10.5h.01"],
       };
-      const symbolIconMap = { "✦": "plus", "▦": "projects", "▤": "database", "◇": "template", "⚙": "settings", "◎": "monitor", "⌁": "settings", "▧": "template", "!": "monitor", "①": "plus", "②": "database", "③": "template", "✓": "monitor", "?": "monitor", "▥": "database" };
+      const symbolIconMap = { "鉁?: "plus", "鈻?: "projects", "鈻?: "database", "鈼?: "template", "鈿?: "settings", "鈼?: "monitor", "鈱?: "settings", "鈻?: "template", "!": "monitor", "鈶?: "plus", "鈶?: "database", "鈶?: "template", "鉁?: "monitor", "?": "monitor", "鈻?: "database" };
       const tabs = [
-        { id: "Create", label: "创建", icon: "plus" },
-        { id: "Projects", label: "项目", icon: "projects" },
-        { id: "Datasets", label: "数据集", icon: "database" },
-        { id: "Templates", label: "模板库", icon: "template" },
-        { id: "Settings", label: "设置", icon: "settings" },
+        { id: "Create", label: "鍒涘缓", icon: "plus" },
+        { id: "Projects", label: "椤圭洰", icon: "projects" },
+        { id: "Datasets", label: "鏁版嵁闆?, icon: "database" },
+        { id: "Templates", label: "妯℃澘搴?, icon: "template" },
+        { id: "Settings", label: "璁剧疆", icon: "settings" },
       ];
 
       let _ctx = null;
@@ -168,7 +168,7 @@
 
       function ErrorPanel({ error, onClose }) {
         if (!error) return null;
-        return <div className="error"><div>{error}</div><button className="btn danger" onClick={onClose}>关闭</button></div>;
+        return <div className="error"><div>{error}</div><button className="btn danger" onClick={onClose}>鍏抽棴</button></div>;
       }
 
       function FileUploadZone({ projectId, onUploaded }) {
@@ -188,13 +188,13 @@
         }
         return (
           <div className="upload">
-            <p>上传 .xlsx / .csv / .tsv，源文件不会被覆盖。</p>
+            <p>涓婁紶 .xlsx / .csv / .tsv锛屾簮鏂囦欢涓嶄細琚鐩栥€?/p>
             <input type="file" accept=".xlsx,.csv,.tsv" disabled={busy} onChange={(e) => upload(e.target.files[0])} />
           </div>
         );
       }
 
-      function PreviewEmpty({ title, desc, icon = "▤" }) {
+      function PreviewEmpty({ title, desc, icon = "鈻? }) {
         const iconName = symbolIconMap[icon] || "database";
         return (
           <div className="preview-empty">
@@ -207,49 +207,49 @@
 
       function WorkbookPreview({ project, workbook, profile, questions, plan, artifact }) {
         if (!project && !workbook && !profile && !plan && !artifact) {
-          return <PreviewEmpty title="暂无报表任务" desc="在左侧填写目标、上传表格后开始生成 Excel 报表" icon="▥" />;
+          return <PreviewEmpty title="鏆傛棤鎶ヨ〃浠诲姟" desc="鍦ㄥ乏渚у～鍐欑洰鏍囥€佷笂浼犺〃鏍煎悗寮€濮嬬敓鎴?Excel 鎶ヨ〃" icon="鈻? />;
         }
         const sheets = (profile && profile.sheets) || [];
         const firstSheet = sheets[0] || null;
         return (
           <div>
-            <div className="preview-title"><Ico>▥</Ico> 报表预览</div>
+            <div className="preview-title"><Ico>鈻?/Ico> 鎶ヨ〃棰勮</div>
             <div className="metric-grid">
               <div className="metric">
                 <div className="metric-value">{sheets.length || 0}</div>
-                <div className="metric-label">已识别 Sheet</div>
+                <div className="metric-label">宸茶瘑鍒?Sheet</div>
               </div>
               <div className="metric">
                 <div className="metric-value">{firstSheet ? firstSheet.column_count || 0 : 0}</div>
-                <div className="metric-label">首个 Sheet 列数</div>
+                <div className="metric-label">棣栦釜 Sheet 鍒楁暟</div>
               </div>
               <div className="metric">
                 <div className="metric-value">{artifact ? "1" : "0"}</div>
-                <div className="metric-label">导出文件</div>
+                <div className="metric-label">瀵煎嚭鏂囦欢</div>
               </div>
             </div>
             <div className="preview-section">
-              <div className="card-title"><Ico>◎</Ico> 当前状态</div>
+              <div className="card-title"><Ico>鈼?/Ico> 褰撳墠鐘舵€?/div>
               <div className="steps">
-                <div className="step"><span className="step-num">1</span><div><b>项目</b><br /><span className="muted">{project ? project.title : "未创建"}</span></div></div>
-                <div className="step"><span className="step-num">2</span><div><b>输入工作簿</b><br /><span className="muted">{workbook ? workbook.filename : "未上传"}</span></div></div>
-                <div className="step"><span className="step-num">3</span><div><b>输出</b><br />{artifact ? <button className="btn primary" onClick={() => downloadArtifact(artifact)}>下载 {artifact.filename || "report.xlsx"}</button> : <span className="muted">等待生成 .xlsx</span>}</div></div>
+                <div className="step"><span className="step-num">1</span><div><b>椤圭洰</b><br /><span className="muted">{project ? project.title : "鏈垱寤?}</span></div></div>
+                <div className="step"><span className="step-num">2</span><div><b>杈撳叆宸ヤ綔绨?/b><br /><span className="muted">{workbook ? workbook.filename : "鏈笂浼?}</span></div></div>
+                <div className="step"><span className="step-num">3</span><div><b>杈撳嚭</b><br />{artifact ? <button className="btn primary" onClick={() => downloadArtifact(artifact)}>涓嬭浇 {artifact.filename || "report.xlsx"}</button> : <span className="muted">绛夊緟鐢熸垚 .xlsx</span>}</div></div>
               </div>
             </div>
             {questions.length > 0 && (
               <div className="preview-section">
-                <div className="card-title"><Ico>?</Ico> AI 追问</div>
+                <div className="card-title"><Ico>?</Ico> AI 杩介棶</div>
                 <ul>{questions.map((q) => <li key={q}>{q}</li>)}</ul>
               </div>
             )}
             {firstSheet && (
               <div className="preview-section">
-                <div className="card-title"><Ico>▤</Ico> 数据结构</div>
+                <div className="card-title"><Ico>鈻?/Ico> 鏁版嵁缁撴瀯</div>
                 <div className="pill-list">
                   <span className="pill">{firstSheet.name}</span>
-                  <span className="pill">{firstSheet.row_count || 0} 行</span>
-                  <span className="pill">{firstSheet.column_count || 0} 列</span>
-                  <span className="pill">{firstSheet.formula_count || 0} 个公式</span>
+                  <span className="pill">{firstSheet.row_count || 0} 琛?/span>
+                  <span className="pill">{firstSheet.column_count || 0} 鍒?/span>
+                  <span className="pill">{firstSheet.formula_count || 0} 涓叕寮?/span>
                 </div>
               </div>
             )}
@@ -264,8 +264,8 @@
       }
 
       function CreateTab({ refresh }) {
-        const [title, setTitle] = useState("经营分析报表");
-        const [goal, setGoal] = useState("整理数据，生成可交付 Excel 报表");
+        const [title, setTitle] = useState("缁忚惀鍒嗘瀽鎶ヨ〃");
+        const [goal, setGoal] = useState("鏁寸悊鏁版嵁锛岀敓鎴愬彲浜や粯 Excel 鎶ヨ〃");
         const [project, setProject] = useState(null);
         const [workbook, setWorkbook] = useState(null);
         const [profile, setProfile] = useState(null);
@@ -332,35 +332,35 @@
               <div className="banner">
                 <Ico>!</Ico>
                 <div>
-                  <b>Excel-first 工作流</b>
-                  <div>左侧整理输入与口径，右侧实时预览报表结构和导出结果。</div>
+                  <b>Excel-first 宸ヤ綔娴?/b>
+                  <div>宸︿晶鏁寸悊杈撳叆涓庡彛寰勶紝鍙充晶瀹炴椂棰勮鎶ヨ〃缁撴瀯鍜屽鍑虹粨鏋溿€?/div>
                 </div>
               </div>
               <div className="card">
-                <div className="card-title"><Ico>①</Ico> 报表目标</div>
-                <div className="field"><label>报表标题</label><input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
-                <div className="field"><label>生成目标 / 业务口径</label><textarea rows="4" value={goal} onChange={(e) => setGoal(e.target.value)} /></div>
+                <div className="card-title"><Ico>鈶?/Ico> 鎶ヨ〃鐩爣</div>
+                <div className="field"><label>鎶ヨ〃鏍囬</label><input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
+                <div className="field"><label>鐢熸垚鐩爣 / 涓氬姟鍙ｅ緞</label><textarea rows="4" value={goal} onChange={(e) => setGoal(e.target.value)} /></div>
                 <div className="row">
-                  <button className="btn primary" onClick={() => createProject().catch((e) => setError(e.message))}>创建项目</button>
+                  <button className="btn primary" onClick={() => createProject().catch((e) => setError(e.message))}>鍒涘缓椤圭洰</button>
                   {project && <StatusBadge value={project.status} />}
                 </div>
               </div>
               <div className="card">
-                <div className="card-title"><Ico>②</Ico> 上传表格并剖析</div>
+                <div className="card-title"><Ico>鈶?/Ico> 涓婁紶琛ㄦ牸骞跺墫鏋?/div>
                 <FileUploadZone projectId={project && project.id} onUploaded={(wb) => importAndProfile(wb).catch((e) => setError(e.message))} />
-                {workbook && <p className="muted">当前工作簿：<b>{workbook.filename}</b> <StatusBadge value={workbook.status} /></p>}
+                {workbook && <p className="muted">褰撳墠宸ヤ綔绨匡細<b>{workbook.filename}</b> <StatusBadge value={workbook.status} /></p>}
               </div>
               <div className="card soft">
-                <div className="card-title"><Ico>③</Ico> 方案与导出</div>
+                <div className="card-title"><Ico>鈶?/Ico> 鏂规涓庡鍑?/div>
                 <div className="steps">
-                  <div className="step"><span className="step-num">A</span><div>先让 AI 根据 profile 追问缺失口径。</div></div>
-                  <div className="step"><span className="step-num">B</span><div>生成受控 WorkbookPlan，确认 Sheet、公式和审计项。</div></div>
-                  <div className="step"><span className="step-num">C</span><div>后端确定性生成 `.xlsx`，并写入审计结果。</div></div>
+                  <div className="step"><span className="step-num">A</span><div>鍏堣 AI 鏍规嵁 profile 杩介棶缂哄け鍙ｅ緞銆?/div></div>
+                  <div className="step"><span className="step-num">B</span><div>鐢熸垚鍙楁帶 WorkbookPlan锛岀‘璁?Sheet銆佸叕寮忓拰瀹¤椤广€?/div></div>
+                  <div className="step"><span className="step-num">C</span><div>鍚庣纭畾鎬х敓鎴?`.xlsx`锛屽苟鍐欏叆瀹¤缁撴灉銆?/div></div>
                 </div>
                 <div className="row" style={{ marginTop: 12 }}>
-                  <button className="btn" disabled={!profile} onClick={() => clarify().catch((e) => setError(e.message))}>生成追问</button>
-                  <button className="btn" disabled={!profile} onClick={() => makePlan().catch((e) => setError(e.message))}>生成方案</button>
-                  <button className="btn primary" disabled={!project || !plan} onClick={() => build().catch((e) => setError(e.message))}>生成 XLSX</button>
+                  <button className="btn" disabled={!profile} onClick={() => clarify().catch((e) => setError(e.message))}>鐢熸垚杩介棶</button>
+                  <button className="btn" disabled={!profile} onClick={() => makePlan().catch((e) => setError(e.message))}>鐢熸垚鏂规</button>
+                  <button className="btn primary" disabled={!project || !plan} onClick={() => build().catch((e) => setError(e.message))}>鐢熸垚 XLSX</button>
                 </div>
               </div>
             </div>
@@ -377,13 +377,13 @@
           <div className="workspace">
             <div className="left-pane">
               <div className="card">
-                <div className="card-title"><Ico>▦</Ico> 报表项目</div>
-                <p className="card-desc">查看已创建的 Excel 报表项目，右侧显示当前项目详情与下载入口。</p>
-                <button className="btn" onClick={() => refresh()}>刷新列表</button>
+                <div className="card-title"><Ico>鈻?/Ico> 鎶ヨ〃椤圭洰</div>
+                <p className="card-desc">鏌ョ湅宸插垱寤虹殑 Excel 鎶ヨ〃椤圭洰锛屽彸渚ф樉绀哄綋鍓嶉」鐩鎯呬笌涓嬭浇鍏ュ彛銆?/p>
+                <button className="btn" onClick={() => refresh()}>鍒锋柊鍒楄〃</button>
               </div>
               <div className="card">
                 <table>
-                  <thead><tr><th>标题</th><th>状态</th><th>创建时间</th></tr></thead>
+                  <thead><tr><th>鏍囬</th><th>鐘舵€?/th><th>鍒涘缓鏃堕棿</th></tr></thead>
                   <tbody>
                     {projects.map((p) => (
                       <tr key={p.id} onClick={() => setActiveProject(p)} style={{ cursor: "pointer" }}>
@@ -399,10 +399,10 @@
             <div className="right-pane">
               {activeProject ? (
                 <div>
-                  <div className="preview-title"><Ico>▦</Ico> 项目详情</div>
+                  <div className="preview-title"><Ico>鈻?/Ico> 椤圭洰璇︽儏</div>
                   <div className="preview-section">
                     <div className="card-title">{activeProject.title}</div>
-                    <p className="muted">{activeProject.goal || "未填写目标"}</p>
+                    <p className="muted">{activeProject.goal || "鏈～鍐欑洰鏍?}</p>
                     <div className="pill-list">
                       <span className="pill">{activeProject.id}</span>
                       <span className="pill">{activeProject.status}</span>
@@ -410,12 +410,12 @@
                     </div>
                   </div>
                   <div className="preview-section">
-                    <div className="card-title"><Ico>→</Ico> 下一步</div>
-                    <p className="muted">如需查看产物和审计详情，可在 Create 流程生成后通过下载按钮验收工作簿。</p>
+                    <div className="card-title"><Ico>鈫?/Ico> 涓嬩竴姝?/div>
+                    <p className="muted">濡傞渶鏌ョ湅浜х墿鍜屽璁¤鎯咃紝鍙湪 Create 娴佺▼鐢熸垚鍚庨€氳繃涓嬭浇鎸夐挳楠屾敹宸ヤ綔绨裤€?/p>
                   </div>
                 </div>
               ) : (
-                <PreviewEmpty title="未选择项目" desc="点击左侧项目行查看详情" icon="▦" />
+                <PreviewEmpty title="鏈€夋嫨椤圭洰" desc="鐐瑰嚮宸︿晶椤圭洰琛屾煡鐪嬭鎯? icon="鈻? />
               )}
             </div>
           </div>
@@ -431,23 +431,23 @@
             <div className="left-pane">
               <ErrorPanel error={error} onClose={() => setError("")} />
               <div className="card">
-                <div className="card-title"><Ico>▤</Ico> 数据集预览</div>
-                <p className="card-desc">输入工作簿 ID，查看后端采样后的 Sheet 预览。这里不会展示服务端绝对路径。</p>
+                <div className="card-title"><Ico>鈻?/Ico> 鏁版嵁闆嗛瑙?/div>
+                <p className="card-desc">杈撳叆宸ヤ綔绨?ID锛屾煡鐪嬪悗绔噰鏍峰悗鐨?Sheet 棰勮銆傝繖閲屼笉浼氬睍绀烘湇鍔＄缁濆璺緞銆?/p>
                 <div className="field">
                   <label>Workbook ID</label>
                   <input value={id} onChange={(e) => setId(e.target.value)} placeholder="wb_xxxxxxxxxxxx" />
                 </div>
-                <button className="btn primary" onClick={() => pluginFetch(`/workbooks/${id}/preview`).then((d) => setPreview(d.preview)).catch((e) => setError(e.message))}>查看预览</button>
+                <button className="btn primary" onClick={() => pluginFetch(`/workbooks/${id}/preview`).then((d) => setPreview(d.preview)).catch((e) => setError(e.message))}>鏌ョ湅棰勮</button>
               </div>
             </div>
             <div className="right-pane">
               {preview ? (
                 <div>
-                  <div className="preview-title"><Ico>▤</Ico> Sheet 采样</div>
+                  <div className="preview-title"><Ico>鈻?/Ico> Sheet 閲囨牱</div>
                   <pre className="json-preview">{JSON.stringify(preview, null, 2)}</pre>
                 </div>
               ) : (
-                <PreviewEmpty title="暂无数据预览" desc="在左侧输入 workbook_id 后查看采样内容" icon="▤" />
+                <PreviewEmpty title="鏆傛棤鏁版嵁棰勮" desc="鍦ㄥ乏渚ц緭鍏?workbook_id 鍚庢煡鐪嬮噰鏍峰唴瀹? icon="鈻? />
               )}
             </div>
           </div>
@@ -468,35 +468,35 @@
             <div className="left-pane">
               <ErrorPanel error={error} onClose={() => setError("")} />
               <div className="card">
-                <div className="card-title"><Ico>◇</Ico> 模板登记</div>
-                <p className="card-desc">登记已有 `.xlsx` 模板，后端会诊断 Sheet、冻结窗格、公式、合并区域和命名区域。</p>
+                <div className="card-title"><Ico>鈼?/Ico> 妯℃澘鐧昏</div>
+                <p className="card-desc">鐧昏宸叉湁 `.xlsx` 妯℃澘锛屽悗绔細璇婃柇 Sheet銆佸喕缁撶獥鏍笺€佸叕寮忋€佸悎骞跺尯鍩熷拰鍛藉悕鍖哄煙銆?/p>
                 <div className="field">
-                  <label>服务端模板路径</label>
+                  <label>鏈嶅姟绔ā鏉胯矾寰?/label>
                   <input placeholder="D:\Synapse\test-materials\excel-maker\report_template.xlsx" value={path} onChange={(e) => setPath(e.target.value)} />
                 </div>
-                <button className="btn primary" onClick={() => pluginFetch("/templates", { method: "POST", body: JSON.stringify({ path }) }).then(load).catch((e) => setError(e.message))}>登记模板</button>
+                <button className="btn primary" onClick={() => pluginFetch("/templates", { method: "POST", body: JSON.stringify({ path }) }).then(load).catch((e) => setError(e.message))}>鐧昏妯℃澘</button>
               </div>
               <div className="card">
-                <div className="card-title"><Ico>▧</Ico> 模板库</div>
-                <table><tbody>{templates.map((t) => <tr key={t.id}><td>{t.name}<br /><small className="muted">{t.filename}</small></td><td><StatusBadge value={t.status} /></td><td><button className="btn" onClick={() => pluginFetch(`/templates/${t.id}/diagnose`, { method: "POST", body: "{}" }).then(load).catch((e) => setError(e.message))}>诊断</button></td></tr>)}</tbody></table>
+                <div className="card-title"><Ico>鈻?/Ico> 妯℃澘搴?/div>
+                <table><tbody>{templates.map((t) => <tr key={t.id}><td>{t.name}<br /><small className="muted">{t.filename}</small></td><td><StatusBadge value={t.status} /></td><td><button className="btn" onClick={() => pluginFetch(`/templates/${t.id}/diagnose`, { method: "POST", body: "{}" }).then(load).catch((e) => setError(e.message))}>璇婃柇</button></td></tr>)}</tbody></table>
               </div>
             </div>
             <div className="right-pane">
               {templates.length ? (
                 <div>
-                  <div className="preview-title"><Ico>◇</Ico> 模板诊断预览</div>
+                  <div className="preview-title"><Ico>鈼?/Ico> 妯℃澘璇婃柇棰勮</div>
                   <div className="metric-grid">
-                    <div className="metric"><div className="metric-value">{templates.length}</div><div className="metric-label">模板数量</div></div>
-                    <div className="metric"><div className="metric-value">{templates.filter((t) => t.has_diagnostic).length}</div><div className="metric-label">已诊断</div></div>
-                    <div className="metric"><div className="metric-value">XLSX</div><div className="metric-label">模板类型</div></div>
+                    <div className="metric"><div className="metric-value">{templates.length}</div><div className="metric-label">妯℃澘鏁伴噺</div></div>
+                    <div className="metric"><div className="metric-value">{templates.filter((t) => t.has_diagnostic).length}</div><div className="metric-label">宸茶瘖鏂?/div></div>
+                    <div className="metric"><div className="metric-value">XLSX</div><div className="metric-label">妯℃澘绫诲瀷</div></div>
                   </div>
                   <div className="preview-section">
-                    <div className="card-title"><Ico>✓</Ico> 验收重点</div>
-                    <p className="muted">诊断模板时应能识别 Sheet 名、冻结窗格、合并区域、公式和命名区域；原始模板文件不应被覆盖。</p>
+                    <div className="card-title"><Ico>鉁?/Ico> 楠屾敹閲嶇偣</div>
+                    <p className="muted">璇婃柇妯℃澘鏃跺簲鑳借瘑鍒?Sheet 鍚嶃€佸喕缁撶獥鏍笺€佸悎骞跺尯鍩熴€佸叕寮忓拰鍛藉悕鍖哄煙锛涘師濮嬫ā鏉挎枃浠朵笉搴旇瑕嗙洊銆?/p>
                   </div>
                 </div>
               ) : (
-                <PreviewEmpty title="暂无模板" desc="在左侧登记 xlsx 模板后进行诊断" icon="◇" />
+                <PreviewEmpty title="鏆傛棤妯℃澘" desc="鍦ㄥ乏渚х櫥璁?xlsx 妯℃澘鍚庤繘琛岃瘖鏂? icon="鈼? />
               )}
             </div>
           </div>
@@ -512,36 +512,36 @@
 
       function storageLabel(key) {
         return ({
-          uploads: "上传文件",
-          workbooks: "工作簿分析",
-          projects: "项目记录",
-          exports: "导出报表",
-          templates: "模板库",
-          cache: "缓存",
+          uploads: "涓婁紶鏂囦欢",
+          workbooks: "宸ヤ綔绨垮垎鏋?,
+          projects: "椤圭洰璁板綍",
+          exports: "瀵煎嚭鎶ヨ〃",
+          templates: "妯℃澘搴?,
+          cache: "缂撳瓨",
         })[key] || key;
       }
 
       const directoryFields = [
-        { key: "uploads_dir", storageKey: "uploads", label: "上传资料目录", placeholder: "默认：插件数据目录/uploads", desc: "上传 CSV、XLSX 和后续素材时的落盘位置。" },
-        { key: "workbooks_dir", storageKey: "workbooks", label: "工作簿分析目录", placeholder: "默认：插件数据目录/workbooks", desc: "保存导入副本、profile 和采样预览。" },
-        { key: "templates_dir", storageKey: "templates", label: "模板诊断目录", placeholder: "默认：插件数据目录/templates", desc: "保存 Excel 模板副本和诊断结果。" },
-        { key: "projects_dir", storageKey: "projects", label: "项目工作区目录", placeholder: "默认：插件数据目录/projects", desc: "保存每个报表项目的中间文件。" },
-        { key: "export_dir", storageKey: "exports", label: "导出文件目录", placeholder: "默认：插件数据目录/exports", desc: "保存最终生成的 XLSX 报表。" },
-        { key: "cache_dir", storageKey: "cache", label: "缓存目录", placeholder: "默认：插件数据目录/cache", desc: "保存临时缓存，可在下方清理。" },
+        { key: "uploads_dir", storageKey: "uploads", label: "涓婁紶璧勬枡鐩綍", placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?uploads", desc: "涓婁紶 CSV銆乆LSX 鍜屽悗缁礌鏉愭椂鐨勮惤鐩樹綅缃€? },
+        { key: "workbooks_dir", storageKey: "workbooks", label: "宸ヤ綔绨垮垎鏋愮洰褰?, placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?workbooks", desc: "淇濆瓨瀵煎叆鍓湰銆乸rofile 鍜岄噰鏍烽瑙堛€? },
+        { key: "templates_dir", storageKey: "templates", label: "妯℃澘璇婃柇鐩綍", placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?templates", desc: "淇濆瓨 Excel 妯℃澘鍓湰鍜岃瘖鏂粨鏋溿€? },
+        { key: "projects_dir", storageKey: "projects", label: "椤圭洰宸ヤ綔鍖虹洰褰?, placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?projects", desc: "淇濆瓨姣忎釜鎶ヨ〃椤圭洰鐨勪腑闂存枃浠躲€? },
+        { key: "export_dir", storageKey: "exports", label: "瀵煎嚭鏂囦欢鐩綍", placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?exports", desc: "淇濆瓨鏈€缁堢敓鎴愮殑 XLSX 鎶ヨ〃銆? },
+        { key: "cache_dir", storageKey: "cache", label: "缂撳瓨鐩綍", placeholder: "榛樿锛氭彃浠舵暟鎹洰褰?cache", desc: "淇濆瓨涓存椂缂撳瓨锛屽彲鍦ㄤ笅鏂规竻鐞嗐€? },
       ];
 
       const styleOptions = [
-        { value: "business", label: "商务报表" },
-        { value: "finance", label: "财务分析" },
-        { value: "operations", label: "运营看板" },
-        { value: "minimal", label: "简洁交付" },
+        { value: "business", label: "鍟嗗姟鎶ヨ〃" },
+        { value: "finance", label: "璐㈠姟鍒嗘瀽" },
+        { value: "operations", label: "杩愯惀鐪嬫澘" },
+        { value: "minimal", label: "绠€娲佷氦浠? },
       ];
       const fontOptions = ["Microsoft YaHei", "DengXian", "SimSun", "Arial", "Calibri"];
       const numberFormatOptions = [
-        { value: "#,##0.00", label: "千分位，两位小数（#,##0.00）" },
-        { value: "#,##0", label: "千分位，整数（#,##0）" },
-        { value: "0.00%", label: "百分比，两位小数（0.00%）" },
-        { value: "¥#,##0.00", label: "人民币金额（¥#,##0.00）" },
+        { value: "#,##0.00", label: "鍗冨垎浣嶏紝涓や綅灏忔暟锛?,##0.00锛? },
+        { value: "#,##0", label: "鍗冨垎浣嶏紝鏁存暟锛?,##0锛? },
+        { value: "0.00%", label: "鐧惧垎姣旓紝涓や綅灏忔暟锛?.00%锛? },
+        { value: "楼#,##0.00", label: "浜烘皯甯侀噾棰濓紙楼#,##0.00锛? },
       ];
 
       function SettingsTab() {
@@ -564,10 +564,10 @@
           setSettings(s.settings); setDeps(d.groups || []); setStats(st.stats); setHealth(h);
         }
         function depStatusLabel(dep) {
-          if (dep.busy || dep.status === "running") return "处理中";
-          if (dep.installed) return "已安装";
-          if (dep.status === "failed") return "失败";
-          return "缺失";
+          if (dep.busy || dep.status === "running") return "澶勭悊涓?;
+          if (dep.installed) return "宸插畨瑁?;
+          if (dep.status === "failed") return "澶辫触";
+          return "缂哄け";
         }
         function depStatusClass(dep) {
           if (dep.busy || dep.status === "running") return "busy";
@@ -577,11 +577,11 @@
         }
         function validateSettingValue(key, value) {
           if (!String(value || "").trim()) {
-            const labels = { default_style: "默认样式", font_family: "字体", number_format: "数字格式" };
-            return `${labels[key] || "配置项"}不能为空；请选择预设值或输入自定义值。`;
+            const labels = { default_style: "榛樿鏍峰紡", font_family: "瀛椾綋", number_format: "鏁板瓧鏍煎紡" };
+            return `${labels[key] || "閰嶇疆椤?}涓嶈兘涓虹┖锛涜閫夋嫨棰勮鍊兼垨杈撳叆鑷畾涔夊€笺€俙;
           }
           if (key === "number_format" && !/[0#?]/.test(String(value))) {
-            return "数字格式看起来不像 Excel 格式代码，建议包含 0、# 或 ?，例如 #,##0.00。";
+            return "鏁板瓧鏍煎紡鐪嬭捣鏉ヤ笉鍍?Excel 鏍煎紡浠ｇ爜锛屽缓璁寘鍚?0銆? 鎴??锛屼緥濡?#,##0.00銆?;
           }
           return "";
         }
@@ -590,7 +590,7 @@
           try {
             const data = await pluginFetch("/healthz");
             setHealth(data);
-            setHealthNotice("健康检查完成：插件 API 可用。");
+            setHealthNotice("鍋ュ悍妫€鏌ュ畬鎴愶細鎻掍欢 API 鍙敤銆?);
           } finally {
             setChecking(false);
           }
@@ -600,7 +600,7 @@
           try {
             const data = await pluginFetch("/system/python-deps");
             setDeps(data.groups || []);
-            setHealthNotice("可选依赖状态已重新检测。");
+            setHealthNotice("鍙€変緷璧栫姸鎬佸凡閲嶆柊妫€娴嬨€?);
           } finally {
             setDetecting(false);
           }
@@ -641,7 +641,7 @@
         async function handlePresetChange(key, value, setMode) {
           if (value === "custom") {
             setMode("custom");
-            setFieldNotice("已切换为自定义，请在下方输入具体值。");
+            setFieldNotice("宸插垏鎹负鑷畾涔夛紝璇峰湪涓嬫柟杈撳叆鍏蜂綋鍊笺€?);
             return;
           }
           setMode("");
@@ -649,7 +649,7 @@
         }
         async function runDep(depId, op) {
           setBusyDep(depId);
-          setHealthNotice(op === "install" ? "依赖安装已开始，稍后自动刷新状态。" : "依赖卸载已开始，稍后自动刷新状态。");
+          setHealthNotice(op === "install" ? "渚濊禆瀹夎宸插紑濮嬶紝绋嶅悗鑷姩鍒锋柊鐘舵€併€? : "渚濊禆鍗歌浇宸插紑濮嬶紝绋嶅悗鑷姩鍒锋柊鐘舵€併€?);
           try {
             const data = await pluginFetch(`/system/python-deps/${depId}/${op}`, { method: "POST", body: "{}" });
             setDeps((prev) => prev.map((item) => item.id === depId ? data.dependency : item));
@@ -659,7 +659,7 @@
         }
         async function cleanupCache() {
           const data = await pluginFetch("/cleanup", { method: "POST", body: "{}" });
-          setHealthNotice(`缓存清理完成，移除 ${data.removed || 0} 项。`);
+          setHealthNotice(`缂撳瓨娓呯悊瀹屾垚锛岀Щ闄?${data.removed || 0} 椤广€俙);
           const refreshed = await pluginFetch("/storage/stats");
           setStats(refreshed.stats);
         }
@@ -678,29 +678,29 @@
             <div className="settings-inner">
               <ErrorPanel error={error} onClose={() => setError("")} />
               <div className="settings-section">
-                <div className="card-title"><Ico>⌁</Ico> 系统组件与依赖下载</div>
+                <div className="card-title"><Ico>鈱?/Ico> 绯荤粺缁勪欢涓庝緷璧栦笅杞?/div>
                 <div className="deps-help">
-                  <strong>可选依赖只服务于对应能力，不会影响基础报表生成。</strong>
-                  <div>Excel 表格读取、旧格式支持、图表渲染和模板增强按需安装。这里使用白名单依赖组，禁止输入任意 pip 包名；安装会调用当前 Synapse 使用的 Python 环境执行 pip。</div>
+                  <strong>鍙€変緷璧栧彧鏈嶅姟浜庡搴旇兘鍔涳紝涓嶄細褰卞搷鍩虹鎶ヨ〃鐢熸垚銆?/strong>
+                  <div>Excel 琛ㄦ牸璇诲彇銆佹棫鏍煎紡鏀寔銆佸浘琛ㄦ覆鏌撳拰妯℃澘澧炲己鎸夐渶瀹夎銆傝繖閲屼娇鐢ㄧ櫧鍚嶅崟渚濊禆缁勶紝绂佹杈撳叆浠绘剰 pip 鍖呭悕锛涘畨瑁呬細璋冪敤褰撳墠 Synapse 浣跨敤鐨?Python 鐜鎵ц pip銆?/div>
                 </div>
                 <div className="settings-actions">
-                  <button className="btn primary" onClick={() => checkHealth().catch((e) => setError(e.message))} disabled={checking}>{checking ? "检查中..." : "健康检查"}</button>
-                  <button className="btn" onClick={() => detectDeps().catch((e) => setError(e.message))} disabled={detecting}>{detecting ? "检测中..." : "检测可选依赖"}</button>
+                  <button className="btn primary" onClick={() => checkHealth().catch((e) => setError(e.message))} disabled={checking}>{checking ? "妫€鏌ヤ腑..." : "鍋ュ悍妫€鏌?}</button>
+                  <button className="btn" onClick={() => detectDeps().catch((e) => setError(e.message))} disabled={detecting}>{detecting ? "妫€娴嬩腑..." : "妫€娴嬪彲閫変緷璧?}</button>
                 </div>
                 {healthNotice && <div className="notice notice-inline">{healthNotice}</div>}
                 {deps.map((dep) => (
                   <div key={dep.id} className="dep-card">
                     <div className="dep-card-main">
-                      <span className={"dep-state " + depStatusClass(dep)}>{dep.busy ? "…" : dep.installed ? "✓" : "!"}</span>
+                      <span className={"dep-state " + depStatusClass(dep)}>{dep.busy ? "鈥? : dep.installed ? "鉁? : "!"}</span>
                       <div>
                         <div className="dep-title"><b>{dep.id}</b> <StatusBadge value={depStatusLabel(dep)} /></div>
                         <div className="muted">{dep.description}</div>
-                        <div className="dep-packages">{(dep.packages || []).join(" · ") || "仅检测，不自动安装"}</div>
+                        <div className="dep-packages">{(dep.packages || []).join(" 路 ") || "浠呮娴嬶紝涓嶈嚜鍔ㄥ畨瑁?}</div>
                       </div>
                     </div>
                     <div className="dep-actions">
-                      <button className="btn" disabled={dep.detect_only || dep.installed || dep.busy || busyDep === dep.id} onClick={() => runDep(dep.id, "install").catch((e) => setError(e.message))}>安装</button>
-                      <button className="btn danger" disabled={dep.detect_only || !dep.installed || dep.busy || busyDep === dep.id} onClick={() => runDep(dep.id, "uninstall").catch((e) => setError(e.message))}>卸载</button>
+                      <button className="btn" disabled={dep.detect_only || dep.installed || dep.busy || busyDep === dep.id} onClick={() => runDep(dep.id, "install").catch((e) => setError(e.message))}>瀹夎</button>
+                      <button className="btn danger" disabled={dep.detect_only || !dep.installed || dep.busy || busyDep === dep.id} onClick={() => runDep(dep.id, "uninstall").catch((e) => setError(e.message))}>鍗歌浇</button>
                     </div>
                     {dep.log_tail && dep.log_tail.length > 0 && <pre className="dep-log">{dep.log_tail.slice(-6).join("\n")}</pre>}
                   </div>
@@ -708,41 +708,41 @@
               </div>
 
               <div className="settings-section">
-                <div className="card-title"><Icon name="folder" /> 文件夹、归集与命名</div>
+                <div className="card-title"><Icon name="folder" /> 鏂囦欢澶广€佸綊闆嗕笌鍛藉悕</div>
                 <div className="deps-help warn">
-                  <strong>每类目录都可以自定义，适合大量客户资料、表格和模板分开管理。</strong>
-                  <div>留空时使用插件数据目录；点击“选择”可输入本机文件夹并自动创建目录。上传、分析、模板诊断和导出文件会写入对应目录。</div>
+                  <strong>姣忕被鐩綍閮藉彲浠ヨ嚜瀹氫箟锛岄€傚悎澶ч噺瀹㈡埛璧勬枡銆佽〃鏍煎拰妯℃澘鍒嗗紑绠＄悊銆?/strong>
+                  <div>鐣欑┖鏃朵娇鐢ㄦ彃浠舵暟鎹洰褰曪紱鐐瑰嚮鈥滈€夋嫨鈥濆彲杈撳叆鏈満鏂囦欢澶瑰苟鑷姩鍒涘缓鐩綍銆備笂浼犮€佸垎鏋愩€佹ā鏉胯瘖鏂拰瀵煎嚭鏂囦欢浼氬啓鍏ュ搴旂洰褰曘€?/div>
                 </div>
                 <div className="directory-list">
                   <div className="field directory-row">
-                    <label>插件数据根目录</label>
+                    <label>鎻掍欢鏁版嵁鏍圭洰褰?/label>
                     <div className="folder-row">
-                      <input value={settings?.data_dir || ""} onChange={(e) => updateSettingDraft("data_dir", e.target.value)} onBlur={(e) => saveSetting("data_dir", e.target.value).catch((err) => setError(err.message))} placeholder="默认使用插件数据目录" />
-                      <button className="btn" onClick={() => chooseDirectory({ key: "data_dir", label: "插件数据根目录" })}>选择</button>
-                      <button className="btn" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({}) }).catch((e) => setError(e.message))}>打开</button>
+                      <input value={settings?.data_dir || ""} onChange={(e) => updateSettingDraft("data_dir", e.target.value)} onBlur={(e) => saveSetting("data_dir", e.target.value).catch((err) => setError(err.message))} placeholder="榛樿浣跨敤鎻掍欢鏁版嵁鐩綍" />
+                      <button className="btn" onClick={() => chooseDirectory({ key: "data_dir", label: "鎻掍欢鏁版嵁鏍圭洰褰? })}>閫夋嫨</button>
+                      <button className="btn" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({}) }).catch((e) => setError(e.message))}>鎵撳紑</button>
                     </div>
                     {directoryPicker?.key === "data_dir" && (
                       <div className="directory-picker">
-                        <input value={directoryPicker.value} onChange={(e) => setDirectoryPicker({ ...directoryPicker, value: e.target.value })} placeholder="输入本机文件夹路径，例如 D:\Synapse\data\excel-maker" />
-                        <button className="btn primary" onClick={() => applyDirectoryPicker().catch((e) => setError(e.message))}>应用目录</button>
-                        <button className="btn" onClick={() => setDirectoryPicker(null)}>取消</button>
+                        <input value={directoryPicker.value} onChange={(e) => setDirectoryPicker({ ...directoryPicker, value: e.target.value })} placeholder="杈撳叆鏈満鏂囦欢澶硅矾寰勶紝渚嬪 D:\Synapse\data\excel-maker" />
+                        <button className="btn primary" onClick={() => applyDirectoryPicker().catch((e) => setError(e.message))}>搴旂敤鐩綍</button>
+                        <button className="btn" onClick={() => setDirectoryPicker(null)}>鍙栨秷</button>
                       </div>
                     )}
-                    <small>根目录用于派生默认 uploads、workbooks、templates、projects、exports、cache 子目录。</small>
+                    <small>鏍圭洰褰曠敤浜庢淳鐢熼粯璁?uploads銆亀orkbooks銆乼emplates銆乸rojects銆乪xports銆乧ache 瀛愮洰褰曘€?/small>
                   </div>
                   {directoryFields.map((field) => (
                     <div className="field directory-row" key={field.key}>
                       <label>{field.label}</label>
                       <div className="folder-row">
                         <input value={settings?.[field.key] || ""} onChange={(e) => updateSettingDraft(field.key, e.target.value)} onBlur={(e) => saveSetting(field.key, e.target.value).catch((err) => setError(err.message))} placeholder={field.placeholder} />
-                        <button className="btn" onClick={() => chooseDirectory(field)}>选择</button>
-                        <button className="btn" onClick={() => openDirectory(field).catch((e) => setError(e.message))}>打开</button>
+                        <button className="btn" onClick={() => chooseDirectory(field)}>閫夋嫨</button>
+                        <button className="btn" onClick={() => openDirectory(field).catch((e) => setError(e.message))}>鎵撳紑</button>
                       </div>
                       {directoryPicker?.key === field.key && (
                         <div className="directory-picker">
-                          <input value={directoryPicker.value} onChange={(e) => setDirectoryPicker({ ...directoryPicker, value: e.target.value })} placeholder={`输入${field.label}路径`} />
-                          <button className="btn primary" onClick={() => applyDirectoryPicker().catch((e) => setError(e.message))}>应用目录</button>
-                          <button className="btn" onClick={() => setDirectoryPicker(null)}>取消</button>
+                          <input value={directoryPicker.value} onChange={(e) => setDirectoryPicker({ ...directoryPicker, value: e.target.value })} placeholder={`杈撳叆${field.label}璺緞`} />
+                          <button className="btn primary" onClick={() => applyDirectoryPicker().catch((e) => setError(e.message))}>搴旂敤鐩綍</button>
+                          <button className="btn" onClick={() => setDirectoryPicker(null)}>鍙栨秷</button>
                         </div>
                       )}
                       <small>{field.desc}</small>
@@ -752,34 +752,34 @@
                 <div className="storage-tools">
                   <div className="settings-section-head compact">
                     <div>
-                      <div className="storage-subhead"><Ico>◎</Ico> 当前状态与空间占用</div>
-                      <p className="card-desc">目录设置和空间占用统一在这里看。</p>
+                      <div className="storage-subhead"><Ico>鈼?/Ico> 褰撳墠鐘舵€佷笌绌洪棿鍗犵敤</div>
+                      <p className="card-desc">鐩綍璁剧疆鍜岀┖闂村崰鐢ㄧ粺涓€鍦ㄨ繖閲岀湅銆?/p>
                     </div>
-                    <button className="btn" onClick={() => pluginFetch("/storage/stats").then((data) => setStats(data.stats)).catch((e) => setError(e.message))}>刷新空间</button>
+                    <button className="btn" onClick={() => pluginFetch("/storage/stats").then((data) => setStats(data.stats)).catch((e) => setError(e.message))}>鍒锋柊绌洪棿</button>
                   </div>
                   <div className="health-summary settings-inline-grid">
-                    <div><span>插件</span><strong>{health?.plugin || "excel-maker"}</strong></div>
-                    <div><span>阶段</span><strong>{health?.phase || "-"}</strong></div>
-                    <div><span>数据库</span><code>{health?.db_path || "加载中..."}</code></div>
+                    <div><span>鎻掍欢</span><strong>{health?.plugin || "excel-maker"}</strong></div>
+                    <div><span>闃舵</span><strong>{health?.phase || "-"}</strong></div>
+                    <div><span>鏁版嵁搴?/span><code>{health?.db_path || "鍔犺浇涓?.."}</code></div>
                   </div>
                   <div className="row" style={{ marginTop: 12 }}>
-                    <button className="btn primary" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({}) }).catch((e) => setError(e.message))}>打开数据目录</button>
-                    <button className="btn" onClick={() => cleanupCache().catch((e) => setError(e.message))}>清理缓存</button>
+                    <button className="btn primary" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({}) }).catch((e) => setError(e.message))}>鎵撳紑鏁版嵁鐩綍</button>
+                    <button className="btn" onClick={() => cleanupCache().catch((e) => setError(e.message))}>娓呯悊缂撳瓨</button>
                   </div>
                   <div className="storage-total">
                     <strong>{formatBytes(stats?.total_bytes)}</strong>
-                    <span>{stats?.total_files || 0} 个文件</span>
+                    <span>{stats?.total_files || 0} 涓枃浠?/span>
                   </div>
                   <div className="storage-card-grid">
                     {storageGroups.map(([key, item]) => (
                       <div className="storage-card" key={key}>
                         <div className="storage-card-head">
                           <strong>{storageLabel(key)}</strong>
-                          <span>{item.files || 0} 个文件</span>
+                          <span>{item.files || 0} 涓枃浠?/span>
                         </div>
                         <div className="storage-size">{formatBytes(item.bytes)}</div>
                         <code>{item.path}</code>
-                        <button className="btn" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({ path: item.path }) }).catch((e) => setError(e.message))}>打开</button>
+                        <button className="btn" onClick={() => pluginFetch("/storage/open-folder", { method: "POST", body: JSON.stringify({ path: item.path }) }).catch((e) => setError(e.message))}>鎵撳紑</button>
                       </div>
                     ))}
                   </div>
@@ -787,50 +787,50 @@
               </div>
 
               <div className="settings-section">
-                <div className="card-title"><Icon name="palette" /> 报表样式与格式</div>
-                <p className="card-desc">这些默认值会影响新建 WorkbookPlan 的视觉风格、字体和数字展示方式；单个项目仍可在生成方案时覆盖。</p>
+                <div className="card-title"><Icon name="palette" /> 鎶ヨ〃鏍峰紡涓庢牸寮?/div>
+                <p className="card-desc">杩欎簺榛樿鍊间細褰卞搷鏂板缓 WorkbookPlan 鐨勮瑙夐鏍笺€佸瓧浣撳拰鏁板瓧灞曠ず鏂瑰紡锛涘崟涓」鐩粛鍙湪鐢熸垚鏂规鏃惰鐩栥€?/p>
                 {fieldNotice && <div className="field-warning">{fieldNotice}</div>}
                 <div className="settings-grid">
                   <div className="field">
-                    <label>默认样式</label>
+                    <label>榛樿鏍峰紡</label>
                     <select value={optionMode(styleOptions, settings?.default_style, styleInputMode)} onChange={(e) => handlePresetChange("default_style", e.target.value, setStyleInputMode).catch((err) => setError(err.message))}>
                       {styleOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                      <option value="custom">自定义...</option>
+                      <option value="custom">鑷畾涔?..</option>
                     </select>
                     {optionMode(styleOptions, settings?.default_style, styleInputMode) === "custom" && (
-                      <input className="custom-value-input" value={settings?.default_style || ""} onChange={(e) => updateSettingDraft("default_style", e.target.value)} onBlur={(e) => saveValidatedSetting("default_style", e.target.value).catch((err) => setError(err.message))} placeholder="输入自定义样式名，例如 board_report" />
+                      <input className="custom-value-input" value={settings?.default_style || ""} onChange={(e) => updateSettingDraft("default_style", e.target.value)} onBlur={(e) => saveValidatedSetting("default_style", e.target.value).catch((err) => setError(err.message))} placeholder="杈撳叆鑷畾涔夋牱寮忓悕锛屼緥濡?board_report" />
                     )}
-                    <small>建议商务报表用于经营分析，财务分析用于预算、利润、现金流类报表。</small>
+                    <small>寤鸿鍟嗗姟鎶ヨ〃鐢ㄤ簬缁忚惀鍒嗘瀽锛岃储鍔″垎鏋愮敤浜庨绠椼€佸埄娑︺€佺幇閲戞祦绫绘姤琛ㄣ€?/small>
                   </div>
                   <div className="field">
-                    <label>品牌色</label>
+                    <label>鍝佺墝鑹?/label>
                     <div className="color-row">
                       <input type="color" value={settings?.brand_color || "#2563eb"} onChange={(e) => { updateSettingDraft("brand_color", e.target.value); saveSetting("brand_color", e.target.value).catch((err) => setError(err.message)); }} />
                       <input value={settings?.brand_color || ""} onChange={(e) => updateSettingDraft("brand_color", e.target.value)} onBlur={(e) => saveSetting("brand_color", e.target.value).catch((err) => setError(err.message))} />
                     </div>
-                    <small>用于标题、强调色和关键指标高亮，推荐使用企业 VI 主色。</small>
+                    <small>鐢ㄤ簬鏍囬銆佸己璋冭壊鍜屽叧閿寚鏍囬珮浜紝鎺ㄨ崘浣跨敤浼佷笟 VI 涓昏壊銆?/small>
                   </div>
                   <div className="field">
-                    <label>字体</label>
+                    <label>瀛椾綋</label>
                     <select value={optionMode(fontOptions, settings?.font_family, fontInputMode)} onChange={(e) => handlePresetChange("font_family", e.target.value, setFontInputMode).catch((err) => setError(err.message))}>
                       {fontOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-                      <option value="custom">自定义...</option>
+                      <option value="custom">鑷畾涔?..</option>
                     </select>
                     {optionMode(fontOptions, settings?.font_family, fontInputMode) === "custom" && (
-                      <input className="custom-value-input" value={settings?.font_family || ""} onChange={(e) => updateSettingDraft("font_family", e.target.value)} onBlur={(e) => saveValidatedSetting("font_family", e.target.value).catch((err) => setError(err.message))} placeholder="输入本机字体名，例如 Microsoft YaHei" />
+                      <input className="custom-value-input" value={settings?.font_family || ""} onChange={(e) => updateSettingDraft("font_family", e.target.value)} onBlur={(e) => saveValidatedSetting("font_family", e.target.value).catch((err) => setError(err.message))} placeholder="杈撳叆鏈満瀛椾綋鍚嶏紝渚嬪 Microsoft YaHei" />
                     )}
-                    <small>Excel 打开时会使用本机已安装字体；若未安装，Excel 会自动替换。</small>
+                    <small>Excel 鎵撳紑鏃朵細浣跨敤鏈満宸插畨瑁呭瓧浣擄紱鑻ユ湭瀹夎锛孍xcel 浼氳嚜鍔ㄦ浛鎹€?/small>
                   </div>
                   <div className="field">
-                    <label>数字格式</label>
+                    <label>鏁板瓧鏍煎紡</label>
                     <select value={optionMode(numberFormatOptions, settings?.number_format, numberInputMode)} onChange={(e) => handlePresetChange("number_format", e.target.value, setNumberInputMode).catch((err) => setError(err.message))}>
                       {numberFormatOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                      <option value="custom">自定义...</option>
+                      <option value="custom">鑷畾涔?..</option>
                     </select>
                     {optionMode(numberFormatOptions, settings?.number_format, numberInputMode) === "custom" && (
-                      <input className="custom-value-input" value={settings?.number_format || ""} onChange={(e) => updateSettingDraft("number_format", e.target.value)} onBlur={(e) => saveValidatedSetting("number_format", e.target.value).catch((err) => setError(err.message))} placeholder="输入 Excel 数字格式代码，例如 #,##0.00" />
+                      <input className="custom-value-input" value={settings?.number_format || ""} onChange={(e) => updateSettingDraft("number_format", e.target.value)} onBlur={(e) => saveValidatedSetting("number_format", e.target.value).catch((err) => setError(err.message))} placeholder="杈撳叆 Excel 鏁板瓧鏍煎紡浠ｇ爜锛屼緥濡?#,##0.00" />
                     )}
-                    <small>使用 Excel 数字格式代码，例如 #,##0.00、0.00%、¥#,##0.00。</small>
+                    <small>浣跨敤 Excel 鏁板瓧鏍煎紡浠ｇ爜锛屼緥濡?#,##0.00銆?.00%銆伮?,##0.00銆?/small>
                   </div>
                 </div>
               </div>
@@ -859,8 +859,8 @@
               <div className="brand">
                 <div className="brand-icon"><ExcelLogoIcon /></div>
                 <div>
-                  <div className="brand-title">Excel 报表工作台</div>
-                  <div className="brand-subtitle">报表生成 · 数据剖析 · 公式说明 · XLSX 导出</div>
+                  <div className="brand-title">Excel 鎶ヨ〃宸ヤ綔鍙?/div>
+                  <div className="brand-subtitle">鎶ヨ〃鐢熸垚 路 鏁版嵁鍓栨瀽 路 鍏紡璇存槑 路 XLSX 瀵煎嚭</div>
                 </div>
               </div>
             </header>
