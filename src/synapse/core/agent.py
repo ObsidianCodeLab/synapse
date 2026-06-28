@@ -6543,7 +6543,10 @@ class Agent:
                     _identity_snippet = ""
                     if hasattr(self, "identity") and hasattr(self.identity, "get_system_prompt"):
                         _identity_snippet = (
-                            self.identity.get_system_prompt(include_active_task=False) or ""
+                            self.identity.get_system_prompt(
+                                include_active_task=False,
+                                agent_voice=self._resolve_agent_voice(),
+                            ) or ""
                         )[:500]
 
                     _fast_system = (
@@ -6587,7 +6590,10 @@ class Agent:
                     _identity_snippet = ""
                     if hasattr(self, "identity") and hasattr(self.identity, "get_system_prompt"):
                         _identity_snippet = (
-                            self.identity.get_system_prompt(include_active_task=False) or ""
+                            self.identity.get_system_prompt(
+                                include_active_task=False,
+                                agent_voice=self._resolve_agent_voice(),
+                            ) or ""
                         )[:500]
 
                     _fast_system = (
@@ -7151,7 +7157,11 @@ class Agent:
                 _identity_snippet = ""
                 if hasattr(self, "identity") and hasattr(self.identity, "get_system_prompt"):
                     _identity_snippet = (
-                        self.identity.get_system_prompt(include_active_task=False) or ""
+                        self.identity.get_system_prompt(
+                            include_active_task=False,
+                            agent_voice=self._resolve_agent_voice(),
+                        )
+                        or ""
                     )[:500]
 
                 _fast_system = (
@@ -7212,7 +7222,11 @@ class Agent:
                 _identity_snippet = ""
                 if hasattr(self, "identity") and hasattr(self.identity, "get_system_prompt"):
                     _identity_snippet = (
-                        self.identity.get_system_prompt(include_active_task=False) or ""
+                        self.identity.get_system_prompt(
+                            include_active_task=False,
+                            agent_voice=self._resolve_agent_voice(),
+                        )
+                        or ""
                     )[:500]
 
                 _fast_system = (
@@ -7312,6 +7326,7 @@ class Agent:
                 is_sub_agent=getattr(self, "_is_sub_agent_call", False),
                 request_id=_request_id,
                 turn_id=_turn_id,
+                agent_voice=self._resolve_agent_voice(),
             ):
                 # 收集回复文本（用于 session 保存 & memory）
                 if event.get("type") == "text_delta":
@@ -8361,6 +8376,7 @@ class Agent:
             tool_evidence_required=tool_evidence_required,
             is_sub_agent=getattr(self, "_is_sub_agent_call", False),
             mode=mode,
+            agent_voice=self._resolve_agent_voice(),
         )
 
     # ==================== 取消状态代理属性 ====================

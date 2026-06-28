@@ -1920,6 +1920,7 @@ class ReasoningEngine:
         tool_evidence_required: bool = False,
         is_sub_agent: bool = False,
         mode: str = "agent",
+        agent_voice: str = "",
     ) -> str:
         """Outer wrapper for :meth:`_run_impl` (v1.27.14, plan S1.5).
 
@@ -1978,6 +1979,7 @@ class ReasoningEngine:
                 tool_evidence_required=tool_evidence_required,
                 is_sub_agent=is_sub_agent,
                 mode=mode,
+                agent_voice=agent_voice,
                 _on_state_resolved=_on_state_resolved,
             )
         finally:
@@ -2028,6 +2030,7 @@ class ReasoningEngine:
         tool_evidence_required: bool = False,
         is_sub_agent: bool = False,
         mode: str = "agent",
+        agent_voice: str = "",
         _on_state_resolved: Any = None,
     ) -> str:
         """
@@ -2254,8 +2257,10 @@ class ReasoningEngine:
         )
         _last_real_input_tokens: int | None = None
 
+        _content_safety_name = agent_voice.strip() if isinstance(agent_voice, str) else ""
+        _content_safety_identity = _content_safety_name or "Synapse"
         _CONTENT_SAFETY_MINIMAL_PROMPT = (
-            "你是 Synapse，一个 AI 助手。"
+            f"你是 {_content_safety_identity}，一个 AI 助手。"
             "始终使用与用户当前消息相同的语言回复。"
         )
 
@@ -3887,6 +3892,7 @@ class ReasoningEngine:
         is_sub_agent: bool = False,
         request_id: str = "",
         turn_id: str = "",
+        agent_voice: str = "",
     ):
         """Outer wrapper for :meth:`_reason_stream_impl` (v1.27.14, plan S1.5).
 
@@ -3953,6 +3959,7 @@ class ReasoningEngine:
                 is_sub_agent=is_sub_agent,
                 request_id=request_id,
                 turn_id=turn_id,
+                agent_voice=agent_voice,
                 _on_state_resolved=_on_state_resolved,
             ):
                 # v1.27.15 (S2 P0-3): record streamed text/thinking into
@@ -4031,6 +4038,7 @@ class ReasoningEngine:
         is_sub_agent: bool = False,
         request_id: str = "",
         turn_id: str = "",
+        agent_voice: str = "",
         _on_state_resolved: Any = None,
     ):
         """
@@ -4124,8 +4132,10 @@ class ReasoningEngine:
             # === 动态 System Prompt（追加活跃 Plan） ===
             _base_sp = base_system_prompt or system_prompt
 
+            _content_safety_name = agent_voice.strip() if isinstance(agent_voice, str) else ""
+            _content_safety_identity = _content_safety_name or "Synapse"
             _CONTENT_SAFETY_MINIMAL_PROMPT_STREAM = (
-                "你是 Synapse，一个 AI 助手。"
+                f"你是 {_content_safety_identity}，一个 AI 助手。"
                 "始终使用与用户当前消息相同的语言回复。"
             )
 
@@ -6955,6 +6965,7 @@ class ReasoningEngine:
         session: Any = None,
         force_tool_retries: int | None = None,
         is_sub_agent: bool = False,
+        agent_voice: str = "",
     ):
         """
         统一流式接口: 将 reason_stream 包装为标准化异步生成器。
@@ -7004,6 +7015,7 @@ class ReasoningEngine:
             session=session,
             force_tool_retries=force_tool_retries,
             is_sub_agent=is_sub_agent,
+            agent_voice=agent_voice,
         ):
             # Track token usage for budget
             if budget and event.get("type") == "usage":

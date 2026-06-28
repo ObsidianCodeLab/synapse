@@ -183,12 +183,14 @@ class MemoryManager:
         embedding_api_key: str = "",
         embedding_api_model: str = "",
         agent_id: str = "",
+        identity_dir: Path | None = None,
     ):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.agent_id = agent_id
 
         self.memory_md_path = Path(memory_md_path)
+        self.identity_dir = Path(identity_dir) if identity_dir else self.memory_md_path.parent
         self.brain = brain
         self._ensure_memory_md_exists()
 
@@ -2197,7 +2199,7 @@ class MemoryManager:
             lifecycle = LifecycleManager(
                 store=self.store,
                 extractor=self.extractor,
-                identity_dir=settings.identity_path,
+                identity_dir=self.identity_dir,
             )
             result = await lifecycle.consolidate_daily(
                 checkpoint=checkpoint,
@@ -2231,7 +2233,7 @@ class MemoryManager:
                 memory_md_path=self.memory_md_path,
                 memory_manager=self,
                 brain=self.brain,
-                identity_dir=settings.identity_path,
+                identity_dir=self.identity_dir,
             )
             result = await dc.consolidate_daily()
 

@@ -915,6 +915,8 @@ export function App() {
   const [installLog, setInstallLog] = useState<string>("");
   const [installLiveLog, setInstallLiveLog] = useState<string>("");
   const [installProgress, setInstallProgress] = useState<{ stage: string; percent: number } | null>(null);
+  const [pipInstallPolling, setPipInstallPolling] = useState(false);
+  const [pipInstallId, setPipInstallId] = useState("default");
   const [extras, setExtras] = useState<string>("all");
   const [indexUrl, setIndexUrl] = useState<string>("https://mirrors.aliyun.com/pypi/simple/");
   const [pipIndexPresetId, setPipIndexPresetId] = useState<"official" | "tuna" | "aliyun" | "custom">("aliyun");
@@ -1336,35 +1338,54 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspaceId, venvDir]);
 
-  // streaming pip logs (install step)
+  // Tauri-local pip install progress is polled from Rust state. The worker
+  // thread never holds a Tauri AppHandle, avoiding late event-loop proxy clones
+  // during shutdown.
   useEffect(() => {
-    let unlisten: null | (() => void) = null;
-    (async () => {
-      unlisten = await listen("pip_install_event", (ev) => {
-        const p = ev.payload as any;
-        if (!p || typeof p !== "object") return;
-        if (p.kind === "stage") {
-          const stage = String(p.stage || "");
-          const percent = Number(p.percent || 0);
-          if (stage) setInstallProgress({ stage, percent: Math.max(0, Math.min(100, percent)) });
-          return;
+    if (!pipInstallPolling || !IS_TAURI) return;
+    let cancelled = false;
+    let cursor = 0;
+    const poll = async () => {
+      try {
+        const p = await invoke<{
+          cursor: number;
+          done: boolean;
+          failed: boolean;
+          stage?: string | null;
+          percent?: number | null;
+          chunks?: string[];
+          missed?: boolean;
+        }>("pip_install_progress", { installId: pipInstallId, cursor });
+        if (cancelled) return;
+        cursor = Number(p.cursor || cursor);
+        if (p.stage) {
+          setInstallProgress({
+            stage: String(p.stage),
+            percent: Math.max(0, Math.min(100, Number(p.percent || 0))),
+          });
         }
-        if (p.kind === "line") {
-          const text = String(p.text || "");
-          if (!text) return;
+        const chunks = Array.isArray(p.chunks) ? p.chunks.join("") : "";
+        if (chunks) {
           setInstallLiveLog((prev) => {
-            const next = prev + text;
-            // keep tail to avoid huge memory usage
+            const next = prev + (p.missed ? "\n[log truncated]\n" : "") + chunks;
             const max = 80_000;
             return next.length > max ? next.slice(next.length - max) : next;
           });
         }
-      });
-    })();
-    return () => {
-      if (unlisten) unlisten();
+        if (p.done) setPipInstallPolling(false);
+      } catch {
+        // Keep polling while install is in progress; startup can briefly race.
+      }
     };
-  }, []);
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [pipInstallPolling, pipInstallId]);
 
   // tray quit failed: service still running
   useEffect(() => {
@@ -1690,13 +1711,16 @@ export function App() {
     }
     setInstallLiveLog("");
     setInstallProgress({ stage: "准备开始", percent: 1 });
+    const installId = `status-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPipInstallId(installId);
+    setPipInstallPolling(true);
     const _busyId = notifyLoading("创建 venv 并安装 Synapse...");
     try {
       // 1) create venv (idempotent)
       setInstallProgress({ stage: "创建 venv", percent: 10 });
       setVenvStatus("创建 venv 中...");
       const py = pythonCandidates[selectedPythonIdx].command;
-      await invoke<string>("create_venv", { pythonCommand: py, venvDir });
+      await invoke<string>("create_venv", { pythonCommand: py, venvDir, installId });
       setVenvReady(true);
       setSynapseInstalled(false);
       setVenvStatus(`venv 就绪：${venvDir}`);
@@ -1742,6 +1766,7 @@ export function App() {
         venvDir,
         packageSpec: spec,
         indexUrl: indexUrl.trim() ? indexUrl.trim() : null,
+        installId,
       });
       setInstallLog(String(log || ""));
       setSynapseInstalled(true);
@@ -1764,6 +1789,7 @@ export function App() {
         notifySuccess("你安装到的 Synapse 不包含 Setup Center 模块。建议切换“安装来源”为 GitHub 或 本地源码，然后重新安装。");
       }
     } finally {
+      setPipInstallPolling(false);
       dismissLoading(_busyId);
     }
   }
@@ -3966,18 +3992,40 @@ export function App() {
           log("未找到可用后端，尝试自动创建 venv 并安装 Synapse...");
           logTask("检查后端环境", "running", "创建 venv...");
           updateTask("backend-check", { detail: "创建 venv..." });
-          const detectedPy = await invoke<Array<{ command: string[]; version: string }>>("detect_python");
-          if (detectedPy.length > 0) {
-            await invoke<string>("create_venv", { pythonCommand: detectedPy[0].command, venvDir: effectiveVenv });
+          const detectedPy = await invoke<Array<{ command: string[]; version: string; isUsable?: boolean }>>("detect_python");
+          const pythonCandidate = detectedPy.find((p) =>
+            Array.isArray(p.command) && p.command.length > 0 && p.isUsable !== false
+          );
+          if (pythonCandidate) {
+            const installId = `onboarding-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            setPipInstallId(installId);
+            setInstallLiveLog("");
+            setInstallProgress({ stage: "创建 venv...", percent: 0 });
+            setPipInstallPolling(true);
+            await invoke<string>("create_venv", {
+              pythonCommand: pythonCandidate.command,
+              venvDir: effectiveVenv,
+              installId,
+            });
             updateTask("backend-check", { detail: "安装 Synapse..." });
             logTask("检查后端环境", "running", "安装 Synapse...");
-            await invoke<string>("pip_install", { venvDir: effectiveVenv, packageSpec: "synapse" });
+            setInstallProgress({ stage: "安装 Synapse...", percent: 0 });
+            try {
+              await invoke<string>("pip_install", {
+                venvDir: effectiveVenv,
+                packageSpec: "synapse",
+                installId,
+              });
+            } finally {
+              setPipInstallPolling(false);
+            }
             log("✓ 已自动安装后端环境");
           } else {
             log("⚠ 未检测到 Python 3.11+，无法自动创建后端环境");
             log(`  已检查路径: bundled=${backendInfo.bundledChecked} venv=${backendInfo.venvChecked}`);
             updateTask("backend-check", { status: "error", detail: "未找到 Python 3.11+" });
             logTask("检查后端环境", "error", "未找到 Python 3.11+");
+            hasErr = true;
           }
         } else {
           log(backendInfo.bundled ? "✓ 使用内置后端" : "✓ 使用 venv 后端");
@@ -3987,9 +4035,20 @@ export function App() {
           logTask("检查后端环境", "done");
         }
       } catch (e) {
+        setPipInstallPolling(false);
         log(`⚠ 后端环境检查失败: ${String(e)}`);
         updateTask("backend-check", { status: "error", detail: String(e).slice(0, 120) });
         logTask("检查后端环境", "error", String(e));
+        if (String(e).length > 200) {
+          log("--- 详细错误信息 ---");
+          log(String(e));
+        }
+        hasErr = true;
+      }
+
+      if (hasErr && obAutostart) {
+        updateTask("autostart", { status: "skipped", detail: "后端环境检查失败" });
+        logTask(t("onboarding.autostart.taskLabel"), "skipped", "后端环境检查失败");
       }
 
       // ── STEP: cli ──

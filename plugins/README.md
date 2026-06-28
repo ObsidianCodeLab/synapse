@@ -1,4 +1,4 @@
-# Synapse 内置插件（来自上游 openakita 仓库 `plugins/`）
+# Synapse 内置插件（来自上游 synapse 仓库 `plugins/`）
 
 本目录为 **可选一等公民插件源码**，已从上游同步并完成 Synapse 品牌化（`synapse.plugins.api`、`requires.synapse` 等）。
 
@@ -47,7 +47,7 @@ D:\github\openakita_jyhk\plugins\tongyi-image
 
 ```powershell
 # 插件
-robocopy D:\github\openakita\plugins D:\github\openakita_jyhk\plugins /E
+robocopy D:\github\synapse\plugins D:\github\openakita_jyhk\plugins /E
 python D:\github\openakita_jyhk\scripts\brand_plugins_tree.py
 
 # Python SDK + 前端 UI SDK（目录 synapse-plugin-sdk、packages/synapse-plugin-ui-sdk）

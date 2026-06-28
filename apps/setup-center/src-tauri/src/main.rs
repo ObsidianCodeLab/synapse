@@ -17,6 +17,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::collections::{HashMap, VecDeque};
 use tauri::Emitter;
 use tauri::Manager;
 #[cfg(desktop)]
@@ -1642,7 +1643,7 @@ fn check_backend_availability(venv_dir: String) -> BackendAvailability {
     };
     let venv_py = venv_pythonw_path(&venv_dir);
     let bundled = bundled_exe.exists();
-    let venv_ready = venv_py.exists();
+    let venv_ready = legacy_venv_has_synapse_backend(&venv_dir);
     let exe_path = if bundled {
         bundled_exe.to_string_lossy().to_string()
     } else if venv_ready {
@@ -1661,6 +1662,26 @@ fn check_backend_availability(venv_dir: String) -> BackendAvailability {
         bundled_checked: bundled_exe.to_string_lossy().to_string(),
         venv_checked: venv_py.to_string_lossy().to_string(),
     }
+}
+
+fn legacy_venv_has_synapse_backend(venv_dir: &str) -> bool {
+    let py = venv_python_path(venv_dir);
+    if !py.exists() {
+        return false;
+    }
+
+    let mut cmd = Command::new(&py);
+    apply_no_window(&mut cmd);
+    strip_harmful_python_env(&mut cmd);
+    cmd.env("PYTHONUTF8", "1");
+    cmd.env("PYTHONIOENCODING", "utf-8");
+    cmd.args([
+        "-c",
+        "import synapse; import synapse.main; import synapse.setup_center.bridge",
+    ]);
+    cmd.output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 /// 强制删除目录：先尝试 Rust remove_dir_all，失败时在 Windows 上回退到 cmd /c rd /s /q
@@ -1839,6 +1860,211 @@ fn now_epoch_secs() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+const PIP_INSTALL_LOG_MAX_CHUNKS: usize = 512;
+const PIP_INSTALL_DEFAULT_ID: &str = "default";
+const PIP_INSTALL_RUNNING_STALE_MS: u64 = 20 * 60 * 1_000;
+
+#[derive(Default)]
+struct PipInstallProgressState {
+    cursor: u64,
+    done: bool,
+    failed: bool,
+    updated_at_ms: u64,
+    stage: Option<String>,
+    percent: Option<u8>,
+    chunks: VecDeque<(u64, String)>,
+}
+
+impl PipInstallProgressState {
+    fn touch(&mut self) {
+        self.updated_at_ms = now_ms();
+    }
+
+    fn push_chunk(&mut self, text: String) {
+        if text.is_empty() {
+            return;
+        }
+        self.cursor = self.cursor.saturating_add(1);
+        let cursor = self.cursor;
+        self.chunks.push_back((cursor, text));
+        while self.chunks.len() > PIP_INSTALL_LOG_MAX_CHUNKS {
+            self.chunks.pop_front();
+        }
+        self.touch();
+    }
+}
+
+static PIP_INSTALL_PROGRESS: Lazy<Mutex<HashMap<String, PipInstallProgressState>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PipInstallProgressSnapshot {
+    cursor: u64,
+    done: bool,
+    failed: bool,
+    stage: Option<String>,
+    percent: Option<u8>,
+    chunks: Vec<String>,
+    missed: bool,
+}
+
+fn pip_install_log_path() -> PathBuf {
+    setup_logs_dir().join("pip-install.log")
+}
+
+fn append_pip_install_log(text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    let path = pip_install_log_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .and_then(|mut f| f.write_all(text.as_bytes()));
+}
+
+fn pip_install_reset_progress(install_id: &str, label: &str, truncate_log: bool) {
+    let mut all = PIP_INSTALL_PROGRESS.lock().unwrap();
+    let mut state = PipInstallProgressState::default();
+    state.touch();
+    all.insert(install_id.to_string(), state);
+    drop(all);
+
+    let header = format!(
+        "\n=== {label} started at {} pid={} ===\n",
+        now_epoch_secs(),
+        std::process::id()
+    );
+    if truncate_log {
+        let path = pip_install_log_path();
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&path)
+            .and_then(|mut f| f.write_all(header.as_bytes()));
+    } else {
+        append_pip_install_log(&header);
+    }
+}
+
+fn pip_install_set_stage(install_id: &str, stage: &str, percent: u8) {
+    let mut all = PIP_INSTALL_PROGRESS.lock().unwrap();
+    let state = all.entry(install_id.to_string()).or_default();
+    state.stage = Some(stage.to_string());
+    state.percent = Some(percent.min(100));
+    state.touch();
+    drop(all);
+    append_pip_install_log(&format!("\n[stage] {stage} ({percent}%)\n"));
+}
+
+fn pip_install_append_line(install_id: &str, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    let mut all = PIP_INSTALL_PROGRESS.lock().unwrap();
+    let state = all.entry(install_id.to_string()).or_default();
+    state.push_chunk(text.to_string());
+    drop(all);
+    append_pip_install_log(text);
+}
+
+fn pip_install_finish_progress(install_id: &str, failed: bool) {
+    let mut all = PIP_INSTALL_PROGRESS.lock().unwrap();
+    let state = all.entry(install_id.to_string()).or_default();
+    state.done = true;
+    state.failed = failed;
+    state.touch();
+    drop(all);
+    append_pip_install_log(&format!(
+        "\n=== install progress {} at {} ===\n",
+        if failed { "failed" } else { "finished" },
+        now_epoch_secs()
+    ));
+}
+
+fn pip_install_is_running() -> bool {
+    let Ok(mut all) = PIP_INSTALL_PROGRESS.lock() else {
+        return false;
+    };
+    let now = now_ms();
+    all.values_mut().any(|state| {
+        if state.done {
+            return false;
+        }
+        if state.updated_at_ms > 0
+            && now.saturating_sub(state.updated_at_ms) > PIP_INSTALL_RUNNING_STALE_MS
+        {
+            state.failed = true;
+            state.done = true;
+            state.push_chunk(
+                "\n[install] progress state expired after 20 minutes without updates\n".to_string(),
+            );
+            return false;
+        }
+        true
+    })
+}
+
+#[tauri::command]
+fn pip_install_progress(
+    install_id: Option<String>,
+    cursor: Option<u64>,
+) -> PipInstallProgressSnapshot {
+    let install_id = install_id.unwrap_or_else(|| PIP_INSTALL_DEFAULT_ID.to_string());
+    let since = cursor.unwrap_or(0);
+    let all = PIP_INSTALL_PROGRESS.lock().unwrap();
+    let Some(state) = all.get(&install_id) else {
+        return PipInstallProgressSnapshot {
+            cursor: 0,
+            done: false,
+            failed: false,
+            stage: None,
+            percent: None,
+            chunks: Vec::new(),
+            missed: false,
+        };
+    };
+    let effective_since = if since > state.cursor { 0 } else { since };
+    let first_available = state
+        .chunks
+        .front()
+        .map(|(c, _)| *c)
+        .unwrap_or(state.cursor);
+    let missed = since > state.cursor
+        || (effective_since > 0 && first_available > effective_since.saturating_add(1));
+    let chunks = state
+        .chunks
+        .iter()
+        .filter(|(c, _)| *c > effective_since)
+        .map(|(_, text)| text.clone())
+        .collect::<Vec<_>>();
+    PipInstallProgressSnapshot {
+        cursor: state.cursor,
+        done: state.done,
+        failed: state.failed,
+        stage: state.stage.clone(),
+        percent: state.percent,
+        chunks,
+        missed,
+    }
 }
 
 fn write_pid_file(workspace_id: &str, pid: u32, started_by: &str) -> Result<(), String> {
@@ -3399,6 +3625,9 @@ fn main() {
                     app_version, ws_id, port, need_start
                 ));
                 if need_start {
+                    if pip_install_is_running() {
+                        log_to_file("[auto-start] skipped: pip install is still running");
+                    } else {
                     AUTO_START_IN_PROGRESS.store(true, Ordering::SeqCst);
                     let venv_dir = synapse_root_dir().join("venv").to_string_lossy().to_string();
                     let ws_clone = ws_id.clone();
@@ -3416,6 +3645,7 @@ fn main() {
                         }
                         AUTO_START_IN_PROGRESS.store(false, Ordering::SeqCst);
                     });
+                    }
                 }
             } else {
                 log_to_file("[auto-start] skipped: no current_workspace_id in state");
@@ -3459,6 +3689,7 @@ fn main() {
             install_bundled_python,
             create_venv,
             pip_install,
+            pip_install_progress,
             pip_uninstall,
             autostart_is_enabled,
             autostart_set_enabled,
@@ -3970,6 +4201,10 @@ fn read_env_kv(path: &Path) -> Vec<(String, String)> {
 #[tauri::command]
 fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<ServiceStatus, String> {
     log_to_file(&format!("[service_start] called: ws={}, venv={}", workspace_id, venv_dir));
+    if pip_install_is_running() {
+        log_to_file("[service_start] rejected: pip install is still running");
+        return Err("pip 安装仍在进行中，请等待安装完成后再启动服务。".to_string());
+    }
     fs::create_dir_all(run_dir()).map_err(|e| {
         let msg = format!("create run dir failed: {e}");
         log_to_file(&format!("[service_start] FAIL: {}", msg));
@@ -4065,6 +4300,10 @@ fn synapse_service_start(venv_dir: String, workspace_id: String) -> Result<Servi
             bundled_name,
             backend_exe.to_string_lossy(),
         ));
+    }
+    if backend_exe == venv_pythonw_path(&venv_dir) && !legacy_venv_has_synapse_backend(&venv_dir) {
+        log_to_file("[service_start] rejected: legacy venv backend is not installed yet");
+        return Err("后端环境尚未安装完成，请先等待 Synapse 安装结束。".to_string());
     }
 
     let log_dir = ws_dir.join("logs");
@@ -5461,26 +5700,46 @@ async fn install_bundled_python(
 }
 
 #[tauri::command]
-async fn create_venv(python_command: Vec<String>, venv_dir: String) -> Result<String, String> {
+async fn create_venv(
+    python_command: Vec<String>,
+    venv_dir: String,
+    install_id: Option<String>,
+) -> Result<String, String> {
     spawn_blocking_result(move || {
-        let venv = PathBuf::from(venv_dir);
-        if venv.exists() {
-            return Ok(venv.to_string_lossy().to_string());
+        let install_id = install_id.unwrap_or_else(|| PIP_INSTALL_DEFAULT_ID.to_string());
+        let install_id_ref = install_id.as_str();
+        pip_install_reset_progress(install_id_ref, "create venv", true);
+        let result: Result<String, String> = (|| {
+            let venv = PathBuf::from(&venv_dir);
+            if venv.exists() {
+                pip_install_set_stage(install_id_ref, "复用已有 venv", 10);
+                pip_install_append_line(
+                    install_id_ref,
+                    &format!("venv already exists: {}\n", venv.display()),
+                );
+                return Ok(venv.to_string_lossy().to_string());
+            }
+            pip_install_set_stage(install_id_ref, "创建 venv", 10);
+            let _ = python_command; // API 兼容保留，实际统一使用安装包内置 Python
+            let bundled_py = bundled_internal_python_path()
+                .ok_or_else(|| "安装包内置 Python 不可用，请重新安装 Synapse".to_string())?;
+            let mut c = Command::new(&bundled_py);
+            apply_no_window(&mut c);
+            apply_bundled_python_env(&mut c, &bundled_backend_dir().join("_internal"));
+            c.args(["-m", "venv"]).arg(&venv);
+            let status = c
+                .status()
+                .map_err(|e| format!("failed to create venv: {e}"))?;
+            if !status.success() {
+                return Err("venv creation failed".to_string());
+            }
+            pip_install_set_stage(install_id_ref, "venv 就绪", 20);
+            Ok(venv.to_string_lossy().to_string())
+        })();
+        if result.is_err() {
+            pip_install_finish_progress(install_id_ref, true);
         }
-        let _ = python_command; // API 兼容保留，实际统一使用安装包内置 Python
-        let bundled_py = bundled_internal_python_path()
-            .ok_or_else(|| "安装包内置 Python 不可用，请重新安装 Synapse".to_string())?;
-        let mut c = Command::new(&bundled_py);
-        apply_no_window(&mut c);
-        apply_bundled_python_env(&mut c, &bundled_backend_dir().join("_internal"));
-        c.args(["-m", "venv"])
-            .arg(&venv)
-            .status()
-            .map_err(|e| format!("failed to create venv: {e}"))?
-            .success()
-            .then_some(())
-            .ok_or_else(|| "venv creation failed".to_string())?;
-        Ok(venv.to_string_lossy().to_string())
+        result
     })
     .await
 }
@@ -5545,46 +5804,29 @@ fn venv_pythonw_path(venv_dir: &str) -> PathBuf {
 
 #[tauri::command]
 async fn pip_install(
-    app: tauri::AppHandle,
     venv_dir: String,
     package_spec: String,
     index_url: Option<String>,
+    install_id: Option<String>,
 ) -> Result<String, String> {
     spawn_blocking_result(move || {
+        let install_id = install_id.unwrap_or_else(|| PIP_INSTALL_DEFAULT_ID.to_string());
+        let install_id_ref = install_id.as_str();
+        pip_install_set_stage(install_id_ref, "安装 Synapse（pip）", 30);
+        pip_install_append_line(
+            install_id_ref,
+            &format!("\n=== pip install started at {} ===\n", now_epoch_secs()),
+        );
+        let result: Result<String, String> = (|| {
         let (py, pythonpath) = resolve_python(&venv_dir)?;
 
         let mut log = String::new();
 
-        #[derive(Serialize, Clone)]
-        #[serde(rename_all = "camelCase")]
-        struct PipInstallEvent {
-            kind: String, // "stage" | "line"
-            stage: Option<String>,
-            percent: Option<u8>,
-            text: Option<String>,
-        }
-
         let emit_stage = |stage: &str, percent: u8| {
-            let _ = app.emit(
-                "pip_install_event",
-                PipInstallEvent {
-                    kind: "stage".into(),
-                    stage: Some(stage.into()),
-                    percent: Some(percent),
-                    text: None,
-                },
-            );
+            pip_install_set_stage(install_id_ref, stage, percent);
         };
         let emit_line = |text: &str| {
-            let _ = app.emit(
-                "pip_install_event",
-                PipInstallEvent {
-                    kind: "line".into(),
-                    stage: None,
-                    percent: None,
-                    text: Some(text.into()),
-                },
-            );
+            pip_install_append_line(install_id_ref, text);
         };
 
         fn run_streaming(
@@ -5782,6 +6024,12 @@ async fn pip_install(
         emit_stage("完成", 100);
 
         Ok(log)
+        })();
+        match &result {
+            Ok(_) => pip_install_finish_progress(install_id_ref, false),
+            Err(_) => pip_install_finish_progress(install_id_ref, true),
+        }
+        result
     })
     .await
 }
