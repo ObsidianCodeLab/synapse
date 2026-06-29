@@ -115,6 +115,27 @@ class SkillsHandler:
 
     async def handle(self, tool_name: str, params: dict[str, Any]) -> str:
         """处理工具调用"""
+        from synapse.rd_meeting.work_plan import check_host_forward_gate, session_id_from_agent
+
+        session_id = session_id_from_agent(self.agent)
+        if tool_name == "execute_skill":
+            gate_err = check_host_forward_gate(
+                session_id,
+                tool_name,
+                skill_name=str(params.get("skill_name") or ""),
+                agent=self.agent,
+            )
+            if gate_err:
+                return gate_err
+        elif tool_name == "run_skill_script":
+            gate_err = check_host_forward_gate(
+                session_id,
+                tool_name,
+                skill_name=str(params.get("skill_name") or ""),
+                agent=self.agent,
+            )
+            if gate_err:
+                return gate_err
         try:
             if tool_name == "list_skills":
                 return self._list_skills(params)
