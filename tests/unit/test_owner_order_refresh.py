@@ -55,7 +55,7 @@ def test_build_rd_view_demand_save_payload_maps_sop_fields(monkeypatch, tmp_path
     assert payload["name"] == "需求澄清"
     assert payload["assignee_id"] == "E001"
     assert payload["product_name"] == "billing-core"
-    assert payload["processing_mode"] == "human"
+    assert payload["processing_mode"] == "ai"
     assert payload["run_status"] == "running"
     assert payload["comments"] == []
 
@@ -66,14 +66,14 @@ def test_build_rd_view_processing_mode():
             {"demand_no": "1", "local_process_state": "全人工"},
             assignee_id="x",
         )["processing_mode"]
-        == "system"
+        == "manual"
     )
     assert (
         build_rd_view_demand_save_payload(
             {"demand_no": "1", "local_process_state": "预备中"},
             assignee_id="x",
         )["processing_mode"]
-        == "system"
+        == "ai"
     )
 
 

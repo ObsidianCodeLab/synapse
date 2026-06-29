@@ -21,7 +21,6 @@ from synapse.rd_meeting.devservice import unified_service_base_url
 from synapse.rd_meeting.paths import meeting_pipeline_path, scope_dir
 from synapse.rd_meeting.room_runtime import load_room_state, read_meeting_pipeline_json
 from synapse.rd_meeting.sandbox_assets import _force_remove_path
-from synapse.rd_sop.manifest import NODE_TYPES
 from synapse.rd_sop.nodes import (
     node_display_name,
     resolve_sop_raw_to_node_id,
@@ -123,9 +122,11 @@ def cleanup_orphan_work_directories(demand_nos: list[str]) -> list[str]:
 
 
 def _processing_mode_for_demand(demand: dict[str, Any]) -> str:
-    """工单当前 SOP 节点的类型（``human`` / ``ai`` / ``ai_human`` / ``system`` 等）。"""
-    node_id = _resolve_sop_node_id(demand)
-    return NODE_TYPES.get(node_id, "ai")
+    """需求单 processing_mode：仅 ``ai`` / ``manual``；``local_process_state`` 为 ``全人工`` 时为 manual。"""
+    local = _snapshot_norm_id(demand.get("local_process_state"))
+    if local == "全人工":
+        return "manual"
+    return "ai"
 
 
 def _resolve_sop_node_id(demand: dict[str, Any]) -> str:
