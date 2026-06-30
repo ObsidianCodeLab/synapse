@@ -27,6 +27,9 @@ def test_should_include_commit_file_filters() -> None:
     assert should_include_commit_file("AGENTS.md") is False
     assert should_include_commit_file("agents.md") is False
     assert should_include_commit_file("tests/unit/test_foo.py") is True
+    assert should_include_commit_file("archive/开发中/task_exec/单元测试用例列表.md") is False
+    assert should_include_commit_file("tests/单元测试用例列表.md") is False
+    assert should_include_commit_file("archive/开发中/task_exec/任务执行记录.md") is False
 
 
 def test_should_include_diff_file_filters() -> None:
@@ -36,6 +39,8 @@ def test_should_include_diff_file_filters() -> None:
     assert should_include_diff_file("agents.md") is False
     assert should_include_diff_file("tests/unit/test_foo.py") is False
     assert should_include_diff_file("src/test_foo.py") is False
+    assert should_include_diff_file("archive/开发中/task_exec/单元测试用例列表.md") is False
+    assert should_include_diff_file("tests/单元测试用例列表.md") is False
 
 
 def test_is_test_file_patterns() -> None:
@@ -222,6 +227,11 @@ def test_collect_repo_commit_stage_paths(tmp_path: Path) -> None:
     (repo / "AGENTS.md").write_text("# local\n", encoding="utf-8")
     (repo / "synapse_archive").mkdir()
     (repo / "synapse_archive" / "doc.md").write_text("archive\n", encoding="utf-8")
+    wo_archive = repo / "archive" / "开发中" / "task_exec"
+    wo_archive.mkdir(parents=True)
+    (wo_archive / "单元测试用例列表.md").write_text("# cases\n", encoding="utf-8")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "单元测试用例列表.md").write_text("# legacy\n", encoding="utf-8")
 
     ok, _detail, paths = collect_repo_commit_stage_paths(str(repo))
     assert ok is True

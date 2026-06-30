@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from synapse.rd_meeting.paths import TEST_LIST_MD_NAME
 from synapse.rd_meeting.product_assets import _run_git
 from synapse.rd_meeting.task_exec import load_task_exec_payload
 
@@ -94,29 +95,40 @@ def is_test_file(rel_path: str) -> bool:
     return bool(_TEST_FILE_RE.match(name))
 
 
-def is_synapse_archive_or_agents_md(rel_path: str) -> bool:
+def is_excluded_repo_path(rel_path: str) -> bool:
+    """沙箱仓库内不应提交/评审的路径（工单归档误落盘、用例列表、synapse_archive、AGENTS.md）。"""
     norm = normalize_repo_rel_path(rel_path)
     if not norm:
         return False
-    parts = [p.lower() for p in norm.split("/")]
-    if "synapse_archive" in parts:
+    parts = norm.split("/")
+    parts_lower = [p.lower() for p in parts]
+    if "synapse_archive" in parts_lower:
         return True
-    return parts[-1].lower() in _SKIP_BASENAMES
+    if parts_lower and parts_lower[0] == "archive":
+        return True
+    if parts and parts[-1] == TEST_LIST_MD_NAME:
+        return True
+    return parts_lower[-1] in _SKIP_BASENAMES
+
+
+def is_synapse_archive_or_agents_md(rel_path: str) -> bool:
+    """兼容旧名；见 :func:`is_excluded_repo_path`。"""
+    return is_excluded_repo_path(rel_path)
 
 
 def should_include_commit_file(rel_path: str) -> bool:
-    """代码提交环节：排除 synapse_archive 与 AGENTS.md。"""
+    """代码提交环节：排除工单归档误落盘、用例列表、synapse_archive 与 AGENTS.md。"""
     norm = normalize_repo_rel_path(rel_path)
     if not norm:
         return False
-    return not is_synapse_archive_or_agents_md(norm)
+    return not is_excluded_repo_path(norm)
 
 
 def should_include_diff_file(rel_path: str) -> bool:
     norm = normalize_repo_rel_path(rel_path)
     if not norm:
         return False
-    if is_synapse_archive_or_agents_md(norm):
+    if is_excluded_repo_path(norm):
         return False
     if is_test_file(norm):
         return False
@@ -261,7 +273,7 @@ def _resolve_git_base_ref(repo_root: Path) -> str | None:
 
 
 def _aggregate_filtered_numstat(numstat: dict[str, dict[str, int]]) -> tuple[int, int]:
-    """汇总 numstat 增删行数（排除 synapse_archive / AGENTS.md）。"""
+    """汇总 numstat 增删行数（排除工单归档误落盘、用例列表、synapse_archive / AGENTS.md）。"""
     added = 0
     deleted = 0
     for rel_path, stat in numstat.items():
@@ -509,21 +521,36 @@ def collect_repo_code_diff_files(repo_path: str) -> list[dict[str, Any]]:
 
 
 def collect_repo_commit_stage_paths(repo_path: str) -> tuple[bool, str, list[str]]:
-    """列出代码提交应暂存的路径（排除 synapse_archive / AGENTS.md）。"""
-    root = str(repo_path or "").strip()
-    if not root:
+    """列出代码提交应暂存的路径（排除工单归档误落盘、用例列表、synapse_archive / AGENTS.md）。"""
+    root_str = str(repo_path or "").strip()
+    if not root_str:
         return False, "缺少仓库路径", []
 
-    ok, status_out = _run_git(["git", "-C", root, "status", "--porcelain"], timeout=120.0)
+    root = Path(root_str)
+    ok, status_out = _run_git(["git", "-C", root_str, "status", "--porcelain"], timeout=120.0)
     if not ok:
         return False, status_out or "git status 失败", []
 
-    paths = [
-        rel_path
-        for _status, rel_path in _parse_status_paths(status_out)
-        if should_include_commit_file(rel_path)
-    ]
-    return True, "", paths
+    paths: set[str] = set()
+    for _status, rel_path in _parse_status_paths(status_out):
+        if not should_include_commit_file(rel_path):
+            continue
+        candidate = _repo_file_path(root, rel_path)
+        if candidate.is_dir():
+            continue
+        paths.add(rel_path)
+
+    ok, untracked = _run_git(
+        ["git", "-C", root_str, "ls-files", "--others", "--exclude-standard"],
+        timeout=120.0,
+    )
+    if ok:
+        for line in untracked.splitlines():
+            rel = normalize_repo_rel_path(line.strip())
+            if rel and should_include_commit_file(rel):
+                paths.add(rel)
+
+    return True, "", sorted(paths)
 
 
 def infer_diff_language(rel_path: str) -> str:
