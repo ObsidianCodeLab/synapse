@@ -31,6 +31,25 @@ def _demand_status_for_to_stage(to_stage: int) -> str | None:
     return _DEMAND_STATUS_BY_TO_STAGE.get(int(to_stage))
 
 
+def planned_demand_stage_hook(from_stage: int, to_stage: int) -> str | None:
+    """若需求单跨阶段将调用转单钩子，返回 hook 名；否则 None。"""
+    return _IMPLEMENTED_DEMAND_TRANSITIONS.get((int(from_stage), int(to_stage)))
+
+
+def cross_stage_hook_required(
+    *,
+    scope_type: ScopeType,
+    from_stage: int,
+    to_stage: int,
+) -> bool:
+    """是否需要在跨阶段前做研发云连通性检测并调用转单钩子。"""
+    if int(from_stage) == int(to_stage):
+        return False
+    if scope_type != "demand":
+        return False
+    return planned_demand_stage_hook(from_stage, to_stage) is not None
+
+
 def _transition_comments(
     *,
     from_stage: int,
@@ -58,6 +77,27 @@ async def run_sop_stage_transition_hook(
     next_node_id: str,
 ) -> dict[str, Any]:
     """执行单次跨阶段钩子，返回摘要（供 history / 日志）。"""
+    if cross_stage_hook_required(
+        scope_type=scope_type,
+        from_stage=from_stage,
+        to_stage=to_stage,
+    ):
+        from synapse.rd_meeting.rd_cloud_connectivity import require_rd_cloud_connectivity
+
+        conn_err = require_rd_cloud_connectivity(
+            context="cross_stage_hook",
+            node_id=completed_node_id,
+            scope_id=scope_id,
+        )
+        if conn_err:
+            return {
+                "status": "connectivity_error",
+                "hook": planned_demand_stage_hook(from_stage, to_stage),
+                "from_stage": from_stage,
+                "to_stage": to_stage,
+                "message": conn_err,
+            }
+
     key = (int(from_stage), int(to_stage))
     comments = _transition_comments(
         from_stage=from_stage,

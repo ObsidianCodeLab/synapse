@@ -625,6 +625,7 @@ class MeetingRoomOrchestrator:
         next_id: str | None = None
         prev_stage_id = stage_id_for_node_id(node_id)
         requested_advance = advance
+        rd_cloud_block_reason = ""
         downstream_block_reason = (
             "" if bypass_downstream_gate else downstream_advance_block_reason(node_id)
         )
@@ -664,6 +665,26 @@ class MeetingRoomOrchestrator:
                     advance = False
                     next_id = None
             if next_id:
+                next_stage_id_candidate = stage_id_for_node_id(next_id)
+                if prev_stage_id != next_stage_id_candidate:
+                    from synapse.rd_meeting.rd_cloud_connectivity import require_rd_cloud_connectivity
+                    from synapse.rd_meeting.sop_stage_hooks import cross_stage_hook_required
+
+                    if cross_stage_hook_required(
+                        scope_type=scope_type,  # type: ignore[arg-type]
+                        from_stage=prev_stage_id,
+                        to_stage=next_stage_id_candidate,
+                    ):
+                        conn_err = require_rd_cloud_connectivity(
+                            context="cross_stage_hook",
+                            node_id=node_id,
+                            scope_id=sid,
+                        )
+                        if conn_err:
+                            rd_cloud_block_reason = conn_err
+                            next_id = None
+                            advance = False
+            if next_id:
                 dev["current_node_id"] = next_id
                 dev["stage_id"] = stage_id_for_node_id(next_id)
                 dev["sop_node_display"] = node_display_name(next_id)
@@ -679,9 +700,15 @@ class MeetingRoomOrchestrator:
                         completed_node_id=node_id,
                         next_node_id=next_id,
                     )
-            else:
+            elif not rd_cloud_block_reason:
                 dev["local_process_state"] = "已完成"
                 room_state["status"] = "completed"
+            elif rd_cloud_block_reason:
+                dev["current_node_id"] = node_id
+                dev["stage_id"] = prev_stage_id
+                dev["sop_node_display"] = node_display_name(node_id)
+                room_state["current_node_id"] = node_id
+                room_state["stage_id"] = prev_stage_id
         else:
             room_state["current_node_id"] = node_id
 
@@ -719,6 +746,23 @@ class MeetingRoomOrchestrator:
                 node_id=node_id,
                 ticket_title=ticket_title,
                 reason=downstream_block_reason,
+            )
+
+        if rd_cloud_block_reason and requested_advance:
+            from synapse.rd_meeting.rd_cloud_connectivity import apply_rd_cloud_connectivity_block
+
+            dev["local_process_state"] = "待人工"
+            dev["current_node_id"] = node_id
+            dev["sop_node_display"] = node_display_name(node_id)
+            room_state["current_node_id"] = node_id
+            apply_rd_cloud_connectivity_block(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                error=rd_cloud_block_reason,
+                context="cross_stage_hook",
+                ticket_title=ticket_title,
             )
 
         if advance and next_id:
@@ -1394,8 +1438,59 @@ class MeetingRoomOrchestrator:
             load_leader_review_html,
             validate_leader_review_artifacts,
         )
+        from synapse.rd_meeting.rd_cloud_connectivity import require_rd_cloud_connectivity
 
         sid = scope_id.strip()
+        conn_err = require_rd_cloud_connectivity(
+            context="leader_review",
+            node_id=node_id,
+            scope_id=sid,
+        )
+        if conn_err:
+            set_phase(sid, "exception_gate")
+            gate = self.mark_human_gate(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=node_id,
+                reason=conn_err,
+                ticket_title=ticket_title,
+                hitl_form_schema=resolve_hitl_schema_for_gate(
+                    resolve_node_binding(node_id),
+                    dynamic_schema=None,
+                    reason=conn_err,
+                    intervention_kind="exception",
+                ),
+                pending_delivery={
+                    "node_id": node_id,
+                    "report_body": f"# 研发云连通性异常\n\n{conn_err}\n",
+                    "await_confirm": False,
+                    "tokens_used": tokens_used,
+                    "duration_seconds": duration_seconds,
+                    "stage_id": stage_id,
+                    "error": conn_err,
+                },
+                intervention_kind="exception",
+            )
+            append_history_event(
+                sid,
+                {
+                    "event": "rd_cloud_connectivity_failed",
+                    "room_id": room_id,
+                    "node_id": node_id,
+                    "context": "leader_review",
+                    "text": conn_err,
+                    "log_type": "error",
+                    "agent_id": "system",
+                },
+            )
+            return {
+                "status": "human_intervention",
+                "node_id": node_id,
+                "exception": True,
+                **gate,
+            }
+
         set_phase(sid, "result_gate")
         ok, val_errors = validate_leader_review_artifacts(sid)
         if not ok:

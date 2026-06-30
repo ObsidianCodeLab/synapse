@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import re
+import socket
 from pathlib import Path
+from typing import Any
+
 from synapse.api.routes.dev_iwhalecloud import _devservice_ip_path, _devservice_ip_path_legacy
 from synapse.config import settings
 
 RD_UNIFIED_PORT = 10001
 GITNEXUS_SERVER_PORT = 11011
+DEVSERVICE_PROBE_PORTS: tuple[int, ...] = (10001, 11001, 11011, 12001, 12011, 13001, 13011)
 
 _IPV4_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}$")
 
@@ -80,3 +84,23 @@ def gnx_cache_dir_for_repo(repo_name: str) -> str:
     if not base or not name:
         return ""
     return str(Path(base) / name)
+
+
+def tcp_probe(host: str, port: int, timeout: float = 3.0) -> tuple[bool, str | None]:
+    """对 host:port 做 TCP 连通性探测。"""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True, None
+    except OSError as exc:
+        return False, str(exc)
+
+
+def probe_devservice_ports(host: str, *, timeout: float = 3.0) -> list[dict[str, Any]]:
+    """对七个固定端口做 TCP 连通性探测（与桌面引导一致）。"""
+    authority = format_host_authority(host) or host.strip()
+    bare = authority.strip("[]")
+    results: list[dict[str, Any]] = []
+    for port in DEVSERVICE_PROBE_PORTS:
+        ok, err = tcp_probe(bare, port, timeout=timeout)
+        results.append({"port": port, "ok": ok, "error": err})
+    return results

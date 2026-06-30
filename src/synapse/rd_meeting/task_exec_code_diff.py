@@ -555,6 +555,7 @@ def collect_repo_commit_stage_paths(repo_path: str) -> tuple[bool, str, list[str
 
 def infer_diff_language(rel_path: str) -> str:
     ext = Path(rel_path).suffix.lower()
+    
     return {
         ".py": "python",
         ".java": "java",

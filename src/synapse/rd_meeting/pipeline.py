@@ -1497,6 +1497,33 @@ def _step_system_node_exec(pipe: MeetingPipeline, ctx: PipelineRunContext) -> No
     save_room_state(sid, rs)
     ctx.room_state = rs
 
+    from synapse.rd_meeting.rd_cloud_connectivity import (
+        apply_rd_cloud_connectivity_block,
+        context_for_node_id,
+        require_rd_cloud_connectivity,
+    )
+
+    cloud_ctx = context_for_node_id(run_node)
+    if cloud_ctx:
+        conn_err = require_rd_cloud_connectivity(
+            context=cloud_ctx,
+            node_id=run_node,
+            scope_id=sid,
+        )
+        if conn_err:
+            apply_rd_cloud_connectivity_block(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=run_node,
+                error=conn_err,
+                context=cloud_ctx,
+                ticket_title=ticket_title,
+            )
+            pipe.mark_step_completed(STEP_SYSTEM_NODE_EXEC)
+            pipe.set_flow_step(STEP_WAITING, reason=conn_err)
+            return
+
     if run_node == "auto_split":
         from synapse.rd_meeting.auto_split_gate import maybe_enter_auto_split_choice_gate
 
@@ -1691,6 +1718,31 @@ def _step_task_exec_cli(
             "system_node": True,
         },
     )
+
+    if is_diff_analysis:
+        from synapse.rd_meeting.rd_cloud_connectivity import (
+            apply_rd_cloud_connectivity_block,
+            require_rd_cloud_connectivity,
+        )
+
+        conn_err = require_rd_cloud_connectivity(
+            context="flight_optimize",
+            node_id=run_node,
+            scope_id=sid,
+        )
+        if conn_err:
+            apply_rd_cloud_connectivity_block(
+                scope_type=scope_type,
+                scope_id=sid,
+                room_id=room_id,
+                node_id=run_node,
+                error=conn_err,
+                context="flight_optimize",
+                ticket_title=ticket_title,
+            )
+            pipe.mark_step_completed(STEP_TASK_EXEC_CLI)
+            pipe.set_flow_step(STEP_WAITING, reason=conn_err)
+            return
 
     if is_diff_analysis:
         from synapse.rd_meeting.flight_optimize_gate import (
