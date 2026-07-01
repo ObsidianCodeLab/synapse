@@ -7,14 +7,13 @@ import { buildWorkOrderStatusPresentation } from '@rd-view/utils/workOrder';
 import type { DemandEnjoyComment, WorkOrderTicket } from '@rd-view/types';
 import { formatElapsedSince } from '@rd-view/utils/workOrder';
 import { formatPersonDisplayName, personNameTitle } from '@rd-view/utils/personName';
-import { PersonName } from '@rd-view/components/PersonName';
 import { mergeOwnEnjoyComment } from '@rd-view/utils/demandEnjoyFeedback';
 import { AUTO_SCROLL_LOOP_DIVIDER_HEIGHT } from '../../utils/popoverScrollList';
 import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
 import { WorkOrderDetailDrawer } from './WorkOrderDetailDrawer';
 import { WorkOrderEnjoyBar } from './WorkOrderEnjoyBar';
 import { chartCardTitleIconStyle, chartCardTitleStyle, chartCardTitleTextStyle, dashboardCardStyle } from '@rd-view/constants/dashboardTheme';
-import type { WorkOrderNodeTagVariant, WorkOrderStatusTagVariant } from '@rd-view/utils/workOrder';
+import type { WorkOrderStatusTagVariant } from '@rd-view/utils/workOrder';
 
 const PRIORITY_COLOR: Record<WorkOrderTicket['priority'], string> = {
   高: '#F53F3F',
@@ -28,18 +27,6 @@ const PAUSE_HOVER_DELAY_MS = 120;
 
 function StatusTag({ variant, label }: { variant: WorkOrderStatusTagVariant; label: string }) {
   return <span className={`work-order-status-tag work-order-status-tag--${variant}`}>{label}</span>;
-}
-
-function CurrentNodeStatusTag({
-  variant,
-  nodeName,
-  runStatusLabel,
-}: {
-  variant: WorkOrderNodeTagVariant;
-  nodeName: string;
-  runStatusLabel: string;
-}) {
-  return <StatusTag variant={variant} label={`${nodeName} · ${runStatusLabel}`} />;
 }
 
 function readTrackOffset(track: HTMLDivElement | null): number {
@@ -69,7 +56,7 @@ function WorkOrderRow({
   onEmojiPickerOpenChange: (open: boolean) => void;
 }) {
   const statusPresentation = buildWorkOrderStatusPresentation(item);
-  const elapsedLabel = item.status === 'completed' ? '总耗时' : '至今';
+  const elapsedLabel = item.status === 'completed' || item.status === 'archived' ? '总耗时' : '至今';
   const elapsedValue = formatElapsedSince(item.createdAt);
 
   return (
@@ -81,13 +68,6 @@ function WorkOrderRow({
               {formatPersonDisplayName(item.assignee)}
             </div>
             <div className="work-scroll-body">
-              <div className="work-scroll-header">
-                <span className="work-scroll-name">
-                  <PersonName name={item.assignee} />
-                </span>
-                <StatusTag variant={statusPresentation.headerTagVariant} label={statusPresentation.label} />
-              </div>
-
               <div className="work-order-row-title">
                 <span className="work-order-row-id">{item.id}</span>
                 <span className="work-order-row-name">{item.title}</span>
@@ -97,6 +77,8 @@ function WorkOrderRow({
                 <span>{elapsedLabel} {elapsedValue}</span>
                 <span className="work-scroll-dot">·</span>
                 <span style={{ color: PRIORITY_COLOR[item.priority] }}>{item.priority}优先级</span>
+                <span className="work-scroll-dot">·</span>
+                <StatusTag variant={statusPresentation.headerTagVariant} label={statusPresentation.label} />
               </div>
 
               <div className="work-order-row-summary">{item.summary}</div>
@@ -104,15 +86,6 @@ function WorkOrderRow({
           </button>
 
           <div className="work-order-emoji-bar">
-            <div className="work-order-row-status-line">
-              {statusPresentation.currentNodeTag && item.currentNodeName ? (
-                <CurrentNodeStatusTag
-                  variant={statusPresentation.currentNodeTag.variant}
-                  nodeName={item.currentNodeName}
-                  runStatusLabel={statusPresentation.currentNodeTag.runStatusLabel}
-                />
-              ) : null}
-            </div>
             <WorkOrderEnjoyBar
               comments={enjoyComments}
               currentEmployeeId={currentEmployeeId}

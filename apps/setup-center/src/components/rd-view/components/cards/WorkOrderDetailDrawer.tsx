@@ -8,6 +8,7 @@ const ORDER_STATUS_TAG: Record<WorkOrderTicket['status'], { label: string; color
   pending: { label: '待处理', color: 'orange' },
   inProgress: { label: '在途', color: 'blue' },
   completed: { label: '完成', color: 'green' },
+  archived: { label: '已归档', color: 'default' },
 };
 
 const PRIORITY_COLOR: Record<WorkOrderTicket['priority'], string> = {

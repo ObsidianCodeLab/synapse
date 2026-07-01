@@ -112,7 +112,7 @@ export interface PersonCostUsageItem {
 }
 
 /** 需求状态 */
-export type RequirementStatus = 'pending' | 'inProgress' | 'completed';
+export type RequirementStatus = 'pending' | 'inProgress' | 'completed' | 'archived';
 
 /** SOP 节点 run_status（与 rd_view_demand_save / owner_order_refresh._RUN_STATUS_TO_SLUG 一致） */
 export type SopNodeRunStatus =
@@ -122,7 +122,8 @@ export type SopNodeRunStatus =
   | 'failed'
   | 'stopped'
   | 'pending'
-  | 'full_manual';
+  | 'full_manual'
+  | 'archived';
 
 /** 智能体对话 */
 export interface SopDialogueMessage {
@@ -205,8 +206,4 @@ export interface WorkOrderTicket {
   sopNodes: WorkOrderSopNode[];
   /** 表1 local_process_state 原文（需求处理状态） */
   localProcessState?: string;
-  /** 表1 当前节点 run_status（需求级，非 sop_nodes） */
-  currentRunStatus?: SopNodeRunStatus;
-  /** 表1 当前节点名称（需求级 name） */
-  currentNodeName?: string;
 }

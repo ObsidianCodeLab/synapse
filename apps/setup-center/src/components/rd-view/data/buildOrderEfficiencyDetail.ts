@@ -196,6 +196,7 @@ type DemandProcessBucketKey = 'pending' | 'inProgress' | 'completed';
 /** userwork / 表1 `local_process_state` → rd-view 三态（schema §1.4 + 后端扩展） */
 const LOCAL_PROCESS_STATE_BUCKET: Record<string, DemandProcessBucketKey> = {
   已完成: 'completed',
+  已归档: 'completed',
   处理中: 'inProgress',
   全人工: 'inProgress',
   异常: 'inProgress',
@@ -207,13 +208,20 @@ const LOCAL_PROCESS_STATE_BUCKET: Record<string, DemandProcessBucketKey> = {
 
 const DEFAULT_LOCAL_PROCESS_BUCKET: DemandProcessBucketKey = 'pending';
 
+/** 与 owner_order_archive.is_archived_local_state 对齐 */
+export function isArchivedLocalProcessState(state: unknown): boolean {
+  return String(state ?? '').trim() === '已归档';
+}
+
 function classifyLocalProcessState(state: unknown): DemandProcessBucketKey {
+  if (isArchivedLocalProcessState(state)) return 'completed';
   const text = String(state ?? '').trim();
   if (!text) return DEFAULT_LOCAL_PROCESS_BUCKET;
   return LOCAL_PROCESS_STATE_BUCKET[text] ?? DEFAULT_LOCAL_PROCESS_BUCKET;
 }
 
 function isCompletedLocalProcessState(state: unknown): boolean {
+  if (isArchivedLocalProcessState(state)) return true;
   return classifyLocalProcessState(state) === 'completed';
 }
 
@@ -388,6 +396,7 @@ function buildPersonCostUsageList(
 }
 
 function mapLocalProcessStateToRequirementStatus(state: unknown): RequirementStatus {
+  if (isArchivedLocalProcessState(state)) return 'archived';
   return classifyLocalProcessState(state);
 }
 
@@ -473,6 +482,7 @@ const RD_VIEW_RUN_STATUS_SLUGS: readonly SopNodeRunStatus[] = [
   'stopped',
   'pending',
   'full_manual',
+  'archived',
 ];
 
 const RUN_STATUS_SLUG_SET = new Set<string>(RD_VIEW_RUN_STATUS_SLUGS);
@@ -485,6 +495,7 @@ export const RD_VIEW_RUN_STATUS_LABEL: Record<SopNodeRunStatus, string> = {
   stopped: '已停止',
   pending: '未开始',
   full_manual: '全人工',
+  archived: '已归档',
 };
 
 function mapRdViewRunStatus(raw: unknown): SopNodeRunStatus {
@@ -493,12 +504,6 @@ function mapRdViewRunStatus(raw: unknown): SopNodeRunStatus {
     return text as SopNodeRunStatus;
   }
   return 'pending';
-}
-
-export function isInProgressAccentRunStatus(
-  runStatus: SopNodeRunStatus | undefined,
-): runStatus is 'human_intervention' | 'failed' | 'stopped' {
-  return runStatus === 'human_intervention' || runStatus === 'failed' || runStatus === 'stopped';
 }
 
 function mapArtifactOutputs(
@@ -579,8 +584,6 @@ function buildWorkOrderTicketFromDemand(demand: RdViewDemandRecord): WorkOrderTi
     enjoyComments: parseDemandEnjoyFeedback(demand.feedback_type),
     sopNodes: buildWorkOrderSopNodesFromDemand(demand),
     localProcessState: String(demand.local_process_state ?? '').trim() || undefined,
-    currentRunStatus: mapRdViewRunStatus(demand.run_status),
-    currentNodeName: String(demand.name ?? '').trim() || undefined,
   };
 }
 
@@ -589,6 +592,7 @@ function buildWorkOrderList(items: WorkOrderTicket[]): WorkOrderTicket[] {
     inProgress: 0,
     pending: 1,
     completed: 2,
+    archived: 3,
   };
 
   return [...items].sort((a, b) => {
