@@ -1651,7 +1651,10 @@ fn check_environment() -> EnvironmentCheck {
     let _bundled_exists = bundled_backend_dir().exists();
 
     let mut conflicts = Vec::new();
-    if !running.is_empty() {
+    // Dev (`tauri dev` / external backend): a running backend is expected; skip the warning.
+    let warn_running_processes =
+        !cfg!(debug_assertions) && !external_backend_dev_mode();
+    if !running.is_empty() && warn_running_processes {
         conflicts.push(format!("检测到 {} 个正在运行的 Synapse 进程", running.len()));
     }
 
