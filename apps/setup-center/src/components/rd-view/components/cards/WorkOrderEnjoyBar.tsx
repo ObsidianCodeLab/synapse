@@ -19,7 +19,6 @@ interface WorkOrderEnjoyBarProps {
   currentEmployeeId: string;
   currentUserName: string;
   onOwnEnjoySelect: (enjoyId: string) => void;
-  onPickerOpenChange?: (open: boolean) => void;
 }
 
 /** 工单表情栏：他人只读回显，本人可选/改 */
@@ -28,7 +27,6 @@ export function WorkOrderEnjoyBar({
   currentEmployeeId,
   currentUserName,
   onOwnEnjoySelect,
-  onPickerOpenChange,
 }: WorkOrderEnjoyBarProps) {
   const ownComment = comments.find((item) => isSameEmployeeId(item.assigneeId, currentEmployeeId));
   const others = comments.filter((item) => !isSameEmployeeId(item.assigneeId, currentEmployeeId));
@@ -46,7 +44,6 @@ export function WorkOrderEnjoyBar({
               : undefined
           }
           onSelect={onOwnEnjoySelect}
-          onOpenChange={onPickerOpenChange}
         />
       ) : null}
     </div>

@@ -65,18 +65,18 @@ export interface OrderSatisfactionDetailItem {
   title: string;
   /** 有值时展示优先级圆点；未传则不显示 */
   priority?: DemandPriorityLevel;
-  /** true=点赞；false=点踩；未传=未评价（明细展示，计分不参与） */
+  /** true=满意（reaction 非 2）；false=点踩（reaction=2） */
   liked?: boolean;
 }
 
 /** 模型 Token 消耗明细 */
 export interface ModelTokenUsageItem {
   model: string;
-  /** 定价：元/千Token（由 model 静态映射表解析） */
+  /** 定价：元/百万Token（由 model 静态映射表模糊匹配） */
   unitPrice: number;
   /** 使用量（Token 数） */
   tokens: number;
-  /** 实际成本：tokens / 1000 × unitPrice 累加 */
+  /** 实际成本：tokens / 1_000_000 × unitPrice 累加 */
   cost: number;
 }
 
@@ -206,4 +206,6 @@ export interface WorkOrderTicket {
   sopNodes: WorkOrderSopNode[];
   /** 表1 local_process_state 原文（需求处理状态） */
   localProcessState?: string;
+  /** 表1 当前 SOP 节点展示名（demand.name，在途时用于「在途 · xxx」） */
+  currentNodeName?: string;
 }

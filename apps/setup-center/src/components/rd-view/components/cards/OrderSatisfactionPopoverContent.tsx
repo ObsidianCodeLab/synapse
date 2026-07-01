@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { LikeFilled, DislikeFilled, MinusCircleOutlined } from '@ant-design/icons';
+import { LikeFilled, DislikeFilled } from '@ant-design/icons';
 import { useDashboard } from '@rd-view/context/DashboardContext';
 import type { DemandPriorityLevel, OrderSatisfactionDetailItem } from '@rd-view/types';
 import { ScrollLoopDivider } from '../../utils/ScrollLoopDivider';
@@ -46,15 +46,10 @@ function SatisfactionOrderRow({ item }: { item: OrderSatisfactionDetailItem }) {
           {item.title}
         </span>
       </div>
-      {item.liked === true ? (
-        <LikeFilled className="order-coverage-icon order-satisfaction-icon--liked" />
-      ) : item.liked === false ? (
+      {item.liked === false ? (
         <DislikeFilled className="order-coverage-icon order-satisfaction-icon--disliked" />
       ) : (
-        <MinusCircleOutlined
-          className="order-coverage-icon order-satisfaction-icon--unset"
-          title="未评价"
-        />
+        <LikeFilled className="order-coverage-icon order-satisfaction-icon--liked" title="满意" />
       )}
     </div>
   );
@@ -178,20 +173,16 @@ export function OrderSatisfactionPopoverContent() {
         </div>
       </div>
       <div className="efficiency-popover-formula">
-        满意度 = 点赞工单数 / 已评价工单数 × 5.0
+        满意度 = 满意工单数 / 已完成工单数 × 5.0（reaction 非 2 即满意）
       </div>
       <div className="efficiency-popover-legend">
         <span className="efficiency-popover-legend-item">
           <LikeFilled className="order-satisfaction-icon--liked" />
-          点赞
+          满意
         </span>
         <span className="efficiency-popover-legend-item">
           <DislikeFilled className="order-satisfaction-icon--disliked" />
           点踩
-        </span>
-        <span className="efficiency-popover-legend-item">
-          <MinusCircleOutlined className="order-satisfaction-icon--unset" />
-          未评价
         </span>
       </div>
     </div>

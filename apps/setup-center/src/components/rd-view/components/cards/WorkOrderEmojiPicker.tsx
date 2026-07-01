@@ -1,13 +1,6 @@
-import { useState } from 'react';
-import { Popover } from 'antd';
-import { SmileOutlined } from '@ant-design/icons';
-import { PersonName } from '@rd-view/components/PersonName';
-import {
-  ENJOY_EMOJI_ITEMS,
-  enjoyIdToEmoji,
-} from '@rd-view/utils/enjoyEmojiCatalog';
+import { ENJOY_EMOJI_ITEMS } from '@rd-view/utils/enjoyEmojiCatalog';
 
-export { ENJOY_EMOJI_ITEMS } from '@rd-view/utils/enjoyEmojiCatalog';
+const QUICK_ENJOY_ITEMS = ENJOY_EMOJI_ITEMS.slice(0, 3);
 
 export interface EmojiReaction {
   enjoyId: string;
@@ -17,78 +10,24 @@ export interface EmojiReaction {
 interface WorkOrderEmojiPickerProps {
   value?: EmojiReaction;
   onSelect: (enjoyId: string) => void;
-  onOpenChange?: (open: boolean) => void;
 }
 
-export function WorkOrderEmojiPicker({ value, onSelect, onOpenChange }: WorkOrderEmojiPickerProps) {
-  const [open, setOpen] = useState(false);
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    onOpenChange?.(nextOpen);
-  };
-
-  const handleGridWheel = (event: React.WheelEvent) => {
-    event.stopPropagation();
-  };
-
-  const handleSelect = (enjoyId: number) => {
-    onSelect(String(enjoyId));
-    handleOpenChange(false);
-  };
-
-  const panel = (
-    <div className="work-order-emoji-panel" onClick={(e) => e.stopPropagation()}>
-      <div className="work-order-emoji-panel-title">选择表情包</div>
-      <div className="work-order-emoji-grid" onWheel={handleGridWheel}>
-        {ENJOY_EMOJI_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`work-order-emoji-item${value?.enjoyId === String(item.id) ? ' work-order-emoji-item--active' : ''}`}
-            onClick={() => handleSelect(item.id)}
-            title={item.label}
-          >
-            {item.emoji}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
+/** 工单快捷表情：点赞 / 点踩 / 催促，点击即选 */
+export function WorkOrderEmojiPicker({ value, onSelect }: WorkOrderEmojiPickerProps) {
   return (
-    <div className="work-order-emoji-picker-wrap" onClick={(e) => e.stopPropagation()}>
-      <Popover
-        content={panel}
-        trigger="click"
-        open={open}
-        onOpenChange={handleOpenChange}
-        placement="topRight"
-        arrow={false}
-        overlayClassName="work-order-emoji-popover"
-        getPopupContainer={() => document.body}
-        destroyOnHidden
-      >
+    <div className="work-order-emoji-quick" onClick={(event) => event.stopPropagation()}>
+      {QUICK_ENJOY_ITEMS.map((item) => (
         <button
+          key={item.id}
           type="button"
-          className={`work-order-emoji-trigger${open ? ' work-order-emoji-trigger--active' : ''}${value ? ' work-order-emoji-trigger--selected' : ''}`}
-          onClick={(e) => e.stopPropagation()}
+          className={`work-order-emoji-quick-btn${value?.enjoyId === String(item.id) ? ' work-order-emoji-quick-btn--active' : ''}`}
+          onClick={() => onSelect(String(item.id))}
+          title={item.label}
+          aria-label={item.label}
         >
-          {value ? (
-            <>
-              <span className="work-order-emoji-trigger-emoji">{enjoyIdToEmoji(value.enjoyId)}</span>
-              <span className="work-order-emoji-trigger-name">
-                <PersonName name={value.personName} />
-              </span>
-            </>
-          ) : (
-            <>
-              <SmileOutlined />
-              <span>选择表情</span>
-            </>
-          )}
+          {item.emoji}
         </button>
-      </Popover>
+      ))}
     </div>
   );
 }

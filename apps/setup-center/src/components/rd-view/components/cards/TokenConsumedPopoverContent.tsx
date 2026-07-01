@@ -9,6 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { ModelAxisTick, MODEL_AXIS_LABEL_MAX_LEN } from '@rd-view/components/charts/ModelAxisTick';
 import { useDashboard } from '@rd-view/context/DashboardContext';
 import { useRdViewColors } from '@rd-view/theme';
 import type { ModelTokenUsageView } from '@rd-view/types';
@@ -18,8 +19,14 @@ import {
   formatUnitPrice,
 } from '@rd-view/utils/tokenConsumption';
 
-const CHART_HEIGHT = 220;
-const CHART_MARGIN = { top: 4, right: 8, left: 4, bottom: 6 };
+/** 弹层宽度按 10 个模型一次性排开，超过才横向滚动 */
+const POPOVER_TARGET_MODELS = 10;
+const SCROLLABLE_MODEL_THRESHOLD = 11;
+const CHART_PLOT_HEIGHT = 220;
+const X_AXIS_HEIGHT = 88;
+const CHART_HEIGHT = CHART_PLOT_HEIGHT + X_AXIS_HEIGHT;
+const CHART_MARGIN = { top: 12, right: 16, left: 8, bottom: 4 };
+const MODEL_LABEL_ANGLE = -42;
 const COST_COLOR = '#165DFF';
 const TOKEN_COLOR = '#FF7D00';
 const DARK_TICK_FILL = '#F2F3F7';
@@ -27,12 +34,10 @@ const DARK_TICK_FILL = '#F2F3F7';
 function TokenTooltip({
   active,
   payload,
-  label,
   tooltipStyle,
 }: {
   active?: boolean;
   payload?: Array<{ payload?: ModelTokenUsageView }>;
-  label?: string | number;
   tooltipStyle: { background: string; border: string; color: string };
 }) {
   if (!active || !payload?.length) return null;
@@ -50,7 +55,9 @@ function TokenTooltip({
         fontSize: 10,
       }}
     >
-      <div style={{ fontWeight: 600, marginBottom: 4, color: tooltipStyle.color }}>{label}</div>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: tooltipStyle.color }}>
+        {row.model}
+      </div>
       <div style={{ color: tooltipStyle.color, opacity: 0.85, marginTop: 2 }}>
         定价：{formatUnitPrice(row.unitPrice)}
       </div>
@@ -77,7 +84,17 @@ export function TokenConsumedPopoverContent() {
   ), [dashboard.details.tokenConsumed]);
 
   const modelCount = chartData.length;
-  const barSize = Math.min(42, Math.max(28, Math.round(CHART_HEIGHT * 0.14)));
+  const scrollable = modelCount > SCROLLABLE_MODEL_THRESHOLD;
+  const categoryWidth = scrollable
+    ? 96
+    : Math.floor(928 / POPOVER_TARGET_MODELS);
+  const chartWidth = scrollable ? modelCount * categoryWidth : '100%';
+  const xTickFontSize = modelCount > 8 ? 10 : 11;
+  const barSize = Math.min(
+    40,
+    Math.max(22, Math.round(categoryWidth * 0.42)),
+  );
+  const barCategoryGap = modelCount > 8 ? '10%' : modelCount > 4 ? '14%' : '18%';
 
   return (
     <div className="efficiency-popover token-consumed-popover">
@@ -87,60 +104,83 @@ export function TokenConsumedPopoverContent() {
           <span className="cost-analysis-axis-label cost-analysis-axis-label--cost">成本(¥)</span>
           <span className="cost-analysis-axis-label cost-analysis-axis-label--token">Token消耗</span>
         </div>
-        <div className="token-consumed-chart-wrap" style={{ height: CHART_HEIGHT }}>
-          <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-            <ComposedChart data={chartData} margin={CHART_MARGIN} barCategoryGap={modelCount > 4 ? '12%' : '18%'}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-              <XAxis
-                dataKey="model"
-                tick={{ fontSize: 11, fill: tickFill }}
-                axisLine={false}
-                tickLine={false}
-                interval={0}
-                height={30}
-              />
-              <YAxis
-                yAxisId="cost"
-                orientation="left"
-                tick={{ fontSize: 10, fill: tickFill, fontWeight: 500 }}
-                axisLine={false}
-                tickLine={false}
-                width={40}
-                domain={[0, (max: number) => Math.ceil(max * 1.15 * 100) / 100]}
-                tickFormatter={(value) => `${value}`}
-              />
-              <YAxis
-                yAxisId="token"
-                orientation="right"
-                tick={{ fontSize: 10, fill: tickFill, fontWeight: 500 }}
-                tickFormatter={formatTokenTick}
-                axisLine={false}
-                tickLine={false}
-                width={44}
-                domain={[0, (max: number) => Math.ceil(max * 1.15)]}
-              />
-              <Tooltip content={<TokenTooltip tooltipStyle={chart.tooltip} />} />
-              <Bar
-                yAxisId="cost"
-                dataKey="cost"
-                name="实际成本"
-                fill={COST_COLOR}
-                barSize={barSize}
-                radius={[3, 3, 0, 0]}
-                legendType="none"
-              />
-              <Line
-                yAxisId="token"
-                type="monotone"
-                dataKey="tokens"
-                name="Token消耗"
-                stroke="none"
-                dot={{ r: 5, fill: TOKEN_COLOR, stroke: dotStroke, strokeWidth: 2 }}
-                activeDot={{ r: 6, fill: TOKEN_COLOR, stroke: dotStroke, strokeWidth: 2 }}
-                legendType="none"
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+        <div
+          className={`token-consumed-chart-wrap${scrollable ? ' token-consumed-chart-wrap--scroll' : ''}`}
+          style={{ height: CHART_HEIGHT }}
+        >
+          <div
+            className="token-consumed-chart-inner"
+            style={scrollable ? { width: chartWidth } : undefined}
+          >
+            <ResponsiveContainer width={chartWidth} height={CHART_HEIGHT}>
+              <ComposedChart
+                data={chartData}
+                margin={CHART_MARGIN}
+                barCategoryGap={barCategoryGap}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
+                <XAxis
+                  dataKey="model"
+                  tick={(props) => (
+                    <ModelAxisTick
+                      {...props}
+                      fill={tickFill}
+                      fontSize={xTickFontSize}
+                      textAnchor="end"
+                      angle={MODEL_LABEL_ANGLE}
+                      dx={0}
+                      dy={12}
+                      maxLabelLen={MODEL_AXIS_LABEL_MAX_LEN}
+                    />
+                  )}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                  height={X_AXIS_HEIGHT}
+                />
+                <YAxis
+                  yAxisId="cost"
+                  orientation="left"
+                  tick={{ fontSize: 10, fill: tickFill, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                  domain={[0, (max: number) => Math.ceil(max * 1.15 * 100) / 100]}
+                  tickFormatter={(value) => `${value}`}
+                />
+                <YAxis
+                  yAxisId="token"
+                  orientation="right"
+                  tick={{ fontSize: 10, fill: tickFill, fontWeight: 500 }}
+                  tickFormatter={formatTokenTick}
+                  axisLine={false}
+                  tickLine={false}
+                  width={44}
+                  domain={[0, (max: number) => Math.ceil(max * 1.15)]}
+                />
+                <Tooltip content={<TokenTooltip tooltipStyle={chart.tooltip} />} />
+                <Bar
+                  yAxisId="cost"
+                  dataKey="cost"
+                  name="实际成本"
+                  fill={COST_COLOR}
+                  barSize={barSize}
+                  radius={[3, 3, 0, 0]}
+                  legendType="none"
+                />
+                <Line
+                  yAxisId="token"
+                  type="monotone"
+                  dataKey="tokens"
+                  name="Token消耗"
+                  stroke="none"
+                  dot={{ r: 5, fill: TOKEN_COLOR, stroke: dotStroke, strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: TOKEN_COLOR, stroke: dotStroke, strokeWidth: 2 }}
+                  legendType="none"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
         <div className="cost-analysis-legend">
           <span className="cost-analysis-legend-item cost-analysis-legend-item--cost">
@@ -154,7 +194,7 @@ export function TokenConsumedPopoverContent() {
         </div>
       </div>
       <div className="efficiency-popover-formula">
-        实际成本 = 使用量 / 1000 × 定价，按实际成本从高到低排列
+        实际成本 = 使用量 × 定价（元/百万Token），按实际成本从高到低排列
       </div>
     </div>
   );

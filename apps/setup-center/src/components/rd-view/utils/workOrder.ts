@@ -60,10 +60,23 @@ function resolveProcessLabel(localProcessState: string, status: RequirementStatu
   return '在途';
 }
 
-/** 工作内容卡片状态：仅依据 local_process_state / RequirementStatus，不看 run_status */
+function appendInProgressSopNodeLabel(
+  baseLabel: string,
+  status: RequirementStatus,
+  nodeName?: string,
+): string {
+  const node = String(nodeName ?? '').trim();
+  if (status !== 'inProgress' || !node || baseLabel.includes(node)) {
+    return baseLabel;
+  }
+  return `${baseLabel} · ${node}`;
+}
+
+/** 工作内容卡片状态：local_process_state + 在途时当前 SOP 节点名（demand.name） */
 export function buildWorkOrderStatusPresentation(ticket: WorkOrderTicket): WorkOrderStatusPresentation {
   const cardTone = ticket.status;
-  const label = resolveProcessLabel(ticket.localProcessState ?? '', ticket.status);
+  const baseLabel = resolveProcessLabel(ticket.localProcessState ?? '', ticket.status);
+  const label = appendInProgressSopNodeLabel(baseLabel, ticket.status, ticket.currentNodeName);
 
   return {
     label,

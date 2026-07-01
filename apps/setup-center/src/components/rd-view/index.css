@@ -35,6 +35,10 @@
   overflow: visible;
 }
 
+.efficiency-popover-overlay:has(.token-consumed-popover) .ant-popover-inner {
+  max-width: none;
+}
+
 .efficiency-popover {
   width: 420px;
   padding: 12px 14px;
@@ -355,10 +359,6 @@
   mask-image: linear-gradient(to bottom, transparent 0, var(--mask-fade) 16px, #000 calc(100% - 16px), transparent 100%);
 }
 
-.work-scroll-panel--emoji-open .work-scroll-viewport {
-  overflow: hidden;
-}
-
 .work-scroll-viewport--interactive {
   mask-image: none;
   cursor: default;
@@ -418,8 +418,13 @@
   border-radius: var(--wo-item-radius);
   background: var(--wo-item-bg);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+}
+
+.work-scroll-item:hover .work-order-card {
+  transform: translateY(-1px);
+  box-shadow: var(--wo-item-hover-shadow, 0 6px 18px rgba(15, 23, 42, 0.08));
 }
 
 .work-order-card--completed {
@@ -504,11 +509,12 @@
 
 .work-order-card-main {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   flex: 1;
   min-height: 0;
   width: 100%;
-  padding: 8px 10px 4px;
+  padding: 10px 12px 6px;
   border: none;
   border-radius: 0;
   background: var(--wo-item-main-bg);
@@ -520,6 +526,27 @@
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+}
+
+.work-order-card-head {
+  display: flex;
+  align-items: stretch;
+  gap: 11px;
+  min-width: 0;
+}
+
+.work-order-card-head-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+.work-scroll-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .work-order-card-main:hover,
@@ -541,15 +568,7 @@
   letter-spacing: normal !important;
 }
 
-.rdViewRoot .work-order-card--completed:hover,
-.rdViewRoot .work-order-card--inProgress:hover,
-.rdViewRoot .work-order-card--pending:hover,
-.rdViewRoot .work-order-card--error:hover,
-.rdViewRoot .work-order-card--manual:hover,
-.rdViewRoot .work-order-card--stopped:hover,
-.rdViewRoot .work-order-card--archived:hover {
-  box-shadow: none;
-}
+/* rdViewRoot：工单卡片 hover 阴影由 .work-scroll-item:hover .work-order-card 统一控制 */
 
 .work-order-emoji-bar {
   display: flex;
@@ -567,6 +586,76 @@
   flex-shrink: 0;
 }
 
+.work-order-emoji-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.work-order-emoji-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  opacity: 0.72;
+  transition: opacity 0.15s ease, transform 0.12s ease;
+}
+
+/* 覆盖 styles.css 全局 button 圆角/边框（:not 链 specificity 极高） */
+.rdViewRoot button.work-order-emoji-quick-btn,
+.rdViewRoot button.work-order-emoji-quick-btn:hover,
+.rdViewRoot button.work-order-emoji-quick-btn:focus-visible,
+.rdViewRoot button.work-order-emoji-quick-btn--active {
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: inherit !important;
+  letter-spacing: normal !important;
+  color: inherit !important;
+}
+
+.rdViewRoot button.work-order-emoji-item,
+.rdViewRoot button.work-order-emoji-item:hover,
+.rdViewRoot button.work-order-emoji-item:focus-visible,
+.rdViewRoot button.work-order-emoji-trigger,
+.rdViewRoot button.work-order-emoji-trigger:hover,
+.rdViewRoot button.work-order-emoji-trigger:focus-visible,
+.rdViewRoot button.work-order-emoji-tab,
+.rdViewRoot button.work-order-emoji-tab:hover,
+.rdViewRoot button.work-order-emoji-tab:focus-visible {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: inherit !important;
+  letter-spacing: normal !important;
+}
+
+.work-order-emoji-quick-btn:hover {
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+.work-order-emoji-quick-btn--active {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
 .work-order-enjoy-bar {
   display: flex;
   align-items: center;
@@ -581,10 +670,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--wo-emoji-trigger-border);
-  border-radius: 12px;
-  background: var(--wo-emoji-trigger-bg);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   font-size: 10px;
   line-height: 1.2;
   max-width: 120px;
@@ -603,10 +692,10 @@
 
 .work-order-emoji-trigger--selected {
   gap: 6px;
-  padding: 2px 10px;
+  padding: 0;
   color: var(--text-primary);
-  border-color: var(--primary-border);
-  background: var(--primary-soft);
+  border: none;
+  background: transparent;
 }
 
 .work-order-emoji-trigger-emoji {
@@ -636,10 +725,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--wo-emoji-trigger-border);
-  border-radius: 12px;
-  background: var(--wo-emoji-trigger-bg);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: normal;
@@ -651,9 +740,9 @@
 
 .work-order-emoji-trigger:hover,
 .work-order-emoji-trigger--active {
-  color: #165DFF;
-  border-color: var(--primary-border);
-  background: var(--primary-soft);
+  color: var(--text-secondary);
+  border: none;
+  background: transparent;
 }
 
 .work-order-emoji-panel-title {
@@ -738,17 +827,48 @@
 
 .work-scroll-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--wo-avatar-border);
-  background: var(--wo-avatar-bg);
-  color: var(--wo-avatar-color);
+  align-self: stretch;
+  width: 44px;
+  min-height: 44px;
+  border-radius: 11px;
+  border: 1px solid transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.work-order-card-main:hover .work-scroll-avatar {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.work-scroll-avatar--inProgress {
+  background: linear-gradient(145deg, rgba(22, 93, 255, 0.14) 0%, rgba(22, 93, 255, 0.06) 100%);
+  color: #165dff;
+  border-color: rgba(22, 93, 255, 0.22);
+}
+
+.work-scroll-avatar--pending {
+  background: linear-gradient(145deg, rgba(255, 125, 0, 0.16) 0%, rgba(255, 125, 0, 0.06) 100%);
+  color: #d25f00;
+  border-color: rgba(255, 125, 0, 0.24);
+}
+
+.work-scroll-avatar--completed {
+  background: linear-gradient(145deg, rgba(0, 180, 42, 0.16) 0%, rgba(0, 180, 42, 0.06) 100%);
+  color: #008026;
+  border-color: rgba(0, 180, 42, 0.22);
+}
+
+.work-scroll-avatar--archived {
+  background: linear-gradient(145deg, rgba(134, 144, 156, 0.18) 0%, rgba(134, 144, 156, 0.06) 100%);
+  color: #4e5969;
+  border-color: rgba(134, 144, 156, 0.28);
 }
 
 .work-order-status-tag {
@@ -921,20 +1041,29 @@
 .work-order-row-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 2px;
+  gap: 8px;
   min-width: 0;
 }
 
 .work-order-row-id {
   flex-shrink: 0;
   font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.04);
   color: var(--text-muted);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .work-order-row-name {
-  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -943,12 +1072,65 @@
 
 .work-order-row-meta {
   font-size: 10px;
+  line-height: 1.35;
   color: var(--text-muted);
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 2px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.work-order-meta-elapsed {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.work-order-meta-priority {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.work-order-row-meta .work-order-status-tag {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-order-row-desc {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  min-height: calc(1.45em * 2 + 14px);
+  word-break: break-word;
+}
+
+.work-order-card--inProgress .work-order-row-desc {
+  background: rgba(22, 93, 255, 0.04);
+  border-color: rgba(22, 93, 255, 0.08);
+}
+
+.work-order-card--pending .work-order-row-desc {
+  background: rgba(255, 125, 0, 0.05);
+  border-color: rgba(255, 125, 0, 0.1);
+}
+
+.work-order-card--completed .work-order-row-desc,
+.work-order-card--archived .work-order-row-desc {
+  background: rgba(15, 23, 42, 0.025);
+  border-color: rgba(15, 23, 42, 0.06);
 }
 
 .work-order-row-summary {
@@ -2111,8 +2293,9 @@
 }
 
 .token-consumed-popover {
-  width: 480px;
-  padding: 12px 14px 10px;
+  width: 960px;
+  max-width: min(960px, calc(100vw - 48px));
+  padding: 12px 16px 10px;
 }
 
 .token-consumed-plot {
@@ -2126,6 +2309,21 @@
 
 .token-consumed-chart-wrap {
   width: 100%;
+}
+
+.token-consumed-chart-wrap--scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.token-consumed-chart-inner {
+  width: 100%;
+  min-width: 0;
+}
+
+.token-consumed-chart-wrap--scroll .token-consumed-chart-inner {
+  min-width: max-content;
 }
 
 .assistant-output-kpi-value {
@@ -2398,22 +2596,12 @@
   border-color: var(--wo-tag-sop-abnormal-fg);
 }
 
-[data-theme='dark'] .rdViewRoot .work-order-emoji-trigger,
-[data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger,
-[data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--text-muted);
-}
-
 [data-theme='dark'] .rdViewRoot .work-order-emoji-trigger:hover,
 [data-theme='dark'] .rdViewRoot .work-order-emoji-trigger--active,
 [data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger:hover,
 [data-theme='daltonized-dark'] .rdViewRoot .work-order-emoji-trigger--active,
 [data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger:hover,
 [data-theme='high-contrast'] .rdViewRoot .work-order-emoji-trigger--active {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.2);
   color: var(--text-secondary);
 }
 

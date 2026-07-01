@@ -77,7 +77,7 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
           layout="vertical"
           data={data}
           barSize={barSize}
-          barCategoryGap={barGap}
+          barCategoryGap="20%"
           margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} horizontal={false} />
@@ -120,7 +120,7 @@ function PersonWorkloadChart({ data, height }: PersonWorkloadChartProps) {
           />
           <Bar dataKey="completed" name="已完成" stackId="stack" fill={chart.series.completed} />
           <Bar dataKey="inProgress" name="进行中" stackId="stack" fill={chart.series.inProgress} />
-          <Bar dataKey="pending" name="待开始" stackId="stack" fill={chart.series.pending} radius={[0, 3, 3, 0]} />
+          <Bar dataKey="pending" name="待开始" stackId="stack" fill={chart.series.pending} />
         </BarChart>
       </ResponsiveContainer>
     </div>

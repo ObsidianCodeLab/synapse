@@ -7,7 +7,7 @@
 export const RD_VIEW_CHART_SERIES = {
   completed: '#165DFF',
   inProgress: '#00B42A',
-  pending: '#FF7D00',
+  pending: '#3D6B54',
 } as const;
 
 export interface RdViewThemePalette {
@@ -196,9 +196,9 @@ export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
   woTagInProgressFg: '#165DFF',
   woTagInProgressBg: '#E8F3FF',
   woTagInProgressBorder: '#C9D8FF',
-  woTagPendingFg: '#FF7D00',
-  woTagPendingBg: '#FFF7E8',
-  woTagPendingBorder: 'rgba(255, 125, 0, 0.35)',
+  woTagPendingFg: RD_VIEW_CHART_SERIES.pending,
+  woTagPendingBg: '#EDF4F0',
+  woTagPendingBorder: 'rgba(61, 107, 84, 0.35)',
   woTagErrorFg: '#F53F3F',
   woTagErrorBg: '#FFF1F0',
   woTagErrorBorder: '#FFCCC7',
@@ -222,7 +222,7 @@ export const RD_VIEW_PALETTE_LIGHT: RdViewThemePalette = {
   woTagSopPendingBorder: '#E5E6EB',
   woAccentCompleted: '#00B42A',
   woAccentInProgress: '#165DFF',
-  woAccentPending: '#FF7D00',
+  woAccentPending: RD_VIEW_CHART_SERIES.pending,
   woAccentError: '#F53F3F',
   woAccentManual: '#FF7875',
 };
@@ -303,9 +303,9 @@ export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
   woTagInProgressFg: '#6AA1FF',
   woTagInProgressBg: 'rgba(22, 93, 255, 0.18)',
   woTagInProgressBorder: 'rgba(106, 161, 255, 0.35)',
-  woTagPendingFg: '#FF9A2E',
-  woTagPendingBg: 'rgba(255, 125, 0, 0.15)',
-  woTagPendingBorder: 'rgba(255, 154, 46, 0.35)',
+  woTagPendingFg: '#6B9A82',
+  woTagPendingBg: 'rgba(61, 107, 84, 0.18)',
+  woTagPendingBorder: 'rgba(107, 154, 130, 0.35)',
   woTagErrorFg: '#F76560',
   woTagErrorBg: 'rgba(247, 101, 96, 0.15)',
   woTagErrorBorder: 'rgba(247, 101, 96, 0.35)',
@@ -329,7 +329,7 @@ export const RD_VIEW_PALETTE_DARK: RdViewThemePalette = {
   woTagSopPendingBorder: '#2E3238',
   woAccentCompleted: '#7BE188',
   woAccentInProgress: '#6AA1FF',
-  woAccentPending: '#FF9A2E',
+  woAccentPending: '#6B9A82',
   woAccentError: '#F76560',
   woAccentManual: '#FFA39E',
 };

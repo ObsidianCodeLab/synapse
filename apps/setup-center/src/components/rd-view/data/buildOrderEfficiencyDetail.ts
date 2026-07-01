@@ -44,6 +44,7 @@ import {
 import { calcModelTokenCost, calcTotalTokens, formatTotalTokens, resolveModelUnitPrice } from '@rd-view/utils/tokenConsumption';
 import { parseDemandEnjoyFeedback } from '@rd-view/utils/demandEnjoyFeedback';
 import { getTimeRangeTrendLabel, sumAssistantOutput } from '@rd-view/utils/assistantOutput';
+import { RD_VIEW_CHART_SERIES } from '@rd-view/theme/palette';
 
 // ---------------------------------------------------------------------------
 // 类型定义（与 rd_view demands / team-overview 接口字段对齐）
@@ -81,7 +82,7 @@ export interface RdViewSopNodeRecord {
   duration_hours?: number | null;
   tokens?: number | null;
   model?: string | null;
-  /** 模型定价：元/千 Token */
+  /** 模型定价：元/百万 Token（历史字段，当前接口未返回） */
   model_price?: number | null;
   /** 节点产出文档列表（rd_view_node_artifact 嵌入） */
   artifact_files?: RdViewArtifactFileRecord[] | null;
@@ -226,9 +227,9 @@ function isCompletedLocalProcessState(state: unknown): boolean {
 }
 
 const DEMAND_STATUS_META: Record<DemandProcessBucketKey, { name: string; color: string }> = {
-  completed: { name: '已完成', color: '#165DFF' },
-  inProgress: { name: '进行中', color: '#00B42A' },
-  pending: { name: '待处理', color: '#FF7D00' },
+  completed: { name: '已完成', color: RD_VIEW_CHART_SERIES.completed },
+  inProgress: { name: '进行中', color: RD_VIEW_CHART_SERIES.inProgress },
+  pending: { name: '待处理', color: RD_VIEW_CHART_SERIES.pending },
 };
 
 const DEMAND_STATUS_ORDER: DemandProcessBucketKey[] = ['completed', 'inProgress', 'pending'];
@@ -555,11 +556,8 @@ function buildWorkOrderSopNodesFromDemand(demand: RdViewDemandRecord): WorkOrder
   });
 }
 
-function buildWorkContentSummary(title: string, content: string): string {
-  const plain = content.replace(/\s+/g, ' ').trim();
-  if (!plain) return title;
-  if (plain.length <= 36) return `${title}：${plain}`;
-  return `${title}：${plain.slice(0, 36)}…`;
+function buildWorkContentSummary(_title: string, content: string): string {
+  return content.replace(/\s+/g, ' ').trim();
 }
 
 /** 工作内容：单条 demand → WorkOrderTicket */
@@ -584,6 +582,7 @@ function buildWorkOrderTicketFromDemand(demand: RdViewDemandRecord): WorkOrderTi
     enjoyComments: parseDemandEnjoyFeedback(demand.feedback_type),
     sopNodes: buildWorkOrderSopNodesFromDemand(demand),
     localProcessState: String(demand.local_process_state ?? '').trim() || undefined,
+    currentNodeName: String(demand.name ?? '').trim() || undefined,
   };
 }
 
@@ -665,7 +664,7 @@ function aggregateSopNodeUsageByModel(
 interface TokenUsageBucket {
   tokens: number;
   costSum: number;
-  /** 展示参考：按 model 静态映射得到的单价（元/千Token） */
+  /** 展示参考：按 model 静态映射模糊匹配得到的单价（元/百万Token） */
   unitPrice: number;
 }
 
@@ -957,21 +956,18 @@ function buildOrderCoverageItemFromDemand(
   return item;
 }
 
-/** `reaction` → liked；1=点赞，2=点踩，未评价返回 null */
-function parseReactionLiked(reaction: unknown): boolean | null {
-  if (reaction == null || reaction === '') return null;
+/** `reaction` → 是否点踩；2=点踩，其余/空视为满意 */
+function isReactionDisliked(reaction: unknown): boolean {
+  if (reaction == null || reaction === '') return false;
   const num = typeof reaction === 'number' ? reaction : Number(String(reaction).trim());
-  if (!Number.isFinite(num)) return null;
-  if (num === 1) return true;
-  if (num === 2) return false;
-  return null;
+  return Number.isFinite(num) && num === 2;
 }
 
 /**
  * 指标 4 — 工单处理质量（单条工单层）
  *
  * - 仅 `local_process_state === '已完成'` 的工单进入明细
- * - 点赞 / 点踩 / 未评价均展示；计分仅统计已评价（like + dislike）
+ * - 仅读 `reaction`：2=点踩，无点踩（含未评价、点赞）均计为满意
  */
 function buildSatisfactionItemFromDemand(
   demand: RdViewDemandRecord,
@@ -983,12 +979,8 @@ function buildSatisfactionItemFromDemand(
   const item: OrderSatisfactionDetailItem = {
     id: demand.demand_no,
     title: demand.demand_title,
+    liked: !isReactionDisliked(demand.reaction),
   };
-
-  const liked = parseReactionLiked(demand.reaction);
-  if (liked !== null) {
-    item.liked = liked;
-  }
 
   const priority = parseDemandPriority(demand.priority);
   if (priority) {

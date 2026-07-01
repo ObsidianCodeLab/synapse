@@ -21,7 +21,7 @@ const PRIORITY_COLOR: Record<WorkOrderTicket['priority'], string> = {
   低: '#86909C',
 };
 
-const ITEM_HEIGHT = 156;
+const ITEM_HEIGHT = 168;
 const SCROLL_SECONDS_PER_ITEM = 3.6;
 const PAUSE_HOVER_DELAY_MS = 120;
 
@@ -45,7 +45,6 @@ function WorkOrderRow({
   currentUserName,
   onOpen,
   onOwnEnjoySelect,
-  onEmojiPickerOpenChange,
 }: {
   item: WorkOrderTicket;
   enjoyComments: DemandEnjoyComment[];
@@ -53,36 +52,41 @@ function WorkOrderRow({
   currentUserName: string;
   onOpen: (order: WorkOrderTicket) => void;
   onOwnEnjoySelect: (orderId: string, enjoyId: string) => void;
-  onEmojiPickerOpenChange: (open: boolean) => void;
 }) {
   const statusPresentation = buildWorkOrderStatusPresentation(item);
   const elapsedLabel = item.status === 'completed' || item.status === 'archived' ? '总耗时' : '至今';
   const elapsedValue = formatElapsedSince(item.createdAt);
+  const description = item.content.trim() || item.summary.trim();
 
   return (
     <div className="work-scroll-item work-order-card-wrap" style={{ height: ITEM_HEIGHT }}>
       <div className={`work-order-card work-order-card--${statusPresentation.cardTone}`}>
         <div className="work-order-card-inner">
           <button type="button" className="work-order-card-main" onClick={() => onOpen(item)}>
-            <div className="work-scroll-avatar" title={personNameTitle(item.assignee)}>
-              {formatPersonDisplayName(item.assignee)}
-            </div>
-            <div className="work-scroll-body">
-              <div className="work-order-row-title">
-                <span className="work-order-row-id">{item.id}</span>
-                <span className="work-order-row-name">{item.title}</span>
+            <div className="work-order-card-head">
+              <div
+                className={`work-scroll-avatar work-scroll-avatar--${statusPresentation.cardTone}`}
+                title={personNameTitle(item.assignee)}
+              >
+                {formatPersonDisplayName(item.assignee)}
               </div>
-
-              <div className="work-order-row-meta">
-                <span>{elapsedLabel} {elapsedValue}</span>
-                <span className="work-scroll-dot">·</span>
-                <span style={{ color: PRIORITY_COLOR[item.priority] }}>{item.priority}优先级</span>
-                <span className="work-scroll-dot">·</span>
-                <StatusTag variant={statusPresentation.headerTagVariant} label={statusPresentation.label} />
+              <div className="work-order-card-head-body">
+                <div className="work-order-row-title">
+                  <span className="work-order-row-id">{item.id}</span>
+                  <span className="work-order-row-name">{item.title}</span>
+                </div>
+                <div className="work-order-row-meta">
+                  <span className="work-order-meta-elapsed">{elapsedLabel} {elapsedValue}</span>
+                  <span className="work-scroll-dot">·</span>
+                  <span className="work-order-meta-priority" style={{ color: PRIORITY_COLOR[item.priority] }}>
+                    {item.priority}优先级
+                  </span>
+                  <span className="work-scroll-dot">·</span>
+                  <StatusTag variant={statusPresentation.headerTagVariant} label={statusPresentation.label} />
+                </div>
               </div>
-
-              <div className="work-order-row-summary">{item.summary}</div>
             </div>
+            <p className="work-order-row-desc">{description || '暂无工单描述'}</p>
           </button>
 
           <div className="work-order-emoji-bar">
@@ -91,7 +95,6 @@ function WorkOrderRow({
               currentEmployeeId={currentEmployeeId}
               currentUserName={currentUserName}
               onOwnEnjoySelect={(enjoyId) => onOwnEnjoySelect(item.id, enjoyId)}
-              onPickerOpenChange={onEmojiPickerOpenChange}
             />
           </div>
         </div>
@@ -107,14 +110,12 @@ export function ScrollChartPanel() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<WorkOrderTicket | null>(null);
   const [enjoyOverrides, setEnjoyOverrides] = useState<Record<string, DemandEnjoyComment[]>>({});
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const pauseTimerRef = useRef<number>();
   const interactiveRef = useRef(false);
   const drawerOpenRef = useRef(false);
-  const emojiPickerOpenRef = useRef(false);
   const viewportHoveredRef = useRef(false);
 
   const currentEmployeeId = currentUser?.employeeId ?? '';
@@ -193,7 +194,7 @@ export function ScrollChartPanel() {
   };
 
   const tryResumeScroll = () => {
-    if (drawerOpenRef.current || emojiPickerOpenRef.current) return;
+    if (drawerOpenRef.current) return;
     if (!interactiveRef.current) return;
     if (isPointerOverViewport()) return;
 
@@ -213,27 +214,11 @@ export function ScrollChartPanel() {
   };
 
   const handleWheel = (event: React.WheelEvent) => {
-    if (!interactiveRef.current || emojiPickerOpenRef.current) return;
-
-    const target = event.target as HTMLElement;
-    if (target.closest('.work-order-emoji-popover, .work-order-emoji-panel')) return;
+    if (!interactiveRef.current) return;
 
     event.preventDefault();
     event.stopPropagation();
     applyManualOffset(offsetRef.current + event.deltaY);
-  };
-
-  const handleEmojiPickerOpenChange = (open: boolean) => {
-    emojiPickerOpenRef.current = open;
-    setEmojiPickerOpen(open);
-
-    if (open) {
-      window.clearTimeout(pauseTimerRef.current);
-      pauseAtCurrentPosition();
-      return;
-    }
-
-    window.requestAnimationFrame(() => tryResumeScroll());
   };
 
   const handleOpenOrder = (order: WorkOrderTicket) => {
@@ -277,7 +262,7 @@ export function ScrollChartPanel() {
   return (
     <>
       <Card
-        className={`dashboard-card work-scroll-panel${interactive ? ' work-scroll-interactive' : ''}${emojiPickerOpen ? ' work-scroll-panel--emoji-open' : ''}`}
+        className={`dashboard-card work-scroll-panel${interactive ? ' work-scroll-interactive' : ''}`}
         title={(
           <div style={chartCardTitleStyle}>
             <UnorderedListOutlined style={chartCardTitleIconStyle} />
@@ -312,7 +297,6 @@ export function ScrollChartPanel() {
                   currentUserName={currentUserName}
                   onOpen={handleOpenOrder}
                   onOwnEnjoySelect={handleOwnEnjoySelect}
-                  onEmojiPickerOpenChange={handleEmojiPickerOpenChange}
                 />
               </Fragment>
             ))}

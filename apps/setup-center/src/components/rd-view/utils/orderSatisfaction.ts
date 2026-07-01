@@ -1,11 +1,10 @@
 import type { OrderSatisfactionDetailItem } from '@rd-view/types';
 
-/** 满意度得分（5 分制）= 点赞数 / 已评价工单数 × 5（未评价不参与计分） */
+/** 满意度得分（5 分制）= 满意工单数 / 已完成工单数 × 5（无点踩即满意） */
 export function calcOrderSatisfactionScore(items: OrderSatisfactionDetailItem[]): number {
-  const rated = items.filter((item) => item.liked != null);
-  if (rated.length === 0) return 0;
-  const likeCount = rated.filter((item) => item.liked === true).length;
-  return Math.round((likeCount / rated.length) * 50) / 10;
+  if (items.length === 0) return 0;
+  const satisfiedCount = items.filter((item) => item.liked !== false).length;
+  return Math.round((satisfiedCount / items.length) * 50) / 10;
 }
 
 export function formatOrderSatisfactionScore(score: number): string {
