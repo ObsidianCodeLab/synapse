@@ -956,18 +956,22 @@ function buildOrderCoverageItemFromDemand(
   return item;
 }
 
-/** `reaction` → 是否点踩；2=点踩，其余/空视为满意 */
-function isReactionDisliked(reaction: unknown): boolean {
-  if (reaction == null || reaction === '') return false;
+/** `reaction` → liked；1=点赞，2=点踩，0/空=未评价 */
+function parseReactionLiked(reaction: unknown): boolean | null {
+  if (reaction == null || reaction === '') return null;
   const num = typeof reaction === 'number' ? reaction : Number(String(reaction).trim());
-  return Number.isFinite(num) && num === 2;
+  if (!Number.isFinite(num) || num === 0) return null;
+  if (num === 1) return true;
+  if (num === 2) return false;
+  return null;
 }
 
 /**
  * 指标 4 — 工单处理质量（单条工单层）
  *
  * - 仅 `local_process_state === '已完成'` 的工单进入明细
- * - 仅读 `reaction`：2=点踩，无点踩（含未评价、点赞）均计为满意
+ * - 展示：1=满意、2=点踩、0/空=未评价
+ * - 计分：未评价与满意合并，仅点踩不计入满意
  */
 function buildSatisfactionItemFromDemand(
   demand: RdViewDemandRecord,
@@ -979,8 +983,12 @@ function buildSatisfactionItemFromDemand(
   const item: OrderSatisfactionDetailItem = {
     id: demand.demand_no,
     title: demand.demand_title,
-    liked: !isReactionDisliked(demand.reaction),
   };
+
+  const liked = parseReactionLiked(demand.reaction);
+  if (liked !== null) {
+    item.liked = liked;
+  }
 
   const priority = parseDemandPriority(demand.priority);
   if (priority) {

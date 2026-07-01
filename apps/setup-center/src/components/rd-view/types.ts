@@ -65,7 +65,7 @@ export interface OrderSatisfactionDetailItem {
   title: string;
   /** 有值时展示优先级圆点；未传则不显示 */
   priority?: DemandPriorityLevel;
-  /** true=满意（reaction 非 2）；false=点踩（reaction=2） */
+  /** true=满意（reaction=1）；false=点踩（reaction=2）；未传=未评价（reaction=0/空） */
   liked?: boolean;
 }
 
