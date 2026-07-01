@@ -42,9 +42,34 @@ function AssistantOutputKpiValue() {
   );
 }
 
+function getKpiTrendPresentation(item: KpiItem): {
+  Arrow: typeof CaretUpOutlined | null;
+  color: string;
+} {
+  const { trend, isPositive } = item;
+  const favorableColor = '#00B42A';
+  const unfavorableColor = '#F53F3F';
+  const neutralColor = 'var(--text-muted)';
+
+  if (trend > 0) {
+    return {
+      Arrow: CaretUpOutlined,
+      color: isPositive ? favorableColor : unfavorableColor,
+    };
+  }
+  if (trend < 0) {
+    return {
+      Arrow: CaretDownOutlined,
+      color: isPositive ? unfavorableColor : favorableColor,
+    };
+  }
+  return { Arrow: null, color: neutralColor };
+}
+
 function KpiCardBody({ item }: { item: KpiItem }) {
   const { state } = useDashboard();
   const trendLabel = item.trendLabel || getTimeRangeTrendLabel(state.timeRange);
+  const { Arrow: TrendArrow, color: trendColor } = getKpiTrendPresentation(item);
 
   return (
     <>
@@ -57,12 +82,10 @@ function KpiCardBody({ item }: { item: KpiItem }) {
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: item.key === 'assistantOutput' ? 2 : 0 }}>
-        {item.isPositive ? (
-          <CaretUpOutlined style={{ color: '#00B42A', fontSize: 10 }} />
-        ) : (
-          <CaretDownOutlined style={{ color: '#F53F3F', fontSize: 10 }} />
-        )}
-        <span style={{ fontSize: 10, fontWeight: 500, color: item.isPositive ? '#00B42A' : '#F53F3F' }}>
+        {TrendArrow ? (
+          <TrendArrow style={{ color: trendColor, fontSize: 10 }} />
+        ) : null}
+        <span style={{ fontSize: 10, fontWeight: 500, color: trendColor }}>
           {item.trend > 0 ? '+' : ''}
           {item.trend}
           {item.key === 'satisfaction' || item.key === 'assistantOutput' ? '' : '%'}
