@@ -587,6 +587,42 @@ def test_refresh_node_metrics_task_exec_human_intervention(tmp_path, monkeypatch
     assert int((saved.get("node_metrics") or {}).get(node_id, {}).get("tokens") or 0) == 1800
 
 
+def test_refresh_node_metrics_preserves_hitl_gate_fields() -> None:
+    scope_id = "nm_refresh_hitl_preserve"
+    node_id = "req_clarify"
+    _write_activity(
+        scope_id,
+        node_id,
+        "default",
+        [{"seq": 1, "ts": "2026-06-05T10:01:00", "category": "llm_usage", "total_tokens": 900}],
+    )
+    gate_schema = {
+        "type": "questionnaire",
+        "version": "1.0",
+        "questions": [{"id": "q1", "type": "single", "title": "确认范围", "options": []}],
+    }
+    rs = default_room_state(
+        room_id="room-hitl-preserve",
+        scope_type="demand",
+        scope_id=scope_id,
+        stage_id=1,
+        current_node_id=node_id,
+        status="human_intervention",
+    )
+    rs["intervention_kind"] = "interactive"
+    rs["hitl_form_schema"] = gate_schema
+    rs["node_metrics"] = {node_id: {"started_at": "2026-06-05T10:00:00", "tokens": 0}}
+    save_room_state(scope_id, rs)
+
+    tokens = refresh_node_metrics(scope_id, node_id, current_node_id=node_id)
+    assert tokens == 900
+    saved = load_room_state(scope_id) or {}
+    assert saved.get("status") == "human_intervention"
+    assert saved.get("intervention_kind") == "interactive"
+    assert saved.get("hitl_form_schema") == gate_schema
+    assert int((saved.get("node_metrics") or {}).get(node_id, {}).get("tokens") or 0) == 900
+
+
 def test_read_meeting_pipeline_json_retries_transient_permission_denied(monkeypatch, tmp_path) -> None:
     from pathlib import Path
 

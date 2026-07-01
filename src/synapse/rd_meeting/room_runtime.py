@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, Literal
 
 from filelock import FileLock
@@ -353,6 +354,29 @@ def resolve_node_summary_metrics(
     }
 
 
+def patch_room_state(
+    scope_id: str,
+    updater: Callable[[dict[str, Any]], None],
+) -> dict[str, Any] | None:
+    """在文件锁内 read-modify-write，避免 metrics 轮询整包写回覆盖门控字段。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return None
+    path = room_state_path(sid)
+    lock = FileLock(str(room_state_lock_path(sid)), timeout=30)
+    with lock:
+        data = read_json_file(path)
+        if not isinstance(data, dict):
+            data = {}
+        else:
+            data = dict(data)
+        updater(data)
+        if isinstance(data.get("node_metrics"), dict):
+            sync_metrics_tokens_from_node_metrics(data, sid)
+        write_json_file(path, data)
+        return data
+
+
 def refresh_node_metrics(
     scope_id: str,
     node_id: str,
@@ -385,17 +409,36 @@ def refresh_node_metrics(
     combined = _aggregate_node_runtime_tokens(sid, nid, carry=carry)
     tokens = combined if combined > 0 else archived_node_tokens(entry)
 
-    payload = dict(rs)
-    nm = dict(nm)
-    entry["tokens"] = tokens
-    if carry > 0:
-        entry["carry_tokens"] = carry
-    if not entry.get("started_at") and tokens > 0:
-        entry["started_at"] = _now_iso()
-    nm[nid] = entry
-    payload["node_metrics"] = nm
-    sync_metrics_tokens_from_node_metrics(payload, sid)
-    save_room_state(sid, payload)
+    def _apply_metrics(data: dict[str, Any]) -> None:
+        nm_local = data.get("node_metrics")
+        if not isinstance(nm_local, dict):
+            nm_local = {}
+        else:
+            nm_local = dict(nm_local)
+        ent = dict(nm_local.get(nid) if isinstance(nm_local.get(nid), dict) else {})
+        cur_local = (current_node_id or str(data.get("current_node_id") or "")).strip()
+        if not _node_metrics_entry_is_live(data, nid, ent, current_node_id=cur_local):
+            return
+        carry_local = max(int(ent.get("carry_tokens") or carry), 0)
+        live = _aggregate_node_runtime_tokens(sid, nid, carry=carry_local)
+        tok = live if live > 0 else archived_node_tokens(ent)
+        ent["tokens"] = tok
+        if carry_local > 0:
+            ent["carry_tokens"] = carry_local
+        if not ent.get("started_at") and tok > 0:
+            ent["started_at"] = _now_iso()
+        nm_local[nid] = ent
+        data["node_metrics"] = nm_local
+
+    try:
+        patch_room_state(sid, _apply_metrics)
+    except Exception:
+        logger.warning(
+            "refresh_node_metrics patch failed scope=%s node=%s",
+            sid,
+            nid,
+            exc_info=True,
+        )
     return tokens
 
 

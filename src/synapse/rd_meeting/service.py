@@ -31,6 +31,7 @@ from synapse.rd_meeting.hitl_submission import (
     parse_hitl_form_text,
     record_hitl_submission_locked,
 )
+from synapse.rd_meeting.hitl_lifecycle import load_room_state_with_hitl_recovery
 from synapse.rd_meeting.live import collect_live_sub_agents
 from synapse.rd_meeting.orchestrator import (
     MeetingRoomOrchestrator,
@@ -286,9 +287,14 @@ class MeetingRoomService:
                 view_nid,
                 current_node_id=current_node_id,
             )
-            rs = load_room_state(scope_id)
+            rs = load_room_state_with_hitl_recovery(scope_id)
             if isinstance(rs, dict):
                 detail["room_state"] = rs
+        elif scope_id:
+            rs = load_room_state_with_hitl_recovery(scope_id)
+            if isinstance(rs, dict):
+                detail["room_state"] = rs
+                room_state = rs
         room_state = detail.get("room_state") if isinstance(detail.get("room_state"), dict) else {}
         node_id = view_nid or current_node_id
         history = read_history(scope_id, node_id=node_id, limit=history_limit) if scope_id else []
@@ -2206,7 +2212,7 @@ class MeetingRoomService:
         titles: dict[str, dict[str, str]],
     ) -> dict[str, Any]:
         item = self._to_list_item(data, scope_id, titles)
-        room_state = load_room_state(scope_id)
+        room_state = load_room_state_with_hitl_recovery(scope_id)
         history = read_history(scope_id, limit=500)
         archive_index = list_archive_index(scope_id)
 

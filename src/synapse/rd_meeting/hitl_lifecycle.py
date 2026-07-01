@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from synapse.rd_meeting.binding import resolve_node_binding
@@ -10,6 +11,8 @@ from synapse.rd_meeting.hitl_feedback import (
     user_has_free_text_input,
 )
 from synapse.rd_meeting.room_runtime import load_room_state, save_room_state
+
+logger = logging.getLogger(__name__)
 
 READY_FOR_NODE_REVIEW_KEY = "ready_for_node_review"
 HITL_CLARIFY_ROUND_KEY = "hitl_clarify_round"
@@ -283,3 +286,77 @@ def user_has_supplement_input(
 ) -> bool:
     """兼容旧名：是否含任意自由输入（见 ``user_has_free_text_input``）。"""
     return user_has_free_text_input(values, schema, comment=comment)
+
+
+def _has_valid_hitl_schema(schema: Any) -> bool:
+    return isinstance(schema, dict) and bool(schema.get("questions"))
+
+
+def recover_missing_hitl_form_schema(
+    room_state: dict[str, Any],
+    *,
+    scope_id: str,
+) -> dict[str, Any] | None:
+    """``human_intervention`` + ``interactive`` 但 schema 丢失时，从 pending/磁盘恢复。"""
+    if str(room_state.get("status") or "").strip() != "human_intervention":
+        return None
+    if str(room_state.get("intervention_kind") or "").strip().lower() != "interactive":
+        return None
+    if _has_valid_hitl_schema(room_state.get("hitl_form_schema")):
+        return None
+
+    sid = (scope_id or "").strip()
+    node_id = str(room_state.get("current_node_id") or "").strip()
+
+    from synapse.rd_meeting.hitl_form import (
+        infer_clarify_hitl_schema,
+        load_scope_questions_json,
+        normalize_hitl_schema,
+    )
+    from synapse.rd_meeting.hitl_submit import PENDING_QUESTIONNAIRE_KEY
+
+    pending_q = room_state.get(PENDING_QUESTIONNAIRE_KEY)
+    if isinstance(pending_q, dict):
+        schema = pending_q.get("schema")
+        if _has_valid_hitl_schema(schema):
+            return normalize_hitl_schema(schema)
+
+    pending = room_state.get("pending_delivery")
+    report_body = str(pending.get("report_body") or "") if isinstance(pending, dict) else ""
+    inferred = infer_clarify_hitl_schema(
+        report_body,
+        scope_id=sid,
+        node_id=node_id or "req_clarify",
+    )
+    if inferred:
+        return inferred
+
+    if sid:
+        file_schema = load_scope_questions_json(sid)
+        if file_schema:
+            return normalize_hitl_schema(file_schema)
+
+    return None
+
+
+def load_room_state_with_hitl_recovery(scope_id: str) -> dict[str, Any] | None:
+    """加载 room_state；若 interactive 门控 schema 被竞态冲掉则尝试恢复并写回。"""
+    sid = (scope_id or "").strip()
+    if not sid:
+        return None
+    rs = load_room_state(sid)
+    if not isinstance(rs, dict):
+        return rs
+    recovered = recover_missing_hitl_form_schema(rs, scope_id=sid)
+    if not recovered:
+        return rs
+    payload = dict(rs)
+    payload["hitl_form_schema"] = recovered
+    save_room_state(sid, payload)
+    logger.info(
+        "recovered hitl_form_schema scope=%s node=%s questions=%s",
+        sid,
+        payload.get("current_node_id"),
+        len(recovered.get("questions") or []),
+    )
+    return payload
