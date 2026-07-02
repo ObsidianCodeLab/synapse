@@ -210,6 +210,14 @@ interface MeetingRoom {
   chatEpoch?: number;
   /** leader_review 节点归档 HTML 报告 */
   leaderReviewReportHtml?: string;
+  /** userwork / dev.status 本地处理状态 */
+  localProcessState?: string;
+}
+
+const WORK_ORDER_LOST_STATE = '工单丢失';
+
+function isWorkOrderLost(room: Pick<MeetingRoom, 'localProcessState'> | null | undefined): boolean {
+  return String(room?.localProcessState ?? '').trim() === WORK_ORDER_LOST_STATE;
 }
 
 
@@ -1005,6 +1013,7 @@ function mapDetailToRoom(item: MeetingRoomDetail): MeetingRoom {
     leaderReviewReportHtml: String(
       (item.room_state?.pending_delivery as { report_html?: string } | undefined)?.report_html || '',
     ).trim() || undefined,
+    localProcessState: String(item.local_process_state ?? '').trim() || undefined,
   };
 }
 
@@ -1468,8 +1477,9 @@ function MeetingBusyOverlay({ label }: { label: string }) {
   );
 }
 
-function meetingStatusTagColor(status: MeetingRoom['status']): string {
-  switch (status) {
+function meetingStatusTagColor(room: Pick<MeetingRoom, 'status' | 'localProcessState'>): string {
+  if (isWorkOrderLost(room)) return 'gold';
+  switch (room.status) {
     case 'human_intervention':
       return 'error';
     case 'failed':
@@ -1574,6 +1584,10 @@ const MeetingRoomTitleBar = ({
   }, [room.ticketId, soulDraft, synapseApiBase]);
 
   const handleResetToAudit = useCallback(() => {
+    if (isWorkOrderLost(room)) {
+      toast.error('工单丢失状态不可执行初始化');
+      return;
+    }
     const base = (synapseApiBase || '').trim();
     if (!base || !room.id) {
       toast.message('当前环境无法执行工单处理初始化');
@@ -1637,10 +1651,10 @@ const MeetingRoomTitleBar = ({
                 {room.ticketTitle}
               </h2>
               <Tag
-                color={meetingStatusTagColor(room.status)}
+                color={meetingStatusTagColor(room)}
                 className={`m-0 shrink-0 border-0 ${MEETING_TAB_BAR_HEIGHT}`}
               >
-                {roomCardStatusLabel(room.status)}
+                {roomCardStatusLabel(room)}
               </Tag>
             </div>
             <div
@@ -1667,7 +1681,7 @@ const MeetingRoomTitleBar = ({
                 className="rd-meeting-soul-alert"
                 aria-label="工单处理初始化"
                 onClick={handleResetToAudit}
-                disabled={resetInitLoading}
+                disabled={resetInitLoading || isWorkOrderLost(room)}
               >
                 <svg
                   className="rd-meeting-soul-alert__svg"
@@ -1786,8 +1800,9 @@ const MeetingRoomTitleBar = ({
   );
 };
 
-function roomCardStatusLabel(status: MeetingRoom['status']): string {
-  switch (status) {
+function roomCardStatusLabel(room: Pick<MeetingRoom, 'status' | 'localProcessState'>): string {
+  if (isWorkOrderLost(room)) return '工单丢失';
+  switch (room.status) {
     case 'human_intervention':
       return '待介入';
     case 'processing':
@@ -1873,7 +1888,7 @@ const RoomCardStageProgress = ({ room }: { room: MeetingRoom }) => {
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDot}`} aria-hidden />
         [{room.stageIndex}/{room.totalStages}] {currentStageLabel}
         <span className="text-muted-foreground/60">·</span>
-        {roomCardStatusLabel(room.status)}
+        {roomCardStatusLabel(room)}
       </span>
     </div>
   );
@@ -1895,16 +1910,23 @@ const RoomCard = ({
   }, [room.meetingStartedAt]);
 
   const durationHot = isMeetingDurationHot(room.meetingStartedAt, nowTick);
+  const workOrderLost = isWorkOrderLost(room);
 
-  const borderColor = 
-    room.status === 'human_intervention' ? 'border-red-500/50 hover:border-red-400' :
-    room.status === 'processing' ? 'border-blue-500/50 hover:border-blue-400' :
-    'border-border hover:border-muted-foreground';
+  const borderColor = workOrderLost
+    ? 'border-amber-500/50 hover:border-amber-400'
+    : room.status === 'human_intervention'
+      ? 'border-red-500/50 hover:border-red-400'
+      : room.status === 'processing'
+        ? 'border-blue-500/50 hover:border-blue-400'
+        : 'border-border hover:border-muted-foreground';
 
-  const glowColor =
-    room.status === 'human_intervention' ? 'shadow-[0_0_15px_rgba(239,68,68,0.15)]' :
-    room.status === 'processing' ? 'shadow-[0_0_15px_rgba(59,130,246,0.15)]' :
-    'shadow-none';
+  const glowColor = workOrderLost
+    ? 'shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+    : room.status === 'human_intervention'
+      ? 'shadow-[0_0_15px_rgba(239,68,68,0.15)]'
+      : room.status === 'processing'
+        ? 'shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+        : 'shadow-none';
 
   return (
     <div
@@ -1912,6 +1934,12 @@ const RoomCard = ({
       className={`cursor-pointer bg-card border ${borderColor} ${glowColor} rounded-2xl overflow-hidden flex flex-col h-[320px] transition-colors duration-300 relative group`}
     >
       <div className="shrink-0 border-b border-border/50 bg-muted/10 p-3 flex flex-col gap-2">
+        {workOrderLost ? (
+          <div className="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-300">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            研发云门户已下架，工单丢失（只读）
+          </div>
+        ) : null}
         <Tooltip title={`${room.ticketId} · ${room.ticketTitle}`}>
           <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
             <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -1968,24 +1996,33 @@ const RoomCard = ({
 
       {/* Footer Action */}
       <div className={`p-3 flex items-center justify-between border-t border-border/50 ${
-        room.status === 'human_intervention' ? 'bg-red-950/20' : 'bg-muted/30'
+        workOrderLost ? 'bg-amber-950/20' : room.status === 'human_intervention' ? 'bg-red-950/20' : 'bg-muted/30'
       }`}>
         <span className={`text-xs font-medium line-clamp-1 flex-1 pr-2 ${
-          room.status === 'human_intervention' ? 'text-red-400 flex items-center gap-1' : 'text-muted-foreground'
+          workOrderLost
+            ? 'text-amber-300 flex items-center gap-1'
+            : room.status === 'human_intervention'
+              ? 'text-red-400 flex items-center gap-1'
+              : 'text-muted-foreground'
         }`}>
-          {room.status === 'human_intervention' && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
-          {room.brief}
+          {workOrderLost ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : null}
+          {!workOrderLost && room.status === 'human_intervention' ? (
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          ) : null}
+          {workOrderLost ? `${WORK_ORDER_LOST_STATE} · ${room.brief}` : room.brief}
         </span>
         <Button 
           type="primary" 
           size="small" 
           className={`shrink-0 flex items-center gap-1 text-[11px] h-7 px-3 border-none ${
-            room.status === 'human_intervention' 
-              ? 'bg-red-600 hover:bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]' 
-              : 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_10px_rgba(37,99,235,0.4)] opacity-0 group-hover:opacity-100 transition-opacity'
+            workOrderLost
+              ? 'bg-amber-700/80 hover:bg-amber-600/90 opacity-100'
+              : room.status === 'human_intervention' 
+                ? 'bg-red-600 hover:bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]' 
+                : 'bg-blue-600 hover:bg-blue-500 shadow-[0_0_10px_rgba(37,99,235,0.4)] opacity-0 group-hover:opacity-100 transition-opacity'
           }`}
         >
-          介入会议 <ChevronRight className="w-3 h-3" />
+          {workOrderLost ? '查看归档' : '介入会议'} <ChevronRight className="w-3 h-3" />
         </Button>
       </div>
     </div>
@@ -2053,6 +2090,7 @@ const InterventionDialog = ({
   });
 
   const openReprocessModal = (nodeId: string) => {
+    if (isWorkOrderLost(room)) return;
     if (room?.status === 'completed') return;
     setReprocessTargetNodeId(nodeId);
     setReprocessReason('');
@@ -2100,6 +2138,7 @@ const InterventionDialog = ({
     }
   }, [sopPipelineCollapsed]);
   /** 人工确认表单/结果确认仅归属当前流水线节点（或 review_payload 指定节点） */
+  const workOrderLost = isWorkOrderLost(room);
   const hitlTargetNodeId = room ? resolveHitlTargetNodeId(room) : '';
   const isViewingHitlNode = Boolean(hitlTargetNodeId && chatNodeId === hitlTargetNodeId);
 
@@ -2122,6 +2161,7 @@ const InterventionDialog = ({
     interventionPanel === 'auto_split_choice' ||
     (room?.interventionKind || '').toLowerCase() === 'auto_split_choice';
   const hitlAvailable = Boolean(
+    !workOrderLost &&
     interventionPanel &&
       room?.status === 'human_intervention' &&
       !hitlLocked &&
@@ -2191,7 +2231,7 @@ const InterventionDialog = ({
   const roomCompleted = room?.status === 'completed';
 
   const canReprocessCodeCommitNode = (nodeId: string) => {
-    if (roomCompleted) return false;
+    if (workOrderLost || roomCompleted) return false;
     if (!room || nodeId !== 'exception_check') return false;
     if (room.runInProgress || room.reprocessingNodeId || room.stoppingRun) return false;
     if (stageIdForNodeId(nodeId) !== stageIdForNodeId(room.currentNode)) return false;
@@ -2202,6 +2242,7 @@ const InterventionDialog = ({
   };
 
   const canReprocessHistoricalNode = (nodeId: string, nodeType: string) =>
+    !workOrderLost &&
     !roomCompleted &&
     (canReprocessCodeCommitNode(nodeId) ||
     Boolean(
@@ -2218,6 +2259,7 @@ const InterventionDialog = ({
 
   const canReprocess = Boolean(
     room &&
+    !workOrderLost &&
     !roomCompleted &&
     selectedNode &&
     !room.runInProgress &&
@@ -2231,6 +2273,7 @@ const InterventionDialog = ({
 
   const canRecover = Boolean(
     room &&
+    !workOrderLost &&
     !roomCompleted &&
     selectedNode &&
     selectedNode.id === room.currentNode &&
@@ -2243,6 +2286,7 @@ const InterventionDialog = ({
 
   const canStopNodeRun = Boolean(
     room &&
+    !workOrderLost &&
     room.status === 'processing' &&
     room.runInProgress &&
     !room.stoppingRun &&
@@ -2533,6 +2577,18 @@ const InterventionDialog = ({
           onResetInitSuccess={onResetInitSuccess}
           synapseApiBase={synapseApiBase}
         />
+
+        {workOrderLost ? (
+          <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+            <div>
+              <p className="font-medium text-amber-200">工单丢失 — 门户已下架，本地目录已保留</p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
+                该需求单在研发云门户中已不存在。当前会议室仅供查看历史产出与协作记录，禁止重新处理、终止运行、人工介入及一切状态推进操作。
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div className="relative flex min-h-0 flex-1">
         {showRoomBusyOverlay ? <MeetingBusyOverlay label={roomBusyOverlayLabel} /> : null}
@@ -3527,6 +3583,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleHitlSubmit = (text: string, values: HitlFormValues) => {
     if (!activeRoom) return;
+    if (isWorkOrderLost(activeRoom)) {
+      toast.error('工单丢失状态不可继续操作');
+      return;
+    }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
@@ -3569,6 +3629,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleReprocess = (nodeId: string, reason?: string) => {
     if (!activeRoom || activeRoom.reprocessingNodeId || activeRoom.stoppingRun) return;
+    if (isWorkOrderLost(activeRoom)) {
+      toast.error('工单丢失状态不可重新处理');
+      return;
+    }
     if (activeRoom.status === 'completed') {
       toast.error('任务已完成，无法重新处理');
       return;
@@ -3618,6 +3682,8 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
           toast.error('该系统节点不允许重新处理');
         } else if (msg.includes('invalid_reprocess_target')) {
           toast.error('只能重新处理当前阶段内已完成的历史节点');
+        } else if (msg.includes('work_order_lost')) {
+          toast.error('工单丢失状态不可重新处理');
         } else if (msg.includes('room_completed')) {
           toast.error('会议室已结束，无法重新处理');
         } else {
@@ -3628,6 +3694,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleRecover = (nodeId: string) => {
     if (!activeRoom) return;
+    if (isWorkOrderLost(activeRoom)) {
+      toast.error('工单丢失状态不可恢复处理');
+      return;
+    }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
 
@@ -3691,6 +3761,10 @@ export const MeetingRoomBoard = ({ synapseApiBase }: { synapseApiBase?: string }
 
   const handleStopRun = () => {
     if (!activeRoom || activeRoom.stoppingRun || activeRoom.reprocessingNodeId) return;
+    if (isWorkOrderLost(activeRoom)) {
+      toast.error('工单丢失状态不可终止运行');
+      return;
+    }
     const base = (synapseApiBase || '').trim();
     if (!base) return;
     const roomId = activeRoom.id;

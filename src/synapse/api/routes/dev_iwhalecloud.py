@@ -339,12 +339,14 @@ def _merge_demand_record(old_d: dict[str, Any], new_d: dict[str, Any]) -> dict[s
 
 def _merge_owner_order_lists(
     old_list: list[Any] | None, new_list: list[Any] | None
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """需求单合并；返回 ``(merged_list, work_dirs_to_cleanup)``。
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    """需求单合并；返回 ``(merged_list, work_dirs_to_cleanup, marked_lost_demands)``。
 
-    老有新无：``local_process_state=已完成`` 保留待归档，否则从 userwork 剔除并回收 ``work/<id>/``。
+    老有新无：``local_process_state=已完成`` / ``已归档`` 保留；SOP 处于任务执行及之后时
+    保留目录并将 ``local_process_state`` 置为 ``工单丢失``；否则剔除并回收 ``work/<id>/``。
     """
     from synapse.rd_meeting.owner_order_refresh import should_keep_orphan_demand
+    from synapse.rd_meeting.work_order_lost import LOST_LOCAL_STATE, should_mark_orphan_demand_lost
 
     old_list = [x for x in (old_list or []) if isinstance(x, dict)]
     new_list = [x for x in (new_list or []) if isinstance(x, dict)]
@@ -359,6 +361,7 @@ def _merge_owner_order_lists(
 
     out: list[dict[str, Any]] = []
     cleanup_dns: list[str] = []
+    marked_lost_dns: list[str] = []
     for d in old_list:
         dn = _snapshot_norm_id(d.get("demand_no"))
         if not dn:
@@ -367,6 +370,11 @@ def _merge_owner_order_lists(
             out.append(_merge_demand_record(d, new_by_dn[dn]))
         elif should_keep_orphan_demand(d):
             out.append(dict(d))
+        elif should_mark_orphan_demand_lost(d):
+            lost = dict(d)
+            lost["local_process_state"] = LOST_LOCAL_STATE
+            out.append(lost)
+            marked_lost_dns.append(dn)
         else:
             cleanup_dns.append(dn)
 
@@ -376,7 +384,7 @@ def _merge_owner_order_lists(
             continue
         out.append(_apply_local_process_state_on_new_demand_insert(dict(d)))
 
-    return out, cleanup_dns
+    return out, cleanup_dns, marked_lost_dns
 
 
 def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> dict[str, Any]:
@@ -384,13 +392,15 @@ def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> d
 
     合并规则：需求单「新有老无插入、新老均有更新」；门户字段（含 ``demand_designer``）以研发云为准；
     刷新时仅 ``demand_status`` 为待处理/需求评审时回写 ``local_process_state`` 与 ``sop_node``，否则保留
-    本地值；``prod`` 始终保留本地已选产品；需求单门户下架（老有新无）时 ``local_process_state=已完成`` 保留
-    待归档，否则剔除并回收 ``work/<demand_no>/``。研发单：新有老无插入且 ``state=待处理``；老有新无仅
+    本地值；``prod`` 始终保留本地已选产品；需求单门户下架（老有新无）时 ``local_process_state=已完成`` /
+    ``已归档`` 保留；SOP 处于任务执行及之后时保留目录并标记 ``工单丢失``；否则剔除并回收
+    ``work/<demand_no>/``。研发单：新有老无插入且 ``state=待处理``；老有新无仅
     ``state=已完成`` 保留；新老均有时门户字段以新为准、``state`` 与本地扩展保留；子单不维护 ``sop_node``。
     """
     from filelock import FileLock
 
     from synapse.rd_meeting.owner_order_refresh import cleanup_orphan_work_directories
+    from synapse.rd_meeting.work_order_lost import apply_work_order_lost
 
     path = _owner_order_file_name()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -409,16 +419,20 @@ def persist_owner_order_snapshot_to_file(*, out_list: list[dict[str, Any]]) -> d
                 logger.warning("读取已有 userwork.json 失败，将仅写入本次数据: %s", exc)
                 existing_list = []
 
-        merged_list, removed_demands = _merge_owner_order_lists(existing_list, out_list)
+        merged_list, removed_demands, marked_lost_demands = _merge_owner_order_lists(existing_list, out_list)
         payload = {
             "list": merged_list,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
         }
         _atomic_write_json_file(path, payload)
 
+    for dn in marked_lost_demands:
+        apply_work_order_lost(dn)
+
     cleaned_work_dirs = cleanup_orphan_work_directories(removed_demands)
     return {
         "removed_demands": removed_demands,
+        "marked_lost_demands": marked_lost_demands,
         "cleaned_work_dirs": cleaned_work_dirs,
     }
 

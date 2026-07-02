@@ -123,3 +123,21 @@ def seq_index_for_node_id(node_id: str) -> int:
             if str(n["id"]) == nid:
                 return index + 1
     return 1
+
+
+def global_index_for_node_id(node_id: str) -> int | None:
+    """节点在全局 SOP 流水线中的顺序（从 0 开始）。"""
+    nid = (node_id or "").strip()
+    for index, n in enumerate(_ALL_NODES):
+        if str(n["id"]) == nid:
+            return index
+    return None
+
+
+def is_at_or_after_node_id(node_id: str, anchor_id: str) -> bool:
+    """``node_id`` 是否处于 ``anchor_id`` 节点或其后继节点。"""
+    anchor_idx = global_index_for_node_id(anchor_id)
+    node_idx = global_index_for_node_id(node_id)
+    if anchor_idx is None or node_idx is None:
+        return False
+    return node_idx >= anchor_idx

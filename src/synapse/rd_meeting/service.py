@@ -165,6 +165,12 @@ class MeetingRoomService:
         return resolve_node_binding(node_id)
 
     @staticmethod
+    def _require_scope_operable(scope_id: str) -> None:
+        from synapse.rd_meeting.work_order_lost import assert_scope_operable
+
+        assert_scope_operable(scope_id)
+
+    @staticmethod
     def _resolve_intervention_panel(room_state: dict[str, Any]) -> str | None:
         from synapse.rd_meeting.intervention_panel import resolve_intervention_panel
 
@@ -192,6 +198,7 @@ class MeetingRoomService:
         ctx = self._room_context(room_id)
         if ctx is None:
             raise ValueError("meeting_room_not_found")
+        self._require_scope_operable(str(ctx.get("scope_id") or ""))
         orch = MeetingRoomOrchestrator()
         result = await orch.run_current_node(
             scope_type=ctx["scope_type"],
@@ -470,6 +477,8 @@ class MeetingRoomService:
         if not sid:
             raise ValueError("scope_id required")
 
+        self._require_scope_operable(sid)
+
         existing = load_dev_status(sid)
         if existing is None:
             merged = load_or_create_dev_status(sid, scope_type=scope_type)
@@ -594,6 +603,7 @@ class MeetingRoomService:
         sid = (scope_id or "").strip()
         if not sid:
             raise ValueError("scope_id required")
+        self._require_scope_operable(sid)
         prod_key = (prod or "").strip()
         if not prod_key:
             raise ValueError("请选择产品（prod）")
@@ -716,6 +726,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
@@ -831,6 +842,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
@@ -910,6 +922,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
@@ -1018,6 +1031,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         if str(detail.get("status") or "").strip() == "completed":
             raise ValueError("room_completed")
@@ -1117,6 +1131,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
         rs = load_room_state(sid) or {}
         current = str(
             rs.get("current_node_id") or detail.get("current_node_id") or "pending"
@@ -1158,6 +1173,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         from synapse.rd_meeting.func_solution_review import has_revision_context
 
@@ -1231,6 +1247,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         from synapse.rd_meeting.unit_test_gate import has_revision_context
 
@@ -1442,6 +1459,7 @@ class MeetingRoomService:
             scope_id = resolve_demand_scope_id(room_id=rid) or ""
         if not scope_id:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(scope_id)
 
         return await reset_demand_work_to_audit(
             scope_id,
@@ -1460,6 +1478,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         st = str((load_room_state(sid) or {}).get("status") or detail.get("status") or "")
         if st != "processing":
@@ -1500,6 +1519,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
         scope = detail.get("scope_type") or "demand"
         scope_type: ScopeType = scope if scope in ("demand", "task") else "demand"
         dev = load_dev_status(sid) or {}
@@ -1564,6 +1584,7 @@ class MeetingRoomService:
         sid = str(detail.get("scope_id") or "").strip()
         if not sid:
             raise ValueError("scope_id missing")
+        self._require_scope_operable(sid)
 
         from synapse.rd_meeting.room_recovery import recover_stopped_node as _recover
 
@@ -1766,6 +1787,7 @@ class MeetingRoomService:
             raise ValueError("meeting_room_not_found")
 
         scope_id = str(detail.get("scope_id") or "")
+        self._require_scope_operable(scope_id)
         scope_type = str(detail.get("scope_type") or "demand")
         ticket_title = str(detail.get("ticket_title") or "")
 
@@ -2323,6 +2345,8 @@ class MeetingRoomService:
 
         room_state = load_room_state(scope_id)
         ui_status: str = "processing"
+        from synapse.rd_meeting.work_order_lost import is_lost_local_state
+
         if room_state and str(room_state.get("status") or "") in (
             "processing",
             "human_intervention",
@@ -2331,6 +2355,8 @@ class MeetingRoomService:
             "stopped",
         ):
             ui_status = str(room_state["status"])
+        elif is_lost_local_state(local):
+            ui_status = "stopped"
         elif local not in ("处理中",):
             ui_status = "completed" if local == "已完成" else "human_intervention"
 

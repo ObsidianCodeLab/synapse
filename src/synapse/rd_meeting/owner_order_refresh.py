@@ -13,14 +13,15 @@ from synapse.api.routes.dev_iwhalecloud import (
     load_owner_order_snapshot_from_file,
 )
 from synapse.rd_meeting.dev_status import load_dev_status
+from synapse.rd_meeting.devservice import unified_service_base_url
 from synapse.rd_meeting.owner_order_archive import (
     ARCHIVED_LOCAL_STATE,
     is_archived_local_state,
 )
-from synapse.rd_meeting.devservice import unified_service_base_url
-from synapse.rd_meeting.paths import meeting_pipeline_path, scope_dir
+from synapse.rd_meeting.paths import scope_dir
 from synapse.rd_meeting.room_runtime import load_room_state, read_meeting_pipeline_json
 from synapse.rd_meeting.sandbox_assets import _force_remove_path
+from synapse.rd_meeting.work_order_lost import LOST_LOCAL_STATE, is_lost_local_state
 from synapse.rd_sop.nodes import (
     node_display_name,
     resolve_sop_raw_to_node_id,
@@ -48,6 +49,7 @@ _RUN_STATUS_TO_SLUG: dict[str, str] = {
     "待人工": "human_intervention",
     "已完成": "completed",
     "已归档": "archived",
+    "工单丢失": "lost",
     "archived": "archived",  # resolve_run_status 历史返回值兼容
     "异常": "failed",
     "已停止": "stopped",
@@ -83,9 +85,9 @@ def run_status_slug_for_demand(demand_no: str, *, local_process_state: str = "")
 
 
 def should_keep_orphan_demand(demand: dict[str, Any]) -> bool:
-    """门户已下架（老有新无）时：``已完成`` 待归档、``已归档`` 条目均保留。"""
+    """门户已下架（老有新无）时：``已完成`` / ``已归档`` / ``工单丢失`` 条目均保留。"""
     local = _snapshot_norm_id(demand.get("local_process_state"))
-    return local == "已完成" or is_archived_local_state(local)
+    return local == "已完成" or is_archived_local_state(local) or is_lost_local_state(local)
 
 
 def _should_archive_orphan_demand(demand: dict[str, Any]) -> bool:
@@ -162,6 +164,8 @@ def resolve_run_status(demand_no: str, *, local_process_state: str = "") -> str:
                 return _PIPELINE_PHASE_TO_RUN_STATUS[phase]
 
     local = (local_process_state or "").strip()
+    if local == LOST_LOCAL_STATE:
+        return LOST_LOCAL_STATE
     if local == "已完成":
         return "已完成"
     if is_archived_local_state(local):
@@ -269,7 +273,9 @@ async def sync_userwork_view_to_unified_service(
             synced += 1
 
             if _should_archive_orphan_demand(demand):
-                from synapse.rd_meeting.owner_order_archive import archive_completed_demand_if_needed
+                from synapse.rd_meeting.owner_order_archive import (
+                    archive_completed_demand_if_needed,
+                )
 
                 await archive_completed_demand_if_needed(demand_no=dn)
 

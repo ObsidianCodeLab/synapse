@@ -126,10 +126,13 @@ def resolve_work_dir_scope(order_dir: Path) -> tuple[str, dict[str, Any]] | None
 
 def should_list_in_meeting_rooms(data: dict[str, Any]) -> bool:
     from synapse.rd_meeting.owner_order_archive import is_archived_local_state
+    from synapse.rd_meeting.work_order_lost import is_lost_local_state
 
     local = str(data.get("local_process_state") or "").strip()
     if is_archived_local_state(local):
         return False
+    if is_lost_local_state(local):
+        return True
     if local in ACTIVE_LOCAL_STATES:
         return True
     if data.get("pipeline_enabled") is True:

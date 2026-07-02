@@ -14,6 +14,7 @@ from synapse.rd_meeting.owner_order_refresh import (
     should_keep_orphan_demand,
     sync_userwork_view_to_unified_service,
 )
+from synapse.rd_meeting.work_order_lost import LOST_LOCAL_STATE
 
 
 def test_should_keep_orphan_only_when_completed():
@@ -21,6 +22,7 @@ def test_should_keep_orphan_only_when_completed():
     assert should_keep_orphan_demand({"local_process_state": "已归档"}) is True
     assert should_keep_orphan_demand({"local_process_state": "archived"}) is True
     assert should_keep_orphan_demand({"local_process_state": "处理中"}) is False
+    assert should_keep_orphan_demand({"local_process_state": LOST_LOCAL_STATE}) is True
     assert should_keep_orphan_demand({"local_process_state": "待处理"}) is False
 
 
