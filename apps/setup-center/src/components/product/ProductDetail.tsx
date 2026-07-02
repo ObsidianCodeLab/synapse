@@ -1143,6 +1143,44 @@ export function ProductDetail({
                   const wireU = repo.wireAnalysisState ?? "new";
                   const doneTime = repo.analysisCompletedAt ?? repo.analysisTime;
                   const isRepoAnalyzing = wireU === "init" || wireU === "process";
+                  const canReanalyzeRepo = wireU === "done" || wireU === "error";
+                  const reanalysisBusy = gitnexusBusyIdx === idx;
+                  const handleGitNexusReanalysis = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (!canReanalyzeRepo || isRepoAnalyzing) return;
+                    if (!IS_TAURI) {
+                      toast.message(t("workbench.products.tauriOnlyAction"));
+                      return;
+                    }
+                    const prodKey = product.name.trim();
+                    if (!prodKey) return;
+                    setGitnexusBusyIdx(idx);
+                    void (async () => {
+                      try {
+                        if (!(await guardOwnerMatch())) return;
+                        const resp = await gitNexusAnalysis(synapseApiBase, {
+                          prod: prodKey,
+                          repo_branch: (repo.branch ?? "").trim(),
+                          prod_branch: (repo.prodBranch ?? "").trim(),
+                        });
+                        const msg =
+                          typeof resp.message === "string" && resp.message.trim() !== ""
+                            ? resp.message.trim()
+                            : t("workbench.products.detail.gitnexusInitDefaultSuccess");
+                        toast.success(msg);
+                        await fetchProcessOnce();
+                      } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        toast.error(
+                          t("workbench.products.detail.gitnexusAnalysisFailed", {
+                            message: msg,
+                          }),
+                        );
+                      } finally {
+                        setGitnexusBusyIdx(null);
+                      }
+                    })();
+                  };
 
                   return (
                     <div
@@ -1197,48 +1235,13 @@ export function ProductDetail({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className={`h-6 w-6 ${wireU === "done" ? "text-primary" : "text-muted-foreground"}`}
+                                className={`h-6 w-6 ${canReanalyzeRepo ? "text-primary" : "text-muted-foreground"}`}
                                 disabled={
-                                  wireU !== "done" || gitnexusBusyIdx === idx || !IS_TAURI
+                                  !canReanalyzeRepo || reanalysisBusy || isRepoAnalyzing || !IS_TAURI
                                 }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (wireU !== "done") return;
-                                  if (!IS_TAURI) {
-                                    toast.message(t("workbench.products.tauriOnlyAction"));
-                                    return;
-                                  }
-                                  const prodKey = product.name.trim();
-                                  if (!prodKey) return;
-                                  setGitnexusBusyIdx(idx);
-                                  void (async () => {
-                                    try {
-                                      if (!(await guardOwnerMatch())) return;
-                                      const resp = await gitNexusAnalysis(synapseApiBase, {
-                                        prod: prodKey,
-                                        repo_branch: (repo.branch ?? "").trim(),
-                                        prod_branch: (repo.prodBranch ?? "").trim(),
-                                      });
-                                      const msg =
-                                        typeof resp.message === "string" && resp.message.trim() !== ""
-                                          ? resp.message.trim()
-                                          : t("workbench.products.detail.gitnexusInitDefaultSuccess");
-                                      toast.success(msg);
-                                      await fetchProcessOnce();
-                                    } catch (err) {
-                                      const msg = err instanceof Error ? err.message : String(err);
-                                      toast.error(
-                                        t("workbench.products.detail.gitnexusAnalysisFailed", {
-                                          message: msg,
-                                        }),
-                                      );
-                                    } finally {
-                                      setGitnexusBusyIdx(null);
-                                    }
-                                  })();
-                                }}
+                                onClick={handleGitNexusReanalysis}
                                 title={
-                                  wireU === "done"
+                                  canReanalyzeRepo
                                     ? t("workbench.products.detail.reanalyze")
                                     : isRepoAnalyzing
                                       ? t("workbench.products.detail.analyzing")
@@ -1248,7 +1251,7 @@ export function ProductDetail({
                                 <RefreshCw
                                   size={12}
                                   className={
-                                    isRepoAnalyzing || gitnexusBusyIdx === idx ? "animate-spin" : ""
+                                    isRepoAnalyzing || reanalysisBusy ? "animate-spin" : ""
                                   }
                                 />
                               </Button>
@@ -1260,7 +1263,7 @@ export function ProductDetail({
                           <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
                             <Button
                               type="button"
-                              disabled={gitnexusBusyIdx === idx || !IS_TAURI}
+                              disabled={reanalysisBusy || !IS_TAURI}
                               title={t("workbench.products.detail.autoAnalysisCardHint")}
                               className="w-full h-8 gap-1.5 text-xs font-medium bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 text-primary border border-primary/20 shadow-sm transition-all rounded-md"
                               onClick={(e) => {
@@ -1297,6 +1300,24 @@ export function ProductDetail({
                             >
                               <Zap className="size-3.5 shrink-0" strokeWidth={2.5} />
                               {t("workbench.products.detail.autoAnalysisCta")}
+                            </Button>
+                          </div>
+                        )}
+
+                        {wireU === "error" && canManage && (
+                          <div className="mt-2.5" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              type="button"
+                              disabled={reanalysisBusy || isRepoAnalyzing || !IS_TAURI}
+                              title={t("workbench.products.detail.reanalyzeDesc")}
+                              className="w-full h-8 gap-1.5 text-xs font-medium bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 text-primary border border-primary/20 shadow-sm transition-all rounded-md"
+                              onClick={handleGitNexusReanalysis}
+                            >
+                              <RefreshCw
+                                className={`size-3.5 shrink-0 ${reanalysisBusy || isRepoAnalyzing ? "animate-spin" : ""}`}
+                                strokeWidth={2.5}
+                              />
+                              {t("workbench.products.detail.reanalyze")}
                             </Button>
                           </div>
                         )}

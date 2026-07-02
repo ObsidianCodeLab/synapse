@@ -112,7 +112,7 @@ export interface PersonCostUsageItem {
 }
 
 /** 需求状态 */
-export type RequirementStatus = 'pending' | 'inProgress' | 'completed' | 'archived';
+export type RequirementStatus = 'pending' | 'inProgress' | 'completed' | 'archived' | 'lost';
 
 /** SOP 节点 run_status（与 rd_view_demand_save / owner_order_refresh._RUN_STATUS_TO_SLUG 一致） */
 export type SopNodeRunStatus =
@@ -123,7 +123,8 @@ export type SopNodeRunStatus =
   | 'stopped'
   | 'pending'
   | 'full_manual'
-  | 'archived';
+  | 'archived'
+  | 'lost';
 
 /** 智能体对话 */
 export interface SopDialogueMessage {

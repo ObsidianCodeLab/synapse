@@ -19,7 +19,7 @@ export const RD_UNIFIED_PATHS = {
   getRepoInfo: "/dev/iwhalecloud/synapse/get_repo_info",
   getProdProcessInfo: "/dev/iwhalecloud/synapse/get_prod_process_info",
   gitNexusInitialize: "/dev/iwhalecloud/synapse/gitnexus_initialize",
-  gitNexusAnalysis: "/dev/iwhalecloud/synapse/gitnexus_analysis",
+  gitNexusAnalysis: "/dev/iwhalecloud/synapse/gitnexus_reanalysis",
   orderInitialize: "/dev/iwhalecloud/synapse/order_initialize",
   docsInitialize: "/dev/iwhalecloud/synapse/docs_initialize",
   /**
@@ -201,7 +201,7 @@ export type GitNexusInitializeBody = {
   prod_branch: string;
 };
 
-/** gitnexus_analysis：按产品与分支重新分析（异步任务）；请求体与 {@link GitNexusInitializeBody} 相同 */
+/** gitnexus_reanalysis：按产品与分支重新分析（异步任务）；请求体与 {@link GitNexusInitializeBody} 相同 */
 export type GitNexusAnalysisBody = GitNexusInitializeBody;
 
 /** order_initialize：按产品启动工单分析初始化（异步任务） */
@@ -703,7 +703,7 @@ export async function gitNexusInitialize(
 }
 
 /**
- * GitNexus 重新分析：研发统一服务 gitnexus_analysis（异步执行，成功仅表示任务已提交）。
+ * GitNexus 重新分析：研发统一服务 gitnexus_reanalysis（异步执行，成功仅表示任务已提交）。
  * 仅应在 Tauri 下调用。
  */
 export async function gitNexusAnalysis(

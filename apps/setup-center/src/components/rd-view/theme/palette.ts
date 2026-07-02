@@ -8,6 +8,7 @@ export const RD_VIEW_CHART_SERIES = {
   completed: '#165DFF',
   inProgress: '#00B42A',
   pending: '#3D6B54',
+  lost: '#FF7D00',
 } as const;
 
 export interface RdViewThemePalette {

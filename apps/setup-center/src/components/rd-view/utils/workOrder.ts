@@ -38,6 +38,7 @@ const LOCAL_PROCESS_STATE_LABEL: Record<string, string> = {
   异常: '在途',
   已完成: '完成',
   已归档: '已归档',
+  工单丢失: '工单丢失',
 };
 
 export type WorkOrderCardTone = RequirementStatus;
@@ -56,6 +57,7 @@ function resolveProcessLabel(localProcessState: string, status: RequirementStatu
   }
   if (status === 'completed') return '完成';
   if (status === 'archived') return '已归档';
+  if (status === 'lost') return '工单丢失';
   if (status === 'pending') return '待处理';
   return '在途';
 }

@@ -18,6 +18,8 @@ const RUN_STATUS_CONFIG: Record<SopNodeRunStatus, { label: string; color: string
   completed: { label: RD_VIEW_RUN_STATUS_LABEL.completed, color: 'success' },
   pending: { label: RD_VIEW_RUN_STATUS_LABEL.pending, color: 'default' },
   full_manual: { label: RD_VIEW_RUN_STATUS_LABEL.full_manual, color: 'warning' },
+  archived: { label: RD_VIEW_RUN_STATUS_LABEL.archived, color: 'default' },
+  lost: { label: RD_VIEW_RUN_STATUS_LABEL.lost, color: 'warning' },
 };
 
 const SOP_GROUP_KEYS = SOP_NODES.map((node) => node.key);

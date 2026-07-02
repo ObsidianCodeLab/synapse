@@ -191,13 +191,14 @@ export interface RdViewDashboardResult {
   workOrders: WorkOrderTicket[];
 }
 
-/** local_process_state → 饼图三类桶 */
-type DemandProcessBucketKey = 'pending' | 'inProgress' | 'completed';
+/** local_process_state → 饼图四类桶（含工单丢失） */
+type DemandProcessBucketKey = 'pending' | 'inProgress' | 'completed' | 'lost';
 
-/** userwork / 表1 `local_process_state` → rd-view 三态（schema §1.4 + 后端扩展） */
+/** userwork / 表1 `local_process_state` → rd-view 分桶（schema §1.4 + 后端扩展） */
 const LOCAL_PROCESS_STATE_BUCKET: Record<string, DemandProcessBucketKey> = {
   已完成: 'completed',
   已归档: 'completed',
+  工单丢失: 'lost',
   处理中: 'inProgress',
   全人工: 'inProgress',
   异常: 'inProgress',
@@ -209,6 +210,13 @@ const LOCAL_PROCESS_STATE_BUCKET: Record<string, DemandProcessBucketKey> = {
 
 const DEFAULT_LOCAL_PROCESS_BUCKET: DemandProcessBucketKey = 'pending';
 
+export const WORK_ORDER_LOST_LOCAL_STATE = '工单丢失';
+
+/** 与 synapse.rd_meeting.work_order_lost.LOST_LOCAL_STATE 对齐 */
+export function isLostLocalProcessState(state: unknown): boolean {
+  return String(state ?? '').trim() === WORK_ORDER_LOST_LOCAL_STATE;
+}
+
 /** 与 owner_order_archive.is_archived_local_state 对齐 */
 export function isArchivedLocalProcessState(state: unknown): boolean {
   return String(state ?? '').trim() === '已归档';
@@ -216,6 +224,7 @@ export function isArchivedLocalProcessState(state: unknown): boolean {
 
 function classifyLocalProcessState(state: unknown): DemandProcessBucketKey {
   if (isArchivedLocalProcessState(state)) return 'completed';
+  if (isLostLocalProcessState(state)) return 'lost';
   const text = String(state ?? '').trim();
   if (!text) return DEFAULT_LOCAL_PROCESS_BUCKET;
   return LOCAL_PROCESS_STATE_BUCKET[text] ?? DEFAULT_LOCAL_PROCESS_BUCKET;
@@ -230,12 +239,13 @@ const DEMAND_STATUS_META: Record<DemandProcessBucketKey, { name: string; color: 
   completed: { name: '已完成', color: RD_VIEW_CHART_SERIES.completed },
   inProgress: { name: '进行中', color: RD_VIEW_CHART_SERIES.inProgress },
   pending: { name: '待处理', color: RD_VIEW_CHART_SERIES.pending },
+  lost: { name: '工单丢失', color: RD_VIEW_CHART_SERIES.lost },
 };
 
-const DEMAND_STATUS_ORDER: DemandProcessBucketKey[] = ['completed', 'inProgress', 'pending'];
+const DEMAND_STATUS_ORDER: DemandProcessBucketKey[] = ['completed', 'inProgress', 'pending', 'lost'];
 
 function createEmptyDemandStatusBucket(): Record<DemandProcessBucketKey, number> {
-  return { pending: 0, inProgress: 0, completed: 0 };
+  return { pending: 0, inProgress: 0, completed: 0, lost: 0 };
 }
 
 function accumulateDemandStatusFromDemand(
@@ -252,7 +262,7 @@ function buildDemandStatusDistribution(
     name: DEMAND_STATUS_META[key].name,
     value: bucket[key],
     color: DEMAND_STATUS_META[key].color,
-  }));
+  })).filter((item) => item.value > 0);
 }
 
 /** 人员工作量按 assignee_id 分组累加桶 */
@@ -285,6 +295,10 @@ function accumulatePersonWorkloadFromDemand(
   }
 
   const statusKey = classifyLocalProcessState(demand.local_process_state);
+  if (statusKey === 'lost') {
+    bucket.set(assigneeId, entry);
+    return;
+  }
   if (statusKey === 'completed') {
     entry.completed += 1;
   } else if (statusKey === 'inProgress') {
@@ -398,7 +412,10 @@ function buildPersonCostUsageList(
 
 function mapLocalProcessStateToRequirementStatus(state: unknown): RequirementStatus {
   if (isArchivedLocalProcessState(state)) return 'archived';
-  return classifyLocalProcessState(state);
+  if (isLostLocalProcessState(state)) return 'lost';
+  const bucket = classifyLocalProcessState(state);
+  if (bucket === 'lost') return 'lost';
+  return bucket;
 }
 
 function mapWorkOrderPriority(priority: unknown): WorkOrderTicket['priority'] {
@@ -484,6 +501,7 @@ const RD_VIEW_RUN_STATUS_SLUGS: readonly SopNodeRunStatus[] = [
   'pending',
   'full_manual',
   'archived',
+  'lost',
 ];
 
 const RUN_STATUS_SLUG_SET = new Set<string>(RD_VIEW_RUN_STATUS_SLUGS);
@@ -497,6 +515,7 @@ export const RD_VIEW_RUN_STATUS_LABEL: Record<SopNodeRunStatus, string> = {
   pending: '未开始',
   full_manual: '全人工',
   archived: '已归档',
+  lost: '工单丢失',
 };
 
 function mapRdViewRunStatus(raw: unknown): SopNodeRunStatus {
@@ -589,9 +608,10 @@ function buildWorkOrderTicketFromDemand(demand: RdViewDemandRecord): WorkOrderTi
 function buildWorkOrderList(items: WorkOrderTicket[]): WorkOrderTicket[] {
   const statusWeight: Record<RequirementStatus, number> = {
     inProgress: 0,
-    pending: 1,
-    completed: 2,
-    archived: 3,
+    lost: 1,
+    pending: 2,
+    completed: 3,
+    archived: 4,
   };
 
   return [...items].sort((a, b) => {
