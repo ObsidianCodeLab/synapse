@@ -5,6 +5,7 @@ Contract A requires on all platforms:
 1) backend executable exists in synapse-server/
 2) bundled interpreter exists in synapse-server/_internal/python*
 3) bundled interpreter can import pip
+4) foundation CryptHelper is bundled (Dev Cloud login / userinfo.encryption)
 """
 
 from __future__ import annotations
@@ -48,6 +49,20 @@ def _bundled_python_env(internal_dir: Path) -> dict:
     # Forcing PYTHONHOME/PYTHONPATH may break importlib on Linux/macOS bundles.
     env["PYTHONNOUSERSITE"] = "1"
     return env
+
+
+def _verify_foundation_bundle(internal: Path) -> bool:
+    """Ensure PyInstaller bundled the vendored foundation CryptHelper module."""
+    candidates = list(internal.glob("foundation/helper/CryptHelper.py"))
+    candidates += list(internal.glob("foundation/helper/CryptHelper.pyc"))
+    if candidates:
+        print(f"[OK] foundation CryptHelper bundled: {candidates[0].relative_to(internal.parent)}")
+        return True
+
+    print("[ERROR] foundation CryptHelper missing from bundled _internal/")
+    print("        Expected foundation/helper/CryptHelper.py under synapse-server/_internal/")
+    print("        Ensure vendor/foundation-*.whl is installed before PyInstaller runs.")
+    return False
 
 
 def main() -> int:
@@ -105,6 +120,9 @@ def main() -> int:
         return 1
     pip_ver = (result.stdout or "").strip()
     print(f"[OK] bundled pip check passed (pip {pip_ver})")
+
+    if not _verify_foundation_bundle(internal):
+        return 1
     return 0
 
 

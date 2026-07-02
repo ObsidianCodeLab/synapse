@@ -80,6 +80,10 @@ export const STT_RECOMMENDED_MODELS: Record<string, { id: string; note: string }
   "siliconflow-intl":[{ id: "FunAudioLLM/SenseVoiceSmall", note: "推荐" }, { id: "TeleAI/TeleSpeechASR", note: "" }],
 };
 
+/** 产品文档（钉钉文档）；Sidebar「文档」与 #docs 深链均指向此外部地址 */
+export const USER_DOCS_URL =
+  "https://alidocs.dingtalk.com/i/nodes/QOG9lyrgJP3Oaxg5uvgz2lnyVzN67Mw4?corpId=dingd60496d6e52565fa35c2f4657eb6378f&utm_scene=team_space";
+
 export const PIP_INDEX_PRESETS: { id: "official" | "tuna" | "aliyun" | "custom"; label: string; url: string }[] = [
   { id: "aliyun", label: "阿里云（默认）", url: "https://mirrors.aliyun.com/pypi/simple/" },
   { id: "tuna", label: "清华 TUNA", url: "https://pypi.tuna.tsinghua.edu.cn/simple" },

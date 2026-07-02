@@ -302,7 +302,9 @@ jobs:
       - name: Install Python project and PyInstaller
         run: |
           pip install -e ".[all]"
+          pip install vendor/foundation-*.whl
           pip install "pyinstaller>=6.18.0"
+          python -c "from foundation.helper.CryptHelper import CryptHelper; print('foundation OK')"
 
       - name: Clean previous PyInstaller output
         run: |

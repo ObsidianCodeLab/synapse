@@ -24,6 +24,8 @@
     "collapse": "收起侧栏",
     "expand": "展开侧栏",
     "docs": "文档",
+    "docsExternalHint": "产品文档托管在钉钉文档，点击后在浏览器中打开。",
+    "docsOpen": "打开文档",
     "dingtalkQr": "钉钉群",
     "dingtalkQrHint": "打开钉钉扫一扫加入群聊",
     "security": "安全",

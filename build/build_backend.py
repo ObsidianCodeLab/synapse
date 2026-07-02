@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPEC_FILE = PROJECT_ROOT / "build" / "synapse.spec"
 DIST_DIR = PROJECT_ROOT / "dist"
 OUTPUT_DIR = DIST_DIR / "synapse-server"
+VENDOR_FOUNDATION_WHEELS = sorted((PROJECT_ROOT / "vendor").glob("foundation-*.whl"))
 
 
 def run_cmd(cmd: list[str], env: dict | None = None, **kwargs) -> subprocess.CompletedProcess:
@@ -134,6 +135,13 @@ def verify_bundled_python_contract(output_dir: Path) -> None:
         sys.exit(1)
     pip_ver = (result.stdout or "").strip()
     print(f"  [OK] Bundled Python pip check passed (pip {pip_ver})")
+
+    crypt_candidates = list(internal_dir.glob("foundation/helper/CryptHelper.py"))
+    crypt_candidates += list(internal_dir.glob("foundation/helper/CryptHelper.pyc"))
+    if not crypt_candidates:
+        print("  [ERROR] foundation CryptHelper missing from bundled _internal/")
+        sys.exit(1)
+    print(f"  [OK] foundation CryptHelper bundled: {crypt_candidates[0].name}")
 
 
 def create_stdlib_zip(output_dir: Path) -> Path | None:
@@ -334,6 +342,23 @@ def clean_dist():
         shutil.rmtree(legacy_cache)
 
 
+def ensure_foundation_wheel():
+    """Install vendored foundation wheel required by Dev Cloud CryptHelper."""
+    if not VENDOR_FOUNDATION_WHEELS:
+        print("  [ERROR] Missing vendor foundation wheel: vendor/foundation-*.whl")
+        print("        Required for data/userinfo.encryption (Dev Cloud login).")
+        sys.exit(1)
+
+    wheel = VENDOR_FOUNDATION_WHEELS[-1]
+    try:
+        import foundation  # noqa: F401
+    except ImportError:
+        print(f"  [INFO] Installing vendored foundation wheel: {wheel.name}")
+        run_cmd([sys.executable, "-m", "pip", "install", str(wheel)])
+    else:
+        print("  [OK] foundation already installed in build environment")
+
+
 def ensure_playwright_chromium():
     """Ensure Playwright Chromium is installed for bundling"""
     try:
@@ -378,16 +403,19 @@ def build_backend(mode: str, fast: bool = False):
     print(f"  Synapse Backend Build - Mode: {label}")
     print(f"{'='*60}\n")
 
-    print("[1/5] Checking dependencies...")
+    print("[1/6] Checking dependencies...")
     check_pyinstaller()
 
-    print("\n[2/5] Ensuring Playwright Chromium for bundling...")
+    print("\n[2/6] Installing vendored foundation wheel...")
+    ensure_foundation_wheel()
+
+    print("\n[3/6] Ensuring Playwright Chromium for bundling...")
     ensure_playwright_chromium()
 
-    print("\n[3/5] Cleaning old build...")
+    print("\n[4/6] Cleaning old build...")
     clean_dist()
 
-    print("\n[4/5] Running PyInstaller...")
+    print("\n[5/6] Running PyInstaller...")
     env = {"SYNAPSE_BUILD_MODE": mode}
     if fast:
         env["SYNAPSE_NO_UPX"] = "1"
@@ -404,7 +432,7 @@ def build_backend(mode: str, fast: bool = False):
 
     run_cmd(cmd, env=env)
 
-    print("\n[5/5] Verifying build output...")
+    print("\n[6/6] Verifying build output...")
     
     if sys.platform == "win32":
         exe_path = OUTPUT_DIR / "synapse-server.exe"

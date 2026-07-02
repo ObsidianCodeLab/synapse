@@ -24,6 +24,8 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "docs": "Docs",
+    "docsExternalHint": "Product docs are hosted on DingTalk Docs and open in your browser.",
+    "docsOpen": "Open docs",
     "dingtalkQr": "DingTalk",
     "dingtalkQrHint": "Scan with DingTalk to join group",
     "security": "Security",

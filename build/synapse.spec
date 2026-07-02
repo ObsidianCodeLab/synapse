@@ -254,6 +254,10 @@ hidden_imports_core = [
     "Crypto.Cipher.AES",
     "Crypto.Util",              # pycryptodome 工具模块 (AES 运行时依赖)
     "Crypto.Util.Padding",      # 加解密填充 (AES CBC 模式常用)
+    # -- WhaleCloud foundation (Dev Cloud userinfo.encryption via CryptHelper) --
+    "foundation",
+    "foundation.helper",
+    "foundation.helper.CryptHelper",
     "botpy",                    # QQ Bot (~5MB)
     "botpy.message",            # QQ Bot 消息模块
     "pilk",                     # SILK 语音编解码 (QQ 语音格式, audio_utils.py 使用)
@@ -398,6 +402,7 @@ hidden_imports = hidden_imports_core + _stdlib_modules
 # new files (e.g. synapse.llm.cache/retry/sse) that may be imported
 # transitively but missed by static analysis in frozen builds.
 hidden_imports += collect_submodules("synapse.llm")
+hidden_imports += collect_submodules("foundation")
 
 # ============== Excludes ==============
 

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense, startTransition } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke, listen, IS_TAURI, IS_WEB, IS_CAPACITOR, IS_LOCAL_WEB, getAppVersion, onWsEvent, reconnectWsNow, setWsApiBaseUrl, logger } from "./platform";
+import { invoke, listen, IS_TAURI, IS_WEB, IS_CAPACITOR, IS_LOCAL_WEB, getAppVersion, onWsEvent, reconnectWsNow, setWsApiBaseUrl, logger, openExternalUrl } from "./platform";
 import { getActiveServer, getActiveServerId } from "./platform/servers";
 import { checkAuth, installFetchInterceptor, AUTH_EXPIRED_EVENT, isPasswordUserSet, clearAccessToken, setTauriRemoteMode, isTauriRemoteMode } from "./platform/auth";
 import { LoginView } from "./views/LoginView";
@@ -67,7 +67,7 @@ import type {
   EnvMap, StepId, Step, ViewId,
 } from "./types";
 import {
-  IconCheckCircle, IconXCircle, IconInfo,
+  IconCheckCircle, IconXCircle, IconInfo, IconBook,
 } from "./icons";
 import { ChevronRight, ChevronDown, Loader2, AlertTriangle, CheckCircle2, Eye, EyeOff, RefreshCw, AlertCircle, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +98,7 @@ import {
   IWHALECLOUD_DEPARTMENTS,
   IWHALECLOUD_POSITIONS,
   WEB_SEARCH_ENV_KEYS,
+  USER_DOCS_URL,
 } from "./constants";
 import { safeFetch } from "./providers";
 import { whalecloudHeart } from "./api/rdUnifiedService";
@@ -5716,14 +5717,22 @@ export function App() {
       );
     }
     if (view === "docs") {
-      const docsBase = httpApiBase();
       return (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-          <iframe
-            src={`${docsBase}/user-docs/`}
-            style={{ flex: 1, border: "none", width: "100%", height: "100%", borderRadius: 8, background: "var(--bg, #fff)" }}
-            title={t("sidebar.docs")}
-          />
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          padding: 24,
+          color: "var(--muted-fg, #64748b)",
+        }}>
+          <IconBook size={32} style={{ opacity: 0.6 }} />
+          <p style={{ margin: 0, fontSize: 14 }}>{t("sidebar.docsExternalHint", "产品文档托管在钉钉文档，将在浏览器中打开。")}</p>
+          <Button type="button" onClick={() => void openExternalUrl(USER_DOCS_URL)}>
+            {t("sidebar.docsOpen", "打开文档")}
+          </Button>
         </div>
       );
     }

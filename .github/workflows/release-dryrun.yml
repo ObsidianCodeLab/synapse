@@ -173,7 +173,9 @@ jobs:
         run: |
           mkdir -p docs-site/.vitepress/dist
           pip install -e ".[all]"
+          pip install vendor/foundation-*.whl
           pip install "pyinstaller>=6.18.0"
+          python -c "from foundation.helper.CryptHelper import CryptHelper; print('foundation OK')"
 
       - name: Clean previous PyInstaller output
         shell: bash

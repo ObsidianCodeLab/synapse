@@ -12,6 +12,7 @@ import {
 } from "../icons";
 import logoUrl from "../assets/logo.png";
 import dingtalkLogoUrl from "../assets/platform_logos/dingtalk.svg";
+import { USER_DOCS_URL } from "../constants";
 import { openExternalUrl } from "../platform";
 import { DingTalkQrModal } from "./DingTalkQrModal";
 
@@ -506,7 +507,7 @@ export function Sidebar({
               </>
             )}
             <span
-              onClick={() => onViewChange("docs")}
+              onClick={() => void openExternalUrl(USER_DOCS_URL)}
               style={{ color: "var(--accent, #5B8DEF)", textDecoration: "none", opacity: 1, display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}
               onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
               onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
@@ -564,7 +565,7 @@ export function Sidebar({
           </div>
           <div style={{ display: "flex", justifyContent: "center", gap: 8 }}>
             <span
-              onClick={() => onViewChange("docs")}
+              onClick={() => void openExternalUrl(USER_DOCS_URL)}
               title={t("sidebar.docs")}
               style={{ color: "var(--accent, #5B8DEF)", opacity: 0.5, display: "flex", cursor: "pointer" }}
             >
