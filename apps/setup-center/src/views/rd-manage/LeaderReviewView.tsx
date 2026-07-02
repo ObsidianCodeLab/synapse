@@ -158,7 +158,7 @@ function DemandListPanel({
         ) : (
           filtered.map((d) => {
             const isActive = d.demand_no === selected;
-            const roleLabel = REVIEWER_ROLE_LABEL[d.my_role] ?? d.my_role;
+            const handlerName = d.submitter_name || d.submitter_id;
             return (
               <motion.button
                 key={`${d.demand_no}-${d.report_id}`}
@@ -180,7 +180,7 @@ function DemandListPanel({
                   {d.demand_title}
                 </div>
                 <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <span>{roleLabel}</span>
+                  <span>{handlerName}</span>
                   {d.updated_at && (
                     <>
                       <span>·</span>
@@ -370,19 +370,51 @@ function ReportPreviewPanel({
   html,
   loading,
   demandNo,
+  demandTitle,
+  handlerName,
 }: {
-  html:     string;
-  loading:  boolean;
-  demandNo: string;
+  html:         string;
+  loading:      boolean;
+  demandNo:     string;
+  demandTitle:  string;
+  handlerName:  string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  const header = demandNo ? (
+    <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 shrink-0 gap-3">
+      <div className="flex items-center gap-2 text-xs text-slate-400 min-w-0 flex-1">
+        <FileText className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+        <span className="font-mono shrink-0 text-slate-300">#{demandNo}</span>
+        {demandTitle ? (
+          <>
+            <span className="text-slate-600 shrink-0">·</span>
+            <span className="text-slate-200 truncate">{demandTitle}</span>
+          </>
+        ) : null}
+        {handlerName ? (
+          <>
+            <span className="text-slate-600 shrink-0">·</span>
+            <span className="shrink-0 text-slate-400">{handlerName}</span>
+          </>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-[10px] text-slate-500">实时报告</span>
+      </div>
+    </div>
+  ) : null;
+
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <Spin size="default" />
-          <p className="mt-3 text-sm text-slate-400">正在加载报告…</p>
+      <div className="flex h-full flex-col">
+        {header}
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <Spin size="default" />
+            <p className="mt-3 text-sm text-slate-400">正在加载报告…</p>
+          </div>
         </div>
       </div>
     );
@@ -390,27 +422,20 @@ function ReportPreviewPanel({
 
   if (!html) {
     return (
-      <div className="flex h-full flex-col items-center justify-center text-slate-500">
-        <FileText className="h-12 w-12 mb-3 opacity-30" />
-        <p className="text-sm">报告尚未生成</p>
-        <p className="text-xs mt-1 text-slate-600">请先在工单面板完成自评</p>
+      <div className="flex h-full flex-col">
+        {header}
+        <div className="flex flex-1 flex-col items-center justify-center text-slate-500">
+          <FileText className="h-12 w-12 mb-3 opacity-30" />
+          <p className="text-sm">报告尚未生成</p>
+          <p className="text-xs mt-1 text-slate-600">请先在工单面板完成自评</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full flex-col">
-      {/* 顶栏 */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 shrink-0">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          <FileText className="h-3.5 w-3.5 text-blue-400" />
-          <span className="font-mono">需求单 #{demandNo}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] text-slate-500">实时报告</span>
-        </div>
-      </div>
+      {header}
       {/* iframe */}
       <iframe
         ref={iframeRef}
@@ -457,7 +482,22 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
     setDemandsLoading(true);
     try {
       const payload = await listReviewDemandsByReviewer(base, { employee_id: employeeId });
-      const items = payload.list ?? [];
+      let items = payload.list ?? [];
+      try {
+        const snap = await fetchRdManageDemands(base, { allowMockFallback: false });
+        const titleByNo = new Map(
+          snap.list.map((d) => [d.demand_no.trim(), d.demand_title.trim()] as const),
+        );
+        items = items.map((item) => {
+          const realTitle = titleByNo.get(item.demand_no.trim());
+          if (realTitle) {
+            return { ...item, demand_title: realTitle };
+          }
+          return item;
+        });
+      } catch {
+        /* 快照不可用时沿用统一服务返回的标题 */
+      }
       setDemands(items);
       setSelectedNo((prev) => {
         if (prev && items.some((d) => d.demand_no === prev)) return prev;
@@ -641,6 +681,14 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
 
   const passCount = (reviewState?.reviewers ?? []).filter((r) => r.conclusion === 'approved').length;
   const totalCount = reviewState?.reviewers?.length ?? 0;
+  const selectedDemand = demands.find((d) => d.demand_no === selectedNo);
+  const previewDemandTitle =
+    reviewState?.demandTitle || selectedDemand?.demand_title || '';
+  const previewHandlerName =
+    selectedDemand?.submitter_name
+    || selectedDemand?.submitter_id
+    || reviewState?.reportRecord?.submitter_name
+    || '';
 
   return (
     <div className="flex h-full overflow-hidden bg-[#09090f] text-slate-100">
@@ -673,6 +721,8 @@ export function LeaderReviewView({ synapseApiBase }: { synapseApiBase?: string }
           html={reviewState?.reportHtml || ''}
           loading={reviewState?.loading === true}
           demandNo={selectedNo || ''}
+          demandTitle={previewDemandTitle}
+          handlerName={previewHandlerName}
         />
       </div>
 

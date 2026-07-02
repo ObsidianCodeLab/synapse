@@ -100,7 +100,7 @@ function normalizeReviewCenterDemandItem(raw: Partial<ReviewCenterDemandItem>): 
   const submitterName = String(raw.submitter_name ?? raw.submitter_id ?? '').trim();
   let demandTitle = String(raw.demand_title ?? '').trim();
   if (!demandTitle) {
-    demandTitle = submitterName ? `${submitterName} · #${demandNo}` : demandNo;
+    demandTitle = demandNo;
   }
   const conclusion = raw.my_conclusion as ReviewCenterDemandItem['my_conclusion'];
   const status = raw.review_status as ReviewCenterDemandItem['review_status'];
